@@ -7,6 +7,7 @@ import OrdersView from '../views/OrdersView.vue'
 import MerchantConsoleView from '../views/MerchantConsoleView.vue'
 import MerchantRegisterView from '../views/MerchantRegisterView.vue'
 import AdminAuditView from '../views/AdminAuditView.vue'
+import MerchantProductsView from '../views/MerchantProductsView.vue'
 import { ElMessage } from 'element-plus'
 
 const routes = [
@@ -27,6 +28,11 @@ const routes = [
   { 
     path: '/merchant-console', 
     component: MerchantConsoleView, 
+    meta: { requiresAuth: true } 
+  },
+  { 
+    path: '/merchant/products', 
+    component: MerchantProductsView, 
     meta: { requiresAuth: true } 
   },
   { 

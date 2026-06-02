@@ -78,6 +78,7 @@ npm run dev   # 端口 5173，API 代理到 8080
 | 用户 | user | 123456 | 1 | Authorization: 1 |
 | 商家 | merchant | 123456 | 2 | Authorization: 2 |
 | 管理员 | admin | 123456 | 3 | Authorization: 3 |
+| 商家2 | merchant2 | 123456 | 4 | Authorization: 4 |
 
 ## 鉴权机制
 
@@ -103,6 +104,47 @@ npm run dev   # 端口 5173，API 代理到 8080
 | app.yml 含密码 | 已提交 git，建议后续环境变量替代 |
 | Java 24 警告 | Maven Jansi/Guava 的 deprecated API 警告，不影响功能 |
 | Git Credential Manager 乱码 | Windows 已知问题，不影响 push |
+| getCurrentMerchantId | 一个用户只能拥有一个商家（selectOne），多商家需额外设计 |
+| product 表结构 | schema.sql 有 description/created_at/updated_at，但旧 DB 可能缺失，需 ALTER TABLE 补充 |
+
+## 数据库修复记录 (2026-06-02)
+
+商品功能测试前需执行：
+```sql
+-- 1. 补充 product 表缺失列（如数据库未从最新 schema.sql 初始化）
+ALTER TABLE product 
+  ADD COLUMN description VARCHAR(255) AFTER name, 
+  ADD COLUMN created_at DATETIME NOT NULL DEFAULT NOW(), 
+  ADD COLUMN updated_at DATETIME NOT NULL DEFAULT NOW() ON UPDATE CURRENT_TIMESTAMP;
+
+-- 2. 商家 2 分配独立用户（解决 selectOne 冲突）
+INSERT INTO `user` (id, username, password, phone, role) 
+VALUES (4, 'merchant2', '123456', '13800000004', 'MERCHANT');
+UPDATE merchant SET user_id = 4 WHERE id = 2;
+
+-- 3. 补充已有商品的 description/timestamp
+UPDATE product SET description = '健康低卡能量满满', created_at = NOW(), updated_at = NOW() WHERE id = 1;
+-- ... (重复 for id 2-5)
+```
+
+## 商品功能 (第三阶段新增)
+
+### 后端 API
+
+| HTTP | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/product/list/{merchantId}` | 无 | 公开：某个商家的 ON_SALE 商品 |
+| GET | `/api/merchant/products/list` | MERCHANT | 商家管理后台分页列表（含 OFF_SALE） |
+| POST | `/api/merchant/products/create` | MERCHANT | 新增商品（默认 OFF_SALE） |
+| PUT | `/api/merchant/products/update` | MERCHANT | 修改商品 |
+| PATCH | `/api/merchant/products/status` | MERCHANT | 上下架（ON_SALE/OFF_SALE） |
+| DELETE | `/api/merchant/products/{id}` | MERCHANT | 软删除（status→DELETED） |
+
+### 设计关键点
+- 价格以分为单位（Integer），前端显示为元（÷100），提交时 ×100
+- 新增商品默认 OFF_SALE，需手动上架才能公开展示
+- 删除为软删除（status=DELETED），所有查询自动过滤
+- 商家隔离：所有操作验证 product.merchantId == currentMerchantId
 
 ## 测试结论
 

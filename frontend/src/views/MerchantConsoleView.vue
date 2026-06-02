@@ -73,6 +73,26 @@ onMounted(load)
     <div v-else-if="merchant" class="console-layout">
       <!-- Left Info Panel -->
       <div class="sidebar-panel">
+        <!-- Navigation Menu -->
+        <el-card class="box-card nav-card" style="margin-bottom: 20px;">
+          <div class="menu-list">
+            <div 
+              class="menu-item active"
+              @click="router.push('/merchant-console')"
+            >
+              <el-icon><List /></el-icon>
+              <span>接单管理</span>
+            </div>
+            <div 
+              class="menu-item"
+              @click="router.push('/merchant/products')"
+            >
+              <el-icon><Goods /></el-icon>
+              <span>商品管理</span>
+            </div>
+          </div>
+        </el-card>
+
         <el-card class="box-card info-card">
           <template #header>
             <div class="card-header">
@@ -338,5 +358,34 @@ onMounted(load)
   margin: 0;
   font-size: 13px;
   color: #909399;
+}
+
+.nav-card {
+  border-radius: 12px;
+}
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #606266;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+.menu-item:hover {
+  color: #409eff;
+  background-color: #f0f7ff;
+}
+.menu-item.active {
+  color: #ffffff;
+  background-color: #409eff;
 }
 </style>

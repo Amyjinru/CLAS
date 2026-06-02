@@ -48,10 +48,13 @@ CREATE TABLE product (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     merchant_id BIGINT NOT NULL,
     name VARCHAR(100) NOT NULL,
+    description VARCHAR(255),
     price INT NOT NULL,
     stock INT NOT NULL DEFAULT 0,
     image VARCHAR(255),
-    status VARCHAR(20) NOT NULL DEFAULT 'ON_SALE'
+    status VARCHAR(20) NOT NULL DEFAULT 'ON_SALE',
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
 );
 
 CREATE TABLE cart (
@@ -95,9 +98,9 @@ INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, scor
     (1, 2, '校园轻食铺', '13800000002', '美食', '软件园东门 1 号', 4.70, 'OPEN', NOW(), NOW()),
     (2, 2, '城市咖啡站', '13800000004', '饮品', '创新街 18 号', 4.50, 'OPEN', NOW(), NOW());
 
-INSERT INTO product (id, merchant_id, name, price, stock, image, status) VALUES
-    (1, 1, '鸡胸肉能量碗', 2590, 30, '/images/product-1.jpg', 'ON_SALE'),
-    (2, 1, '牛油果沙拉', 2290, 24, '/images/product-2.jpg', 'ON_SALE'),
-    (3, 1, '低糖酸奶杯', 1290, 40, '/images/product-3.jpg', 'ON_SALE'),
-    (4, 2, '拿铁', 1800, 50, '/images/product-4.jpg', 'ON_SALE'),
-    (5, 2, '冷萃咖啡', 2200, 35, '/images/product-5.jpg', 'ON_SALE');
+INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
+    (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', NOW(), NOW()),
+    (2, 1, '牛油果沙拉', '富含优质脂肪', 2290, 24, '/images/product-2.jpg', 'ON_SALE', NOW(), NOW()),
+    (3, 1, '低糖酸奶杯', '无糖配方更健康', 1290, 40, '/images/product-3.jpg', 'ON_SALE', NOW(), NOW()),
+    (4, 2, '拿铁', '精选浓缩咖啡与鲜牛奶', 1800, 50, '/images/product-4.jpg', 'ON_SALE', NOW(), NOW()),
+    (5, 2, '冷萃咖啡', '低温慢速萃取', 2200, 35, '/images/product-5.jpg', 'ON_SALE', NOW(), NOW());

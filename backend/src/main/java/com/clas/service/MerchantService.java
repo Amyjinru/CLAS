@@ -12,6 +12,7 @@ import com.clas.entity.User;
 import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.MerchantAuditLogMapper;
 import com.clas.mapper.UserMapper;
+import com.clas.config.UserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -223,5 +224,18 @@ public class MerchantService {
             merchant.getCreatedAt(),
             merchant.getUpdatedAt()
         );
+    }
+
+    public Long getCurrentMerchantId() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new BusinessException("未登录，请先登录");
+        }
+        Merchant merchant = merchantMapper.selectOne(new LambdaQueryWrapper<Merchant>()
+            .eq(Merchant::getUserId, userId));
+        if (merchant == null) {
+            throw new BusinessException("当前用户未入驻为商家");
+        }
+        return merchant.getId();
     }
 }
