@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.dto.AddCartRequest;
 import com.clas.dto.CartItemResponse;
+import com.clas.dto.RemoveCartRequest;
 import com.clas.entity.Cart;
 import com.clas.entity.Product;
 import com.clas.mapper.CartMapper;
@@ -45,6 +46,23 @@ public class CartService {
             if (nextQuantity > product.getStock()) {
                 throw new BusinessException("库存不足");
             }
+            cart.setQuantity(nextQuantity);
+            cartMapper.updateById(cart);
+        }
+        return list(request.userId());
+    }
+
+    public List<CartItemResponse> remove(RemoveCartRequest request) {
+        Cart cart = cartMapper.selectOne(new LambdaQueryWrapper<Cart>()
+            .eq(Cart::getUserId, request.userId())
+            .eq(Cart::getProductId, request.productId()));
+        if (cart == null) {
+            throw new BusinessException("购物车中没有该商品");
+        }
+        int nextQuantity = cart.getQuantity() - request.quantity();
+        if (nextQuantity <= 0) {
+            cartMapper.deleteById(cart.getId());
+        } else {
             cart.setQuantity(nextQuantity);
             cartMapper.updateById(cart);
         }

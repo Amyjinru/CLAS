@@ -3,8 +3,11 @@ package com.clas.controller;
 import com.clas.common.Result;
 import com.clas.dto.CreateOrderRequest;
 import com.clas.dto.OrderResponse;
+import com.clas.dto.PaymentRequest;
+import com.clas.dto.PaymentResponse;
 import com.clas.entity.Orders;
 import com.clas.service.OrderService;
+import com.clas.service.PaymentService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/order")
 public class OrderController {
     private final OrderService orderService;
+    private final PaymentService paymentService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, PaymentService paymentService) {
         this.orderService = orderService;
+        this.paymentService = paymentService;
     }
 
     @PostMapping("/create")
@@ -39,8 +44,10 @@ public class OrderController {
     }
 
     @PostMapping("/pay/{orderId}")
-    public Result<Orders> pay(@PathVariable Long orderId) {
-        return Result.ok(orderService.pay(orderId));
+    public Result<PaymentResponse> pay(@PathVariable Long orderId) {
+        Orders order = orderService.requireOrder(orderId);
+        PaymentRequest request = new PaymentRequest(orderId, order.getUserId(), "MOCK");
+        return Result.ok(paymentService.mockPay(request));
     }
 
     @PostMapping("/accept/{orderId}")

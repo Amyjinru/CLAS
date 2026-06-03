@@ -1,6 +1,6 @@
 :root {
   color: #1f2937;
-  background: #f6f7fb;
+  background: #ffffff;
   font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
 }
 
@@ -36,6 +36,12 @@ button.secondary,
 .button.secondary {
   background: #e6eefc;
   color: #1d4ed8;
+}
+
+button:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 
 input,

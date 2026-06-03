@@ -27,6 +27,8 @@ Controller -> Service -> Mapper -> MySQL
 | `orders` | 订单主表 |
 | `order_item` | 订单商品明细 |
 | `review` | 完成订单后的评价 |
+| `payment` | 模拟支付流水 |
+| `announcement` | 平台公告 |
 
 ## 接口映射
 
@@ -43,10 +45,17 @@ Controller -> Service -> Mapper -> MySQL
 | 创建订单 | `POST /api/order/create` |
 | 用户订单 | `GET /api/order/list/{userId}` |
 | 商家订单 | `GET /api/order/merchant/{merchantId}` |
-| 模拟支付 | `POST /api/order/pay/{orderId}` |
+| 模拟支付 | `POST /api/payment/mock` |
+| 支付状态 | `GET /api/payment/status/{orderId}` |
+| 兼容旧支付 | `POST /api/order/pay/{orderId}` |
 | 商家接单 | `POST /api/order/accept/{orderId}` |
 | 确认完成 | `POST /api/order/complete/{orderId}` |
 | 添加评价 | `POST /api/review/add` |
+| 订单评价 | `GET /api/review/order/{orderId}` |
+| 商家评价列表 | `GET /api/review/merchant/{merchantId}` |
+| 商家评分 | `GET /api/review/rating/{merchantId}` |
+| 公告列表 | `GET /api/announcement/list` |
+| 创建公告 | `POST /api/announcement/create` |
 
 ## 订单状态
 

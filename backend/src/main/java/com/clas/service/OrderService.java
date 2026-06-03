@@ -78,8 +78,10 @@ public class OrderService {
 
         List<OrderItem> orderItems = merchantCartItems.stream().map(cart -> {
             Product product = products.get(cart.getProductId());
-            product.setStock(product.getStock() - cart.getQuantity());
-            productMapper.updateById(product);
+            int rows = productMapper.deductStock(product.getId(), cart.getQuantity());
+            if (rows == 0) {
+                throw new BusinessException("库存不足：" + product.getName());
+            }
 
             OrderItem orderItem = new OrderItem();
             orderItem.setOrderId(order.getId());
@@ -106,14 +108,6 @@ public class OrderService {
             .eq(Orders::getMerchantId, merchantId)
             .orderByDesc(Orders::getCreateTime));
         return withItems(orders);
-    }
-
-    public Orders pay(Long orderId) {
-        Orders order = requireOrder(orderId);
-        requireStatus(order, "PENDING_PAYMENT");
-        order.setStatus("PAID");
-        ordersMapper.updateById(order);
-        return order;
     }
 
     public Orders accept(Long orderId) {
