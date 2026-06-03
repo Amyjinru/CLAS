@@ -1,8 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser } from '../api/clas'
+// ===== test1: 商户审核 API =====
+import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts } from '../api/clas'
 import { ElMessage } from 'element-plus'
+
+// ===== version_314: 订单详情组件 =====
+import OrderDetailContent from '../components/OrderDetailContent.vue'
 
 const router = useRouter()
 const merchant = ref(null)
@@ -10,12 +14,25 @@ const orders = ref([])
 const loading = ref(true)
 const loginUser = ref(null)
 
+// ===== version_314: 订单详情弹窗 & 商品名映射 =====
+const productNames = ref({})
+const selectedOrder = ref(null)
+
+// ===== test1: 商户审核状态映射 =====
 const statusMap = {
   PENDING: { text: '待审核', type: 'warning' },
   APPROVED: { text: '已审核', type: 'info' },
   OPEN: { text: '营业中', type: 'success' },
   CLOSED: { text: '停业中', type: 'danger' },
   BLOCKED: { text: '已禁用', type: 'danger' }
+}
+
+// ===== version_314: 订单状态映射 =====
+const orderStatusLabel = {
+  PENDING_PAYMENT: '待支付',
+  PAID: '已支付',
+  ACCEPTED: '商家已接单',
+  COMPLETED: '已完成'
 }
 
 async function load() {
@@ -30,9 +47,16 @@ async function load() {
   try {
     const data = await getMyMerchant()
     merchant.value = data
-    
+
     if (merchant.value && merchant.value.status === 'OPEN') {
-      orders.value = await listMerchantOrders(merchant.value.id)
+      // version_314: 并行加载订单 + 商品名映射
+      const merchantId = merchant.value.id
+      const [orderList, products] = await Promise.all([
+        listMerchantOrders(merchantId),
+        listProducts(merchantId)
+      ])
+      orders.value = orderList
+      productNames.value = Object.fromEntries(products.map((p) => [p.id, p.name]))
     }
   } catch (error) {
     // API client handles error messages
@@ -41,17 +65,49 @@ async function load() {
   }
 }
 
+// ===== test1: 原有接单操作 =====
 async function handleAccept(orderId) {
   try {
     await acceptOrder(orderId)
     ElMessage.success('已接单')
-    orders.value = await listMerchantOrders(merchant.value.id)
+    if (merchant.value) {
+      const [orderList, products] = await Promise.all([
+        listMerchantOrders(merchant.value.id),
+        listProducts(merchant.value.id)
+      ])
+      orders.value = orderList
+      productNames.value = Object.fromEntries(products.map((p) => [p.id, p.name]))
+    }
   } catch (error) {
     // API client handles errors
   }
 }
 
-onMounted(load)
+// ===== version_314: 通用订单操作方法 =====
+async function operate(action, order) {
+  if (action === 'accept') await acceptOrder(order.order.id)
+  if (selectedOrder.value?.order.id === order.order.id) {
+    selectedOrder.value = orders.value.find((item) => item.order.id === order.order.id) || null
+  }
+  await load()
+}
+}
+
+function openDetail(order) {
+  selectedOrder.value = order
+}
+
+function closeDetail() {
+  selectedOrder.value = null
+}
+
+onMounted(() => {
+  if (currentRole() !== 'MERCHANT') {
+    router.push('/login')
+    return
+  }
+  load()
+})
 </script>
 
 <template>
@@ -186,22 +242,28 @@ onMounted(load)
                 <span class="price-text">¥{{ (scope.row.order.totalPrice / 100).toFixed(2) }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="order.status" label="订单状态" width="120">
+            <el-table-column prop="order.status" label="订单状态" width="140">
               <template #default="scope">
                 <el-tag :type="scope.row.order.status === 'PAID' ? 'success' : 'info'">
-                  {{ scope.row.order.status }}
+                  {{ orderStatusLabel[scope.row.order.status] || scope.row.order.status }}
                 </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="商品清单">
               <template #default="scope">
                 <div v-for="item in scope.row.items" :key="item.id" class="order-item-list">
-                  {{ item.name }} x {{ item.quantity }}
+                  {{ productNames[item.productId] || item.name }} x {{ item.quantity }}
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
+            <el-table-column label="操作" width="180" fixed="right">
               <template #default="scope">
+                <el-button
+                  size="small"
+                  @click="openDetail(scope.row)"
+                >
+                  查看详情
+                </el-button>
                 <el-button
                   v-if="scope.row.order.status === 'PAID'"
                   type="primary"
@@ -224,7 +286,32 @@ onMounted(load)
         </el-card>
       </div>
     </div>
-  </div>
+    </div>
+
+    <!-- ===== version_314: 订单详情侧滑弹窗 ===== -->
+    <div v-if="selectedOrder" class="order-overlay" @click.self="closeDetail">
+      <aside class="order-panel">
+        <header class="order-panel-head">
+          <h2>订单详情</h2>
+          <button class="panel-close" type="button" @click="closeDetail">×</button>
+        </header>
+
+        <div class="order-panel-body">
+          <OrderDetailContent :order="selectedOrder" :product-names="productNames" />
+        </div>
+
+        <footer class="order-panel-foot">
+          <button
+            v-if="selectedOrder.order.status === 'PAID'"
+            type="button"
+            @click="operate('accept', selectedOrder)"
+          >
+            接单
+          </button>
+          <button class="secondary" type="button" @click="closeDetail">关闭</button>
+        </footer>
+      </aside>
+    </div>
 </template>
 
 <style scoped>
@@ -387,5 +474,105 @@ onMounted(load)
 .menu-item.active {
   color: #ffffff;
   background-color: #409eff;
+}
+
+/* ===== version_314: 订单卡片 & 详情弹窗样式 ===== */
+.order-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.order-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.order-head h2 {
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+
+.order-head p {
+  color: #667085;
+  margin: 0;
+}
+
+.order-overlay {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.28);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 30;
+}
+
+.order-panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  max-height: min(80vh, 640px);
+  max-width: 520px;
+  width: 100%;
+}
+
+.order-panel-head,
+.order-panel-foot {
+  padding: 16px 18px;
+}
+
+.order-panel-head {
+  align-items: center;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  justify-content: space-between;
+}
+
+.order-panel-head h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.panel-close {
+  background: #f3f4f6;
+  color: #6b7280;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.order-panel-body {
+  overflow: auto;
+  padding: 18px;
+}
+
+.order-panel-body :deep(.order-detail) {
+  background: transparent;
+  padding: 0;
+}
+
+.order-panel-foot {
+  border-top: 1px solid #eef2f7;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .order-head {
+    flex-direction: column;
+  }
+
+  .order-overlay {
+    padding: 14px;
+  }
 }
 </style>

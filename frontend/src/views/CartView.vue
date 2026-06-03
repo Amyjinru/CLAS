@@ -20,7 +20,7 @@ async function submit() {
   if (!items.value.length) return
   const merchantId = merchantIds()[0]
   const data = await createOrder({ merchantId })
-  message.value = `订单 ${data.order.id} 已创建，待支付`
+  message.value = `订单 ${data.order.id} 已创建，库存已扣减，请前往支付`
   await load()
 }
 

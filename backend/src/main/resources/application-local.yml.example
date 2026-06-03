@@ -1,0 +1,6 @@
+# 复制本文件为 application-local.yml，并填写你的 MySQL 密码。
+# application-local.yml 已被 .gitignore 忽略，不会提交到仓库。
+spring:
+  datasource:
+    username: root
+    password: 在这里填写MySQL密码

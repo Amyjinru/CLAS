@@ -3,6 +3,7 @@ package com.clas.controller;
 import com.clas.common.Result;
 import com.clas.dto.AddCartRequest;
 import com.clas.dto.CartItemResponse;
+import com.clas.dto.RemoveCartRequest;
 import com.clas.service.CartService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -26,6 +27,11 @@ public class CartController {
     @PostMapping("/add")
     public Result<List<CartItemResponse>> add(@Valid @RequestBody AddCartRequest request) {
         return Result.ok(cartService.add(request));
+    }
+
+    @PostMapping("/remove")
+    public Result<List<CartItemResponse>> remove(@Valid @RequestBody RemoveCartRequest request) {
+        return Result.ok(cartService.remove(request));
     }
 
     @GetMapping("/list/{userId}")
