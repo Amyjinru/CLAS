@@ -1,6 +1,15 @@
+-- Windows 导入请先执行: chcp 65001
+-- 或使用: mysql -u root -p --default-character-set=utf8mb4 -e "source D:/path/schema.sql"
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS clas DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE clas;
 
+SET NAMES utf8mb4;
+
+DROP TABLE IF EXISTS announcement;
+DROP TABLE IF EXISTS payment;
 DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS order_item;
 DROP TABLE IF EXISTS orders;
@@ -16,7 +25,7 @@ CREATE TABLE `user` (
     password VARCHAR(255) NOT NULL,
     phone VARCHAR(20) UNIQUE,
     role VARCHAR(20) NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE merchant (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -62,7 +71,7 @@ CREATE TABLE cart (
     user_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -71,7 +80,7 @@ CREATE TABLE orders (
     total_price INT NOT NULL,
     status VARCHAR(20) NOT NULL,
     create_time DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE order_item (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -79,7 +88,7 @@ CREATE TABLE order_item (
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL,
     price INT NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE review (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -87,7 +96,25 @@ CREATE TABLE review (
     user_id BIGINT NOT NULL,
     score INT NOT NULL,
     content TEXT
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE payment (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    amount INT NOT NULL,
+    pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
+    status VARCHAR(20) NOT NULL,
+    create_time DATETIME NOT NULL
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE announcement (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(100) NOT NULL,
+    content TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
+    create_time DATETIME NOT NULL
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `user` (id, username, password, phone, role) VALUES
     (1, 'user', '123456', '13800000001', 'USER'),
@@ -104,3 +131,7 @@ INSERT INTO product (id, merchant_id, name, description, price, stock, image, st
     (3, 1, '低糖酸奶杯', '无糖配方更健康', 1290, 40, '/images/product-3.jpg', 'ON_SALE', NOW(), NOW()),
     (4, 2, '拿铁', '精选浓缩咖啡与鲜牛奶', 1800, 50, '/images/product-4.jpg', 'ON_SALE', NOW(), NOW()),
     (5, 2, '冷萃咖啡', '低温慢速萃取', 2200, 35, '/images/product-5.jpg', 'ON_SALE', NOW(), NOW());
+
+INSERT INTO announcement (id, title, content, status, create_time) VALUES
+    (1, '欢迎使用 CLAS 综合生活助手平台', '本平台支持在线点餐、模拟支付与订单评价，祝您使用愉快。', 'PUBLISHED', NOW()),
+    (2, '春季优惠活动', '部分商家参与满减活动，详情请进入店铺查看。', 'PUBLISHED', NOW());

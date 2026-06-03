@@ -2,22 +2,41 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.dto.MerchantRatingResponse;
 import com.clas.dto.ReviewRequest;
+import com.clas.entity.Merchant;
 import com.clas.entity.Orders;
 import com.clas.entity.Review;
+import com.clas.mapper.MerchantMapper;
+import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.ReviewMapper;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Collections;
+import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ReviewService {
     private final ReviewMapper reviewMapper;
     private final OrderService orderService;
+    private final OrdersMapper ordersMapper;
+    private final MerchantMapper merchantMapper;
 
-    public ReviewService(ReviewMapper reviewMapper, OrderService orderService) {
+    public ReviewService(
+        ReviewMapper reviewMapper,
+        OrderService orderService,
+        OrdersMapper ordersMapper,
+        MerchantMapper merchantMapper
+    ) {
         this.reviewMapper = reviewMapper;
         this.orderService = orderService;
+        this.ordersMapper = ordersMapper;
+        this.merchantMapper = merchantMapper;
     }
 
+    @Transactional
     public Review add(ReviewRequest request) {
         Orders order = orderService.requireOrder(request.orderId());
         if (!request.userId().equals(order.getUserId())) {
@@ -37,7 +56,56 @@ public class ReviewService {
         review.setScore(request.score());
         review.setContent(request.content());
         reviewMapper.insert(review);
+        recalculateMerchantScore(order.getMerchantId());
         return review;
     }
-}
 
+    public Review getByOrderId(Long orderId) {
+        return reviewMapper.selectOne(new LambdaQueryWrapper<Review>()
+            .eq(Review::getOrderId, orderId));
+    }
+
+    public List<Review> listByMerchantId(Long merchantId) {
+        List<Long> orderIds = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
+                .eq(Orders::getMerchantId, merchantId))
+            .stream()
+            .map(Orders::getId)
+            .toList();
+        if (orderIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return reviewMapper.selectList(new LambdaQueryWrapper<Review>()
+            .in(Review::getOrderId, orderIds)
+            .orderByDesc(Review::getId));
+    }
+
+    public MerchantRatingResponse getMerchantRating(Long merchantId) {
+        Merchant merchant = merchantMapper.selectById(merchantId);
+        if (merchant == null) {
+            throw new BusinessException("商家不存在");
+        }
+        List<Review> reviews = listByMerchantId(merchantId);
+        return new MerchantRatingResponse(
+            merchantId,
+            merchant.getScore(),
+            (long) reviews.size()
+        );
+    }
+
+    private void recalculateMerchantScore(Long merchantId) {
+        List<Review> reviews = listByMerchantId(merchantId);
+        if (reviews.isEmpty()) {
+            return;
+        }
+        double average = reviews.stream()
+            .mapToInt(Review::getScore)
+            .average()
+            .orElse(0);
+        Merchant merchant = merchantMapper.selectById(merchantId);
+        if (merchant == null) {
+            return;
+        }
+        merchant.setScore(BigDecimal.valueOf(average).setScale(2, RoundingMode.HALF_UP));
+        merchantMapper.updateById(merchant);
+    }
+}

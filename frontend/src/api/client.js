@@ -31,7 +31,7 @@ export const api = axios.create({
   timeout: 10000
 })
 
-// Request Interceptor
+// ===== test1: 请求拦截器（loading + 认证头） =====
 api.interceptors.request.use(
   config => {
     // Show loading unless specified otherwise
@@ -53,7 +53,7 @@ api.interceptors.request.use(
   }
 )
 
-// Response Interceptor
+// ===== test1: 响应拦截器（ElMessage 错误提示 + 静默模式） =====
 api.interceptors.response.use(
   response => {
     if (!response.config.silent) {
