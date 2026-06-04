@@ -54,38 +54,38 @@ onMounted(load)
   align-items: center;
   display: flex;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
-
 .section-head h2 {
   font-size: 18px;
   margin: 0;
+  font-weight: 700;
+  color: var(--text-primary);
 }
-
 .section-head a {
-  color: #2563eb;
+  color: var(--color-primary);
   font-size: 14px;
+  font-weight: 600;
 }
 
 .announcement-preview {
-  border-top: 1px solid #eef2f7;
-  padding-top: 12px;
-  margin-top: 12px;
+  border-top: 1px solid var(--border-light);
+  padding-top: 14px;
+  margin-top: 14px;
 }
-
 .announcement-preview:first-of-type {
   border-top: 0;
   margin-top: 0;
   padding-top: 0;
 }
-
 .announcement-preview h3 {
   font-size: 16px;
   margin: 0 0 6px;
+  color: var(--text-primary);
 }
-
 .announcement-preview p {
-  color: #667085;
+  color: var(--text-secondary);
   margin: 0;
+  line-height: 1.6;
 }
 </style>

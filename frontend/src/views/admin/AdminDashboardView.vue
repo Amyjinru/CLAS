@@ -53,26 +53,27 @@ function initSalesChart() {
 
   const data = salesOverview.value.dailySales || []
   salesChart.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['销售额(元)', '订单数'] },
-    xAxis: { type: 'category', data: data.map(d => d.date) },
+    color: ['#f97316', '#0d9488', '#7c3aed', '#059669'],
+    tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: '#ebe3d5', textStyle: { color: '#1a1510' } },
+    legend: { data: ['销售额(元)', '订单数'], textStyle: { color: '#6b5c49' } },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'category', data: data.map(d => d.date), axisLine: { lineStyle: { color: '#d6ccb8' } }, axisLabel: { color: '#8c7a64' } },
     yAxis: [
-      { type: 'value', name: '销售额(元)' },
-      { type: 'value', name: '订单数' }
+      { type: 'value', name: '销售额(元)', nameTextStyle: { color: '#8c7a64' }, axisLabel: { color: '#8c7a64' }, splitLine: { lineStyle: { color: '#f5f0e8' } } },
+      { type: 'value', name: '订单数', nameTextStyle: { color: '#8c7a64' }, axisLabel: { color: '#8c7a64' }, splitLine: { show: false } }
     ],
     series: [
       {
-        name: '销售额(元)',
-        type: 'bar',
+        name: '销售额(元)', type: 'bar', barWidth: '40%',
         data: data.map(d => (d.amount / 100).toFixed(2)),
-        itemStyle: { color: '#409EFF' }
+        itemStyle: { borderRadius: [6, 6, 0, 0], color: '#f97316' }
       },
       {
-        name: '订单数',
-        type: 'line',
-        yAxisIndex: 1,
+        name: '订单数', type: 'line', yAxisIndex: 1, smooth: true,
         data: data.map(d => d.orderCount),
-        itemStyle: { color: '#67C23A' }
+        lineStyle: { color: '#0d9488', width: 2 },
+        itemStyle: { color: '#0d9488' },
+        symbol: 'circle', symbolSize: 6
       }
     ]
   })
@@ -91,14 +92,18 @@ function initOrderStatusChart() {
   }
 
   orderChart.setOption({
-    tooltip: { trigger: 'item' },
+    color: ['#f97316', '#0d9488', '#7c3aed', '#059669'],
+    tooltip: { trigger: 'item', backgroundColor: '#fff', borderColor: '#ebe3d5', textStyle: { color: '#1a1510' } },
     series: [{
       type: 'pie',
-      radius: ['40%', '70%'],
+      radius: ['45%', '75%'],
+      center: ['50%', '50%'],
       data: data.map(d => ({
         name: statusNames[d.status] || d.status,
         value: d.count
-      }))
+      })),
+      label: { color: '#6b5c49', fontSize: 12 },
+      emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.1)' } }
     }]
   })
 }
@@ -113,10 +118,10 @@ function formatFen(v) {
 }
 
 const statCards = computed(() => [
-  { label: '总订单数', value: stats.value.totalOrders, color: '#409EFF' },
-  { label: '总销售额(元)', value: formatFen(stats.value.totalSales), color: '#67C23A' },
-  { label: '总用户数', value: stats.value.totalUsers, color: '#E6A23C' },
-  { label: '总商家数', value: stats.value.totalMerchants, color: '#F56C6C' }
+  { label: '总订单数', value: stats.value.totalOrders, color: 'var(--clas-amber-500)', bg: 'var(--clas-amber-50)' },
+  { label: '总销售额(元)', value: formatFen(stats.value.totalSales), color: 'var(--clas-teal-600)', bg: 'var(--clas-teal-50)' },
+  { label: '总用户数', value: stats.value.totalUsers, color: '#7c3aed', bg: '#f5f3ff' },
+  { label: '总商家数', value: stats.value.totalMerchants, color: '#059669', bg: '#ecfdf5' }
 ])
 </script>
 
@@ -208,24 +213,34 @@ const statCards = computed(() => [
 <style scoped>
 .page-title {
   font-size: 22px;
-  margin: 0 0 20px 0;
+  margin: 0 0 24px 0;
 }
 .card-row {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .chart-card {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .stat-card {
   text-align: center;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg) !important;
 }
 .stat-value {
-  font-size: 32px;
-  font-weight: bold;
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 .stat-label {
-  font-size: 14px;
-  color: #909399;
-  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 </style>

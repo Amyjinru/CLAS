@@ -11,7 +11,7 @@ const message = ref('')
 const roleHome = {
   USER: '/home',
   MERCHANT: '/merchant-console',
-  ADMIN: '/admin/announcements'
+  ADMIN: '/admin/dashboard'
 }
 
 async function submit() {
@@ -45,15 +45,55 @@ async function submit() {
 </template>
 
 <style scoped>
-.hint {
-  color: #667085;
-  margin: 0 0 8px;
+.panel {
+  max-width: 400px;
+  margin: 60px auto;
+  padding: 40px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
 }
-
-.hint-list {
-  color: #667085;
+h1 {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+}
+.hint {
+  color: var(--text-secondary);
+  margin: 0 0 4px;
   font-size: 14px;
-  margin: 0 0 16px;
+}
+.hint-list {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 24px;
   padding-left: 18px;
+  line-height: 1.8;
+}
+.hint-list li::marker {
+  color: var(--color-primary);
+}
+label {
+  margin: 16px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+input {
+  margin-top: 6px;
+}
+button {
+  width: 100%;
+  margin-top: 8px;
+  height: 44px;
+  font-size: 15px;
+}
+p {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
 }
 </style>

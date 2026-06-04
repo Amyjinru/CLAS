@@ -53,38 +53,65 @@ function navigateTo(path) {
 </template>
 
 <style scoped>
+/* ═══════════════ 管理后台侧边栏 —「暖食」主题 ═══════════════ */
 .admin-shell {
   display: flex;
   min-height: calc(100vh - 64px);
-  background-color: #f0f2f5;
+  background-color: var(--bg-page);
 }
 
 .admin-sidebar {
   width: 220px;
-  background-color: #304156;
+  background: linear-gradient(180deg, #2d251c 0%, #1a1510 100%);
   flex-shrink: 0;
   overflow-y: auto;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.08);
 }
 
 .sidebar-header {
-  padding: 20px;
+  padding: 26px 20px 20px 20px;
   text-align: center;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-header h2 {
-  color: #fff;
-  font-size: 18px;
+  color: var(--text-inverse);
+  font-size: 17px;
+  font-weight: 700;
   margin: 0;
+  letter-spacing: 0.08em;
 }
 
 .sidebar-menu {
-  border-right: none;
+  border-right: none !important;
+  padding-top: 8px;
+}
+.sidebar-menu .el-menu-item {
+  margin: 2px 10px;
+  border-radius: var(--radius-sm);
+  height: 44px;
+  line-height: 44px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  transition: all var(--transition-fast);
+  color: var(--text-sidebar);
+}
+.sidebar-menu .el-menu-item:hover {
+  background-color: var(--bg-sidebar-hover) !important;
+  color: var(--text-inverse) !important;
+}
+.sidebar-menu .el-menu-item.is-active {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(249, 115, 22, 0.08)) !important;
+  color: var(--text-sidebar-active) !important;
+  font-weight: 600;
+  border-left: 3px solid var(--color-primary);
 }
 
 .admin-main {
   flex: 1;
-  padding: 24px;
+  padding: 28px 32px;
   overflow-y: auto;
+  background: var(--bg-page);
 }
 </style>

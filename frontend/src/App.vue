@@ -81,23 +81,25 @@ async function handleLogout() {
 </template>
 
 <style scoped>
-/* ===== test1 完整布局样式 ===== */
+/* ═══════════════ 顶栏 —「暖食」主题 ═══════════════ */
 .shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f5f7fa;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-page);
+  font-family: var(--font-body);
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #ffffff;
-  padding: 0 40px;
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  padding: 0 32px;
   height: 64px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 0 var(--border-color), 0 2px 8px rgba(45, 37, 28, 0.04);
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -106,76 +108,82 @@ async function handleLogout() {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .brand {
-  font-size: 20px;
-  font-weight: 800;
-  color: #409eff !important;
+  font-size: 21px;
+  font-weight: 900;
+  color: var(--color-primary) !important;
   text-decoration: none !important;
+  letter-spacing: 0.05em;
+  transition: color var(--transition-fast);
+}
+.brand:hover {
+  color: var(--color-primary-hover) !important;
 }
 
 .user-welcome {
-  font-size: 14px;
-  color: #606266;
+  font-size: 13px;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding-left: 18px;
+  border-left: 1px solid var(--border-color);
 }
 
 .role-tag {
-  font-weight: bold;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 nav {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 4px;
 }
 
 nav a {
   text-decoration: none;
-  color: #606266;
-  font-size: 14px;
+  color: var(--text-secondary);
+  font-size: 13.5px;
   font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 4px;
-  transition: all 0.3s ease;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  letter-spacing: 0.02em;
 }
 
-nav a:hover, nav a.router-link-active {
-  color: #409eff;
-  background-color: #ecf5ff;
+nav a:hover,
+nav a.router-link-active {
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
 }
 
 .logout-link {
-  color: #f56c6c !important;
+  color: var(--clas-danger) !important;
+  margin-left: 4px;
+  font-weight: 600;
 }
-
 .logout-link:hover {
-  background-color: #fef0f0 !important;
+  background-color: var(--clas-danger-light) !important;
 }
 
 .main-content {
   flex: 1;
-  padding: 20px 0;
 }
 
-/* ===== version_314 独有样式 ===== */
-.nav-user {
-  color: #667085;
-  font-size: 14px;
-}
-
+/* version_314 兼容 */
+.nav-user { color: var(--text-secondary); font-size: 14px; }
 .nav-logout {
   background: none;
   border: 0;
-  color: #dc2626;
+  color: var(--clas-danger);
   cursor: pointer;
   font: inherit;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 600;
   min-height: auto;
   padding: 0;
 }
