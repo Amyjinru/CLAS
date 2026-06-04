@@ -23,6 +23,9 @@ public class UserService {
         if (user == null || !request.password().equals(user.getPassword())) {
             throw new BusinessException("用户名或密码错误");
         }
+        if (user.getEnabled() != null && !user.getEnabled()) {
+            throw new BusinessException("账号已被禁用，请联系管理员");
+        }
         user.setPassword(null);
         return new LoginResponse(user);
     }

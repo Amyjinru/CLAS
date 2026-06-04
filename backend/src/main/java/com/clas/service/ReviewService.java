@@ -92,6 +92,13 @@ public class ReviewService {
         );
     }
 
+    /**
+     * 公开的重算商家评分方法 — 供 AdminController 删除评价后调用
+     */
+    public void recalculateMerchantScorePublic(Long merchantId) {
+        recalculateMerchantScore(merchantId);
+    }
+
     private void recalculateMerchantScore(Long merchantId) {
         List<Review> reviews = listByMerchantId(merchantId);
         if (reviews.isEmpty()) {

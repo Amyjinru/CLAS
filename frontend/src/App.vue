@@ -15,7 +15,7 @@ const role = computed(() => user.value?.role || null)
 const brandLink = computed(() => {
   if (!user.value) return '/login'
   if (role.value === 'MERCHANT') return '/merchant-console'
-  if (role.value === 'ADMIN') return '/admin/announcements'
+  if (role.value === 'ADMIN') return '/admin/dashboard'
   return '/home'
 })
 

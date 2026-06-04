@@ -91,7 +91,6 @@ async function operate(action, order) {
   }
   await load()
 }
-}
 
 function openDetail(order) {
   selectedOrder.value = order

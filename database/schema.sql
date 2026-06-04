@@ -24,7 +24,8 @@ CREATE TABLE `user` (
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     phone VARCHAR(20) UNIQUE,
-    role VARCHAR(20) NOT NULL
+    role VARCHAR(20) NOT NULL,
+    enabled TINYINT(1) NOT NULL DEFAULT 1
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE merchant (

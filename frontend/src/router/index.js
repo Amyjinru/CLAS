@@ -3,6 +3,7 @@ import { currentRole, currentUser } from '../api/clas'
 import LoginView from '../views/LoginView.vue'
 import HomeView from '../views/HomeView.vue'
 import MerchantDetailView from '../views/MerchantDetailView.vue'
+import CartView from '../views/CartView.vue'
 import OrdersView from '../views/OrdersView.vue'
 import MerchantConsoleView from '../views/MerchantConsoleView.vue'
 // ===== test1: 商户入驻/审核/商品管理视图 =====
@@ -17,6 +18,13 @@ import UserAnnouncementsView from '../views/user/UserAnnouncementsView.vue'
 import MerchantAnnouncementsView from '../views/merchant/MerchantAnnouncementsView.vue'
 import AdminAnnouncementsView from '../views/admin/AdminAnnouncementsView.vue'
 
+// ===== 同学E: 管理后台新页面 =====
+import AdminLayout from '../views/admin/AdminLayout.vue'
+import AdminDashboardView from '../views/admin/AdminDashboardView.vue'
+import AdminUsersView from '../views/admin/AdminUsersView.vue'
+import AdminOrdersView from '../views/admin/AdminOrdersView.vue'
+import AdminReviewsView from '../views/admin/AdminReviewsView.vue'
+
 // ===== test1: Element Plus 提示 =====
 import { ElMessage } from 'element-plus'
 
@@ -24,7 +32,7 @@ import { ElMessage } from 'element-plus'
 function defaultPath() {
   const role = currentRole()
   if (role === 'MERCHANT') return '/merchant-console'
-  if (role === 'ADMIN') return '/admin/announcements'
+  if (role === 'ADMIN') return '/admin/dashboard'
   if (role === 'USER') return '/home'
   return '/login'
 }
@@ -51,8 +59,23 @@ const routes = [
   // test1: 商户入驻
   { path: '/merchant-register', component: MerchantRegisterView },
 
-  // test1: 商家审核
-  { path: '/admin-audit', component: AdminAuditView, meta: { roles: ['ADMIN'] } },
+  // ===== 同学E: 管理后台（已整合到 AdminLayout）=====
+  { path: '/admin-audit', redirect: '/admin/audit' },
+  { path: '/admin/announcements-old', redirect: '/admin/announcements' },
+  {
+    path: '/admin',
+    component: AdminLayout,
+    meta: { roles: ['ADMIN'] },
+    children: [
+      { path: '', redirect: '/admin/dashboard' },
+      { path: 'dashboard', component: AdminDashboardView },
+      { path: 'orders', component: AdminOrdersView },
+      { path: 'users', component: AdminUsersView },
+      { path: 'audit', component: AdminAuditView },
+      { path: 'reviews', component: AdminReviewsView },
+      { path: 'announcements', component: AdminAnnouncementsView }
+    ]
+  },
 
   // test1: 商户商品管理
   { path: '/merchant/products', component: MerchantProductsView, meta: { requiresAuth: true } },
@@ -63,7 +86,6 @@ const routes = [
   // version_314: 全平台公告
   { path: '/user/announcements', component: UserAnnouncementsView, meta: { roles: ['USER'] } },
   { path: '/merchant/announcements', component: MerchantAnnouncementsView, meta: { roles: ['MERCHANT'] } },
-  { path: '/admin/announcements', component: AdminAnnouncementsView, meta: { roles: ['ADMIN'] } },
   { path: '/announcements', redirect: () => defaultPath() }
 ]
 

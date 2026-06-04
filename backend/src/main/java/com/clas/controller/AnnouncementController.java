@@ -1,6 +1,7 @@
 package com.clas.controller;
 
 import com.clas.common.Result;
+import com.clas.config.RequireRole;
 import com.clas.dto.AnnouncementRequest;
 import com.clas.entity.Announcement;
 import com.clas.service.AnnouncementService;
@@ -29,11 +30,13 @@ public class AnnouncementController {
         return Result.ok(announcementService.listPublished());
     }
 
+    @RequireRole("ADMIN")
     @PostMapping("/create")
     public Result<Announcement> create(@Valid @RequestBody AnnouncementRequest request) {
         return Result.ok(announcementService.create(request));
     }
 
+    @RequireRole("ADMIN")
     @PutMapping("/{id}")
     public Result<Announcement> update(
         @PathVariable Long id,
@@ -42,6 +45,7 @@ public class AnnouncementController {
         return Result.ok(announcementService.update(id, request));
     }
 
+    @RequireRole("ADMIN")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         announcementService.delete(id);

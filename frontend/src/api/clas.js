@@ -87,3 +87,15 @@ export const getMerchantRating = (merchantId) => api.get(`/review/rating/${merch
 export const listAnnouncements = () => api.get('/announcement/list').then(unwrap)
 export const createAnnouncement = (payload) => api.post('/announcement/create', payload).then(unwrap)
 export const deleteAnnouncement = (id) => api.delete(`/announcement/${id}`).then(unwrap)
+
+// ===== 同学E: 管理后台 API =====
+export const getDashboard = () => api.get('/admin/dashboard').then(unwrap)
+export const getOrderStats = () => api.get('/admin/stats/orders').then(unwrap)
+export const getSalesOverview = () => api.get('/admin/stats/sales').then(unwrap)
+export const getMerchantRanking = () => api.get('/admin/stats/merchants').then(unwrap)
+export const getTopProducts = () => api.get('/admin/stats/products').then(unwrap)
+export const listAdminOrders = (params) => api.get('/admin/orders', { params }).then(unwrap)
+export const listAdminUsers = (params) => api.get('/admin/users', { params }).then(unwrap)
+export const toggleUserStatus = (id, enabled) => api.put(`/admin/users/${id}/status`, { enabled }).then(unwrap)
+export const listAdminReviews = (params) => api.get('/admin/reviews', { params }).then(unwrap)
+export const deleteAdminReview = (id) => api.delete(`/admin/reviews/${id}`).then(unwrap)
