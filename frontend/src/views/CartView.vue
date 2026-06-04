@@ -60,6 +60,8 @@ onMounted(load)
 
     <p class="cart-message" v-if="message">{{ message }}</p>
   </div>
+</template>
+
 <style scoped>
 .cart-container {
   max-width: 640px;

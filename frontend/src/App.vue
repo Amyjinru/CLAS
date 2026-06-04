@@ -50,27 +50,36 @@ async function handleLogout() {
         </span>
       </div>
       <nav>
-        <!-- 所有用户可见 -->
-        <RouterLink to="/home">浏览商家</RouterLink>
+        <!-- ===== 未登录访客 ===== -->
+        <template v-if="!user">
+          <RouterLink to="/home">浏览商家</RouterLink>
+          <RouterLink to="/merchant-register">商家入驻</RouterLink>
+          <RouterLink to="/login">登录</RouterLink>
+        </template>
 
-        <!-- 已登录用户 -->
-        <template v-if="user">
+        <!-- ===== USER 普通用户 ===== -->
+        <template v-else-if="role === 'USER'">
+          <RouterLink to="/home">浏览商家</RouterLink>
           <RouterLink to="/cart">购物车</RouterLink>
           <RouterLink to="/orders">我的订单</RouterLink>
-          <!-- version_314: 平台公告入口，按角色显隐 -->
-          <RouterLink v-if="role === 'USER'" to="/user/announcements">平台公告</RouterLink>
-          <RouterLink v-if="role === 'ADMIN'" to="/admin/announcements">公告管理</RouterLink>
-          <RouterLink v-if="role === 'MERCHANT'" to="/merchant/announcements">平台公告</RouterLink>
-          <RouterLink v-if="role === 'MERCHANT'" to="/merchant-console">商家工作台</RouterLink>
-          <RouterLink v-if="role === 'USER'" to="/merchant-register">商家入驻</RouterLink>
-          <RouterLink v-if="role === 'ADMIN'" to="/admin-audit">商家审核</RouterLink>
+          <RouterLink to="/user/announcements">平台公告</RouterLink>
+          <RouterLink to="/merchant-register">商家入驻</RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
 
-        <!-- 未登录访客 -->
-        <template v-else>
-          <RouterLink to="/merchant-register">商家入驻</RouterLink>
-          <RouterLink to="/login">登录</RouterLink>
+        <!-- ===== MERCHANT 商家 ===== -->
+        <template v-else-if="role === 'MERCHANT'">
+          <RouterLink to="/merchant-console">商家工作台</RouterLink>
+          <RouterLink to="/merchant/announcements">平台公告</RouterLink>
+          <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
+        </template>
+
+        <!-- ===== ADMIN 管理员 ===== -->
+        <template v-else-if="role === 'ADMIN'">
+          <RouterLink to="/admin/dashboard">管理后台</RouterLink>
+          <RouterLink to="/admin/audit">商家审核</RouterLink>
+          <RouterLink to="/admin/announcements">公告管理</RouterLink>
+          <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
       </nav>
     </header>
