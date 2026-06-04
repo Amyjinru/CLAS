@@ -53,7 +53,7 @@ function navigateTo(path) {
 </template>
 
 <style scoped>
-/* ═══════════════ 管理后台侧边栏 —「暖食」主题 ═══════════════ */
+/* ═══════════════ 管理后台侧边栏 —「暖食」主题（固定定位） ═══════════════ */
 .admin-shell {
   display: flex;
   min-height: calc(100vh - 64px);
@@ -64,7 +64,12 @@ function navigateTo(path) {
   width: 220px;
   background: linear-gradient(180deg, #2d251c 0%, #1a1510 100%);
   flex-shrink: 0;
+  position: fixed;
+  top: 64px;
+  left: 0;
+  bottom: 0;
   overflow-y: auto;
+  z-index: 100;
   box-shadow: 2px 0 16px rgba(0, 0, 0, 0.08);
 }
 
@@ -110,8 +115,10 @@ function navigateTo(path) {
 
 .admin-main {
   flex: 1;
+  margin-left: 220px;
   padding: 28px 32px;
   overflow-y: auto;
+  min-height: calc(100vh - 64px);
   background: var(--bg-page);
 }
 </style>
