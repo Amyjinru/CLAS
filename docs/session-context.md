@@ -1,4 +1,4 @@
-# CLAS 项目会话上下文（2026-06-01）
+# CLAS 项目会话上下文（2026-06-04）
 
 > 供 Claude 下次唤醒时快速恢复上下文。记录本次会话的关键决策、环境信息和操作要点。
 
@@ -7,15 +7,19 @@
 ## 当前分支
 
 ```
-feature/merchant-audit-system (已推送 origin)
+E (已推送 upstream/dev → PR #2)
 ```
+
+## 上次会话摘要
+
+同学E 完成了管理后台 + 数据统计 + UI全面优化。全部代码已提交并推送到 GitHub。
 
 ## 项目概览
 
 CLAS（Comprehensive Life Assistant System）— 外卖电商 MVP + 第二阶段增强。
 
 - **后端**：Spring Boot 3.3.5, MyBatis Plus 3.5.9, MySQL 8.0, Lombok, Java 17 目标
-- **前端**：Vue 3 + Vite 5 + Element Plus + Pinia + Vue Router + Axios
+- **前端**：Vue 3 + Vite 5 + Element Plus + ECharts + Pinia + Vue Router + Axios
 - **数据库**：8 张表（user, merchant, merchant_audit_log, product, cart, orders, order_item, review）
 
 ## 本地环境
@@ -70,6 +74,18 @@ npm run dev   # 端口 5173，API 代理到 8080
 5. **前端页面**：商家控制台、商家入驻、管理员审核
 6. **数据库**：merchant 表扩展、merchant_audit_log 新表、user.phone UNIQUE
 7. **其他**：清空购物车 DELETE /api/cart/clear/{userId}、时间戳自动填充
+
+## 第三阶段新增功能（同学E）
+
+1. **管理后台仪表盘**：统计卡片 + 今日概览 + 订单状态饼图 + 近7天销售额柱线图 + 商家排行 + 热销商品
+2. **管理员API**：10个新端点（/api/admin/*），全部 @RequireRole("ADMIN")
+3. **用户管理**：分页列表 + 禁用/启用账号
+4. **订单管理**：全平台订单分页 + 状态筛选
+5. **评价管理**：评价列表 + 删除 + 自动重算商家评分
+6. **安全修复**：公告CRUD加权限保护、登录校验enabled状态
+7. **数据库**：user表新增enabled字段
+8. **UI全面优化**：「暖食」设计语言，CSS变量体系，ECharts图表，侧边栏固定定位
+9. **导航**：按角色（USER/MERCHANT/ADMIN）分离顶栏菜单
 
 ## 演示账号
 

@@ -168,3 +168,81 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 - `DELETE /api/cart/clear/{userId}` 清空购物车
 - `MyMetaObjectHandler` 自动填充 `created_at` / `updated_at` 时间戳
 
+---
+
+## 功能改进：管理后台 + 数据统计 + 前端整合（同学E）
+
+### 一、管理后台仪表盘
+
+**API**
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/admin/dashboard` | 仪表盘汇总（总用户/商家/订单/销售额 + 今日数据） |
+| `GET /api/admin/stats/orders` | 订单统计（按状态分布 + 近7天每日趋势） |
+| `GET /api/admin/stats/sales` | 销售额统计（按日期趋势 + 总/月/周销售额） |
+| `GET /api/admin/stats/merchants` | 商家排行（按销售额 + 按评分，Top 10） |
+| `GET /api/admin/stats/products` | 热销商品排行（按销量，Top 10） |
+
+**前端**
+
+- `/admin/dashboard` 仪表盘页面：4个统计卡片 + 今日概览 + 订单状态饼图 + 近7天销售额柱线混合图 + 商家排行 + 热销商品
+
+### 二、管理员统一管理后台
+
+**API**（均需 `@RequireRole("ADMIN")` 权限）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/admin/users` | 用户列表（分页，屏蔽密码字段） |
+| `PUT /api/admin/users/{id}/status` | 禁用/启用用户账号 |
+| `GET /api/admin/orders` | 全平台订单列表（分页 + 状态筛选） |
+| `GET /api/admin/reviews` | 全平台评价列表（含关联用户/商家信息） |
+| `DELETE /api/admin/reviews/{id}` | 删除评价并自动重新计算商家评分 |
+
+**前端**（AdminLayout 侧边栏布局）
+
+| 路由 | 页面 | 说明 |
+| --- | --- | --- |
+| `/admin/dashboard` | 仪表盘 | ECharts 统计图表 |
+| `/admin/orders` | 订单管理 | 全平台订单分页列表 |
+| `/admin/users` | 用户管理 | 用户列表 + 禁用/启用 |
+| `/admin/audit` | 商家审核 | 整合自第二阶段 |
+| `/admin/reviews` | 评价管理 | 评价列表 + 删除 |
+| `/admin/announcements` | 公告管理 | 整合自第四阶段 |
+
+### 三、安全修复
+
+- `AnnouncementController` 的创建/修改/删除操作添加 `@RequireRole("ADMIN")` 权限保护
+- `UserService.login()` 增加 `enabled` 字段校验，禁用用户无法登录
+- 用户表新增 `enabled TINYINT(1) NOT NULL DEFAULT 1` 字段
+
+### 四、UI 全面优化 —「暖食」设计语言
+
+- 暖琥珀主色调（#f97316）+ 深青强调色（#0d9488）
+- 完整 CSS 变量体系覆盖 Element Plus 所有组件
+- 管理后台深咖啡色侧边栏固定定位，切换页面不抖动
+- 毛玻璃顶栏 + 卡片圆角阴影 + 按钮悬浮微动效
+- ECharts 图表配色与主题统一
+- 导航栏按角色（USER/MERCHANT/ADMIN）分离显示
+
+### 五、数据库变更
+
+| 变更 | 说明 |
+| --- | --- |
+| `user` 表新增字段 | `enabled TINYINT(1) NOT NULL DEFAULT 1`，支持管理员禁用用户 |
+
+### 六、新增文件
+
+| 文件 | 说明 |
+| --- | --- |
+| `controller/AdminController.java` | 管理后台统一控制器 |
+| `service/StatisticsService.java` | 数据聚合统计服务 |
+| `dto/DashboardStats.java` 等 5 个 DTO | 仪表盘/统计/排行数据对象 |
+| `views/admin/AdminLayout.vue` | 管理后台侧边栏布局 |
+| `views/admin/AdminDashboardView.vue` | ECharts 仪表盘页面 |
+| `views/admin/AdminUsersView.vue` | 用户管理页面 |
+| `views/admin/AdminOrdersView.vue` | 订单管理页面 |
+| `views/admin/AdminReviewsView.vue` | 评价管理页面 |
+| `styles/theme.css` | CSS 主题变量体系 |
+

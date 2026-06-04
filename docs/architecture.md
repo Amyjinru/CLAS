@@ -65,3 +65,43 @@ PENDING_PAYMENT -> PAID -> ACCEPTED -> COMPLETED
 
 评价只允许在 `COMPLETED` 状态后提交，同一订单只能评价一次。
 
+## 管理后台子系统（同学E）
+
+AdminLayout 采用固定侧边栏 + 内容区布局：
+
+```text
+┌──────────────────────────────────┐
+│  Topbar (App.vue)                 │
+├────────┬─────────────────────────┤
+│ Sidebar│  Main Content Area       │
+│ (fixed)│  <RouterView />         │
+│ 220px │                         │
+└────────┴─────────────────────────┘
+```
+
+侧边栏菜单：仪表盘 / 订单管理 / 用户管理 / 商家审核 / 评价管理 / 公告管理
+
+所有管理后台 API 需要 `@RequireRole("ADMIN")` 权限，统一前缀 `/api/admin/`。
+
+## 新增管理后台 API
+
+| 功能 | 接口 |
+| --- | --- |
+| 仪表盘汇总 | `GET /api/admin/dashboard` |
+| 订单统计 | `GET /api/admin/stats/orders` |
+| 销售额概览 | `GET /api/admin/stats/sales` |
+| 商家排行 | `GET /api/admin/stats/merchants` |
+| 热销商品 | `GET /api/admin/stats/products` |
+| 全平台订单 | `GET /api/admin/orders?page=1&size=10&status=PAID` |
+| 用户列表 | `GET /api/admin/users?page=1&size=10` |
+| 禁用/启用用户 | `PUT /api/admin/users/{id}/status` |
+| 评价列表 | `GET /api/admin/reviews?page=1&size=10` |
+| 删除评价 | `DELETE /api/admin/reviews/{id}` |
+
+## UI 设计
+
+- 主色调：暖琥珀 #f97316，底色：暖奶油 #faf7f2
+- 侧边栏：深咖啡渐变，固定定位
+- CSS 变量体系（theme.css）覆盖 Element Plus 组件
+- ECharts 用于仪表盘图表
+
