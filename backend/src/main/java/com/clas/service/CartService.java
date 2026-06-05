@@ -5,6 +5,7 @@ import com.clas.common.BusinessException;
 import com.clas.dto.AddCartRequest;
 import com.clas.dto.CartItemResponse;
 import com.clas.dto.RemoveCartRequest;
+import com.clas.dto.UpdateCartRequest;
 import com.clas.entity.Cart;
 import com.clas.entity.Product;
 import com.clas.mapper.CartMapper;
@@ -69,6 +70,26 @@ public class CartService {
         return list(request.userId());
     }
 
+    public List<CartItemResponse> update(UpdateCartRequest request) {
+        Cart cart = requireCartItem(request.userId(), request.productId());
+        Product product = productMapper.selectById(request.productId());
+        if (product == null || !"ON_SALE".equals(product.getStatus())) {
+            throw new BusinessException("商品不存在或已下架");
+        }
+        if (product.getStock() < request.quantity()) {
+            throw new BusinessException("库存不足");
+        }
+        cart.setQuantity(request.quantity());
+        cartMapper.updateById(cart);
+        return list(request.userId());
+    }
+
+    public List<CartItemResponse> deleteItem(Long userId, Long productId) {
+        Cart cart = requireCartItem(userId, productId);
+        cartMapper.deleteById(cart.getId());
+        return list(userId);
+    }
+
     public List<CartItemResponse> list(Long userId) {
         List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, userId)
@@ -85,6 +106,16 @@ public class CartService {
 
     public void clear(Long userId) {
         cartMapper.delete(new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId));
+    }
+
+    private Cart requireCartItem(Long userId, Long productId) {
+        Cart cart = cartMapper.selectOne(new LambdaQueryWrapper<Cart>()
+            .eq(Cart::getUserId, userId)
+            .eq(Cart::getProductId, productId));
+        if (cart == null) {
+            throw new BusinessException("购物车中没有该商品");
+        }
+        return cart;
     }
 
     private CartItemResponse toResponse(Cart item, Product product) {
@@ -107,4 +138,3 @@ public class CartService {
         );
     }
 }
-

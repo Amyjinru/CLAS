@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder } from '../api/clas'
 import { ElMessage } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -32,7 +32,10 @@ const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
   PAID: '已支付',
   ACCEPTED: '商家已接单',
-  COMPLETED: '已完成'
+  COMPLETED: '已完成',
+  CANCELED: '已取消',
+  REJECTED: '商家已拒单',
+  REFUNDED: '已退款'
 }
 
 async function load() {
@@ -83,9 +86,20 @@ async function handleAccept(orderId) {
   }
 }
 
+async function handleReject(orderId) {
+  try {
+    await rejectOrder(orderId)
+    ElMessage.success('已拒单')
+    await load()
+  } catch (error) {
+    // API client handles errors
+  }
+}
+
 // ===== version_314: 通用订单操作方法 =====
 async function operate(action, order) {
   if (action === 'accept') await acceptOrder(order.order.id)
+  if (action === 'reject') await rejectOrder(order.order.id)
   if (selectedOrder.value?.order.id === order.order.id) {
     selectedOrder.value = orders.value.find((item) => item.order.id === order.order.id) || null
   }
@@ -271,6 +285,14 @@ onMounted(() => {
                 >
                   确认接单
                 </el-button>
+                <el-button
+                  v-if="scope.row.order.status === 'PAID'"
+                  type="danger"
+                  size="small"
+                  @click="handleReject(scope.row.order.id)"
+                >
+                  拒单
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -306,6 +328,14 @@ onMounted(() => {
             @click="operate('accept', selectedOrder)"
           >
             接单
+          </button>
+          <button
+            v-if="selectedOrder.order.status === 'PAID'"
+            class="secondary"
+            type="button"
+            @click="operate('reject', selectedOrder)"
+          >
+            拒单
           </button>
           <button class="secondary" type="button" @click="closeDetail">关闭</button>
         </footer>

@@ -1,6 +1,8 @@
 package com.clas;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -139,6 +141,80 @@ class ModuleIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+    }
+
+    @Test
+    void cartUpdateAndDeleteItemWork() throws Exception {
+        mockMvc.perform(post("/api/cart/add")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", 1,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(post("/api/cart/update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", 1,
+                    "productId", 1,
+                    "quantity", 2
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].quantity").value(2))
+            .andExpect(jsonPath("$.data[0].subtotal").value(5180));
+
+        mockMvc.perform(delete("/api/cart/item/1/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void cancelPendingOrderRestoresStock() throws Exception {
+        MvcResult beforeStockResult = mockMvc.perform(get("/api/product/list/1"))
+            .andExpect(status().isOk())
+            .andReturn();
+        int beforeStock = objectMapper.readTree(beforeStockResult.getResponse().getContentAsString())
+            .path("data").get(0).path("stock").asInt();
+
+        mockMvc.perform(post("/api/cart/add")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", 1,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", 1,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.status").value("PENDING_PAYMENT"))
+            .andReturn();
+
+        mockMvc.perform(get("/api/product/list/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].stock").value(beforeStock - 1));
+
+        Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        mockMvc.perform(post("/api/order/cancel/" + orderId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("CANCELED"));
+
+        MvcResult afterStockResult = mockMvc.perform(get("/api/product/list/1"))
+            .andExpect(status().isOk())
+            .andReturn();
+        int afterStock = objectMapper.readTree(afterStockResult.getResponse().getContentAsString())
+            .path("data").get(0).path("stock").asInt();
+        assertEquals(beforeStock, afterStock);
     }
 
     @Test

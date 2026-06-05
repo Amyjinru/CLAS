@@ -37,7 +37,7 @@ public class PaymentService {
         if (!request.userId().equals(order.getUserId())) {
             throw new BusinessException("只能支付自己的订单");
         }
-        if (!"PENDING_PAYMENT".equals(order.getStatus())) {
+        if (!OrderService.STATUS_PENDING_PAYMENT.equals(order.getStatus())) {
             throw new BusinessException("订单当前不可支付，状态：" + order.getStatus());
         }
 
@@ -59,7 +59,7 @@ public class PaymentService {
             payment.setStatus(STATUS_SUCCESS);
             paymentRepository.save(payment);
 
-            order.setStatus("PAID");
+            order.setStatus(OrderService.STATUS_PAID);
             ordersMapper.updateById(order);
             return PaymentResponse.from(payment, order.getStatus());
         } catch (InterruptedException exception) {
@@ -86,10 +86,12 @@ public class PaymentService {
     }
 
     private String mapOrderStatusToPaymentStatus(String orderStatus) {
-        if ("PENDING_PAYMENT".equals(orderStatus)) {
+        if (OrderService.STATUS_PENDING_PAYMENT.equals(orderStatus)) {
             return STATUS_PENDING;
         }
-        if ("PAID".equals(orderStatus) || "ACCEPTED".equals(orderStatus) || "COMPLETED".equals(orderStatus)) {
+        if (OrderService.STATUS_PAID.equals(orderStatus)
+            || OrderService.STATUS_ACCEPTED.equals(orderStatus)
+            || OrderService.STATUS_COMPLETED.equals(orderStatus)) {
             return STATUS_SUCCESS;
         }
         return STATUS_FAILED;
