@@ -4,6 +4,7 @@ import com.clas.common.Result;
 import com.clas.dto.AddCartRequest;
 import com.clas.dto.CartItemResponse;
 import com.clas.dto.RemoveCartRequest;
+import com.clas.dto.UpdateCartRequest;
 import com.clas.service.CartService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -34,9 +35,19 @@ public class CartController {
         return Result.ok(cartService.remove(request));
     }
 
+    @PostMapping("/update")
+    public Result<List<CartItemResponse>> update(@Valid @RequestBody UpdateCartRequest request) {
+        return Result.ok(cartService.update(request));
+    }
+
     @GetMapping("/list/{userId}")
     public Result<List<CartItemResponse>> list(@PathVariable Long userId) {
         return Result.ok(cartService.list(userId));
+    }
+
+    @DeleteMapping("/item/{userId}/{productId}")
+    public Result<List<CartItemResponse>> deleteItem(@PathVariable Long userId, @PathVariable Long productId) {
+        return Result.ok(cartService.deleteItem(userId, productId));
     }
 
     @DeleteMapping("/clear/{userId}")
@@ -45,4 +56,3 @@ public class CartController {
         return Result.ok();
     }
 }
-

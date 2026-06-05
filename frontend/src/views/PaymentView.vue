@@ -22,7 +22,10 @@ const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
   PAID: '已支付',
   ACCEPTED: '商家已接单',
-  COMPLETED: '已完成'
+  COMPLETED: '已完成',
+  CANCELED: '已取消',
+  REJECTED: '商家已拒单',
+  REFUNDED: '已退款'
 }
 
 async function loadStatus() {

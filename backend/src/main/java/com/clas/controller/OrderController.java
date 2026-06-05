@@ -59,5 +59,19 @@ public class OrderController {
     public Result<Orders> complete(@PathVariable Long orderId) {
         return Result.ok(orderService.complete(orderId));
     }
-}
 
+    @PostMapping("/cancel/{orderId}")
+    public Result<Orders> cancel(@PathVariable Long orderId) {
+        return Result.ok(orderService.cancel(orderId));
+    }
+
+    @PostMapping("/reject/{orderId}")
+    public Result<Orders> reject(@PathVariable Long orderId) {
+        return Result.ok(orderService.reject(orderId));
+    }
+
+    @PostMapping("/refund/{orderId}")
+    public Result<Orders> refund(@PathVariable Long orderId) {
+        return Result.ok(orderService.refund(orderId));
+    }
+}
