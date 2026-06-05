@@ -17,6 +17,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 
     @Override
     public Payment save(Payment payment) {
+        // 支付流水创建后还会更新状态，因此同一个 save 同时支持插入和更新。
         if (payment.getId() == null) {
             paymentMapper.insert(payment);
         } else {
@@ -27,9 +28,11 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 
     @Override
     public Optional<Payment> findLatestByOrderId(Long orderId) {
+        // 一个订单可能有多次模拟支付记录，状态查询取最新一条。
         Payment payment = paymentMapper.selectOne(new LambdaQueryWrapper<Payment>()
             .eq(Payment::getOrderId, orderId)
             .orderByDesc(Payment::getCreateTime)
+            .orderByDesc(Payment::getId)
             .last("LIMIT 1"));
         return Optional.ofNullable(payment);
     }

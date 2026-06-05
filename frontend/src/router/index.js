@@ -3,6 +3,7 @@ import { currentRole, currentUser } from '../api/clas'
 import LoginView from '../views/LoginView.vue'
 import HomeView from '../views/HomeView.vue'
 import MerchantDetailView from '../views/MerchantDetailView.vue'
+import CartView from '../views/CartView.vue'
 import OrdersView from '../views/OrdersView.vue'
 import MerchantConsoleView from '../views/MerchantConsoleView.vue'
 // ===== test1: 商户入驻/审核/商品管理视图 =====
