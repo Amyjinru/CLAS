@@ -4,6 +4,8 @@ import com.clas.common.Result;
 import com.clas.dto.LoginRequest;
 import com.clas.dto.LoginResponse;
 import com.clas.dto.RegisterRequest;
+import com.clas.dto.ResetPasswordRequest;
+import com.clas.dto.SendCodeRequest;
 import com.clas.entity.User;
 import com.clas.service.UserService;
 import jakarta.validation.Valid;
@@ -29,6 +31,35 @@ public class UserController {
     @PostMapping("/register")
     public Result<User> register(@Valid @RequestBody RegisterRequest request) {
         return Result.ok(userService.register(request));
+    }
+
+    /**
+     * 注册 — 发送验证码到手机号。
+     * 检查手机号未被注册，生成验证码存入 VerificationCodeStore。
+     */
+    @PostMapping("/register/send-code")
+    public Result<String> sendRegisterCode(@Valid @RequestBody SendCodeRequest request) {
+        userService.sendRegisterCode(request);
+        return Result.ok("验证码已发送");
+    }
+
+    /**
+     * 忘记密码 — 发送验证码到已绑定手机号。
+     * 参照 auth-flow 技能的 sendForgotPasswordCode 流程。
+     */
+    @PostMapping("/forgot-password/send-code")
+    public Result<String> sendForgotPasswordCode(@Valid @RequestBody SendCodeRequest request) {
+        userService.sendForgotPasswordCode(request);
+        return Result.ok("验证码已发送");
+    }
+
+    /**
+     * 忘记密码 — 验证码校验 + 密码重置 + 自动登录。
+     * 参照 auth-flow 技能的 verifyForgotPasswordCode + resetForgotPassword 流程。
+     */
+    @PostMapping("/forgot-password/reset")
+    public Result<LoginResponse> resetForgotPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return Result.ok(userService.resetForgotPassword(request));
     }
 }
 

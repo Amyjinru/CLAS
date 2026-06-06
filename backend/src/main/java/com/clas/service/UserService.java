@@ -2,9 +2,12 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.common.VerificationCodeStore;
 import com.clas.dto.LoginRequest;
 import com.clas.dto.LoginResponse;
 import com.clas.dto.RegisterRequest;
+import com.clas.dto.ResetPasswordRequest;
+import com.clas.dto.SendCodeRequest;
 import com.clas.entity.User;
 import com.clas.mapper.UserMapper;
 import java.util.Set;
@@ -35,28 +38,29 @@ public class UserService {
     }
 
     public User register(RegisterRequest request) {
-        // 空角色统一落到普通用户，保持注册入口的默认身份稳定。
+        String phone = request.phone().trim();
+
+        // 1. 验证码校验（失败会抛异常）
+        VerificationCodeStore.verify(phone, request.code());
+
+        // 2. 空角色统一落到普通用户
         String role = request.role() == null || request.role().isBlank() ? "USER" : request.role().trim().toUpperCase();
         if (!ALLOWED_ROLES.contains(role)) {
             throw new BusinessException("角色只能是 USER、MERCHANT 或 ADMIN");
         }
 
-        // 空手机号按未填写处理，避免唯一索引里出现无意义的空字符串。
-        String phone = request.phone() == null || request.phone().isBlank() ? null : request.phone().trim();
-
+        // 3. 用户名唯一性
         Long count = userMapper.selectCount(new LambdaQueryWrapper<User>()
             .eq(User::getUsername, request.username()));
         if (count > 0) {
             throw new BusinessException("用户名已存在");
         }
 
-        // 手机号是登录身份资料的一部分，注册时提前拦截重复值。
-        if (phone != null) {
-            Long phoneCount = userMapper.selectCount(new LambdaQueryWrapper<User>()
-                .eq(User::getPhone, phone));
-            if (phoneCount > 0) {
-                throw new BusinessException("手机号已存在");
-            }
+        // 4. 手机号唯一性
+        Long phoneCount = userMapper.selectCount(new LambdaQueryWrapper<User>()
+            .eq(User::getPhone, phone));
+        if (phoneCount > 0) {
+            throw new BusinessException("手机号已存在");
         }
 
         User user = new User();
@@ -67,5 +71,69 @@ public class UserService {
         userMapper.insert(user);
         user.setPassword(null);
         return user;
+    }
+
+    /**
+     * 注册 — 发送验证码。
+     * 检查手机号未被注册，生成验证码并存入 VerificationCodeStore。
+     */
+    public void sendRegisterCode(SendCodeRequest request) {
+        String phone = request.phone().trim();
+        // 检查手机号是否已被注册
+        Long phoneCount = userMapper.selectCount(new LambdaQueryWrapper<User>()
+            .eq(User::getPhone, phone));
+        if (phoneCount > 0) {
+            throw new BusinessException("该手机号已被注册");
+        }
+        VerificationCodeStore.generateAndStore(phone);
+    }
+
+    /**
+     * 忘记密码 — 发送验证码。
+     * 验证手机号已绑定到某个账号，生成验证码并存入 VerificationCodeStore。
+     * 参照 auth-flow 技能的 sendForgotPasswordCode 流程。
+     */
+    public void sendForgotPasswordCode(SendCodeRequest request) {
+        String phone = request.phone().trim();
+        // 检查手机号是否已绑定到某个账号
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
+            .eq(User::getPhone, phone));
+        if (user == null) {
+            throw new BusinessException("该手机号未绑定任何账号");
+        }
+        if (user.getEnabled() != null && !user.getEnabled()) {
+            throw new BusinessException("该账号已被禁用，无法重置密码");
+        }
+        // 生成并存储验证码（冷却检查在 store 内部处理）
+        VerificationCodeStore.generateAndStore(phone);
+    }
+
+    /**
+     * 忘记密码 — 验证码校验 + 密码重置 + 自动登录。
+     * 参照 auth-flow 技能的 verifyForgotPasswordCode + resetForgotPassword 两步合并。
+     */
+    public LoginResponse resetForgotPassword(ResetPasswordRequest request) {
+        String phone = request.phone().trim();
+        // 1. 验证码校验（失败会抛异常）
+        VerificationCodeStore.verify(phone, request.code());
+        // 2. 查找用户
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
+            .eq(User::getPhone, phone));
+        if (user == null) {
+            throw new BusinessException("该手机号未绑定任何账号");
+        }
+        if (user.getEnabled() != null && !user.getEnabled()) {
+            throw new BusinessException("账号已被禁用，无法重置密码");
+        }
+        // 3. 新密码不能与旧密码相同
+        if (request.newPassword().equals(user.getPassword())) {
+            throw new BusinessException("新密码不能与旧密码相同");
+        }
+        // 4. 更新密码
+        user.setPassword(request.newPassword());
+        userMapper.updateById(user);
+        user.setPassword(null);
+        // 5. 返回登录信息（自动登录）
+        return new LoginResponse(user);
     }
 }
