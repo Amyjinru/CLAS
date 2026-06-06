@@ -1,6 +1,8 @@
 package com.clas;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,11 +29,192 @@ class ModuleIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
+    void userRegisterWorksAndHidesPassword() throws Exception {
+        // 注册成功时默认角色应为 USER，响应中不能把明文密码带回前端。
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "username", "new_user",
+                    "password", "123456",
+                    "phone", "13900000010"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.username").value("new_user"))
+            .andExpect(jsonPath("$.data.role").value("USER"))
+            .andExpect(jsonPath("$.data.password").doesNotExist());
+    }
+
+    @Test
+    void userRegisterRejectsDuplicateUsername() throws Exception {
+        // 用户名是登录主键，重复注册必须被业务层拦截。
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "username", "user",
+                    "password", "123456",
+                    "phone", "13900000011"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("用户名已存在"));
+    }
+
+    @Test
+    void userRegisterRejectsDuplicatePhone() throws Exception {
+        // 手机号也要保持唯一，避免不同账号共享同一份身份资料。
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "username", "phone_conflict_user",
+                    "password", "123456",
+                    "phone", "13800000001"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("手机号已存在"));
+    }
+
+    @Test
+    void userRegisterRejectsUnknownRole() throws Exception {
+        // 角色字段只允许项目约定的三种值，防止其他同学误造状态名。
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "username", "bad_role_user",
+                    "password", "123456",
+                    "role", "ROOT"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("角色只能是 USER、MERCHANT 或 ADMIN"));
+    }
+
+    @Test
+    void userLoginWorksAndRejectsBadPassword() throws Exception {
+        // 登录成功返回当前用户资料；登录失败统一返回业务错误。
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "username", "user",
+                    "password", "123456"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.user.username").value("user"))
+            .andExpect(jsonPath("$.data.user.password").doesNotExist());
+
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "username", "user",
+                    "password", "wrong-password"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("用户名或密码错误"));
+    }
+
+    @Test
+    void adminMerchantListRequiresAdminRole() throws Exception {
+        // 管理员接口必须同时拦截未登录用户和非 ADMIN 角色用户。
+        mockMvc.perform(get("/api/merchant/admin/list"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("未登录，请先登录"));
+
+        mockMvc.perform(get("/api/merchant/admin/list")
+                .header("Authorization", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("权限不足，无法访问"));
+
+        mockMvc.perform(get("/api/merchant/admin/list")
+                .header("Authorization", "3"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
     void announcementListWorks() throws Exception {
         mockMvc.perform(get("/api/announcement/list"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+    }
+
+    @Test
+    void cartUpdateAndDeleteItemWork() throws Exception {
+        mockMvc.perform(post("/api/cart/add")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", 1,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(post("/api/cart/update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", 1,
+                    "productId", 1,
+                    "quantity", 2
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].quantity").value(2))
+            .andExpect(jsonPath("$.data[0].subtotal").value(5180));
+
+        mockMvc.perform(delete("/api/cart/item/1/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void cancelPendingOrderRestoresStock() throws Exception {
+        MvcResult beforeStockResult = mockMvc.perform(get("/api/product/list/1"))
+            .andExpect(status().isOk())
+            .andReturn();
+        int beforeStock = objectMapper.readTree(beforeStockResult.getResponse().getContentAsString())
+            .path("data").get(0).path("stock").asInt();
+
+        mockMvc.perform(post("/api/cart/add")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", 1,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", 1,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.status").value("PENDING_PAYMENT"))
+            .andReturn();
+
+        mockMvc.perform(get("/api/product/list/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].stock").value(beforeStock - 1));
+
+        Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        mockMvc.perform(post("/api/order/cancel/" + orderId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("CANCELED"));
+
+        MvcResult afterStockResult = mockMvc.perform(get("/api/product/list/1"))
+            .andExpect(status().isOk())
+            .andReturn();
+        int afterStock = objectMapper.readTree(afterStockResult.getResponse().getContentAsString())
+            .path("data").get(0).path("stock").asInt();
+        assertEquals(beforeStock, afterStock);
     }
 
     @Test

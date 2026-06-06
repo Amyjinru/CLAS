@@ -1,12 +1,5 @@
--- Windows 导入请先执行: chcp 65001
--- 或使用: mysql -u root -p --default-character-set=utf8mb4 -e "source D:/path/schema.sql"
-SET NAMES utf8mb4;
-SET CHARACTER SET utf8mb4;
-
 CREATE DATABASE IF NOT EXISTS clas DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE clas;
-
-SET NAMES utf8mb4;
 
 DROP TABLE IF EXISTS announcement;
 DROP TABLE IF EXISTS payment;
@@ -31,7 +24,7 @@ CREATE TABLE `user` (
 CREATE TABLE merchant (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
-    merchant_name VARCHAR(100) NOT NULL UNIQUE,
+    merchant_name VARCHAR(100) NOT NULL,
     phone VARCHAR(20) NOT NULL UNIQUE,
     category VARCHAR(50),
     address VARCHAR(255),
@@ -41,7 +34,8 @@ CREATE TABLE merchant (
     admin_remarks VARCHAR(255),
     settlement_cycle INT,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uk_merchant_user_id (user_id)
 );
 
 CREATE TABLE merchant_audit_log (
@@ -72,7 +66,7 @@ CREATE TABLE cart (
     user_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL
-) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -81,7 +75,7 @@ CREATE TABLE orders (
     total_price INT NOT NULL,
     status VARCHAR(20) NOT NULL,
     create_time DATETIME NOT NULL
-) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE order_item (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -89,7 +83,7 @@ CREATE TABLE order_item (
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL,
     price INT NOT NULL
-) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE review (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -97,7 +91,7 @@ CREATE TABLE review (
     user_id BIGINT NOT NULL,
     score INT NOT NULL,
     content TEXT
-) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE payment (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -107,7 +101,7 @@ CREATE TABLE payment (
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
     create_time DATETIME NOT NULL
-) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE TABLE announcement (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -115,24 +109,21 @@ CREATE TABLE announcement (
     content TEXT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
     create_time DATETIME NOT NULL
-) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 INSERT INTO `user` (id, username, password, phone, role) VALUES
     (1, 'user', '123456', '13800000001', 'USER'),
     (2, 'merchant', '123456', '13800000002', 'MERCHANT'),
-    (3, 'admin', '123456', '13800000003', 'ADMIN');
+    (3, 'admin', '123456', '13800000003', 'ADMIN'),
+    (4, 'merchant2', '123456', '13800000012', 'MERCHANT');
 
 INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, score, status, created_at, updated_at) VALUES
     (1, 2, '校园轻食铺', '13800000002', '美食', '软件园东门 1 号', 4.70, 'OPEN', NOW(), NOW()),
-    (2, 2, '城市咖啡站', '13800000004', '饮品', '创新街 18 号', 4.50, 'OPEN', NOW(), NOW());
+    (2, 4, '城市咖啡站', '13800000012', '饮品', '创新街 18 号', 4.50, 'OPEN', NOW(), NOW());
 
 INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
     (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', NOW(), NOW()),
-    (2, 1, '牛油果沙拉', '富含优质脂肪', 2290, 24, '/images/product-2.jpg', 'ON_SALE', NOW(), NOW()),
-    (3, 1, '低糖酸奶杯', '无糖配方更健康', 1290, 40, '/images/product-3.jpg', 'ON_SALE', NOW(), NOW()),
-    (4, 2, '拿铁', '精选浓缩咖啡与鲜牛奶', 1800, 50, '/images/product-4.jpg', 'ON_SALE', NOW(), NOW()),
-    (5, 2, '冷萃咖啡', '低温慢速萃取', 2200, 35, '/images/product-5.jpg', 'ON_SALE', NOW(), NOW());
-
-INSERT INTO announcement (id, title, content, status, create_time) VALUES
-    (1, '欢迎使用 CLAS 综合生活助手平台', '本平台支持在线点餐、模拟支付与订单评价，祝您使用愉快。', 'PUBLISHED', NOW()),
-    (2, '春季优惠活动', '部分商家参与满减活动，详情请进入店铺查看。', 'PUBLISHED', NOW());
+    (2, 1, '牛油果沙拉', '新鲜牛油果配时蔬', 2290, 24, '/images/product-2.jpg', 'ON_SALE', NOW(), NOW()),
+    (3, 1, '低糖酸奶杯', '低糖酸奶搭配燕麦', 1290, 40, '/images/product-3.jpg', 'ON_SALE', NOW(), NOW()),
+    (4, 2, '拿铁', '经典意式拿铁', 1800, 50, '/images/product-4.jpg', 'ON_SALE', NOW(), NOW()),
+    (5, 2, '冷萃咖啡', '低温慢萃咖啡', 2200, 35, '/images/product-5.jpg', 'ON_SALE', NOW(), NOW());

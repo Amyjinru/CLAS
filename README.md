@@ -68,6 +68,57 @@ npm run dev
 
 第一版没有鉴权，前端只把当前登录用户保存在 `localStorage`。
 
+## 同学 A 维护：用户模块与接口约定
+
+### 用户接口
+
+| 接口 | 说明 |
+| --- | --- |
+| `POST /api/user/register` | 用户注册，默认角色为 `USER` |
+| `POST /api/user/login` | 用户登录，成功后返回当前用户信息 |
+
+注册规则：
+
+- `username` 必填且唯一。
+- `password` 必填，第一版暂时明文存储。
+- `phone` 可为空；填写时必须唯一。
+- `role` 可为空；填写时只能是 `USER`、`MERCHANT`、`ADMIN`。
+- 所有用户响应都会隐藏 `password` 字段。
+
+### 统一返回格式
+
+所有 `/api/**` 接口统一返回：
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {}
+}
+```
+
+业务错误统一返回 `code=400`，例如：
+
+```json
+{
+  "code": 400,
+  "message": "用户名或密码错误",
+  "data": null
+}
+```
+
+### 简易鉴权与角色
+
+- 当前阶段不接入 JWT / Spring Security。
+- 前端登录后将用户信息写入 `localStorage` 的 `clas_user`。
+- 后端通过请求头 `Authorization: <userId>` 获取当前用户。
+- 角色统一使用字符串：`USER`、`MERCHANT`、`ADMIN`。
+- 需要权限的接口使用 `@RequireRole` 注解控制。
+
+### 金额单位
+
+所有金额字段统一使用 `INT`，单位为“分”；前端展示时再除以 `100` 转成“元”。
+
 ---
 
 ## 功能改进：商家列表/详情、商家入驻/状态
@@ -167,7 +218,6 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 
 - `DELETE /api/cart/clear/{userId}` 清空购物车
 - `MyMetaObjectHandler` 自动填充 `created_at` / `updated_at` 时间戳
-
 ---
 
 ## 功能改进：管理后台 + 数据统计 + 前端整合（同学E）
@@ -245,4 +295,3 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 | `views/admin/AdminOrdersView.vue` | 订单管理页面 |
 | `views/admin/AdminReviewsView.vue` | 评价管理页面 |
 | `styles/theme.css` | CSS 主题变量体系 |
-

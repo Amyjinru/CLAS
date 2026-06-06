@@ -21,6 +21,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OrderService {
+    public static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
+    public static final String STATUS_PAID = "PAID";
+    public static final String STATUS_ACCEPTED = "ACCEPTED";
+    public static final String STATUS_COMPLETED = "COMPLETED";
+    public static final String STATUS_CANCELED = "CANCELED";
+    public static final String STATUS_REJECTED = "REJECTED";
+    public static final String STATUS_REFUNDED = "REFUNDED";
+
     private final OrdersMapper ordersMapper;
     private final OrderItemMapper orderItemMapper;
     private final CartMapper cartMapper;
@@ -72,7 +80,7 @@ public class OrderService {
         order.setUserId(request.userId());
         order.setMerchantId(request.merchantId());
         order.setTotalPrice(totalPrice);
-        order.setStatus("PENDING_PAYMENT");
+        order.setStatus(STATUS_PENDING_PAYMENT);
         order.setCreateTime(LocalDateTime.now());
         ordersMapper.insert(order);
 
@@ -112,16 +120,46 @@ public class OrderService {
 
     public Orders accept(Long orderId) {
         Orders order = requireOrder(orderId);
-        requireStatus(order, "PAID");
-        order.setStatus("ACCEPTED");
+        requireStatus(order, STATUS_PAID);
+        order.setStatus(STATUS_ACCEPTED);
         ordersMapper.updateById(order);
         return order;
     }
 
     public Orders complete(Long orderId) {
         Orders order = requireOrder(orderId);
-        requireStatus(order, "ACCEPTED");
-        order.setStatus("COMPLETED");
+        requireStatus(order, STATUS_ACCEPTED);
+        order.setStatus(STATUS_COMPLETED);
+        ordersMapper.updateById(order);
+        return order;
+    }
+
+    @Transactional
+    public Orders cancel(Long orderId) {
+        Orders order = requireOrder(orderId);
+        requireStatusIn(order, STATUS_PENDING_PAYMENT, STATUS_PAID);
+        restoreOrderStock(orderId);
+        order.setStatus(STATUS_CANCELED);
+        ordersMapper.updateById(order);
+        return order;
+    }
+
+    @Transactional
+    public Orders reject(Long orderId) {
+        Orders order = requireOrder(orderId);
+        requireStatus(order, STATUS_PAID);
+        restoreOrderStock(orderId);
+        order.setStatus(STATUS_REJECTED);
+        ordersMapper.updateById(order);
+        return order;
+    }
+
+    @Transactional
+    public Orders refund(Long orderId) {
+        Orders order = requireOrder(orderId);
+        requireStatusIn(order, STATUS_ACCEPTED, STATUS_COMPLETED);
+        restoreOrderStock(orderId);
+        order.setStatus(STATUS_REFUNDED);
         ordersMapper.updateById(order);
         return order;
     }
@@ -146,5 +184,21 @@ public class OrderService {
             throw new BusinessException("订单状态错误，当前状态：" + order.getStatus());
         }
     }
-}
 
+    private void requireStatusIn(Orders order, String... statuses) {
+        for (String status : statuses) {
+            if (status.equals(order.getStatus())) {
+                return;
+            }
+        }
+        throw new BusinessException("订单状态错误，当前状态：" + order.getStatus());
+    }
+
+    private void restoreOrderStock(Long orderId) {
+        List<OrderItem> orderItems = orderItemMapper.selectList(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        for (OrderItem item : orderItems) {
+            productMapper.restoreStock(item.getProductId(), item.getQuantity());
+        }
+    }
+}

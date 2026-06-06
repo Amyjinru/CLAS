@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
-import { completeOrder, getReviewByOrder, listOrders } from '../api/clas'
+import { cancelOrder, completeOrder, getReviewByOrder, listOrders } from '../api/clas'
 
 const orders = ref([])
 const message = ref('')
@@ -12,7 +12,10 @@ const statusLabel = {
   PENDING_PAYMENT: '待支付',
   PAID: '已支付',
   ACCEPTED: '商家已接单',
-  COMPLETED: '已完成'
+  COMPLETED: '已完成',
+  CANCELED: '已取消',
+  REJECTED: '商家已拒单',
+  REFUNDED: '已退款'
 }
 
 async function load() {
@@ -38,6 +41,11 @@ async function load() {
 
 async function complete(order) {
   await completeOrder(order.order.id)
+  await load()
+}
+
+async function cancel(order) {
+  await cancelOrder(order.order.id)
   await load()
 }
 
@@ -70,6 +78,13 @@ onMounted(load)
         >
           去支付
         </RouterLink>
+        <button
+          v-if="['PENDING_PAYMENT', 'PAID'].includes(order.order.status)"
+          class="secondary"
+          @click="cancel(order)"
+        >
+          取消订单
+        </button>
         <button v-if="order.order.status === 'ACCEPTED'" @click="complete(order)">确认完成</button>
         <RouterLink
           v-if="order.order.status === 'COMPLETED' && !hasReview(order.order.id)"

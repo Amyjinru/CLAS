@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception exception) {
-        return Result.fail("系统异常：" + exception.getMessage());
+        // 普通异常不直接暴露堆栈或 SQL 等内部信息，前端只需要稳定的兜底提示。
+        return Result.fail("系统异常，请稍后重试");
     }
 }
-

@@ -12,5 +12,11 @@ public interface ProductMapper extends BaseMapper<Product> {
         WHERE id = #{productId} AND stock >= #{quantity}
         """)
     int deductStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
-}
 
+    @Update("""
+        UPDATE product
+        SET stock = stock + #{quantity}
+        WHERE id = #{productId}
+        """)
+    int restoreStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+}

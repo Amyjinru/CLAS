@@ -1,9 +1,10 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { createOrder, getCart } from '../api/clas'
+import { createOrder, deleteCartItem, getCart, updateCart } from '../api/clas'
 
 const items = ref([])
 const message = ref('')
+const updatingProductId = ref(null)
 
 const total = () => items.value.reduce((sum, item) => sum + item.subtotal, 0)
 const merchantIds = () => [...new Set(items.value.map((item) => item.merchantId).filter(Boolean))]
@@ -24,6 +25,37 @@ async function submit() {
   await load()
 }
 
+async function changeQuantity(item, quantity) {
+  const nextQuantity = Number(quantity)
+  if (!Number.isInteger(nextQuantity) || nextQuantity < 1) {
+    message.value = '数量至少为 1'
+    await load()
+    return
+  }
+  updatingProductId.value = item.productId
+  try {
+    items.value = await updateCart({ productId: item.productId, quantity: nextQuantity })
+    message.value = '购物车数量已更新'
+  } catch (error) {
+    message.value = error.response?.data?.message || '更新数量失败'
+    await load()
+  } finally {
+    updatingProductId.value = null
+  }
+}
+
+async function deleteItem(item) {
+  updatingProductId.value = item.productId
+  try {
+    items.value = await deleteCartItem(item.productId)
+    message.value = '商品已从购物车删除'
+  } catch (error) {
+    message.value = error.response?.data?.message || '删除商品失败'
+  } finally {
+    updatingProductId.value = null
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -38,11 +70,33 @@ onMounted(load)
 
     <div class="cart-items" v-if="items.length">
       <div class="cart-item" v-for="item in items" :key="item.productId">
-        <div class="item-info">
-          <h2 class="item-name">{{ item.productName }}</h2>
-          <span class="item-qty">× {{ item.quantity }}</span>
+        <div class="item-main">
+          <div class="item-info">
+            <h2 class="item-name">{{ item.productName }}</h2>
+            <p class="item-meta">库存 {{ item.stock }} · 单价 ¥{{ (item.price / 100).toFixed(2) }}</p>
+          </div>
+          <div class="item-price">¥{{ (item.subtotal / 100).toFixed(2) }}</div>
         </div>
-        <div class="item-price">¥{{ (item.subtotal / 100).toFixed(2) }}</div>
+        <div class="cart-actions">
+          <label class="quantity-field">
+            数量
+            <input
+              type="number"
+              min="1"
+              :max="item.stock"
+              :value="item.quantity"
+              :disabled="updatingProductId === item.productId"
+              @change="changeQuantity(item, $event.target.value)"
+            />
+          </label>
+          <button
+            class="delete-btn"
+            :disabled="updatingProductId === item.productId"
+            @click="deleteItem(item)"
+          >
+            删除
+          </button>
+        </div>
       </div>
     </div>
 
@@ -105,9 +159,6 @@ onMounted(load)
 }
 
 .cart-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -119,10 +170,16 @@ onMounted(load)
   box-shadow: var(--shadow-sm);
 }
 
+.item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .item-info {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
 }
 .item-name {
   font-size: 16px;
@@ -130,10 +187,10 @@ onMounted(load)
   color: var(--text-primary);
   margin: 0;
 }
-.item-qty {
-  font-size: 14px;
+.item-meta {
+  font-size: 13px;
   color: var(--text-muted);
-  font-weight: 500;
+  margin: 0;
 }
 
 .item-price {
@@ -142,6 +199,69 @@ onMounted(load)
   color: var(--clas-amber-600);
   white-space: nowrap;
   margin-left: 24px;
+}
+
+/* 购物车操作区：数量输入 + 删除按钮 */
+.cart-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.quantity-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.quantity-field input {
+  width: 72px;
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  text-align: center;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast);
+}
+.quantity-field input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+.quantity-field input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.delete-btn {
+  height: 32px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--clas-error, #ef4444);
+  border: 1px solid var(--clas-error-light, #fecaca);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.delete-btn:hover:not(:disabled) {
+  background: var(--clas-error-light, #fef2f2);
+  border-color: var(--clas-error, #ef4444);
+}
+.delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .cart-empty {
@@ -222,6 +342,8 @@ onMounted(load)
   }
   .cart-item {
     padding: 14px 16px;
+  }
+  .item-main {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
@@ -229,6 +351,15 @@ onMounted(load)
   .item-price {
     margin-left: 0;
     align-self: flex-end;
+  }
+  .cart-actions {
+    justify-content: stretch;
+  }
+  .quantity-field {
+    flex: 1;
+  }
+  .quantity-field input {
+    flex: 1;
   }
   .checkout-bar {
     flex-direction: column;
