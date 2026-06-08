@@ -45,7 +45,7 @@ CREATE TABLE merchant (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uk_merchant_user_id (user_id)
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE merchant_audit_log (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -55,7 +55,7 @@ CREATE TABLE merchant_audit_log (
     new_status VARCHAR(20) NOT NULL,
     remarks VARCHAR(255),
     created_at DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE product (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -68,14 +68,14 @@ CREATE TABLE product (
     status VARCHAR(20) NOT NULL DEFAULT 'ON_SALE',
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE cart (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE user_address (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -86,7 +86,7 @@ CREATE TABLE user_address (
     is_default TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE favorite (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -94,7 +94,7 @@ CREATE TABLE favorite (
     merchant_id BIGINT NOT NULL,
     created_at DATETIME NOT NULL,
     UNIQUE KEY uk_favorite_user_merchant (user_id, merchant_id)
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE notification (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -103,7 +103,7 @@ CREATE TABLE notification (
     content VARCHAR(255) NOT NULL,
     read_flag TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -117,7 +117,7 @@ CREATE TABLE orders (
     refund_reason VARCHAR(255),
     refund_status VARCHAR(20) NOT NULL DEFAULT 'NONE',
     create_time DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE order_item (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -125,7 +125,7 @@ CREATE TABLE order_item (
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL,
     price INT NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE review (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -136,7 +136,7 @@ CREATE TABLE review (
     merchant_reply TEXT,
     report_reason VARCHAR(255),
     report_status VARCHAR(20) NOT NULL DEFAULT 'NONE'
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE payment (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -146,7 +146,7 @@ CREATE TABLE payment (
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
     create_time DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE announcement (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -154,7 +154,7 @@ CREATE TABLE announcement (
     content TEXT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
     create_time DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE service_booking (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -167,7 +167,7 @@ CREATE TABLE service_booking (
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE group_deal (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -181,7 +181,7 @@ CREATE TABLE group_deal (
     status VARCHAR(20) NOT NULL DEFAULT 'ON_SALE',
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE deal_order (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -193,17 +193,17 @@ CREATE TABLE deal_order (
     pay_amount INT NOT NULL,
     create_time DATETIME NOT NULL,
     used_time DATETIME
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `user` (phone, username, password, role) VALUES
-    ('13800000001', 'user', 'Abc123!', 'USER'),
-    ('13800000002', 'merchant', 'Abc123!', 'MERCHANT'),
-    ('13800000003', 'admin', 'Abc123!', 'ADMIN'),
-    ('13800000012', 'merchant2', 'Abc123!', 'MERCHANT');
+INSERT INTO `user` (phone, username, password, role, enabled) VALUES
+    ('13800000001', 'user', 'Abc123!', 'USER', 1),
+    ('13800000002', 'merchant', 'Abc123!', 'MERCHANT', 1),
+    ('13800000003', 'admin', 'Abc123!', 'ADMIN', 1),
+    ('13800000012', 'merchant2', 'Abc123!', 'MERCHANT', 1);
 
-INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES
-    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', NOW(), NOW()),
-    (2, '13800000012', '城市咖啡站', '13800000023', '饮品', '创新街 18 号', '08:30-22:30', 200, 1200, 2200, 4.50, 'OPEN', NOW(), NOW());
+INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, business_hours, delivery_fee, min_order_price, average_price, score, status, bank_account, settlement_cycle, created_at, updated_at) VALUES
+    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', '6222000000000000001', 7, NOW(), NOW()),
+    (2, '13800000012', '城市咖啡站', '13800000023', '饮品', '创新街 18 号', '08:30-22:30', 200, 1200, 2200, 4.50, 'OPEN', '6222000000000000002', 7, NOW(), NOW());
 
 INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
     (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', NOW(), NOW()),
@@ -214,6 +214,9 @@ INSERT INTO product (id, merchant_id, name, description, price, stock, image, st
 
 INSERT INTO user_address (id, user_id, contact_name, phone, address, is_default, created_at, updated_at) VALUES
     (1, '13800000001', '张同学', '13800000001', '软件学院 A 座 302', 1, NOW(), NOW());
+
+INSERT INTO announcement (id, title, content, status, create_time) VALUES
+    (1, '平台公告', '欢迎使用 CLAS 生活助手平台演示版。', 'PUBLISHED', NOW());
 
 INSERT INTO service_booking (id, user_id, merchant_id, service_name, appointment_time, contact_phone, note, status, created_at, updated_at) VALUES
     (1, '13800000001', 1, '门店轻食咨询', DATE_ADD(NOW(), INTERVAL 1 DAY), '13800000001', '希望安排下午到店', 'CONFIRMED', NOW(), NOW());
