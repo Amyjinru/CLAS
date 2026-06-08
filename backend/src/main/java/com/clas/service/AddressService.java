@@ -2,6 +2,7 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.common.GeoUtils;
 import com.clas.config.UserContext;
 import com.clas.dto.AddressRequest;
 import com.clas.entity.UserAddress;
@@ -27,6 +28,9 @@ public class AddressService {
 
     @Transactional
     public UserAddress create(AddressRequest request) {
+        if (!GeoUtils.hasCoordinate(request.longitude(), request.latitude())) {
+            throw new BusinessException("请选择收货地址地图位置");
+        }
         if (Boolean.TRUE.equals(request.isDefault())) {
             clearDefaults();
         }
@@ -35,6 +39,8 @@ public class AddressService {
         address.setContactName(request.contactName());
         address.setPhone(request.phone());
         address.setAddress(request.address());
+        address.setLongitude(request.longitude());
+        address.setLatitude(request.latitude());
         address.setIsDefault(Boolean.TRUE.equals(request.isDefault()));
         userAddressMapper.insert(address);
         return address;

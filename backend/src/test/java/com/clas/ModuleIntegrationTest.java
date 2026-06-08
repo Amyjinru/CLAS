@@ -183,6 +183,9 @@ class ModuleIntegrationTest {
                     Map.entry("contactPhone", "13900000015"),
                     Map.entry("category", "美食"),
                     Map.entry("address", "测试地址 1 号"),
+                    Map.entry("longitude", 116.390000),
+                    Map.entry("latitude", 39.910000),
+                    Map.entry("deliveryRadiusM", 3000),
                     Map.entry("bankAccount", "123456789"),
                     Map.entry("settlementCycle", 7)
                 ))))
@@ -236,6 +239,32 @@ class ModuleIntegrationTest {
                 .header("Authorization", ADMIN_PHONE))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
+    void merchantListCalculatesDistanceFromAddress() throws Exception {
+        mockMvc.perform(get("/api/merchant/list")
+                .header("Authorization", USER_PHONE)
+                .param("addressId", "1")
+                .param("sort", "distance"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data[0].distanceMeters").isNumber())
+            .andExpect(jsonPath("$.data[0].estimatedMinutes").isNumber())
+            .andExpect(jsonPath("$.data[0].deliveryAvailable").value(true));
+    }
+
+    @Test
+    void merchantDeliveryEstimateWorksWithoutAmapKey() throws Exception {
+        mockMvc.perform(get("/api/merchant/1/delivery-estimate")
+                .param("lat", "39.910000")
+                .param("lng", "116.398000"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.merchantId").value(1))
+            .andExpect(jsonPath("$.data.distanceMeters").isNumber())
+            .andExpect(jsonPath("$.data.estimatedMinutes").isNumber())
+            .andExpect(jsonPath("$.data.deliveryAvailable").value(true));
     }
 
     @Test

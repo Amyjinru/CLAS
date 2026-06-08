@@ -21,6 +21,9 @@ public class Merchant {
     private String phone;
     private String category;
     private String address;
+    private BigDecimal longitude;
+    private BigDecimal latitude;
+    private Integer deliveryRadiusM;
     private String businessHours;
     private Integer deliveryFee;
     private Integer minOrderPrice;

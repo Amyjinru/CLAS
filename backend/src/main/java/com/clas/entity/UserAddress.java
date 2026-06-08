@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -17,6 +18,8 @@ public class UserAddress {
     private String contactName;
     private String phone;
     private String address;
+    private BigDecimal longitude;
+    private BigDecimal latitude;
     private Boolean isDefault;
 
     @TableField(fill = FieldFill.INSERT)

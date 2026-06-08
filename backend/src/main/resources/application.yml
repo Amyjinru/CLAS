@@ -5,10 +5,9 @@ spring:
   application:
     name: clas-backend
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/clas?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: root
-    password: 123456
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:clas}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
   data:
     redis:
       host: 127.0.0.1
@@ -20,3 +19,6 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+
+amap:
+  web-service-key: ${AMAP_WEB_SERVICE_KEY:}

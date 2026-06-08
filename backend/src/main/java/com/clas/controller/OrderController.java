@@ -40,6 +40,7 @@ public class OrderController {
         return Result.ok(orderService.create(new CreateOrderRequest(
             currentUserId(),
             request.merchantId(),
+            request.addressId(),
             request.deliveryAddress()
         )));
     }

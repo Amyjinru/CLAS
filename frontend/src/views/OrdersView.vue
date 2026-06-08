@@ -67,6 +67,11 @@ function hasReview(orderId) {
   return reviewedOrderIds.value.has(orderId)
 }
 
+function distanceText(distance) {
+  if (!distance) return ''
+  return distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`
+}
+
 onMounted(load)
 </script>
 
@@ -82,7 +87,11 @@ onMounted(load)
       <div>
         <h2>订单 {{ order.order.id }}</h2>
         <p>{{ statusLabel[order.order.status] || order.order.status }} · {{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }} · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p>
-        <p v-if="order.order.deliveryAddress">送至 {{ order.order.deliveryAddress }} · 约 {{ order.order.estimatedMinutes }} 分钟</p>
+        <p v-if="order.order.deliveryAddress">
+          送至 {{ order.order.deliveryAddress }} · 约 {{ order.order.estimatedMinutes }} 分钟
+          <span v-if="order.order.routeDistanceMeters"> · 路线 {{ distanceText(order.order.routeDistanceMeters) }}</span>
+          <span v-else-if="order.order.distanceMeters"> · 直线 {{ distanceText(order.order.distanceMeters) }}</span>
+        </p>
         <p>{{ order.items.length }} 件商品</p>
       </div>
       <div class="row-actions">

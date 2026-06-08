@@ -3,6 +3,7 @@ package com.clas.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import java.math.BigDecimal;
 
 public record MerchantRegisterRequest(
     @NotBlank(message = "商家名称不能为空")
@@ -15,6 +16,10 @@ public record MerchantRegisterRequest(
 
     @NotBlank(message = "商家地址不能为空")
     String address,
+
+    BigDecimal longitude,
+    BigDecimal latitude,
+    Integer deliveryRadiusM,
 
     @NotBlank(message = "银行账号不能为空")
     @Pattern(regexp = "^\\d{9,25}$", message = "银行账号必须是9到25位数字")

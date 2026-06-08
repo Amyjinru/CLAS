@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS merchant (
     phone VARCHAR(20) NOT NULL UNIQUE,
     category VARCHAR(50),
     address VARCHAR(255),
+    longitude DECIMAL(10,6),
+    latitude DECIMAL(10,6),
+    delivery_radius_m INT NOT NULL DEFAULT 3000,
     business_hours VARCHAR(100),
     delivery_fee INT NOT NULL DEFAULT 0,
     min_order_price INT NOT NULL DEFAULT 0,
@@ -63,6 +66,8 @@ CREATE TABLE IF NOT EXISTS user_address (
     contact_name VARCHAR(50) NOT NULL,
     phone VARCHAR(20) NOT NULL,
     address VARCHAR(255) NOT NULL,
+    longitude DECIMAL(10,6),
+    latitude DECIMAL(10,6),
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
@@ -92,6 +97,10 @@ CREATE TABLE IF NOT EXISTS orders (
     total_price INT NOT NULL,
     status VARCHAR(20) NOT NULL,
     delivery_address VARCHAR(255),
+    delivery_longitude DECIMAL(10,6),
+    delivery_latitude DECIMAL(10,6),
+    distance_meters INT,
+    route_distance_meters INT,
     delivery_status VARCHAR(20) NOT NULL DEFAULT 'WAITING',
     estimated_minutes INT NOT NULL DEFAULT 30,
     refund_reason VARCHAR(255),
@@ -198,8 +207,8 @@ INSERT INTO "user" (phone, username, password, role) VALUES
     ('13800000002', 'merchant', 'Abc123!', 'MERCHANT'),
     ('13800000003', 'admin', 'Abc123!', 'ADMIN');
 
-INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES
-    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, longitude, latitude, delivery_radius_m, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES
+    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 116.397428, 39.909230, 3000, '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
     (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
@@ -207,8 +216,8 @@ INSERT INTO product (id, merchant_id, name, description, price, stock, image, st
 INSERT INTO announcement (id, title, content, status, create_time) VALUES
     (1, '测试公告', 'H2 集成测试公告', 'PUBLISHED', CURRENT_TIMESTAMP);
 
-INSERT INTO user_address (id, user_id, contact_name, phone, address, is_default, created_at, updated_at) VALUES
-    (1, '13800000001', '张同学', '13800000001', '软件学院 A 座 302', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO user_address (id, user_id, contact_name, phone, address, longitude, latitude, is_default, created_at, updated_at) VALUES
+    (1, '13800000001', '张同学', '13800000001', '软件学院 A 座 302', 116.398000, 39.910000, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO service_booking (id, user_id, merchant_id, service_name, appointment_time, contact_phone, note, status, created_at, updated_at) VALUES
     (1, '13800000001', 1, '门店轻食咨询', DATEADD('DAY', 1, CURRENT_TIMESTAMP), '13800000001', '希望安排下午到店', 'CONFIRMED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

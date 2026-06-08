@@ -12,6 +12,7 @@ import {
   sessionUser
 } from '../api/clas'
 import { ElMessage } from 'element-plus'
+import LocationSelector from '../components/LocationSelector.vue'
 
 const addresses = ref([])
 const dealOrders = ref([])
@@ -21,8 +22,27 @@ const form = reactive({
   contactName: '',
   phone: '',
   address: '',
+  longitude: null,
+  latitude: null,
   isDefault: false
 })
+
+const locationData = reactive({
+  province: '',
+  city: '',
+  district: '',
+  street: '',
+  address: '',
+  longitude: null,
+  latitude: null
+})
+
+function onLocationConfirm(loc) {
+  form.address = loc.address
+  form.longitude = loc.longitude
+  form.latitude = loc.latitude
+  ElMessage.success('收货位置已确认')
+}
 
 async function load() {
   const [addressList, orderList, favoriteList, notificationList] = await Promise.all([
@@ -38,9 +58,13 @@ async function load() {
 }
 
 async function submitAddress() {
+  if (!form.longitude || !form.latitude) {
+    ElMessage.warning('请在地图中选择收货位置')
+    return
+  }
   await createAddress(form)
   ElMessage.success('地址已保存')
-  Object.assign(form, { contactName: '', phone: '', address: '', isDefault: false })
+  Object.assign(form, { contactName: '', phone: '', address: '', longitude: null, latitude: null, isDefault: false })
   await load()
 }
 
@@ -82,8 +106,14 @@ onMounted(load)
         <el-form-item label="电话">
           <el-input v-model="form.phone" />
         </el-form-item>
-        <el-form-item label="地址">
-          <el-input v-model="form.address" />
+        <el-form-item label="收货位置">
+          <LocationSelector
+            v-model="locationData"
+            @confirm="onLocationConfirm"
+          />
+          <div v-if="form.address" class="address-preview">
+            已选位置: {{ form.address }}
+          </div>
         </el-form-item>
         <el-checkbox v-model="form.isDefault">设为默认地址</el-checkbox>
         <el-button type="primary" @click="submitAddress">保存地址</el-button>
@@ -93,6 +123,9 @@ onMounted(load)
         <div>
           <strong>{{ item.contactName }}</strong>
           <p>{{ item.phone }} · {{ item.address }}</p>
+          <p v-if="item.longitude && item.latitude" class="coord-line">
+            {{ Number(item.longitude).toFixed(6) }}, {{ Number(item.latitude).toFixed(6) }}
+          </p>
         </div>
         <div class="row-actions">
           <el-tag v-if="item.isDefault" type="success">默认</el-tag>
@@ -170,10 +203,20 @@ onMounted(load)
   color: var(--text-secondary);
   margin: 6px 0 0;
 }
+.list-row .coord-line {
+  color: var(--text-muted);
+  font-size: 12px;
+}
 .row-actions {
   align-items: center;
   display: flex;
   gap: 8px;
+}
+.address-preview {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #67c23a;
+  line-height: 1.4;
 }
 @media (max-width: 900px) {
   .profile-grid {

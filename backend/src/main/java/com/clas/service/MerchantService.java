@@ -2,24 +2,30 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.common.GeoUtils;
 import com.clas.common.MerchantStatusEnum;
 import com.clas.common.PasswordValidator;
 import com.clas.common.PhoneValidator;
 import com.clas.common.VerificationCodeStore;
 import com.clas.dto.MerchantAuditRequest;
+import com.clas.dto.DeliveryEstimateResponse;
 import com.clas.dto.MerchantRegisterRequest;
 import com.clas.dto.MerchantResponse;
 import com.clas.entity.Merchant;
 import com.clas.entity.MerchantAuditLog;
 import com.clas.entity.User;
+import com.clas.entity.UserAddress;
 import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.MerchantAuditLogMapper;
+import com.clas.mapper.UserAddressMapper;
 import com.clas.mapper.UserMapper;
 import com.clas.config.UserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,25 +33,43 @@ public class MerchantService {
     private final MerchantMapper merchantMapper;
     private final MerchantAuditLogMapper merchantAuditLogMapper;
     private final UserMapper userMapper;
+    private final UserAddressMapper userAddressMapper;
     private final VerificationCodeStore verificationCodeStore;
+    private final AmapRouteService amapRouteService;
 
     public MerchantService(
         MerchantMapper merchantMapper,
         MerchantAuditLogMapper merchantAuditLogMapper,
         UserMapper userMapper,
-        VerificationCodeStore verificationCodeStore
+        UserAddressMapper userAddressMapper,
+        VerificationCodeStore verificationCodeStore,
+        AmapRouteService amapRouteService
     ) {
         this.merchantMapper = merchantMapper;
         this.merchantAuditLogMapper = merchantAuditLogMapper;
         this.userMapper = userMapper;
+        this.userAddressMapper = userAddressMapper;
         this.verificationCodeStore = verificationCodeStore;
+        this.amapRouteService = amapRouteService;
     }
 
     public List<MerchantResponse> list() {
-        return search(null, null, "score");
+        return search(null, null, "score", null, null, null, false);
     }
 
     public List<MerchantResponse> search(String keyword, String category, String sort) {
+        return search(keyword, category, sort, null, null, null, false);
+    }
+
+    public List<MerchantResponse> search(
+        String keyword,
+        String category,
+        String sort,
+        BigDecimal latitude,
+        BigDecimal longitude,
+        Long addressId,
+        Boolean onlyDeliverable
+    ) {
         LambdaQueryWrapper<Merchant> wrapper = new LambdaQueryWrapper<Merchant>()
             .eq(Merchant::getStatus, MerchantStatusEnum.OPEN);
         if (keyword != null && !keyword.isBlank()) {
@@ -58,15 +82,23 @@ public class MerchantService {
         if (category != null && !category.isBlank()) {
             wrapper.eq(Merchant::getCategory, category);
         }
+        boolean distanceSort = "distance".equals(sort);
         if ("price".equals(sort)) {
             wrapper.orderByAsc(Merchant::getAveragePrice);
         } else if ("latest".equals(sort)) {
             wrapper.orderByDesc(Merchant::getId);
-        } else {
+        } else if (!distanceSort) {
             wrapper.orderByDesc(Merchant::getScore);
         }
         List<Merchant> merchants = merchantMapper.selectList(wrapper);
-        return merchants.stream().map(this::convertToResponse).collect(Collectors.toList());
+        Coordinate coordinate = resolveCoordinate(latitude, longitude, addressId);
+        return merchants.stream()
+            .map(merchant -> convertToResponse(merchant, coordinate))
+            .filter(response -> !Boolean.TRUE.equals(onlyDeliverable) || Boolean.TRUE.equals(response.deliveryAvailable()))
+            .sorted(distanceSort ? Comparator
+                .comparing((MerchantResponse response) -> response.distanceMeters() == null ? Integer.MAX_VALUE : response.distanceMeters())
+                .thenComparing(MerchantResponse::score, Comparator.nullsLast(Comparator.reverseOrder())) : (left, right) -> 0)
+            .collect(Collectors.toList());
     }
 
     public List<MerchantResponse> listAll() {
@@ -81,6 +113,25 @@ public class MerchantService {
             throw new BusinessException("商家不存在或未营业");
         }
         return convertToResponse(merchant);
+    }
+
+    public DeliveryEstimateResponse deliveryEstimate(Long id, BigDecimal latitude, BigDecimal longitude) {
+        Merchant merchant = merchantMapper.selectById(id);
+        if (merchant == null || merchant.getStatus() != MerchantStatusEnum.OPEN) {
+            throw new BusinessException("商家不存在或未营业");
+        }
+        if (!GeoUtils.hasCoordinate(longitude, latitude)) {
+            throw new BusinessException("请选择当前位置");
+        }
+        Estimate estimate = estimateDelivery(merchant, new Coordinate(latitude, longitude));
+        return new DeliveryEstimateResponse(
+            merchant.getId(),
+            estimate.distanceMeters(),
+            estimate.routeDistanceMeters(),
+            estimate.estimatedMinutes(),
+            merchant.getDeliveryRadiusM() == null ? 3000 : merchant.getDeliveryRadiusM(),
+            estimate.deliveryAvailable()
+        );
     }
 
     public MerchantResponse getMerchantByUserId(String userId) {
@@ -161,6 +212,12 @@ public class MerchantService {
         merchant.setPhone(contactPhone);
         merchant.setCategory(request.category());
         merchant.setAddress(request.address());
+        if (!GeoUtils.hasCoordinate(request.longitude(), request.latitude())) {
+            throw new BusinessException("请选择商家地图位置");
+        }
+        merchant.setLongitude(request.longitude());
+        merchant.setLatitude(request.latitude());
+        merchant.setDeliveryRadiusM(normalizeDeliveryRadius(request.deliveryRadiusM()));
         merchant.setBusinessHours("09:00-21:00");
         merchant.setDeliveryFee(0);
         merchant.setMinOrderPrice(0);
@@ -241,6 +298,11 @@ public class MerchantService {
     }
 
     private MerchantResponse convertToResponse(Merchant merchant) {
+        return convertToResponse(merchant, null);
+    }
+
+    private MerchantResponse convertToResponse(Merchant merchant, Coordinate coordinate) {
+        Estimate estimate = estimateDelivery(merchant, coordinate);
         return new MerchantResponse(
             merchant.getId(),
             merchant.getUserId(),
@@ -248,6 +310,9 @@ public class MerchantService {
             merchant.getPhone(),
             merchant.getCategory(),
             merchant.getAddress(),
+            merchant.getLongitude(),
+            merchant.getLatitude(),
+            merchant.getDeliveryRadiusM(),
             merchant.getBusinessHours(),
             merchant.getDeliveryFee(),
             merchant.getMinOrderPrice(),
@@ -258,8 +323,80 @@ public class MerchantService {
             merchant.getAdminRemarks(),
             merchant.getSettlementCycle(),
             merchant.getCreatedAt(),
-            merchant.getUpdatedAt()
+            merchant.getUpdatedAt(),
+            estimate.distanceMeters(),
+            estimate.routeDistanceMeters(),
+            estimate.estimatedMinutes(),
+            estimate.deliveryAvailable()
         );
+    }
+
+    private Estimate estimateDelivery(Merchant merchant, Coordinate coordinate) {
+        if (coordinate == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) {
+            return new Estimate(null, null, null, null);
+        }
+        int distanceMeters = GeoUtils.distanceMeters(
+            coordinate.latitude(),
+            coordinate.longitude(),
+            merchant.getLatitude(),
+            merchant.getLongitude()
+        );
+        int radius = merchant.getDeliveryRadiusM() == null ? 3000 : merchant.getDeliveryRadiusM();
+        boolean deliveryAvailable = distanceMeters <= radius;
+        Optional<AmapRouteService.RouteEstimate> route = amapRouteService.estimateDriving(
+            merchant.getLongitude(),
+            merchant.getLatitude(),
+            coordinate.longitude(),
+            coordinate.latitude()
+        );
+        Integer routeDistanceMeters = route.map(AmapRouteService.RouteEstimate::distanceMeters).orElse(null);
+        int estimatedMinutes = route
+            .map(AmapRouteService.RouteEstimate::durationMinutes)
+            .map(minutes -> Math.max(20, minutes + 10))
+            .orElseGet(() -> estimateMinutes(distanceMeters));
+        return new Estimate(distanceMeters, routeDistanceMeters, estimatedMinutes, deliveryAvailable);
+    }
+
+    private int estimateMinutes(int distanceMeters) {
+        return Math.max(20, 20 + (int) Math.ceil(distanceMeters / 500.0) * 5);
+    }
+
+    private Coordinate resolveCoordinate(BigDecimal latitude, BigDecimal longitude, Long addressId) {
+        if (addressId != null) {
+            UserAddress address = userAddressMapper.selectById(addressId);
+            if (address == null || !UserContext.getUserId().equals(address.getUserId())) {
+                throw new BusinessException("地址不存在或无权操作");
+            }
+            if (!GeoUtils.hasCoordinate(address.getLongitude(), address.getLatitude())) {
+                throw new BusinessException("该地址缺少地图坐标");
+            }
+            return new Coordinate(address.getLatitude(), address.getLongitude());
+        }
+        if (GeoUtils.hasCoordinate(longitude, latitude)) {
+            return new Coordinate(latitude, longitude);
+        }
+        return null;
+    }
+
+    private int normalizeDeliveryRadius(Integer radius) {
+        if (radius == null) {
+            return 3000;
+        }
+        if (radius < 500 || radius > 10000) {
+            throw new BusinessException("配送范围需在500到10000米之间");
+        }
+        return radius;
+    }
+
+    private record Coordinate(BigDecimal latitude, BigDecimal longitude) {
+    }
+
+    private record Estimate(
+        Integer distanceMeters,
+        Integer routeDistanceMeters,
+        Integer estimatedMinutes,
+        Boolean deliveryAvailable
+    ) {
     }
 
     public Long getCurrentMerchantId() {
