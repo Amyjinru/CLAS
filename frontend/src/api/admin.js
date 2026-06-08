@@ -10,3 +10,4 @@ export const listAdminUsers = (params) => api.get('/admin/users', { params }).th
 export const toggleUserStatus = (id, enabled) => api.put(`/admin/users/${id}/status`, { enabled }).then(unwrap)
 export const listAdminReviews = (params) => api.get('/admin/reviews', { params }).then(unwrap)
 export const deleteAdminReview = (id) => api.delete(`/admin/reviews/${id}`).then(unwrap)
+export const resolveReviewReport = (id, status) => api.put(`/admin/reviews/${id}/report-status`, { status }).then(unwrap)

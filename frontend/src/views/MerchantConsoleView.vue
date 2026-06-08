@@ -1,8 +1,8 @@
-<script setup>
+﻿<script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -13,6 +13,9 @@ const merchant = ref(null)
 const orders = ref([])
 const loading = ref(true)
 const loginUser = ref(null)
+const voucherCode = ref('')
+const reviews = ref([])
+const replyDrafts = ref({})
 
 // ===== version_314: 订单详情弹窗 & 商品名映射 =====
 const productNames = ref({})
@@ -35,7 +38,8 @@ const orderStatusLabel = {
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
-  REFUNDED: '已退款'
+  REFUNDED: '已退款',
+  REFUND_PENDING: '退款处理中'
 }
 
 async function load() {
@@ -54,11 +58,13 @@ async function load() {
     if (merchant.value && merchant.value.status === 'OPEN') {
       // version_314: 并行加载订单 + 商品名映射
       const merchantId = merchant.value.id
-      const [orderList, products] = await Promise.all([
+      const [orderList, products, reviewList] = await Promise.all([
         listMerchantOrders(),
-        listProducts(merchantId)
+        listProducts(merchantId),
+        listReviewsByMerchant(merchantId)
       ])
       orders.value = orderList
+      reviews.value = reviewList
       productNames.value = Object.fromEntries(products.map((p) => [p.id, p.name]))
     }
   } catch (error) {
@@ -94,6 +100,45 @@ async function handleReject(orderId) {
   } catch (error) {
     // API client handles errors
   }
+}
+
+async function handleDeliver(orderId) {
+  await deliverOrder(orderId)
+  ElMessage.success('订单已标记为配送中')
+  await load()
+}
+
+async function handleRefund(orderId, approved) {
+  if (approved) {
+    await approveRefund(orderId)
+    ElMessage.success('已通过退款')
+  } else {
+    await rejectRefund(orderId)
+    ElMessage.success('已拒绝退款')
+  }
+  await load()
+}
+
+async function handleRedeem() {
+  if (!voucherCode.value.trim()) {
+    ElMessage.warning('请输入团购券码')
+    return
+  }
+  const order = await redeemDeal(voucherCode.value.trim())
+  ElMessage.success(`核销成功：${order.voucherCode}`)
+  voucherCode.value = ''
+}
+
+async function handleReply(review) {
+  const reply = replyDrafts.value[review.id]
+  if (!reply?.trim()) {
+    ElMessage.warning('请输入回复内容')
+    return
+  }
+  await replyReview(review.id, reply.trim())
+  ElMessage.success('回复已发布')
+  replyDrafts.value[review.id] = ''
+  await load()
 }
 
 // ===== version_314: 通用订单操作方法 =====
@@ -145,19 +190,26 @@ onMounted(() => {
         <!-- Navigation Menu -->
         <el-card class="box-card nav-card" style="margin-bottom: 20px;">
           <div class="menu-list">
-            <div 
+            <div
               class="menu-item active"
               @click="router.push('/merchant-console')"
             >
               <el-icon><List /></el-icon>
               <span>接单管理</span>
             </div>
-            <div 
+            <div
               class="menu-item"
               @click="router.push('/merchant/products')"
             >
               <el-icon><Goods /></el-icon>
               <span>商品管理</span>
+            </div>
+            <div
+              class="menu-item"
+              @click="router.push('/merchant/deals')"
+            >
+              <el-icon><Ticket /></el-icon>
+              <span>团购管理</span>
             </div>
           </div>
         </el-card>
@@ -243,10 +295,15 @@ onMounted(() => {
         <!-- Orders Work List (Only show when status is OPEN) -->
         <el-card v-if="merchant.status === 'OPEN'" class="box-card work-card">
           <template #header>
-            <div class="card-header">
-              <h3>待接单管理 (营业中)</h3>
-            </div>
+          <div class="card-header">
+            <h3>待接单管理 (营业中)</h3>
+          </div>
           </template>
+
+          <div class="redeem-box">
+            <el-input v-model="voucherCode" placeholder="输入团购券码进行到店核销" clearable />
+            <el-button type="primary" @click="handleRedeem">核销团购券</el-button>
+          </div>
 
           <el-table :data="orders" style="width: 100%" empty-text="当前没有待处理的订单">
             <el-table-column prop="order.id" label="订单编号" width="100" />
@@ -260,6 +317,12 @@ onMounted(() => {
                 <el-tag :type="scope.row.order.status === 'PAID' ? 'success' : 'info'">
                   {{ orderStatusLabel[scope.row.order.status] || scope.row.order.status }}
                 </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="配送" width="180">
+              <template #default="scope">
+                <div>{{ scope.row.order.deliveryStatus || 'WAITING' }}</div>
+                <small v-if="scope.row.order.deliveryAddress">{{ scope.row.order.deliveryAddress }}</small>
               </template>
             </el-table-column>
             <el-table-column label="商品清单">
@@ -293,6 +356,49 @@ onMounted(() => {
                 >
                   拒单
                 </el-button>
+                <el-button
+                  v-if="scope.row.order.status === 'ACCEPTED' && scope.row.order.deliveryStatus !== 'DELIVERING'"
+                  type="warning"
+                  size="small"
+                  @click="handleDeliver(scope.row.order.id)"
+                >
+                  配送中
+                </el-button>
+                <el-button
+                  v-if="scope.row.order.status === 'REFUND_PENDING'"
+                  type="primary"
+                  size="small"
+                  @click="handleRefund(scope.row.order.id, true)"
+                >
+                  通过退款
+                </el-button>
+                <el-button
+                  v-if="scope.row.order.status === 'REFUND_PENDING'"
+                  type="danger"
+                  size="small"
+                  @click="handleRefund(scope.row.order.id, false)"
+                >
+                  拒绝退款
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
+        <el-card v-if="merchant.status === 'OPEN'" class="box-card work-card review-card">
+          <template #header>
+            <div class="card-header">
+              <h3>评价回复</h3>
+            </div>
+          </template>
+          <el-table :data="reviews" style="width: 100%" empty-text="暂无评价">
+            <el-table-column prop="score" label="评分" width="90" />
+            <el-table-column prop="content" label="评价内容" />
+            <el-table-column prop="merchantReply" label="商家回复" />
+            <el-table-column label="回复" width="260">
+              <template #default="scope">
+                <el-input v-model="replyDrafts[scope.row.id]" placeholder="输入回复" size="small" />
+                <el-button size="small" type="primary" @click="handleReply(scope.row)">发布</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -389,6 +495,26 @@ onMounted(() => {
   margin: 0;
   font-size: 16px;
   color: #303133;
+}
+
+.redeem-box {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.redeem-box :deep(.el-input) {
+  max-width: 320px;
+}
+
+.review-card {
+  margin-top: 20px;
+}
+
+.review-card :deep(.cell) {
+  display: flex;
+  gap: 8px;
 }
 
 .merchant-badge {

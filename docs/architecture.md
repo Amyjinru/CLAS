@@ -114,3 +114,34 @@ AdminLayout 采用固定侧边栏 + 内容区布局：
 - 侧边栏：深咖啡渐变，固定定位
 - CSS 变量体系（theme.css）覆盖 Element Plus 组件
 - ECharts 用于仪表盘图表
+# 2026-06-08 当前架构补充
+
+本轮开发后，系统已经从单一外卖 MVP 扩展为生活助手平台综合模块。新增模块仍保持 `Controller -> Service -> Mapper -> MySQL` 分层，前端保持 `views + api + router` 拆分。
+
+## 新增业务模块
+
+| 模块 | 后端核心文件 | 前端入口 | 权限边界 |
+| --- | --- | --- | --- |
+| 地址管理 | `AddressController` / `AddressService` / `UserAddressMapper` | `/profile` | USER 只能管理自己的地址 |
+| 团购券 | `DealController` / `DealService` | `/deals`, `/merchant/deals` | USER 买券，MERCHANT 仅管理/核销自己店铺券 |
+| 收藏店铺 | `FavoriteController` / `FavoriteService` | `/merchant/:id`, `/profile` | USER 只能查看和取消自己的收藏 |
+| 消息通知 | `NotificationController` / `NotificationService` | `/profile` | 当前用户只能读取/标记自己的通知 |
+| 退款售后 | `OrderController` / `OrderService` | `/orders`, `/merchant-console` | USER 申请退款，MERCHANT 仅审核本店订单 |
+| 生活预约 | `BookingController` / `BookingService` / `ServiceBookingMapper` | `/bookings`, `/merchant/bookings` | USER 仅处理本人预约，MERCHANT 仅处理本店预约 |
+| 评价治理 | `ReviewController` / `ReviewService`, `AdminController` | `/review/:orderId`, `/merchant-console`, `/admin/reviews` | 商家仅回复本店评价，管理员处理举报状态 |
+
+## 关键表结构
+
+当前业务表共 16 张：`user`, `merchant`, `merchant_audit_log`, `product`, `cart`, `user_address`, `favorite`, `notification`, `orders`, `order_item`, `review`, `payment`, `announcement`, `group_deal`, `deal_order`, `service_booking`。
+
+## 新增 API 摘要
+
+| 功能 | API |
+| --- | --- |
+| 地址 | `GET /api/address/mine`, `POST /api/address`, `POST /api/address/{id}/default`, `DELETE /api/address/{id}` |
+| 团购 | `GET /api/deals`, `GET /api/deals/merchant`, `POST /api/deals/merchant`, `POST /api/deals/{id}/buy`, `GET /api/deals/mine`, `POST /api/deals/redeem` |
+| 收藏 | `GET /api/favorites/mine`, `POST /api/favorites/{merchantId}`, `DELETE /api/favorites/{merchantId}` |
+| 通知 | `GET /api/notifications/mine`, `POST /api/notifications/{id}/read` |
+| 退款 | `POST /api/order/refund/{orderId}`, `POST /api/order/refund/{orderId}/approve`, `POST /api/order/refund/{orderId}/reject` |
+| 预约 | `POST /api/bookings`, `GET /api/bookings/mine`, `POST /api/bookings/{id}/cancel`, `GET /api/bookings/merchant`, `POST /api/bookings/{id}/status` |
+| 评价治理 | `POST /api/review/{reviewId}/reply`, `POST /api/review/{reviewId}/report`, `PUT /api/admin/reviews/{id}/report-status` |

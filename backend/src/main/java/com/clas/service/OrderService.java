@@ -28,22 +28,26 @@ public class OrderService {
     public static final String STATUS_CANCELED = "CANCELED";
     public static final String STATUS_REJECTED = "REJECTED";
     public static final String STATUS_REFUNDED = "REFUNDED";
+    public static final String STATUS_REFUND_PENDING = "REFUND_PENDING";
 
     private final OrdersMapper ordersMapper;
     private final OrderItemMapper orderItemMapper;
     private final CartMapper cartMapper;
     private final ProductMapper productMapper;
+    private final NotificationService notificationService;
 
     public OrderService(
         OrdersMapper ordersMapper,
         OrderItemMapper orderItemMapper,
         CartMapper cartMapper,
-        ProductMapper productMapper
+        ProductMapper productMapper,
+        NotificationService notificationService
     ) {
         this.ordersMapper = ordersMapper;
         this.orderItemMapper = orderItemMapper;
         this.cartMapper = cartMapper;
         this.productMapper = productMapper;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -81,6 +85,10 @@ public class OrderService {
         order.setMerchantId(request.merchantId());
         order.setTotalPrice(totalPrice);
         order.setStatus(STATUS_PENDING_PAYMENT);
+        order.setDeliveryAddress(request.deliveryAddress());
+        order.setDeliveryStatus("WAITING");
+        order.setEstimatedMinutes(30);
+        order.setRefundStatus("NONE");
         order.setCreateTime(LocalDateTime.now());
         ordersMapper.insert(order);
 
@@ -101,6 +109,7 @@ public class OrderService {
             return orderItem;
         }).toList();
 
+        notificationService.send(order.getUserId(), "订单已创建", "订单 " + order.getId() + " 已创建，请及时完成支付。");
         return new OrderResponse(order, orderItems);
     }
 
@@ -130,7 +139,19 @@ public class OrderService {
         Orders order = requireMerchantOrder(orderId, merchantId);
         requireStatus(order, STATUS_PAID);
         order.setStatus(STATUS_ACCEPTED);
+        order.setDeliveryStatus("PREPARING");
         ordersMapper.updateById(order);
+        notificationService.send(order.getUserId(), "商家已接单", "订单 " + order.getId() + " 正在备餐。");
+        return order;
+    }
+
+    public Orders deliver(Long orderId, Long merchantId) {
+        Orders order = requireMerchantOrder(orderId, merchantId);
+        requireStatus(order, STATUS_ACCEPTED);
+        order.setDeliveryStatus("DELIVERING");
+        order.setEstimatedMinutes(15);
+        ordersMapper.updateById(order);
+        notificationService.send(order.getUserId(), "订单配送中", "订单 " + order.getId() + " 已进入配送流程。");
         return order;
     }
 
@@ -146,7 +167,9 @@ public class OrderService {
         Orders order = requireUserOrder(orderId, userId);
         requireStatus(order, STATUS_ACCEPTED);
         order.setStatus(STATUS_COMPLETED);
+        order.setDeliveryStatus("DELIVERED");
         ordersMapper.updateById(order);
+        notificationService.send(order.getUserId(), "订单已完成", "订单 " + order.getId() + " 已完成，欢迎评价本次体验。");
         return order;
     }
 
@@ -202,10 +225,34 @@ public class OrderService {
 
     @Transactional
     public Orders refund(Long orderId, String userId) {
+        return requestRefund(orderId, userId, "用户申请退款");
+    }
+
+    @Transactional
+    public Orders requestRefund(Long orderId, String userId, String reason) {
         Orders order = requireUserOrder(orderId, userId);
-        requireStatusIn(order, STATUS_ACCEPTED, STATUS_COMPLETED);
-        restoreOrderStock(orderId);
-        order.setStatus(STATUS_REFUNDED);
+        requireStatusIn(order, STATUS_PAID, STATUS_ACCEPTED, STATUS_COMPLETED);
+        order.setStatus(STATUS_REFUND_PENDING);
+        order.setRefundStatus("PENDING");
+        order.setRefundReason(reason);
+        ordersMapper.updateById(order);
+        notificationService.send(userId, "退款申请已提交", "订单 " + orderId + " 的退款申请已提交，等待商家处理。");
+        return order;
+    }
+
+    @Transactional
+    public Orders resolveRefund(Long orderId, Long merchantId, boolean approved) {
+        Orders order = requireMerchantOrder(orderId, merchantId);
+        requireStatus(order, STATUS_REFUND_PENDING);
+        order.setRefundStatus(approved ? "APPROVED" : "REJECTED");
+        if (approved) {
+            restoreOrderStock(orderId);
+            order.setStatus(STATUS_REFUNDED);
+            notificationService.send(order.getUserId(), "退款已通过", "订单 " + orderId + " 已退款。");
+        } else {
+            order.setStatus(STATUS_ACCEPTED);
+            notificationService.send(order.getUserId(), "退款被拒绝", "订单 " + orderId + " 的退款申请未通过。");
+        }
         ordersMapper.updateById(order);
         return order;
     }

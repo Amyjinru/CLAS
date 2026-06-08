@@ -5,3 +5,5 @@ export const addReview = (payload) => api.post('/review/add', { userId: currentU
 export const getReviewByOrder = (orderId) => api.get(`/review/order/${orderId}`).then(unwrap)
 export const listReviewsByMerchant = (merchantId) => api.get(`/review/merchant/${merchantId}`).then(unwrap)
 export const getMerchantRating = (merchantId) => api.get(`/review/rating/${merchantId}`).then(unwrap)
+export const replyReview = (reviewId, reply) => api.post(`/review/${reviewId}/reply`, { reply }).then(unwrap)
+export const reportReview = (reviewId, reason) => api.post(`/review/${reviewId}/report`, { reason }).then(unwrap)

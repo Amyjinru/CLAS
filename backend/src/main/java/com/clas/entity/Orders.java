@@ -15,5 +15,10 @@ public class Orders {
     private Long merchantId;
     private Integer totalPrice;
     private String status;
+    private String deliveryAddress;
+    private String deliveryStatus;
+    private Integer estimatedMinutes;
+    private String refundReason;
+    private String refundStatus;
     private LocalDateTime createTime;
 }

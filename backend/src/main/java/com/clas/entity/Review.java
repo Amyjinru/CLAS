@@ -14,4 +14,7 @@ public class Review {
     private String userId;
     private Integer score;
     private String content;
+    private String merchantReply;
+    private String reportReason;
+    private String reportStatus;
 }

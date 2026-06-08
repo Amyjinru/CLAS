@@ -2,7 +2,7 @@
 import BackButton from '../components/BackButton.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { addCart, createOrder, getCart, getMerchant, listProducts, removeCart } from '../api/clas'
+import { addCart, addFavorite, createOrder, getCart, getMerchant, listFavorites, listProducts, removeCart, removeFavorite } from '../api/clas'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +13,7 @@ const cartItems = ref([])
 const cartOpen = ref(false)
 const message = ref('')
 const submitting = ref(false)
+const favoriteMerchantIds = ref(new Set())
 
 const merchantCartItems = computed(() =>
   cartItems.value.filter((item) => item.merchantId === merchantId.value)
@@ -27,6 +28,12 @@ const cartTotal = computed(() =>
 async function loadProducts() {
   merchant.value = await getMerchant(route.params.id)
   products.value = await listProducts(route.params.id)
+  try {
+    const favorites = await listFavorites()
+    favoriteMerchantIds.value = new Set(favorites.map((item) => item.id))
+  } catch {
+    favoriteMerchantIds.value = new Set()
+  }
 }
 
 async function loadCart() {
@@ -107,6 +114,17 @@ function closeCart() {
   cartOpen.value = false
 }
 
+async function toggleFavorite() {
+  if (favoriteMerchantIds.value.has(merchantId.value)) {
+    await removeFavorite(merchantId.value)
+    message.value = '已取消收藏'
+  } else {
+    await addFavorite(merchantId.value)
+    message.value = '已收藏商家'
+  }
+  await loadProducts()
+}
+
 onMounted(load)
 
 watch(
@@ -127,6 +145,10 @@ watch(
     <section class="panel" v-if="merchant">
       <h1>{{ merchant.merchantName }}</h1>
       <p>{{ merchant.category }} · {{ merchant.address }} · {{ merchant.score }} 分</p>
+      <p>{{ merchant.businessHours }} · 起送 ¥{{ ((merchant.minOrderPrice || 0) / 100).toFixed(0) }} · 配送费 ¥{{ ((merchant.deliveryFee || 0) / 100).toFixed(0) }}</p>
+      <button class="secondary" @click="toggleFavorite">
+        {{ favoriteMerchantIds.has(merchantId) ? '取消收藏' : '收藏商家' }}
+      </button>
     </section>
 
     <p class="message">{{ message }}</p>

@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
-import { cancelOrder, completeOrder, getReviewByOrder, listOrders } from '../api/clas'
+import { cancelOrder, completeOrder, getReviewByOrder, listOrders, requestRefund } from '../api/clas'
 
 const orders = ref([])
 const message = ref('')
@@ -15,7 +15,14 @@ const statusLabel = {
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
-  REFUNDED: '已退款'
+  REFUNDED: '已退款',
+  REFUND_PENDING: '退款处理中'
+}
+const deliveryLabel = {
+  WAITING: '等待商家接单',
+  PREPARING: '商家备餐中',
+  DELIVERING: '配送中',
+  DELIVERED: '已送达'
 }
 
 async function load() {
@@ -49,6 +56,13 @@ async function cancel(order) {
   await load()
 }
 
+async function refund(order) {
+  const reason = window.prompt('请输入退款原因', '行程变化，申请退款')
+  if (!reason) return
+  await requestRefund(order.order.id, reason)
+  await load()
+}
+
 function hasReview(orderId) {
   return reviewedOrderIds.value.has(orderId)
 }
@@ -67,7 +81,8 @@ onMounted(load)
     <article class="row" v-for="order in orders" :key="order.order.id">
       <div>
         <h2>订单 {{ order.order.id }}</h2>
-        <p>{{ statusLabel[order.order.status] || order.order.status }} · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p>
+        <p>{{ statusLabel[order.order.status] || order.order.status }} · {{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }} · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p>
+        <p v-if="order.order.deliveryAddress">送至 {{ order.order.deliveryAddress }} · 约 {{ order.order.estimatedMinutes }} 分钟</p>
         <p>{{ order.items.length }} 件商品</p>
       </div>
       <div class="row-actions">
@@ -86,6 +101,13 @@ onMounted(load)
           取消订单
         </button>
         <button v-if="order.order.status === 'ACCEPTED'" @click="complete(order)">确认完成</button>
+        <button
+          v-if="['PAID', 'ACCEPTED', 'COMPLETED'].includes(order.order.status)"
+          class="secondary"
+          @click="refund(order)"
+        >
+          申请退款
+        </button>
         <RouterLink
           v-if="order.order.status === 'COMPLETED' && !hasReview(order.order.id)"
           class="button secondary"

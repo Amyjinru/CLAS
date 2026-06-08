@@ -60,8 +60,11 @@ async function handleLogout() {
         <!-- ===== USER 普通用户 ===== -->
         <template v-else-if="role === 'USER'">
           <RouterLink to="/home">浏览商家</RouterLink>
+          <RouterLink to="/deals">团购</RouterLink>
+          <RouterLink to="/bookings">生活预约</RouterLink>
           <RouterLink to="/cart">购物车</RouterLink>
           <RouterLink to="/orders">我的订单</RouterLink>
+          <RouterLink to="/profile">个人中心</RouterLink>
           <RouterLink to="/user/announcements">平台公告</RouterLink>
           <RouterLink to="/merchant-register">商家入驻</RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
@@ -70,6 +73,8 @@ async function handleLogout() {
         <!-- ===== MERCHANT 商家 ===== -->
         <template v-else-if="role === 'MERCHANT'">
           <RouterLink to="/merchant-console">商家工作台</RouterLink>
+          <RouterLink to="/merchant/deals">团购管理</RouterLink>
+          <RouterLink to="/merchant/bookings">预约管理</RouterLink>
           <RouterLink to="/merchant/announcements">平台公告</RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>

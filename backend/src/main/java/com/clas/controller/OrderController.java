@@ -7,6 +7,7 @@ import com.clas.dto.CreateOrderRequest;
 import com.clas.dto.OrderResponse;
 import com.clas.dto.PaymentRequest;
 import com.clas.dto.PaymentResponse;
+import com.clas.dto.RefundRequest;
 import com.clas.entity.Orders;
 import com.clas.service.MerchantService;
 import com.clas.service.OrderService;
@@ -36,7 +37,11 @@ public class OrderController {
     @PostMapping("/create")
     @RequireRole("USER")
     public Result<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
-        return Result.ok(orderService.create(new CreateOrderRequest(currentUserId(), request.merchantId())));
+        return Result.ok(orderService.create(new CreateOrderRequest(
+            currentUserId(),
+            request.merchantId(),
+            request.deliveryAddress()
+        )));
     }
 
     @GetMapping("/list/{userId}")
@@ -83,10 +88,29 @@ public class OrderController {
         return Result.ok(orderService.reject(orderId, merchantService.getCurrentMerchantId()));
     }
 
+    @PostMapping("/deliver/{orderId}")
+    @RequireRole("MERCHANT")
+    public Result<Orders> deliver(@PathVariable Long orderId) {
+        return Result.ok(orderService.deliver(orderId, merchantService.getCurrentMerchantId()));
+    }
+
     @PostMapping("/refund/{orderId}")
     @RequireRole("USER")
-    public Result<Orders> refund(@PathVariable Long orderId) {
-        return Result.ok(orderService.refund(orderId, currentUserId()));
+    public Result<Orders> refund(@PathVariable Long orderId, @Valid @RequestBody(required = false) RefundRequest request) {
+        String reason = request == null ? "用户申请退款" : request.reason();
+        return Result.ok(orderService.requestRefund(orderId, currentUserId(), reason));
+    }
+
+    @PostMapping("/refund/{orderId}/approve")
+    @RequireRole("MERCHANT")
+    public Result<Orders> approveRefund(@PathVariable Long orderId) {
+        return Result.ok(orderService.resolveRefund(orderId, merchantService.getCurrentMerchantId(), true));
+    }
+
+    @PostMapping("/refund/{orderId}/reject")
+    @RequireRole("MERCHANT")
+    public Result<Orders> rejectRefund(@PathVariable Long orderId) {
+        return Result.ok(orderService.resolveRefund(orderId, merchantService.getCurrentMerchantId(), false));
     }
 
     private String currentUserId() {

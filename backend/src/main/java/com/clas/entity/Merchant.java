@@ -21,6 +21,10 @@ public class Merchant {
     private String phone;
     private String category;
     private String address;
+    private String businessHours;
+    private Integer deliveryFee;
+    private Integer minOrderPrice;
+    private Integer averagePrice;
     private BigDecimal score;
     private MerchantStatusEnum status;
     private String bankAccount;

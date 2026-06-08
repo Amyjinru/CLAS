@@ -1,0 +1,104 @@
+<script setup>
+import { onMounted, reactive, ref } from 'vue'
+import { createDeal, listMerchantDeals } from '../api/clas'
+import { ElMessage } from 'element-plus'
+
+const deals = ref([])
+const form = reactive({
+  title: '',
+  description: '',
+  originalPrice: 0,
+  dealPrice: 0,
+  stock: 20,
+  validDays: 30,
+  status: 'ON_SALE'
+})
+
+function yuan(value) {
+  return ((value || 0) / 100).toFixed(2)
+}
+
+async function load() {
+  deals.value = await listMerchantDeals()
+}
+
+async function submit() {
+  await createDeal({
+    ...form,
+    originalPrice: Math.round(Number(form.originalPrice) * 100),
+    dealPrice: Math.round(Number(form.dealPrice) * 100)
+  })
+  ElMessage.success('团购套餐已创建')
+  Object.assign(form, { title: '', description: '', originalPrice: 0, dealPrice: 0, stock: 20, validDays: 30, status: 'ON_SALE' })
+  await load()
+}
+
+onMounted(load)
+</script>
+
+<template>
+  <section class="hero">
+    <div>
+      <h1>团购管理</h1>
+      <p>维护到店套餐、优惠券库存和有效期。</p>
+    </div>
+  </section>
+
+  <section class="deal-layout">
+    <div class="panel">
+      <h2>新建团购</h2>
+      <el-form :model="form" label-position="top">
+        <el-form-item label="套餐名称"><el-input v-model="form.title" /></el-form-item>
+        <el-form-item label="说明"><el-input v-model="form.description" /></el-form-item>
+        <el-form-item label="门市价（元）"><el-input-number v-model="form.originalPrice" :min="0" /></el-form-item>
+        <el-form-item label="团购价（元）"><el-input-number v-model="form.dealPrice" :min="0" /></el-form-item>
+        <el-form-item label="库存"><el-input-number v-model="form.stock" :min="0" /></el-form-item>
+        <el-form-item label="有效天数"><el-input-number v-model="form.validDays" :min="1" /></el-form-item>
+        <el-button type="primary" @click="submit">创建套餐</el-button>
+      </el-form>
+    </div>
+
+    <div class="panel">
+      <h2>已有套餐</h2>
+      <article class="deal-row" v-for="deal in deals" :key="deal.id">
+        <div>
+          <strong>{{ deal.title }}</strong>
+          <p>{{ deal.description }}</p>
+        </div>
+        <div class="deal-price">¥{{ yuan(deal.dealPrice) }}</div>
+      </article>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.deal-layout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 360px minmax(0, 1fr);
+}
+.panel h2 {
+  margin-top: 0;
+}
+.deal-row {
+  align-items: center;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 0;
+}
+.deal-row p {
+  color: var(--text-secondary);
+  margin: 6px 0 0;
+}
+.deal-price {
+  color: var(--color-primary);
+  font-size: 20px;
+  font-weight: 800;
+}
+@media (max-width: 900px) {
+  .deal-layout {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

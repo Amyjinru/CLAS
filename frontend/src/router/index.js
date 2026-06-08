@@ -8,11 +8,16 @@ const HomeView = () => import('../views/HomeView.vue')
 const MerchantDetailView = () => import('../views/MerchantDetailView.vue')
 const CartView = () => import('../views/CartView.vue')
 const OrdersView = () => import('../views/OrdersView.vue')
+const DealsView = () => import('../views/DealsView.vue')
+const BookingsView = () => import('../views/BookingsView.vue')
+const ProfileView = () => import('../views/ProfileView.vue')
 const PaymentView = () => import('../views/PaymentView.vue')
 const ReviewView = () => import('../views/ReviewView.vue')
 const MerchantRegisterView = () => import('../views/MerchantRegisterView.vue')
 const MerchantConsoleView = () => import('../views/MerchantConsoleView.vue')
 const MerchantProductsView = () => import('../views/MerchantProductsView.vue')
+const MerchantDealsView = () => import('../views/MerchantDealsView.vue')
+const MerchantBookingsView = () => import('../views/MerchantBookingsView.vue')
 const UserAnnouncementsView = () => import('../views/user/UserAnnouncementsView.vue')
 const MerchantAnnouncementsView = () => import('../views/merchant/MerchantAnnouncementsView.vue')
 const AdminLayout = () => import('../views/admin/AdminLayout.vue')
@@ -40,6 +45,9 @@ const routes = [
   { path: '/merchant/:id', component: MerchantDetailView, meta: { roles: ['USER'], userPortal: true } },
 
   { path: '/cart', component: CartView, meta: { roles: ['USER'] } },
+  { path: '/deals', component: DealsView, meta: { roles: ['USER'] } },
+  { path: '/bookings', component: BookingsView, meta: { roles: ['USER'] } },
+  { path: '/profile', component: ProfileView, meta: { roles: ['USER'] } },
 
   { path: '/orders', component: OrdersView, meta: { roles: ['USER'] } },
 
@@ -66,6 +74,8 @@ const routes = [
   },
 
   { path: '/merchant/products', component: MerchantProductsView, meta: { roles: ['MERCHANT'] } },
+  { path: '/merchant/deals', component: MerchantDealsView, meta: { roles: ['MERCHANT'] } },
+  { path: '/merchant/bookings', component: MerchantBookingsView, meta: { roles: ['MERCHANT'] } },
 
   { path: '/merchant-console', component: MerchantConsoleView, meta: { roles: ['MERCHANT'] } },
 

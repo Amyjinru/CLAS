@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,8 +34,12 @@ public class MerchantController {
     }
 
     @GetMapping("/list")
-    public Result<List<MerchantResponse>> list() {
-        return Result.ok(merchantService.list());
+    public Result<List<MerchantResponse>> list(
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) String category,
+        @RequestParam(required = false) String sort
+    ) {
+        return Result.ok(merchantService.search(keyword, category, sort));
     }
 
     @GetMapping("/{id}")

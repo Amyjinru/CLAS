@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS merchant (
     phone VARCHAR(20) NOT NULL UNIQUE,
     category VARCHAR(50),
     address VARCHAR(255),
+    business_hours VARCHAR(100),
+    delivery_fee INT NOT NULL DEFAULT 0,
+    min_order_price INT NOT NULL DEFAULT 0,
+    average_price INT NOT NULL DEFAULT 0,
     score DECIMAL(3,2) DEFAULT 0.00,
     status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
     bank_account VARCHAR(50),
@@ -53,12 +57,45 @@ CREATE TABLE IF NOT EXISTS cart (
     quantity INT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS user_address (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    contact_name VARCHAR(50) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS favorite (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    merchant_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    UNIQUE(user_id, merchant_id)
+);
+
+CREATE TABLE IF NOT EXISTS notification (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    content VARCHAR(255) NOT NULL,
+    read_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,
     merchant_id BIGINT NOT NULL,
     total_price INT NOT NULL,
     status VARCHAR(20) NOT NULL,
+    delivery_address VARCHAR(255),
+    delivery_status VARCHAR(20) NOT NULL DEFAULT 'WAITING',
+    estimated_minutes INT NOT NULL DEFAULT 30,
+    refund_reason VARCHAR(255),
+    refund_status VARCHAR(20) NOT NULL DEFAULT 'NONE',
     create_time TIMESTAMP NOT NULL
 );
 
@@ -75,7 +112,10 @@ CREATE TABLE IF NOT EXISTS review (
     order_id BIGINT NOT NULL,
     user_id VARCHAR(20) NOT NULL,
     score INT NOT NULL,
-    content CLOB
+    content CLOB,
+    merchant_reply CLOB,
+    report_reason VARCHAR(255),
+    report_status VARCHAR(20) NOT NULL DEFAULT 'NONE'
 );
 
 CREATE TABLE IF NOT EXISTS payment (
@@ -96,7 +136,52 @@ CREATE TABLE IF NOT EXISTS announcement (
     create_time TIMESTAMP NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS service_booking (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    merchant_id BIGINT NOT NULL,
+    service_name VARCHAR(100) NOT NULL,
+    appointment_time TIMESTAMP NOT NULL,
+    contact_phone VARCHAR(20) NOT NULL,
+    note VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS group_deal (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    merchant_id BIGINT NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    description VARCHAR(255),
+    original_price INT NOT NULL,
+    deal_price INT NOT NULL,
+    stock INT NOT NULL DEFAULT 0,
+    valid_days INT NOT NULL DEFAULT 30,
+    status VARCHAR(20) NOT NULL DEFAULT 'ON_SALE',
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS deal_order (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    deal_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    merchant_id BIGINT NOT NULL,
+    voucher_code VARCHAR(40) NOT NULL UNIQUE,
+    status VARCHAR(20) NOT NULL DEFAULT 'UNUSED',
+    pay_amount INT NOT NULL,
+    create_time TIMESTAMP NOT NULL,
+    used_time TIMESTAMP
+);
+
 DELETE FROM announcement;
+DELETE FROM service_booking;
+DELETE FROM deal_order;
+DELETE FROM group_deal;
+DELETE FROM notification;
+DELETE FROM favorite;
+DELETE FROM user_address;
 DELETE FROM payment;
 DELETE FROM review;
 DELETE FROM order_item;
@@ -113,8 +198,8 @@ INSERT INTO "user" (phone, username, password, role) VALUES
     ('13800000002', 'merchant', 'Abc123!', 'MERCHANT'),
     ('13800000003', 'admin', 'Abc123!', 'ADMIN');
 
-INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, score, status, created_at, updated_at) VALUES
-    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 4.70, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES
+    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
     (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
@@ -122,8 +207,23 @@ INSERT INTO product (id, merchant_id, name, description, price, stock, image, st
 INSERT INTO announcement (id, title, content, status, create_time) VALUES
     (1, '测试公告', 'H2 集成测试公告', 'PUBLISHED', CURRENT_TIMESTAMP);
 
+INSERT INTO user_address (id, user_id, contact_name, phone, address, is_default, created_at, updated_at) VALUES
+    (1, '13800000001', '张同学', '13800000001', '软件学院 A 座 302', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+INSERT INTO service_booking (id, user_id, merchant_id, service_name, appointment_time, contact_phone, note, status, created_at, updated_at) VALUES
+    (1, '13800000001', 1, '门店轻食咨询', DATEADD('DAY', 1, CURRENT_TIMESTAMP), '13800000001', '希望安排下午到店', 'CONFIRMED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+INSERT INTO group_deal (id, merchant_id, title, description, original_price, deal_price, stock, valid_days, status, created_at, updated_at) VALUES
+    (1, 1, '双人轻食套餐', '任选两份主食加酸奶杯，到店核销更划算', 6400, 4990, 50, 30, 'ON_SALE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
 ALTER TABLE merchant ALTER COLUMN id RESTART WITH 10;
 ALTER TABLE merchant_audit_log ALTER COLUMN id RESTART WITH 10;
 ALTER TABLE product ALTER COLUMN id RESTART WITH 10;
 ALTER TABLE orders ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE announcement ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE user_address ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE favorite ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE notification ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE service_booking ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE group_deal ALTER COLUMN id RESTART WITH 10;
+ALTER TABLE deal_order ALTER COLUMN id RESTART WITH 10;

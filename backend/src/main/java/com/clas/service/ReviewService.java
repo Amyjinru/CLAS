@@ -23,17 +23,23 @@ public class ReviewService {
     private final OrderService orderService;
     private final OrdersMapper ordersMapper;
     private final MerchantMapper merchantMapper;
+    private final MerchantService merchantService;
+    private final NotificationService notificationService;
 
     public ReviewService(
         ReviewMapper reviewMapper,
         OrderService orderService,
         OrdersMapper ordersMapper,
-        MerchantMapper merchantMapper
+        MerchantMapper merchantMapper,
+        MerchantService merchantService,
+        NotificationService notificationService
     ) {
         this.reviewMapper = reviewMapper;
         this.orderService = orderService;
         this.ordersMapper = ordersMapper;
         this.merchantMapper = merchantMapper;
+        this.merchantService = merchantService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -55,6 +61,7 @@ public class ReviewService {
         review.setUserId(request.userId());
         review.setScore(request.score());
         review.setContent(request.content());
+        review.setReportStatus("NONE");
         reviewMapper.insert(review);
         recalculateMerchantScore(order.getMerchantId());
         return review;
@@ -97,6 +104,40 @@ public class ReviewService {
         );
     }
 
+    public Review reply(Long reviewId, String reply) {
+        Review review = requireReview(reviewId);
+        Orders order = orderService.requireOrder(review.getOrderId());
+        if (!merchantService.getCurrentMerchantId().equals(order.getMerchantId())) {
+            throw new BusinessException("只能回复自己店铺的评价");
+        }
+        review.setMerchantReply(reply);
+        reviewMapper.updateById(review);
+        notificationService.send(review.getUserId(), "商家回复了评价", "您的订单 " + review.getOrderId() + " 评价收到商家回复。");
+        return review;
+    }
+
+    public Review report(Long reviewId, String reason, String userId) {
+        Review review = requireReview(reviewId);
+        if (!review.getUserId().equals(userId)) {
+            throw new BusinessException("只能举报自己的评价记录");
+        }
+        review.setReportReason(reason);
+        review.setReportStatus("PENDING");
+        reviewMapper.updateById(review);
+        return review;
+    }
+
+    public Review resolveReport(Long reviewId, String status) {
+        Review review = requireReview(reviewId);
+        String nextStatus = status == null || status.isBlank() ? "RESOLVED" : status;
+        if (!"RESOLVED".equals(nextStatus) && !"REJECTED".equals(nextStatus) && !"PENDING".equals(nextStatus)) {
+            throw new BusinessException("举报状态只能是 PENDING、RESOLVED 或 REJECTED");
+        }
+        review.setReportStatus(nextStatus);
+        reviewMapper.updateById(review);
+        return review;
+    }
+
     /**
      * 公开的重算商家评分方法 — 供 AdminController 删除评价后调用
      */
@@ -119,5 +160,13 @@ public class ReviewService {
         }
         merchant.setScore(BigDecimal.valueOf(average).setScale(2, RoundingMode.HALF_UP));
         merchantMapper.updateById(merchant);
+    }
+
+    private Review requireReview(Long reviewId) {
+        Review review = reviewMapper.selectById(reviewId);
+        if (review == null) {
+            throw new BusinessException("评价不存在");
+        }
+        return review;
     }
 }

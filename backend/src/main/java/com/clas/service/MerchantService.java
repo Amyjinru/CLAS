@@ -42,9 +42,30 @@ public class MerchantService {
     }
 
     public List<MerchantResponse> list() {
-        List<Merchant> merchants = merchantMapper.selectList(new LambdaQueryWrapper<Merchant>()
-            .eq(Merchant::getStatus, MerchantStatusEnum.OPEN)
-            .orderByDesc(Merchant::getScore));
+        return search(null, null, "score");
+    }
+
+    public List<MerchantResponse> search(String keyword, String category, String sort) {
+        LambdaQueryWrapper<Merchant> wrapper = new LambdaQueryWrapper<Merchant>()
+            .eq(Merchant::getStatus, MerchantStatusEnum.OPEN);
+        if (keyword != null && !keyword.isBlank()) {
+            wrapper.and(w -> w.like(Merchant::getMerchantName, keyword)
+                .or()
+                .like(Merchant::getAddress, keyword)
+                .or()
+                .like(Merchant::getCategory, keyword));
+        }
+        if (category != null && !category.isBlank()) {
+            wrapper.eq(Merchant::getCategory, category);
+        }
+        if ("price".equals(sort)) {
+            wrapper.orderByAsc(Merchant::getAveragePrice);
+        } else if ("latest".equals(sort)) {
+            wrapper.orderByDesc(Merchant::getId);
+        } else {
+            wrapper.orderByDesc(Merchant::getScore);
+        }
+        List<Merchant> merchants = merchantMapper.selectList(wrapper);
         return merchants.stream().map(this::convertToResponse).collect(Collectors.toList());
     }
 
@@ -140,6 +161,10 @@ public class MerchantService {
         merchant.setPhone(contactPhone);
         merchant.setCategory(request.category());
         merchant.setAddress(request.address());
+        merchant.setBusinessHours("09:00-21:00");
+        merchant.setDeliveryFee(0);
+        merchant.setMinOrderPrice(0);
+        merchant.setAveragePrice(0);
         merchant.setScore(BigDecimal.valueOf(0.00));
         merchant.setStatus(MerchantStatusEnum.PENDING); // Default pending
         merchant.setBankAccount(request.bankAccount());
@@ -223,6 +248,10 @@ public class MerchantService {
             merchant.getPhone(),
             merchant.getCategory(),
             merchant.getAddress(),
+            merchant.getBusinessHours(),
+            merchant.getDeliveryFee(),
+            merchant.getMinOrderPrice(),
+            merchant.getAveragePrice(),
             merchant.getScore(),
             merchant.getStatus(),
             merchant.getBankAccount(),

@@ -1,10 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { createOrder, deleteCartItem, getCart, updateCart } from '../api/clas'
+import { createOrder, deleteCartItem, getCart, listAddresses, updateCart } from '../api/clas'
 
 const items = ref([])
 const message = ref('')
 const updatingProductId = ref(null)
+const addresses = ref([])
+const selectedAddress = ref('')
 
 const total = () => items.value.reduce((sum, item) => sum + item.subtotal, 0)
 const merchantIds = () => [...new Set(items.value.map((item) => item.merchantId).filter(Boolean))]
@@ -12,6 +14,8 @@ const merchantIds = () => [...new Set(items.value.map((item) => item.merchantId)
 async function load() {
   try {
     items.value = await getCart()
+    addresses.value = await listAddresses()
+    selectedAddress.value = addresses.value.find((item) => item.isDefault)?.address || addresses.value[0]?.address || ''
   } catch (error) {
     message.value = '请先登录后查看购物车'
   }
@@ -20,7 +24,7 @@ async function load() {
 async function submit() {
   if (!items.value.length) return
   const merchantId = merchantIds()[0]
-  const data = await createOrder({ merchantId })
+  const data = await createOrder({ merchantId, deliveryAddress: selectedAddress.value })
   message.value = `订单 ${data.order.id} 已创建，库存已扣减，请前往支付`
   await load()
 }
@@ -105,6 +109,15 @@ onMounted(load)
     </div>
 
     <footer class="checkout-bar" v-if="items.length">
+      <label class="address-select">
+        <span class="total-label">配送地址</span>
+        <select v-model="selectedAddress">
+          <option value="">暂不选择</option>
+          <option v-for="item in addresses" :key="item.id" :value="item.address">
+            {{ item.contactName }} · {{ item.address }}
+          </option>
+        </select>
+      </label>
       <div class="checkout-total">
         <span class="total-label">合计</span>
         <span class="total-price">¥{{ (total() / 100).toFixed(2) }}</span>
@@ -289,6 +302,19 @@ onMounted(load)
   display: flex;
   align-items: baseline;
   gap: 12px;
+}
+.address-select {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+.address-select select {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  height: 38px;
+  max-width: 240px;
+  padding: 0 10px;
 }
 .total-label {
   font-size: 15px;

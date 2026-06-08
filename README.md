@@ -298,3 +298,25 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 | `views/admin/AdminOrdersView.vue` | 订单管理页面 |
 | `views/admin/AdminReviewsView.vue` | 评价管理页面 |
 | `styles/theme.css` | CSS 主题变量体系 |
+# 2026-06-08 开发进度快照
+
+当前 `dev` 分支已经从外卖下单 MVP 扩展为“生活助手平台”综合演示版本，围绕作业第二个开发建议补齐了用户、商家、管理员三端能力：
+
+- 用户端：商家搜索/筛选、商品下单、地址管理、团购券购买、收藏店铺、消息通知、订单退款申请、生活服务预约、评价与举报。
+- 商家端：接单/配送/完成、团购券创建与核销、评价回复、退款审核、预约确认/完成/取消、公告查看。
+- 管理端：商家审核、仪表盘统计、用户/订单/评价/公告管理、评价举报处理。
+- 数据库：当前 schema 已扩展到 16 张业务表，新增/调整内容见 `database/schema.sql`，协作同学拉取后需要重新执行脚本或同步迁移表结构。
+- 鉴权说明：仍采用课程演示级 `Authorization: <phone>` + `@RequireRole` 方案，尚未接入生产级 JWT / Spring Security。
+
+新增页面入口：
+
+| 角色 | 路由 | 功能 |
+| --- | --- | --- |
+| USER | `/home` | 商家搜索、筛选、推荐排序 |
+| USER | `/deals` | 团购券列表与购买 |
+| USER | `/bookings` | 生活服务预约提交与取消 |
+| USER | `/profile` | 地址、收藏、通知中心 |
+| MERCHANT | `/merchant-console` | 订单、配送、退款、评价回复、核销 |
+| MERCHANT | `/merchant/deals` | 团购券管理 |
+| MERCHANT | `/merchant/bookings` | 预约管理 |
+| ADMIN | `/admin/reviews` | 评价举报处理 |

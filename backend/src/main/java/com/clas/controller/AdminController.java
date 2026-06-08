@@ -161,6 +161,9 @@ public class AdminController {
             map.put("username", user != null ? user.getUsername() : "未知");
             map.put("score", r.getScore());
             map.put("content", r.getContent());
+            map.put("merchantReply", r.getMerchantReply());
+            map.put("reportReason", r.getReportReason());
+            map.put("reportStatus", r.getReportStatus());
             map.put("merchantId", order != null ? order.getMerchantId() : null);
             return map;
         }).toList();
@@ -188,5 +191,10 @@ public class AdminController {
             reviewService.recalculateMerchantScorePublic(order.getMerchantId());
         }
         return Result.ok();
+    }
+
+    @PutMapping("/reviews/{id}/report-status")
+    public Result<Review> resolveReviewReport(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return Result.ok(reviewService.resolveReport(id, body.getOrDefault("status", "RESOLVED")));
     }
 }

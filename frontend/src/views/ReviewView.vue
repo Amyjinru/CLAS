@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
-import { addReview, getReviewByOrder } from '../api/clas'
+import { addReview, getReviewByOrder, reportReview } from '../api/clas'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,6 +12,7 @@ const content = ref('')
 const existingReview = ref(null)
 const message = ref('')
 const submitting = ref(false)
+const reportReason = ref('')
 
 async function load() {
   try {
@@ -39,6 +40,13 @@ function goOrders() {
   router.push('/orders')
 }
 
+async function report() {
+  if (!reportReason.value.trim() || !existingReview.value) return
+  await reportReview(existingReview.value.id, reportReason.value.trim())
+  message.value = '举报已提交，管理员会尽快处理'
+  await load()
+}
+
 onMounted(load)
 </script>
 
@@ -53,6 +61,14 @@ onMounted(load)
       <p>您已评价过该订单</p>
       <p>评分：{{ '★'.repeat(existingReview.score) }}{{ '☆'.repeat(5 - existingReview.score) }}</p>
       <p>{{ existingReview.content || '（无文字评价）' }}</p>
+      <p v-if="existingReview.merchantReply" class="reply">商家回复：{{ existingReview.merchantReply }}</p>
+      <p v-if="existingReview.reportStatus !== 'NONE'">举报状态：{{ existingReview.reportStatus }}</p>
+      <label>
+        举报原因
+        <textarea v-model="reportReason" placeholder="例如：评价内容需复核、商家回复不当..." />
+      </label>
+      <p class="message">{{ message }}</p>
+      <button class="secondary" @click="report">提交举报</button>
       <button class="secondary" @click="goOrders">返回订单列表</button>
     </div>
 
@@ -85,6 +101,12 @@ onMounted(load)
 
 .review-result p {
   margin-bottom: 10px;
+}
+
+.reply {
+  background: var(--color-primary-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
 }
 
 input[type='range'] {

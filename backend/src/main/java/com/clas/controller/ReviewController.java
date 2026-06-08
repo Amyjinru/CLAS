@@ -4,6 +4,8 @@ import com.clas.common.Result;
 import com.clas.config.RequireRole;
 import com.clas.config.UserContext;
 import com.clas.dto.MerchantRatingResponse;
+import com.clas.dto.ReviewReplyRequest;
+import com.clas.dto.ReviewReportRequest;
 import com.clas.dto.ReviewRequest;
 import com.clas.entity.Review;
 import com.clas.service.ReviewService;
@@ -50,5 +52,17 @@ public class ReviewController {
     @GetMapping("/rating/{merchantId}")
     public Result<MerchantRatingResponse> merchantRating(@PathVariable Long merchantId) {
         return Result.ok(reviewService.getMerchantRating(merchantId));
+    }
+
+    @PostMapping("/{reviewId}/reply")
+    @RequireRole("MERCHANT")
+    public Result<Review> reply(@PathVariable Long reviewId, @Valid @RequestBody ReviewReplyRequest request) {
+        return Result.ok(reviewService.reply(reviewId, request.reply()));
+    }
+
+    @PostMapping("/{reviewId}/report")
+    @RequireRole("USER")
+    public Result<Review> report(@PathVariable Long reviewId, @Valid @RequestBody ReviewReportRequest request) {
+        return Result.ok(reviewService.report(reviewId, request.reason(), UserContext.getUserId()));
     }
 }

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -420,5 +421,51 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("新公告"));
+    }
+
+    @Test
+    void bookingFlowRequiresOwnerAndMerchantRoles() throws Exception {
+        mockMvc.perform(get("/api/bookings/merchant")
+                .header("Authorization", USER_PHONE))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400));
+
+        MvcResult bookingResult = mockMvc.perform(post("/api/bookings")
+                .header("Authorization", USER_PHONE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "merchantId", 1,
+                    "serviceName", "到店咨询",
+                    "appointmentTime", LocalDateTime.now().plusDays(2),
+                    "contactPhone", USER_PHONE,
+                    "note", "集成测试预约"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.status").value("PENDING"))
+            .andExpect(jsonPath("$.data.userId").value(USER_PHONE))
+            .andReturn();
+
+        Long bookingId = objectMapper.readTree(bookingResult.getResponse().getContentAsString())
+            .path("data").path("id").asLong();
+
+        mockMvc.perform(post("/api/bookings/" + bookingId + "/status")
+                .header("Authorization", USER_PHONE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("status", "CONFIRMED"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400));
+
+        mockMvc.perform(post("/api/bookings/" + bookingId + "/status")
+                .header("Authorization", MERCHANT_PHONE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("status", "CONFIRMED"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
+
+        mockMvc.perform(post("/api/bookings/" + bookingId + "/cancel")
+                .header("Authorization", USER_PHONE))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("CANCELED"));
     }
 }
