@@ -2,19 +2,26 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.common.GeoUtils;
 import com.clas.dto.CreateOrderRequest;
 import com.clas.dto.OrderResponse;
 import com.clas.entity.Cart;
+import com.clas.entity.Merchant;
 import com.clas.entity.OrderItem;
 import com.clas.entity.Orders;
 import com.clas.entity.Product;
+import com.clas.entity.UserAddress;
 import com.clas.mapper.CartMapper;
+import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.OrderItemMapper;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.ProductMapper;
+import com.clas.mapper.UserAddressMapper;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,19 +42,28 @@ public class OrderService {
     private final CartMapper cartMapper;
     private final ProductMapper productMapper;
     private final NotificationService notificationService;
+    private final MerchantMapper merchantMapper;
+    private final UserAddressMapper userAddressMapper;
+    private final AmapRouteService amapRouteService;
 
     public OrderService(
         OrdersMapper ordersMapper,
         OrderItemMapper orderItemMapper,
         CartMapper cartMapper,
         ProductMapper productMapper,
-        NotificationService notificationService
+        NotificationService notificationService,
+        MerchantMapper merchantMapper,
+        UserAddressMapper userAddressMapper,
+        AmapRouteService amapRouteService
     ) {
         this.ordersMapper = ordersMapper;
         this.orderItemMapper = orderItemMapper;
         this.cartMapper = cartMapper;
         this.productMapper = productMapper;
         this.notificationService = notificationService;
+        this.merchantMapper = merchantMapper;
+        this.userAddressMapper = userAddressMapper;
+        this.amapRouteService = amapRouteService;
     }
 
     @Transactional
@@ -67,6 +83,7 @@ public class OrderService {
         if (merchantCartItems.isEmpty()) {
             throw new BusinessException("该商家的购物车为空");
         }
+        DeliverySnapshot deliverySnapshot = resolveDeliverySnapshot(request);
 
         int totalPrice = 0;
         for (Cart item : merchantCartItems) {
@@ -85,9 +102,13 @@ public class OrderService {
         order.setMerchantId(request.merchantId());
         order.setTotalPrice(totalPrice);
         order.setStatus(STATUS_PENDING_PAYMENT);
-        order.setDeliveryAddress(request.deliveryAddress());
+        order.setDeliveryAddress(deliverySnapshot.address());
+        order.setDeliveryLongitude(deliverySnapshot.longitude());
+        order.setDeliveryLatitude(deliverySnapshot.latitude());
+        order.setDistanceMeters(deliverySnapshot.distanceMeters());
+        order.setRouteDistanceMeters(deliverySnapshot.routeDistanceMeters());
         order.setDeliveryStatus("WAITING");
-        order.setEstimatedMinutes(30);
+        order.setEstimatedMinutes(deliverySnapshot.estimatedMinutes());
         order.setRefundStatus("NONE");
         order.setCreateTime(LocalDateTime.now());
         ordersMapper.insert(order);
@@ -309,5 +330,71 @@ public class OrderService {
         for (OrderItem item : orderItems) {
             productMapper.restoreStock(item.getProductId(), item.getQuantity());
         }
+    }
+
+    private DeliverySnapshot resolveDeliverySnapshot(CreateOrderRequest request) {
+        if (request.addressId() == null) {
+            return new DeliverySnapshot(request.deliveryAddress(), null, null, null, null, 30);
+        }
+        UserAddress address = userAddressMapper.selectById(request.addressId());
+        if (address == null || !request.userId().equals(address.getUserId())) {
+            throw new BusinessException("地址不存在或无权操作");
+        }
+        if (!GeoUtils.hasCoordinate(address.getLongitude(), address.getLatitude())) {
+            throw new BusinessException("该地址缺少地图坐标");
+        }
+        Merchant merchant = merchantMapper.selectById(request.merchantId());
+        if (merchant == null) {
+            throw new BusinessException("商家不存在");
+        }
+        if (!GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) {
+            throw new BusinessException("商家缺少地图坐标，暂不支持配送");
+        }
+
+        int distanceMeters = GeoUtils.distanceMeters(
+            address.getLatitude(),
+            address.getLongitude(),
+            merchant.getLatitude(),
+            merchant.getLongitude()
+        );
+        int radius = merchant.getDeliveryRadiusM() == null ? 3000 : merchant.getDeliveryRadiusM();
+        if (distanceMeters > radius) {
+            throw new BusinessException("收货地址超出商家配送范围");
+        }
+
+        Optional<AmapRouteService.RouteEstimate> route = amapRouteService.estimateDriving(
+            merchant.getLongitude(),
+            merchant.getLatitude(),
+            address.getLongitude(),
+            address.getLatitude()
+        );
+        Integer routeDistanceMeters = route.map(AmapRouteService.RouteEstimate::distanceMeters).orElse(null);
+        int estimatedMinutes = route
+            .map(AmapRouteService.RouteEstimate::durationMinutes)
+            .map(minutes -> Math.max(20, minutes + 10))
+            .orElseGet(() -> estimateMinutes(distanceMeters));
+
+        return new DeliverySnapshot(
+            address.getAddress(),
+            address.getLongitude(),
+            address.getLatitude(),
+            distanceMeters,
+            routeDistanceMeters,
+            estimatedMinutes
+        );
+    }
+
+    private int estimateMinutes(int distanceMeters) {
+        return Math.max(20, 20 + (int) Math.ceil(distanceMeters / 500.0) * 5);
+    }
+
+    private record DeliverySnapshot(
+        String address,
+        BigDecimal longitude,
+        BigDecimal latitude,
+        Integer distanceMeters,
+        Integer routeDistanceMeters,
+        Integer estimatedMinutes
+    ) {
     }
 }

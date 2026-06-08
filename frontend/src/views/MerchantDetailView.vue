@@ -2,7 +2,11 @@
 import BackButton from '../components/BackButton.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { addCart, addFavorite, createOrder, getCart, getMerchant, listFavorites, listProducts, removeCart, removeFavorite } from '../api/clas'
+import { addCart, addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listProducts, removeCart, removeFavorite } from '../api/clas'
+import LocationSelector from '../components/LocationSelector.vue'
+import MerchantRouteMap from '../components/MerchantRouteMap.vue'
+import { loadAmap } from '../utils/amap'
+import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +18,9 @@ const cartOpen = ref(false)
 const message = ref('')
 const submitting = ref(false)
 const favoriteMerchantIds = ref(new Set())
+const currentLocation = ref(getCurrentLocation())
+const deliveryEstimate = ref(null)
+const locationDialogVisible = ref(false)
 
 const merchantCartItems = computed(() =>
   cartItems.value.filter((item) => item.merchantId === merchantId.value)
@@ -46,6 +53,74 @@ async function loadCart() {
 
 async function load() {
   await Promise.all([loadProducts(), loadCart()])
+  await ensureLocation()
+  await loadDeliveryEstimate()
+}
+
+async function ensureLocation() {
+  if (currentLocation.value?.longitude && currentLocation.value?.latitude) {
+    return
+  }
+  try {
+    const addresses = await listAddresses({ silent: true })
+    const address = addresses.find((item) => item.isDefault) || addresses[0]
+    if (address?.longitude && address?.latitude) {
+      currentLocation.value = {
+        address: address.address,
+        longitude: Number(address.longitude),
+        latitude: Number(address.latitude),
+        source: 'address'
+      }
+      setCurrentLocation(currentLocation.value)
+    }
+  } catch {
+    currentLocation.value = null
+  }
+}
+
+async function autoLocate() {
+  try {
+    const AMap = await loadAmap()
+    const geolocation = new AMap.Geolocation({
+      enableHighAccuracy: true,
+      timeout: 8000,
+      showButton: false
+    })
+    geolocation.getCurrentPosition(async (status, result) => {
+      if (status !== 'complete') {
+        message.value = '自动定位失败，请手动选择位置'
+        return
+      }
+      currentLocation.value = {
+        province: result.addressComponent?.province || '',
+        city: result.addressComponent?.city || '',
+        district: result.addressComponent?.district || '',
+        address: result.formattedAddress || '当前位置',
+        longitude: result.position.lng,
+        latitude: result.position.lat,
+        source: 'auto'
+      }
+      setCurrentLocation(currentLocation.value)
+      await loadDeliveryEstimate()
+    })
+  } catch {
+    message.value = '自动定位失败，请检查高德配置'
+  }
+}
+
+async function loadDeliveryEstimate() {
+  if (!merchant.value?.id || !currentLocation.value?.longitude || !currentLocation.value?.latitude) {
+    deliveryEstimate.value = null
+    return
+  }
+  try {
+    deliveryEstimate.value = await getDeliveryEstimate(merchant.value.id, {
+      lat: currentLocation.value.latitude,
+      lng: currentLocation.value.longitude
+    })
+  } catch {
+    deliveryEstimate.value = null
+  }
 }
 
 function isSoldOut(product) {
@@ -95,7 +170,13 @@ async function submitOrder() {
   submitting.value = true
   message.value = ''
   try {
-    const data = await createOrder({ merchantId: merchantId.value })
+    const addresses = await listAddresses()
+    const address = addresses.find((item) => item.isDefault) || addresses[0]
+    if (!address?.id) {
+      message.value = '请先在个人中心添加配送地址'
+      return
+    }
+    const data = await createOrder({ merchantId: merchantId.value, addressId: address.id })
     cartOpen.value = false
     await load()
     router.push(`/payment/${data.order.id}`)
@@ -104,6 +185,13 @@ async function submitOrder() {
   } finally {
     submitting.value = false
   }
+}
+
+function confirmLocation(location) {
+  currentLocation.value = location
+  setCurrentLocation(location)
+  locationDialogVisible.value = false
+  loadDeliveryEstimate()
 }
 
 function toggleCart() {
@@ -150,6 +238,15 @@ watch(
         {{ favoriteMerchantIds.has(merchantId) ? '取消收藏' : '收藏商家' }}
       </button>
     </section>
+
+    <MerchantRouteMap
+      v-if="merchant"
+      :merchant="merchant"
+      :user-location="currentLocation"
+      :estimate="deliveryEstimate"
+      @locate="autoLocate"
+      @select="locationDialogVisible = true"
+    />
 
     <p class="message">{{ message }}</p>
 
@@ -222,6 +319,14 @@ watch(
         </footer>
       </aside>
     </div>
+
+    <el-dialog v-model="locationDialogVisible" title="选择当前位置" width="760px">
+      <LocationSelector
+        v-model="currentLocation"
+        save-enabled
+        @confirm="confirmLocation"
+      />
+    </el-dialog>
   </div>
 </template>
 

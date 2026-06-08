@@ -3,6 +3,7 @@ import { computed, reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { registerMerchant, currentUser, sendRegisterCode } from '../api/clas'
 import { ElMessage } from 'element-plus'
+import LocationSelector from '../components/LocationSelector.vue'
 
 const router = useRouter()
 const user = ref(null)
@@ -12,6 +13,9 @@ const form = reactive({
   merchantName: '',
   category: '',
   address: '',
+  longitude: null,
+  latitude: null,
+  deliveryRadiusM: 3000,
   accountPhone: '',
   contactPhone: '',
   code: '',
@@ -21,6 +25,23 @@ const form = reactive({
   password: '',
   confirmPassword: ''
 })
+
+const locationData = reactive({
+  province: '',
+  city: '',
+  district: '',
+  street: '',
+  address: '',
+  longitude: null,
+  latitude: null
+})
+
+function onLocationConfirm(loc) {
+  form.address = loc.address
+  form.longitude = loc.longitude
+  form.latitude = loc.latitude
+  ElMessage.success('地址位置已确认')
+}
 
 const phonePattern = /^1[3-9]\d{9}$/
 
@@ -132,6 +153,10 @@ async function submitForm() {
     }
     if (!user.value && !merchantPasswordMatches.value) {
       ElMessage.warning('两次输入的密码不一致')
+      return
+    }
+    if (!form.longitude || !form.latitude) {
+      ElMessage.warning('请在地图中选择商家位置')
       return
     }
     
@@ -266,7 +291,17 @@ async function submitForm() {
         </el-form-item>
 
         <el-form-item label="商家地址" prop="address">
-          <el-input v-model="form.address" type="textarea" :rows="2" placeholder="请输入店铺具体地址" />
+          <LocationSelector
+            v-model="locationData"
+            @confirm="onLocationConfirm"
+          />
+          <div v-if="form.address" class="address-preview">
+            已选地址: {{ form.address }}
+          </div>
+        </el-form-item>
+
+        <el-form-item label="配送范围(米)" prop="deliveryRadiusM">
+          <el-input-number v-model="form.deliveryRadiusM" :min="500" :max="10000" :step="500" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="银行账号" prop="bankAccount">
@@ -367,5 +402,12 @@ async function submitForm() {
 .submit-btn {
   padding-left: 32px;
   padding-right: 32px;
+}
+
+.address-preview {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #67c23a;
+  line-height: 1.4;
 }
 </style>

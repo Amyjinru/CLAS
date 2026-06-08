@@ -2,6 +2,7 @@ import { api, unwrap } from './client'
 
 export const listMerchants = (params) => api.get('/merchant/list', { params }).then(unwrap)
 export const getMerchant = (id) => api.get(`/merchant/${id}`).then(unwrap)
+export const getDeliveryEstimate = (id, params) => api.get(`/merchant/${id}/delivery-estimate`, { params }).then(unwrap)
 export const registerMerchant = (payload) => api.post('/merchant/register', payload).then(unwrap)
 export const getMyMerchant = () => api.get('/merchant/my').then(unwrap)
 export const adminListMerchants = () => api.get('/merchant/admin/list').then(unwrap)

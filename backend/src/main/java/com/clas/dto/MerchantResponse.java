@@ -11,6 +11,9 @@ public record MerchantResponse(
     String phone,
     String category,
     String address,
+    BigDecimal longitude,
+    BigDecimal latitude,
+    Integer deliveryRadiusM,
     String businessHours,
     Integer deliveryFee,
     Integer minOrderPrice,
@@ -21,6 +24,10 @@ public record MerchantResponse(
     String adminRemarks,
     Integer settlementCycle,
     LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    LocalDateTime updatedAt,
+    Integer distanceMeters,
+    Integer routeDistanceMeters,
+    Integer estimatedMinutes,
+    Boolean deliveryAvailable
 ) {
 }

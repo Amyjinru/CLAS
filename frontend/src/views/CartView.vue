@@ -6,7 +6,7 @@ const items = ref([])
 const message = ref('')
 const updatingProductId = ref(null)
 const addresses = ref([])
-const selectedAddress = ref('')
+const selectedAddressId = ref('')
 
 const total = () => items.value.reduce((sum, item) => sum + item.subtotal, 0)
 const merchantIds = () => [...new Set(items.value.map((item) => item.merchantId).filter(Boolean))]
@@ -15,7 +15,7 @@ async function load() {
   try {
     items.value = await getCart()
     addresses.value = await listAddresses()
-    selectedAddress.value = addresses.value.find((item) => item.isDefault)?.address || addresses.value[0]?.address || ''
+    selectedAddressId.value = addresses.value.find((item) => item.isDefault)?.id || addresses.value[0]?.id || ''
   } catch (error) {
     message.value = '请先登录后查看购物车'
   }
@@ -23,8 +23,12 @@ async function load() {
 
 async function submit() {
   if (!items.value.length) return
+  if (!selectedAddressId.value) {
+    message.value = '请先在个人中心添加并选择配送地址'
+    return
+  }
   const merchantId = merchantIds()[0]
-  const data = await createOrder({ merchantId, deliveryAddress: selectedAddress.value })
+  const data = await createOrder({ merchantId, addressId: selectedAddressId.value })
   message.value = `订单 ${data.order.id} 已创建，库存已扣减，请前往支付`
   await load()
 }
@@ -111,9 +115,9 @@ onMounted(load)
     <footer class="checkout-bar" v-if="items.length">
       <label class="address-select">
         <span class="total-label">配送地址</span>
-        <select v-model="selectedAddress">
+        <select v-model="selectedAddressId">
           <option value="">暂不选择</option>
-          <option v-for="item in addresses" :key="item.id" :value="item.address">
+          <option v-for="item in addresses" :key="item.id" :value="item.id">
             {{ item.contactName }} · {{ item.address }}
           </option>
         </select>

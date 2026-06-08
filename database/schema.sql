@@ -33,6 +33,9 @@ CREATE TABLE merchant (
     phone VARCHAR(20) NOT NULL UNIQUE,
     category VARCHAR(50),
     address VARCHAR(255),
+    longitude DECIMAL(10,6),
+    latitude DECIMAL(10,6),
+    delivery_radius_m INT NOT NULL DEFAULT 3000,
     business_hours VARCHAR(100),
     delivery_fee INT NOT NULL DEFAULT 0,
     min_order_price INT NOT NULL DEFAULT 0,
@@ -83,6 +86,8 @@ CREATE TABLE user_address (
     contact_name VARCHAR(50) NOT NULL,
     phone VARCHAR(20) NOT NULL,
     address VARCHAR(255) NOT NULL,
+    longitude DECIMAL(10,6),
+    latitude DECIMAL(10,6),
     is_default TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
@@ -112,6 +117,10 @@ CREATE TABLE orders (
     total_price INT NOT NULL,
     status VARCHAR(20) NOT NULL,
     delivery_address VARCHAR(255),
+    delivery_longitude DECIMAL(10,6),
+    delivery_latitude DECIMAL(10,6),
+    distance_meters INT,
+    route_distance_meters INT,
     delivery_status VARCHAR(20) NOT NULL DEFAULT 'WAITING',
     estimated_minutes INT NOT NULL DEFAULT 30,
     refund_reason VARCHAR(255),
@@ -201,9 +210,9 @@ INSERT INTO `user` (phone, username, password, role) VALUES
     ('13800000003', 'admin', 'Abc123!', 'ADMIN'),
     ('13800000012', 'merchant2', 'Abc123!', 'MERCHANT');
 
-INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES
-    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', NOW(), NOW()),
-    (2, '13800000012', '城市咖啡站', '13800000023', '饮品', '创新街 18 号', '08:30-22:30', 200, 1200, 2200, 4.50, 'OPEN', NOW(), NOW());
+INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, longitude, latitude, delivery_radius_m, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES
+    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 116.397428, 39.909230, 3000, '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', NOW(), NOW()),
+    (2, '13800000012', '城市咖啡站', '13800000023', '饮品', '创新街 18 号', 116.405285, 39.904989, 5000, '08:30-22:30', 200, 1200, 2200, 4.50, 'OPEN', NOW(), NOW());
 
 INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
     (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', NOW(), NOW()),
@@ -212,8 +221,8 @@ INSERT INTO product (id, merchant_id, name, description, price, stock, image, st
     (4, 2, '拿铁', '经典意式拿铁', 1800, 50, '/images/product-4.jpg', 'ON_SALE', NOW(), NOW()),
     (5, 2, '冷萃咖啡', '低温慢萃咖啡', 2200, 35, '/images/product-5.jpg', 'ON_SALE', NOW(), NOW());
 
-INSERT INTO user_address (id, user_id, contact_name, phone, address, is_default, created_at, updated_at) VALUES
-    (1, '13800000001', '张同学', '13800000001', '软件学院 A 座 302', 1, NOW(), NOW());
+INSERT INTO user_address (id, user_id, contact_name, phone, address, longitude, latitude, is_default, created_at, updated_at) VALUES
+    (1, '13800000001', '张同学', '13800000001', '软件学院 A 座 302', 116.398000, 39.910000, 1, NOW(), NOW());
 
 INSERT INTO service_booking (id, user_id, merchant_id, service_name, appointment_time, contact_phone, note, status, created_at, updated_at) VALUES
     (1, '13800000001', 1, '门店轻食咨询', DATE_ADD(NOW(), INTERVAL 1 DAY), '13800000001', '希望安排下午到店', 'CONFIRMED', NOW(), NOW());

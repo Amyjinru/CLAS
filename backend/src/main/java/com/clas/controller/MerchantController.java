@@ -5,6 +5,7 @@ import com.clas.common.Result;
 import com.clas.config.RequireRole;
 import com.clas.config.UserContext;
 import com.clas.dto.MerchantAuditRequest;
+import com.clas.dto.DeliveryEstimateResponse;
 import com.clas.dto.MerchantRegisterRequest;
 import com.clas.dto.MerchantResponse;
 import com.clas.dto.OrderResponse;
@@ -13,6 +14,7 @@ import com.clas.entity.Orders;
 import com.clas.service.MerchantService;
 import com.clas.service.OrderService;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,14 +39,27 @@ public class MerchantController {
     public Result<List<MerchantResponse>> list(
         @RequestParam(required = false) String keyword,
         @RequestParam(required = false) String category,
-        @RequestParam(required = false) String sort
+        @RequestParam(required = false) String sort,
+        @RequestParam(required = false) BigDecimal lat,
+        @RequestParam(required = false) BigDecimal lng,
+        @RequestParam(required = false) Long addressId,
+        @RequestParam(required = false) Boolean onlyDeliverable
     ) {
-        return Result.ok(merchantService.search(keyword, category, sort));
+        return Result.ok(merchantService.search(keyword, category, sort, lat, lng, addressId, onlyDeliverable));
     }
 
     @GetMapping("/{id}")
     public Result<MerchantResponse> detail(@PathVariable Long id) {
         return Result.ok(merchantService.detail(id));
+    }
+
+    @GetMapping("/{id}/delivery-estimate")
+    public Result<DeliveryEstimateResponse> deliveryEstimate(
+        @PathVariable Long id,
+        @RequestParam BigDecimal lat,
+        @RequestParam BigDecimal lng
+    ) {
+        return Result.ok(merchantService.deliveryEstimate(id, lat, lng));
     }
 
     @GetMapping("/order/{merchantId}")
