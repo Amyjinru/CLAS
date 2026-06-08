@@ -2,10 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
-import { getPaymentStatus, mockPay } from '../api/clas'
+import { getDealPaymentStatus, getPaymentStatus, mockPay, payDealOrder } from '../api/clas'
 
 const route = useRoute()
 const router = useRouter()
+const isDealPayment = computed(() => route.name === 'DealPayment')
 const orderId = computed(() => Number(route.params.orderId))
 const paymentInfo = ref(null)
 const payMethod = ref('MOCK')
@@ -25,12 +26,21 @@ const orderStatusLabel = {
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
-  REFUNDED: '已退款'
+  REFUNDED: '已退款',
+  UNUSED: '待使用',
+  USED: '已核销'
 }
+
+const backTarget = computed(() => (isDealPayment.value ? '/deals' : '/orders'))
+const backLabel = computed(() => (isDealPayment.value ? '返回团购' : '返回我的订单'))
+const pageTitle = computed(() => (isDealPayment.value ? '团购券支付' : '模拟支付'))
+const orderLabel = computed(() => (isDealPayment.value ? '团购订单号' : '订单号'))
 
 async function loadStatus() {
   try {
-    paymentInfo.value = await getPaymentStatus(orderId.value)
+    paymentInfo.value = isDealPayment.value
+      ? await getDealPaymentStatus(orderId.value)
+      : await getPaymentStatus(orderId.value)
   } catch (error) {
     message.value = error.response?.data?.message || '加载支付信息失败'
   }
@@ -40,8 +50,10 @@ async function submitPay() {
   loading.value = true
   message.value = '正在模拟支付，请稍候...'
   try {
-    paymentInfo.value = await mockPay({ orderId: orderId.value, payMethod: payMethod.value })
-    message.value = '支付成功'
+    paymentInfo.value = isDealPayment.value
+      ? await payDealOrder(orderId.value, payMethod.value)
+      : await mockPay({ orderId: orderId.value, payMethod: payMethod.value })
+    message.value = isDealPayment.value ? '支付成功，团购券已生成' : '支付成功'
   } catch (error) {
     message.value = error.response?.data?.message || '支付失败'
   } finally {
@@ -49,19 +61,19 @@ async function submitPay() {
   }
 }
 
-function goOrders() {
-  router.push('/orders')
+function goNext() {
+  router.push(isDealPayment.value ? '/profile' : '/orders')
 }
 
 onMounted(loadStatus)
 </script>
 
 <template>
-  <BackButton to="/orders" label="返回我的订单" />
+  <BackButton :to="backTarget" :label="backLabel" />
 
   <section class="panel narrow">
-    <h1>模拟支付</h1>
-    <p>订单号：{{ orderId }}</p>
+    <h1>{{ pageTitle }}</h1>
+    <p>{{ orderLabel }}：{{ orderId }}</p>
     <p v-if="paymentInfo">
       应付金额：¥{{ (paymentInfo.amount / 100).toFixed(2) }}
     </p>
@@ -88,7 +100,9 @@ onMounted(loadStatus)
       </button>
     </div>
     <div class="toolbar" v-else>
-      <button class="secondary" @click="goOrders">查看我的订单</button>
+      <button class="secondary" @click="goNext">
+        {{ isDealPayment ? '查看我的团购券' : '查看我的订单' }}
+      </button>
     </div>
   </section>
 </template>

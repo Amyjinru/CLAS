@@ -98,6 +98,64 @@ main {
   margin: 0 auto;
   max-width: 1080px;
   padding: 24px;
+  width: 100%;
+}
+
+/* ─── 用户端宽屏布局 ─── */
+.user-page {
+  width: 100%;
+}
+
+.user-page-grid-2 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.user-page-grid-3 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.user-page-split {
+  align-items: start;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.user-page-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+@media (min-width: 1024px) {
+  main {
+    max-width: 1280px;
+    padding: 28px 36px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  .user-page-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .user-page-grid-2,
+  .user-page-grid-3,
+  .user-page-split {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ─── 顶栏 ─── */

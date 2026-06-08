@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { addCart, addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listProducts, removeCart, removeFavorite } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
 import MerchantRouteMap from '../components/MerchantRouteMap.vue'
+import MerchantReviewSection from '../components/MerchantReviewSection.vue'
 import { loadAmap } from '../utils/amap'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
 
@@ -267,6 +268,8 @@ watch(
         </div>
       </article>
     </section>
+
+    <MerchantReviewSection :merchant-id="merchantId" />
 
     <div class="cart-dock">
       <button class="cart-dock-toggle" type="button" @click="toggleCart">

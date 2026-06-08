@@ -56,6 +56,7 @@ public class PaymentService {
             payment.setStatus(STATUS_SUCCESS);
             paymentRepository.save(payment);
 
+            orderService.deductStockForPayment(order.getId());
             order.setStatus(OrderService.STATUS_PAID);
             ordersMapper.updateById(order);
             return PaymentResponse.from(payment, order.getStatus());

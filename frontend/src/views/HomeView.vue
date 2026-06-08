@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { currentRole, listAddresses, listAnnouncements, listMerchants } from '../api/clas'
+import { currentRole, listAddresses, listAnnouncements, listMerchants, currentUser } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
 import { loadAmap } from '../utils/amap'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
@@ -11,7 +11,7 @@ const merchants = ref([])
 const announcements = ref([])
 const keyword = ref('')
 const category = ref('')
-const sort = ref('score')
+const sort = ref(currentUser() ? 'recommend' : 'score')
 const addresses = ref([])
 const selectedAddressId = ref('')
 const currentLocation = ref(getCurrentLocation())
@@ -160,6 +160,7 @@ onMounted(async () => {
       <el-option v-for="item in addresses" :key="item.id" :label="`${item.contactName} · ${item.address}`" :value="item.id" />
     </el-select>
     <el-segmented v-model="sort" :options="[
+      { label: '智能推荐', value: 'recommend' },
       { label: '距离最近', value: 'distance' },
       { label: '评分优先', value: 'score' },
       { label: '人均低价', value: 'price' },

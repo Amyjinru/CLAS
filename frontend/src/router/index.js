@@ -19,6 +19,7 @@ const MerchantProductsView = () => import('../views/MerchantProductsView.vue')
 const MerchantDealsView = () => import('../views/MerchantDealsView.vue')
 const MerchantBookingsView = () => import('../views/MerchantBookingsView.vue')
 const UserAnnouncementsView = () => import('../views/user/UserAnnouncementsView.vue')
+const NotificationsView = () => import('../views/user/NotificationsView.vue')
 const MerchantAnnouncementsView = () => import('../views/merchant/MerchantAnnouncementsView.vue')
 const AdminLayout = () => import('../views/admin/AdminLayout.vue')
 const AdminAuditView = () => import('../views/AdminAuditView.vue')
@@ -27,6 +28,7 @@ const AdminDashboardView = () => import('../views/admin/AdminDashboardView.vue')
 const AdminUsersView = () => import('../views/admin/AdminUsersView.vue')
 const AdminOrdersView = () => import('../views/admin/AdminOrdersView.vue')
 const AdminReviewsView = () => import('../views/admin/AdminReviewsView.vue')
+const AdminAppealsView = () => import('../views/admin/AdminAppealsView.vue')
 
 function defaultPath() {
   const role = currentRole()
@@ -48,10 +50,12 @@ const routes = [
   { path: '/deals', component: DealsView, meta: { roles: ['USER'] } },
   { path: '/bookings', component: BookingsView, meta: { roles: ['USER'] } },
   { path: '/profile', component: ProfileView, meta: { roles: ['USER'] } },
+  { path: '/profile/notifications', component: NotificationsView, meta: { roles: ['USER'] } },
 
   { path: '/orders', component: OrdersView, meta: { roles: ['USER'] } },
 
-  { path: '/payment/:orderId', component: PaymentView, meta: { roles: ['USER'] } },
+  { path: '/payment/deal/:orderId', name: 'DealPayment', component: PaymentView, meta: { roles: ['USER'] } },
+  { path: '/payment/:orderId', name: 'OrderPayment', component: PaymentView, meta: { roles: ['USER'] } },
   { path: '/review/:orderId', component: ReviewView, meta: { roles: ['USER'] } },
 
   { path: '/merchant-register', component: MerchantRegisterView },
@@ -69,6 +73,7 @@ const routes = [
       { path: 'users', component: AdminUsersView },
       { path: 'audit', component: AdminAuditView },
       { path: 'reviews', component: AdminReviewsView },
+      { path: 'appeals', component: AdminAppealsView },
       { path: 'announcements', component: AdminAnnouncementsView }
     ]
   },

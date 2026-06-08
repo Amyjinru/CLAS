@@ -10,6 +10,7 @@ const route = useRoute()
 // version_314: computed 管理用户状态与角色
 const user = sessionUser
 const role = computed(() => user.value?.role || null)
+const welcomeName = computed(() => user.value?.nickname || user.value?.username || user.value?.phone || '')
 
 // version_314: 按角色动态品牌链接
 const brandLink = computed(() => {
@@ -45,7 +46,7 @@ async function handleLogout() {
       <div class="header-left">
         <RouterLink class="brand" :to="brandLink">CLAS 生活助手</RouterLink>
         <span v-if="user" class="user-welcome">
-          欢迎, {{ user.username }}
+          欢迎, {{ welcomeName }}
           <el-tag size="small" type="info" class="role-tag">{{ user.role }}</el-tag>
         </span>
       </div>
