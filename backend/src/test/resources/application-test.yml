@@ -8,3 +8,11 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema-test.sql
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+
+clas:
+  verification:
+    fixed-code: "123456"

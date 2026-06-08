@@ -2,7 +2,7 @@ package com.clas.dto;
 
 public record CartItemResponse(
     Long id,
-    Long userId,
+    String userId,
     Long productId,
     Long merchantId,
     String productName,
@@ -13,4 +13,3 @@ public record CartItemResponse(
     Integer subtotal
 ) {
 }
-

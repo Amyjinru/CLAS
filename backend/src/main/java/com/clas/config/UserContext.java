@@ -13,9 +13,9 @@ public class UserContext {
         return THREAD_LOCAL.get();
     }
 
-    public static Long getUserId() {
+    public static String getUserId() {
         User user = THREAD_LOCAL.get();
-        return user != null ? user.getId() : null;
+        return user != null ? user.getPhone() : null;
     }
 
     public static String getRole() {

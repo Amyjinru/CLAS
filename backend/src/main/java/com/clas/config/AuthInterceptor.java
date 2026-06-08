@@ -27,13 +27,9 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && !authHeader.trim().isEmpty()) {
-            try {
-                Long userId = Long.parseLong(authHeader.trim());
-                User user = userMapper.selectById(userId);
-                if (user != null) {
-                    UserContext.setUser(user);
-                }
-            } catch (NumberFormatException ignored) {
+            User user = userMapper.selectById(authHeader.trim());
+            if (user != null) {
+                UserContext.setUser(user);
             }
         }
 

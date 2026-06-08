@@ -34,16 +34,17 @@ Controller -> Service -> Mapper -> MySQL
 
 | 功能 | 接口 |
 | --- | --- |
-| 登录 | `POST /api/user/login` |
-| 注册 | `POST /api/user/register` |
+| 发送注册验证码 | `POST /api/user/register/send-code` |
+| 手机号登录 | `POST /api/user/login` |
+| 手机号注册 | `POST /api/user/register` |
 | 商家列表 | `GET /api/merchant/list` |
 | 商家详情 | `GET /api/merchant/{id}` |
 | 商品列表 | `GET /api/product/list/{merchantId}` |
 | 加入购物车 | `POST /api/cart/add` |
-| 查看购物车 | `GET /api/cart/list/{userId}` |
-| 清空购物车 | `DELETE /api/cart/clear/{userId}` |
+| 查看购物车 | `GET /api/cart/list/{userId}`（`userId` 为手机号） |
+| 清空购物车 | `DELETE /api/cart/clear/{userId}`（`userId` 为手机号） |
 | 创建订单 | `POST /api/order/create` |
-| 用户订单 | `GET /api/order/list/{userId}` |
+| 用户订单 | `GET /api/order/list/{userId}`（`userId` 为手机号） |
 | 商家订单 | `GET /api/order/merchant/{merchantId}` |
 | 模拟支付 | `POST /api/payment/mock` |
 | 支付状态 | `GET /api/payment/status/{orderId}` |
@@ -83,6 +84,15 @@ AdminLayout 采用固定侧边栏 + 内容区布局：
 
 所有管理后台 API 需要 `@RequireRole("ADMIN")` 权限，统一前缀 `/api/admin/`。
 
+## 账号与验证码
+
+- 用户账号以手机号作为主键，`user.phone` 是数据库主键。
+- `username` 只是展示名，允许重复。
+- 普通用户和未登录商家入驻都需要先发送验证码，再用手机号 + 验证码注册。
+- 验证码使用 Redis 存储，后端控制台模拟短信发送；默认 Redis 地址为 `127.0.0.1:6379`。
+- 密码规则统一为：至少 6 位，包含大写字母、小写字母、数字和特殊符号，且不包含空白字符。
+- 鉴权请求头为 `Authorization: <phone>`。
+
 ## 新增管理后台 API
 
 | 功能 | 接口 |
@@ -94,7 +104,7 @@ AdminLayout 采用固定侧边栏 + 内容区布局：
 | 热销商品 | `GET /api/admin/stats/products` |
 | 全平台订单 | `GET /api/admin/orders?page=1&size=10&status=PAID` |
 | 用户列表 | `GET /api/admin/users?page=1&size=10` |
-| 禁用/启用用户 | `PUT /api/admin/users/{id}/status` |
+| 禁用/启用用户 | `PUT /api/admin/users/{phone}/status` |
 | 评价列表 | `GET /api/admin/reviews?page=1&size=10` |
 | 删除评价 | `DELETE /api/admin/reviews/{id}` |
 
@@ -104,4 +114,3 @@ AdminLayout 采用固定侧边栏 + 内容区布局：
 - 侧边栏：深咖啡渐变，固定定位
 - CSS 变量体系（theme.css）覆盖 Element Plus 组件
 - ECharts 用于仪表盘图表
-

@@ -104,7 +104,7 @@ public class OrderService {
         return new OrderResponse(order, orderItems);
     }
 
-    public List<OrderResponse> listForUser(Long userId) {
+    public List<OrderResponse> listForUser(String userId) {
         List<Orders> orders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
             .eq(Orders::getUserId, userId)
             .orderByDesc(Orders::getCreateTime));

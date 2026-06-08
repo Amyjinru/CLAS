@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 public record MerchantResponse(
     Long id,
-    Long userId,
+    String userId,
     String merchantName,
     String phone,
     String category,

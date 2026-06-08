@@ -12,7 +12,7 @@ public class Payment {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long orderId;
-    private Long userId;
+    private String userId;
     private Integer amount;
     private String payMethod;
     private String status;

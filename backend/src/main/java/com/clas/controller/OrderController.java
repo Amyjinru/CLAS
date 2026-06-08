@@ -34,7 +34,7 @@ public class OrderController {
     }
 
     @GetMapping("/list/{userId}")
-    public Result<List<OrderResponse>> list(@PathVariable Long userId) {
+    public Result<List<OrderResponse>> list(@PathVariable String userId) {
         return Result.ok(orderService.listForUser(userId));
     }
 

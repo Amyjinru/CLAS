@@ -8,11 +8,10 @@ import lombok.Data;
 @Data
 @TableName("`user`")
 public class User {
-    @TableId(type = IdType.AUTO)
-    private Long id;
+    @TableId(type = IdType.INPUT)
+    private String phone;
     private String username;
     private String password;
-    private String phone;
     private String role;
     private Boolean enabled;
 }

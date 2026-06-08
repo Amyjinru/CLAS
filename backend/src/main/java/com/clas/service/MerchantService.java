@@ -3,6 +3,9 @@ package com.clas.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.MerchantStatusEnum;
+import com.clas.common.PasswordValidator;
+import com.clas.common.PhoneValidator;
+import com.clas.common.VerificationCodeStore;
 import com.clas.dto.MerchantAuditRequest;
 import com.clas.dto.MerchantRegisterRequest;
 import com.clas.dto.MerchantResponse;
@@ -24,11 +27,18 @@ public class MerchantService {
     private final MerchantMapper merchantMapper;
     private final MerchantAuditLogMapper merchantAuditLogMapper;
     private final UserMapper userMapper;
+    private final VerificationCodeStore verificationCodeStore;
 
-    public MerchantService(MerchantMapper merchantMapper, MerchantAuditLogMapper merchantAuditLogMapper, UserMapper userMapper) {
+    public MerchantService(
+        MerchantMapper merchantMapper,
+        MerchantAuditLogMapper merchantAuditLogMapper,
+        UserMapper userMapper,
+        VerificationCodeStore verificationCodeStore
+    ) {
         this.merchantMapper = merchantMapper;
         this.merchantAuditLogMapper = merchantAuditLogMapper;
         this.userMapper = userMapper;
+        this.verificationCodeStore = verificationCodeStore;
     }
 
     public List<MerchantResponse> list() {
@@ -52,45 +62,42 @@ public class MerchantService {
         return convertToResponse(merchant);
     }
 
-    public MerchantResponse getMerchantByUserId(Long userId) {
+    public MerchantResponse getMerchantByUserId(String userId) {
         Merchant merchant = merchantMapper.selectOne(new LambdaQueryWrapper<Merchant>()
             .eq(Merchant::getUserId, userId));
         return merchant != null ? convertToResponse(merchant) : null;
     }
 
     @Transactional
-    public MerchantResponse register(MerchantRegisterRequest request, Long loggedInUserId) {
-        Long finalUserId = loggedInUserId;
+    public MerchantResponse register(MerchantRegisterRequest request, String loggedInUserId) {
+        String finalUserId = loggedInUserId;
+        String contactPhone = PhoneValidator.normalizeAndValidate(request.contactPhone());
 
         // 1. If not logged in, we must register a new user first
         if (finalUserId == null) {
+            String accountPhone = PhoneValidator.normalizeAndValidate(request.accountPhone());
+            PasswordValidator.validate(request.password());
+            if (!request.password().equals(request.confirmPassword())) {
+                throw new BusinessException("两次输入的密码不一致");
+            }
+            verificationCodeStore.verify(accountPhone, "register", request.code());
+
             if (request.username() == null || request.username().isBlank() ||
                 request.password() == null || request.password().isBlank()) {
-                throw new BusinessException("未登录用户注册商家，必须提供用户名和密码");
+                throw new BusinessException("未登录用户注册商家，必须提供展示名和密码");
             }
-            // Check username duplicate
-            Long userCount = userMapper.selectCount(new LambdaQueryWrapper<User>()
-                .eq(User::getUsername, request.username()));
-            if (userCount > 0) {
-                throw new BusinessException("用户名已存在");
-            }
-            
-            // Check phone duplicate in user table
-            if (request.phone() != null && !request.phone().isBlank()) {
-                Long userPhoneCount = userMapper.selectCount(new LambdaQueryWrapper<User>()
-                    .eq(User::getPhone, request.phone()));
-                if (userPhoneCount > 0) {
-                    throw new BusinessException("该手机号已被注册");
-                }
+
+            if (userMapper.selectById(accountPhone) != null) {
+                throw new BusinessException("该手机号已被注册");
             }
 
             User user = new User();
+            user.setPhone(accountPhone);
             user.setUsername(request.username());
-            user.setPassword(request.password()); // Plain text as per original style
-            user.setPhone(request.phone());
+            user.setPassword(request.password());
             user.setRole("MERCHANT");
             userMapper.insert(user);
-            finalUserId = user.getId();
+            finalUserId = accountPhone;
         } else {
             // If already logged in, check if user is already a merchant or has merchant role
             User user = userMapper.selectById(finalUserId);
@@ -121,7 +128,7 @@ public class MerchantService {
 
         // Phone uniqueness
         Long phoneCount = merchantMapper.selectCount(new LambdaQueryWrapper<Merchant>()
-            .eq(Merchant::getPhone, request.phone()));
+            .eq(Merchant::getPhone, contactPhone));
         if (phoneCount > 0) {
             throw new BusinessException("联系电话已被其他商家占用");
         }
@@ -130,7 +137,7 @@ public class MerchantService {
         Merchant merchant = new Merchant();
         merchant.setUserId(finalUserId);
         merchant.setMerchantName(request.merchantName());
-        merchant.setPhone(request.phone());
+        merchant.setPhone(contactPhone);
         merchant.setCategory(request.category());
         merchant.setAddress(request.address());
         merchant.setScore(BigDecimal.valueOf(0.00));
@@ -144,7 +151,7 @@ public class MerchantService {
     }
 
     @Transactional
-    public MerchantResponse audit(Long merchantId, MerchantAuditRequest auditRequest, Long adminId) {
+    public MerchantResponse audit(Long merchantId, MerchantAuditRequest auditRequest, String adminId) {
         Merchant merchant = merchantMapper.selectById(merchantId);
         if (merchant == null) {
             throw new BusinessException("商家不存在");
@@ -227,7 +234,7 @@ public class MerchantService {
     }
 
     public Long getCurrentMerchantId() {
-        Long userId = UserContext.getUserId();
+        String userId = UserContext.getUserId();
         if (userId == null) {
             throw new BusinessException("未登录，请先登录");
         }

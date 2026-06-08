@@ -16,7 +16,7 @@ public class MerchantAuditLog {
     private Long id;
     
     private Long merchantId;
-    private Long adminId;
+    private String adminId;
     private MerchantStatusEnum oldStatus;
     private MerchantStatusEnum newStatus;
     private String remarks;

@@ -16,7 +16,7 @@ public class Merchant {
     @TableId(type = IdType.AUTO)
     private Long id;
     
-    private Long userId;
+    private String userId;
     private String merchantName;
     private String phone;
     private String category;

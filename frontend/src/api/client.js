@@ -41,8 +41,8 @@ api.interceptors.request.use(
 
     // Add Authorization header
     const user = JSON.parse(localStorage.getItem('clas_user') || 'null')
-    if (user && user.id) {
-      config.headers['Authorization'] = user.id
+    if (user && user.phone) {
+      config.headers['Authorization'] = user.phone
     }
 
     return config
