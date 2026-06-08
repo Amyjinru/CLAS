@@ -84,13 +84,13 @@ public class CartService {
         return list(request.userId());
     }
 
-    public List<CartItemResponse> deleteItem(Long userId, Long productId) {
+    public List<CartItemResponse> deleteItem(String userId, Long productId) {
         Cart cart = requireCartItem(userId, productId);
         cartMapper.deleteById(cart.getId());
         return list(userId);
     }
 
-    public List<CartItemResponse> list(Long userId) {
+    public List<CartItemResponse> list(String userId) {
         List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, userId)
             .orderByAsc(Cart::getId));
@@ -104,11 +104,11 @@ public class CartService {
             .toList();
     }
 
-    public void clear(Long userId) {
+    public void clear(String userId) {
         cartMapper.delete(new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId));
     }
 
-    private Cart requireCartItem(Long userId, Long productId) {
+    private Cart requireCartItem(String userId, Long productId) {
         Cart cart = cartMapper.selectOne(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, userId)
             .eq(Cart::getProductId, productId));

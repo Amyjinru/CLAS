@@ -1,7 +1,7 @@
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { registerMerchant, currentUser } from '../api/clas'
+import { registerMerchant, currentUser, sendRegisterCode } from '../api/clas'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -12,12 +12,36 @@ const form = reactive({
   merchantName: '',
   category: '',
   address: '',
-  phone: '',
+  accountPhone: '',
+  contactPhone: '',
+  code: '',
   bankAccount: '',
   settlementCycle: 7,
   username: '',
-  password: ''
+  password: '',
+  confirmPassword: ''
 })
+
+const phonePattern = /^1[3-9]\d{9}$/
+
+function validPhone(phone) {
+  return phonePattern.test((phone || '').trim())
+}
+
+function passwordChecks(password) {
+  const value = password || ''
+  return [
+    { key: 'length', label: '不少于6位', ok: value.length >= 6 },
+    { key: 'lower', label: '包含小写字母', ok: /[a-z]/.test(value) },
+    { key: 'upper', label: '包含大写字母', ok: /[A-Z]/.test(value) },
+    { key: 'digit', label: '包含数字', ok: /\d/.test(value) },
+    { key: 'special', label: '包含特殊符号', ok: /[\W_]/.test(value) && !/\s/.test(value) }
+  ]
+}
+
+const merchantPasswordChecks = computed(() => passwordChecks(form.password))
+const merchantPasswordOk = computed(() => merchantPasswordChecks.value.every((item) => item.ok))
+const merchantPasswordMatches = computed(() => form.confirmPassword && form.password === form.confirmPassword)
 
 onMounted(() => {
   user.value = currentUser()
@@ -34,7 +58,14 @@ const rules = reactive({
   address: [
     { required: true, message: '请输入商家地址', trigger: 'blur' }
   ],
-  phone: [
+  accountPhone: [
+    { required: true, message: '请输入账号手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+  ],
+  code: [
+    { required: true, message: '请输入验证码', trigger: 'blur' }
+  ],
+  contactPhone: [
     { required: true, message: '请输入联系电话', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
   ],
@@ -46,17 +77,45 @@ const rules = reactive({
     { required: true, message: '请输入结算周期', trigger: 'blur' }
   ],
   username: [
-    { required: true, message: '请输入登录账号', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9_]{3,20}$/, message: '3-20位字母、数字或下划线', trigger: 'blur' }
+    { required: true, message: '请输入展示名', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入登录密码', trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度在 6 到 20 个字符', trigger: 'blur' }
+    { required: true, message: '请输入登录密码', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' }
   ]
 })
 
 const categories = ['美食', '饮品', '超市', '水果', '生鲜', '鲜花']
 const submitting = ref(false)
+const codeSending = ref(false)
+const codeCooldown = ref(0)
+let cooldownTimer = null
+
+async function sendMerchantCode() {
+  if (!validPhone(form.accountPhone)) {
+    ElMessage.warning('请输入正确的账号手机号')
+    return
+  }
+  codeSending.value = true
+  try {
+    await sendRegisterCode({ phone: form.accountPhone })
+    ElMessage.success('验证码已发送，请查看后端控制台输出')
+    codeCooldown.value = 60
+    cooldownTimer = setInterval(() => {
+      codeCooldown.value--
+      if (codeCooldown.value <= 0) {
+        clearInterval(cooldownTimer)
+        cooldownTimer = null
+      }
+    }, 1000)
+  } finally {
+    codeSending.value = false
+  }
+}
+
+const cooldownText = computed(() => codeCooldown.value ? `${codeCooldown.value}秒后重发` : '发送验证码')
 
 async function submitForm() {
   if (!formRef.value) return
@@ -66,13 +125,25 @@ async function submitForm() {
       ElMessage.warning('请完善表单信息')
       return
     }
+
+    if (!user.value && !merchantPasswordOk.value) {
+      ElMessage.warning('密码至少6位，必须包含大小写英文字母、数字和特殊符号')
+      return
+    }
+    if (!user.value && !merchantPasswordMatches.value) {
+      ElMessage.warning('两次输入的密码不一致')
+      return
+    }
     
     submitting.value = true
     try {
       const payload = { ...form }
       if (user.value) {
+        delete payload.accountPhone
+        delete payload.code
         delete payload.username
         delete payload.password
+        delete payload.confirmPassword
       }
       
       const data = await registerMerchant(payload)
@@ -132,11 +203,43 @@ async function submitForm() {
         <!-- Account registration section for visitors -->
         <template v-if="!user">
           <h3 class="section-title">1. 创建登录账号</h3>
-          <el-form-item label="登录用户名" prop="username">
-            <el-input v-model="form.username" placeholder="请输入拟注册的账号名" />
+          <el-form-item label="账号手机号" prop="accountPhone">
+            <div class="code-row">
+              <el-input v-model="form.accountPhone" maxlength="11" placeholder="请输入用于登录的手机号" />
+              <el-button
+                :loading="codeSending"
+                :disabled="codeCooldown > 0 || !validPhone(form.accountPhone)"
+                @click="sendMerchantCode"
+              >
+                {{ cooldownText }}
+              </el-button>
+            </div>
+          </el-form-item>
+          <el-form-item label="验证码" prop="code">
+            <el-input v-model="form.code" maxlength="6" placeholder="请输入后端控制台输出的6位验证码" />
+          </el-form-item>
+          <el-form-item label="展示名" prop="username">
+            <el-input v-model="form.username" placeholder="请输入展示名，可与他人重复" />
           </el-form-item>
           <el-form-item label="登录密码" prop="password">
-            <el-input v-model="form.password" type="password" show-password placeholder="请输入拟注册的密码" />
+            <el-input v-model="form.password" type="password" show-password placeholder="至少6位，含大小写字母、数字、特殊符号" />
+            <ul class="password-checks">
+              <li
+                v-for="item in merchantPasswordChecks"
+                :key="item.key"
+                :class="{ ok: item.ok }"
+              >
+                {{ item.ok ? '✓' : '·' }} {{ item.label }}
+              </li>
+            </ul>
+          </el-form-item>
+          <el-form-item label="确认密码" prop="confirmPassword">
+            <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" />
+            <p
+              v-if="form.confirmPassword"
+              class="match-tip"
+              :class="{ ok: merchantPasswordMatches }"
+            >{{ merchantPasswordMatches ? '两次密码一致' : '两次输入的密码不一致' }}</p>
           </el-form-item>
           <el-divider />
         </template>
@@ -158,8 +261,8 @@ async function submitForm() {
           </el-select>
         </el-form-item>
 
-        <el-form-item label="联系电话" prop="phone">
-          <el-input v-model="form.phone" placeholder="请输入联系手机号" />
+        <el-form-item label="联系电话" prop="contactPhone">
+          <el-input v-model="form.contactPhone" maxlength="11" placeholder="请输入店铺联系手机号，可与账号手机号不同" />
         </el-form-item>
 
         <el-form-item label="商家地址" prop="address">
@@ -211,6 +314,40 @@ async function submitForm() {
 
 .alert-tip {
   margin-bottom: 24px;
+}
+
+.code-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  width: 100%;
+}
+
+.password-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: #909399;
+}
+
+.password-checks li.ok {
+  color: #16a34a;
+}
+
+.match-tip {
+  width: 100%;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #ef4444;
+}
+
+.match-tip.ok {
+  color: #16a34a;
 }
 
 .section-title {

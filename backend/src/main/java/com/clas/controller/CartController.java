@@ -41,17 +41,17 @@ public class CartController {
     }
 
     @GetMapping("/list/{userId}")
-    public Result<List<CartItemResponse>> list(@PathVariable Long userId) {
+    public Result<List<CartItemResponse>> list(@PathVariable String userId) {
         return Result.ok(cartService.list(userId));
     }
 
     @DeleteMapping("/item/{userId}/{productId}")
-    public Result<List<CartItemResponse>> deleteItem(@PathVariable Long userId, @PathVariable Long productId) {
+    public Result<List<CartItemResponse>> deleteItem(@PathVariable String userId, @PathVariable Long productId) {
         return Result.ok(cartService.deleteItem(userId, productId));
     }
 
     @DeleteMapping("/clear/{userId}")
-    public Result<Void> clear(@PathVariable Long userId) {
+    public Result<Void> clear(@PathVariable String userId) {
         cartService.clear(userId);
         return Result.ok();
     }

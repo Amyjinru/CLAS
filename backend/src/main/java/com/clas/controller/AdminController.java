@@ -114,7 +114,7 @@ public class AdminController {
         @RequestParam(defaultValue = "10") int size
     ) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        wrapper.orderByAsc(User::getId);
+        wrapper.orderByAsc(User::getPhone);
         wrapper.select(User.class, info -> !"password".equals(info.getColumn()));
 
         Page<User> result = userMapper.selectPage(new Page<>(page, size), wrapper);
@@ -126,9 +126,9 @@ public class AdminController {
         ));
     }
 
-    @PutMapping("/users/{id}/status")
-    public Result<User> toggleUserStatus(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
-        User user = userMapper.selectById(id);
+    @PutMapping("/users/{phone}/status")
+    public Result<User> toggleUserStatus(@PathVariable String phone, @RequestBody Map<String, Boolean> body) {
+        User user = userMapper.selectById(phone);
         if (user == null) {
             throw new BusinessException("用户不存在");
         }

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { currentRole, currentUser } from '../api/clas'
 import LoginView from '../views/LoginView.vue'
+import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import HomeView from '../views/HomeView.vue'
 import MerchantDetailView from '../views/MerchantDetailView.vue'
 import CartView from '../views/CartView.vue'
@@ -43,6 +44,7 @@ const routes = [
 
   // 公共路由
   { path: '/login', component: LoginView, meta: { public: true } },
+  { path: '/forgot-password', component: ForgotPasswordView, meta: { public: true } },
   { path: '/home', component: HomeView, meta: { roles: ['USER'], userPortal: true } },
   { path: '/merchant/:id', component: MerchantDetailView, meta: { roles: ['USER'], userPortal: true } },
 

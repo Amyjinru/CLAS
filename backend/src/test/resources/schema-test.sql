@@ -1,14 +1,14 @@
 CREATE TABLE IF NOT EXISTS "user" (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(50) NOT NULL UNIQUE,
+    phone VARCHAR(20) PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) UNIQUE,
-    role VARCHAR(20) NOT NULL
+    role VARCHAR(20) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE IF NOT EXISTS merchant (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     merchant_name VARCHAR(100) NOT NULL,
     phone VARCHAR(20) NOT NULL UNIQUE,
     category VARCHAR(50),
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS merchant (
 CREATE TABLE IF NOT EXISTS merchant_audit_log (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     merchant_id BIGINT NOT NULL,
-    admin_id BIGINT NOT NULL,
+    admin_id VARCHAR(20) NOT NULL,
     old_status VARCHAR(20),
     new_status VARCHAR(20) NOT NULL,
     remarks VARCHAR(255),
@@ -48,14 +48,14 @@ CREATE TABLE IF NOT EXISTS product (
 
 CREATE TABLE IF NOT EXISTS cart (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     merchant_id BIGINT NOT NULL,
     total_price INT NOT NULL,
     status VARCHAR(20) NOT NULL,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS order_item (
 CREATE TABLE IF NOT EXISTS review (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     score INT NOT NULL,
     content CLOB
 );
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS review (
 CREATE TABLE IF NOT EXISTS payment (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     amount INT NOT NULL,
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
@@ -108,13 +108,13 @@ DELETE FROM merchant;
 DELETE FROM "user";
 
 -- 演示账号在测试库中也保持 USER / MERCHANT / ADMIN 三角色齐全。
-INSERT INTO "user" (id, username, password, phone, role) VALUES
-    (1, 'user', '123456', '13800000001', 'USER'),
-    (2, 'merchant', '123456', '13800000002', 'MERCHANT'),
-    (3, 'admin', '123456', '13800000003', 'ADMIN');
+INSERT INTO "user" (phone, username, password, role) VALUES
+    ('13800000001', 'user', 'Abc123!', 'USER'),
+    ('13800000002', 'merchant', 'Abc123!', 'MERCHANT'),
+    ('13800000003', 'admin', 'Abc123!', 'ADMIN');
 
 INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, score, status, created_at, updated_at) VALUES
-    (1, 2, '校园轻食铺', '13800000002', '美食', '软件园东门 1 号', 4.70, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 4.70, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
     (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
@@ -122,7 +122,6 @@ INSERT INTO product (id, merchant_id, name, description, price, stock, image, st
 INSERT INTO announcement (id, title, content, status, create_time) VALUES
     (1, '测试公告', 'H2 集成测试公告', 'PUBLISHED', CURRENT_TIMESTAMP);
 
-ALTER TABLE "user" ALTER COLUMN id RESTART WITH 10;
 ALTER TABLE merchant ALTER COLUMN id RESTART WITH 10;
 ALTER TABLE merchant_audit_log ALTER COLUMN id RESTART WITH 10;
 ALTER TABLE product ALTER COLUMN id RESTART WITH 10;

@@ -11,10 +11,9 @@ import lombok.Data;
 public class Orders {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long userId;
+    private String userId;
     private Long merchantId;
     private Integer totalPrice;
     private String status;
     private LocalDateTime createTime;
 }
-

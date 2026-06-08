@@ -45,7 +45,6 @@ public class UserController {
 
     /**
      * 忘记密码 — 发送验证码到已绑定手机号。
-     * 参照 auth-flow 技能的 sendForgotPasswordCode 流程。
      */
     @PostMapping("/forgot-password/send-code")
     public Result<String> sendForgotPasswordCode(@Valid @RequestBody SendCodeRequest request) {
@@ -55,11 +54,9 @@ public class UserController {
 
     /**
      * 忘记密码 — 验证码校验 + 密码重置 + 自动登录。
-     * 参照 auth-flow 技能的 verifyForgotPasswordCode + resetForgotPassword 流程。
      */
     @PostMapping("/forgot-password/reset")
     public Result<LoginResponse> resetForgotPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return Result.ok(userService.resetForgotPassword(request));
     }
 }
-

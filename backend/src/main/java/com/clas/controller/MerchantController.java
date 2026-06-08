@@ -56,13 +56,13 @@ public class MerchantController {
 
     @PostMapping("/register")
     public Result<MerchantResponse> register(@Valid @RequestBody MerchantRegisterRequest request) {
-        Long loggedInUserId = UserContext.getUserId();
+        String loggedInUserId = UserContext.getUserId();
         return Result.ok(merchantService.register(request, loggedInUserId));
     }
 
     @GetMapping("/my")
     public Result<MerchantResponse> getMyMerchant() {
-        Long loggedInUserId = UserContext.getUserId();
+        String loggedInUserId = UserContext.getUserId();
         if (loggedInUserId == null) {
             throw new BusinessException("未登录，请先登录");
         }
@@ -79,7 +79,7 @@ public class MerchantController {
     @PostMapping("/admin/audit/{id}")
     @RequireRole("ADMIN")
     public Result<MerchantResponse> audit(@PathVariable Long id, @Valid @RequestBody MerchantAuditRequest request) {
-        Long adminId = UserContext.getUserId();
+        String adminId = UserContext.getUserId();
         if (adminId == null) {
             throw new BusinessException("未登录，请先登录");
         }

@@ -34,10 +34,10 @@ export function logout() {
 
 export function currentUserId() {
   const user = currentUser()
-  if (!user?.id) {
+  if (!user?.phone) {
     throw new Error('NOT_LOGGED_IN')
   }
-  return user.id
+  return user.phone
 }
 
 /** MVP 演示：merchant 账号对应 1 号店铺 */
@@ -49,7 +49,7 @@ export const login = (payload) => api.post('/user/login', payload).then(unwrap)
 export const register = (payload) => api.post('/user/register', payload).then(unwrap)
 // ===== 注册验证码 =====
 export const sendRegisterCode = (payload) => api.post('/user/register/send-code', payload).then(unwrap)
-// ===== 忘记密码：发送验证码 + 重置密码（参照 auth-flow 技能） =====
+// ===== 忘记密码：发送验证码 + 重置密码 =====
 export const sendForgotPasswordCode = (payload) => api.post('/user/forgot-password/send-code', payload).then(unwrap)
 export const resetForgotPassword = (payload) => api.post('/user/forgot-password/reset', payload).then(unwrap)
 export const listMerchants = () => api.get('/merchant/list').then(unwrap)

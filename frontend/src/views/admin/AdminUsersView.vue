@@ -28,7 +28,7 @@ async function toggleStatus(user) {
     await ElMessageBox.confirm(`确定要${action}用户 "${user.username}" 吗？`, '确认操作', {
       confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
     })
-    await api.put(`/admin/users/${user.id}/status`, { enabled: !user.enabled })
+    await api.put(`/admin/users/${user.phone}/status`, { enabled: !user.enabled })
     ElMessage.success(`${action}成功`)
     await load()
   } catch (e) {

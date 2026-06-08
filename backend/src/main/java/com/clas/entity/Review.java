@@ -11,8 +11,7 @@ public class Review {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long orderId;
-    private Long userId;
+    private String userId;
     private Integer score;
     private String content;
 }
-

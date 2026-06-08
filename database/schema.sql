@@ -13,17 +13,16 @@ DROP TABLE IF EXISTS merchant;
 DROP TABLE IF EXISTS `user`;
 
 CREATE TABLE `user` (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(50) NOT NULL UNIQUE,
+    phone VARCHAR(20) PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) UNIQUE,
     role VARCHAR(20) NOT NULL,
     enabled TINYINT(1) NOT NULL DEFAULT 1
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE merchant (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     merchant_name VARCHAR(100) NOT NULL,
     phone VARCHAR(20) NOT NULL UNIQUE,
     category VARCHAR(50),
@@ -41,7 +40,7 @@ CREATE TABLE merchant (
 CREATE TABLE merchant_audit_log (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     merchant_id BIGINT NOT NULL,
-    admin_id BIGINT NOT NULL,
+    admin_id VARCHAR(20) NOT NULL,
     old_status VARCHAR(20),
     new_status VARCHAR(20) NOT NULL,
     remarks VARCHAR(255),
@@ -63,14 +62,14 @@ CREATE TABLE product (
 
 CREATE TABLE cart (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL
 );
 
 CREATE TABLE orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     merchant_id BIGINT NOT NULL,
     total_price INT NOT NULL,
     status VARCHAR(20) NOT NULL,
@@ -88,7 +87,7 @@ CREATE TABLE order_item (
 CREATE TABLE review (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     score INT NOT NULL,
     content TEXT
 );
@@ -96,7 +95,7 @@ CREATE TABLE review (
 CREATE TABLE payment (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
     amount INT NOT NULL,
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
@@ -111,15 +110,15 @@ CREATE TABLE announcement (
     create_time DATETIME NOT NULL
 );
 
-INSERT INTO `user` (id, username, password, phone, role) VALUES
-    (1, 'user', '123456', '13800000001', 'USER'),
-    (2, 'merchant', '123456', '13800000002', 'MERCHANT'),
-    (3, 'admin', '123456', '13800000003', 'ADMIN'),
-    (4, 'merchant2', '123456', '13800000012', 'MERCHANT');
+INSERT INTO `user` (phone, username, password, role) VALUES
+    ('13800000001', 'user', 'Abc123!', 'USER'),
+    ('13800000002', 'merchant', 'Abc123!', 'MERCHANT'),
+    ('13800000003', 'admin', 'Abc123!', 'ADMIN'),
+    ('13800000012', 'merchant2', 'Abc123!', 'MERCHANT');
 
 INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, score, status, created_at, updated_at) VALUES
-    (1, 2, '校园轻食铺', '13800000002', '美食', '软件园东门 1 号', 4.70, 'OPEN', NOW(), NOW()),
-    (2, 4, '城市咖啡站', '13800000012', '饮品', '创新街 18 号', 4.50, 'OPEN', NOW(), NOW());
+    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 4.70, 'OPEN', NOW(), NOW()),
+    (2, '13800000012', '城市咖啡站', '13800000023', '饮品', '创新街 18 号', 4.50, 'OPEN', NOW(), NOW());
 
 INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
     (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', NOW(), NOW()),

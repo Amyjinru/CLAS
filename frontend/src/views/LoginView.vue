@@ -34,11 +34,31 @@ function redirectByRole(user) {
 // ============================================================
 // 登录
 // ============================================================
-const loginForm = reactive({ username: 'user', password: '123456' })
+const phonePattern = /^1[3-9]\d{9}$/
+const loginForm = reactive({ phone: '13800000001', password: 'Abc123!' })
 const loginLoading = ref(false)
 const showLoginPassword = ref(false)
 
+function validPhone(phone) {
+  return phonePattern.test((phone || '').trim())
+}
+
+function passwordChecks(password) {
+  const value = password || ''
+  return [
+    { key: 'length', label: '不少于6位', ok: value.length >= 6 },
+    { key: 'lower', label: '包含小写字母', ok: /[a-z]/.test(value) },
+    { key: 'upper', label: '包含大写字母', ok: /[A-Z]/.test(value) },
+    { key: 'digit', label: '包含数字', ok: /\d/.test(value) },
+    { key: 'special', label: '包含特殊符号', ok: /[\W_]/.test(value) && !/\s/.test(value) }
+  ]
+}
+
 async function submitLogin() {
+  if (!validPhone(loginForm.phone)) {
+    showMessage('请输入正确的手机号', 'error')
+    return
+  }
   loginLoading.value = true
   showMessage('')
   try {
@@ -56,9 +76,13 @@ async function submitLogin() {
 // ============================================================
 // 注册（手机号 + 验证码必填）
 // ============================================================
-const registerForm = reactive({ username: '', password: '', phone: '', code: '' })
+const registerForm = reactive({ username: '', password: '', confirmPassword: '', phone: '', code: '' })
 const registerLoading = ref(false)
 const showRegPassword = ref(false)
+const showRegConfirmPassword = ref(false)
+const registerPasswordChecks = computed(() => passwordChecks(registerForm.password))
+const registerPasswordOk = computed(() => registerPasswordChecks.value.every((item) => item.ok))
+const registerPasswordMatches = computed(() => registerForm.confirmPassword && registerForm.password === registerForm.confirmPassword)
 
 // 验证码发送
 const codeSending = ref(false)
@@ -66,6 +90,10 @@ const codeCooldown = ref(0)
 let cooldownTimer = null
 
 async function sendCode() {
+  if (!validPhone(registerForm.phone)) {
+    showMessage('请输入正确的手机号', 'error')
+    return
+  }
   codeSending.value = true
   showMessage('')
   try {
@@ -92,12 +120,25 @@ const cooldownText = computed(() => {
 })
 
 async function submitRegister() {
+  if (!validPhone(registerForm.phone)) {
+    showMessage('请输入正确的手机号', 'error')
+    return
+  }
+  if (!registerPasswordOk.value) {
+    showMessage('密码至少6位，必须包含大小写英文字母、数字和特殊符号', 'error')
+    return
+  }
+  if (!registerPasswordMatches.value) {
+    showMessage('两次输入的密码不一致', 'error')
+    return
+  }
   registerLoading.value = true
   showMessage('')
   try {
     const payload = {
       username: registerForm.username,
       password: registerForm.password,
+      confirmPassword: registerForm.confirmPassword,
       phone: registerForm.phone,
       code: registerForm.code
     }
@@ -143,11 +184,11 @@ function switchTab(tab) {
       <!-- ============================================ -->
       <template v-if="activeTab === 'login'">
         <h1>登录</h1>
-        <p class="hint">演示账号：user / merchant / admin，密码均为 123456</p>
+        <p class="hint">演示账号：13800000001 / 13800000002 / 13800000003，密码均为 Abc123!</p>
 
         <div class="form-group">
-          <label>账号 <span class="required">*</span></label>
-          <input v-model="loginForm.username" placeholder="请输入账号" />
+          <label>手机号 <span class="required">*</span></label>
+          <input v-model="loginForm.phone" placeholder="请输入手机号" maxlength="11" />
         </div>
 
         <div class="form-group">
@@ -178,6 +219,9 @@ function switchTab(tab) {
               </svg>
             </button>
           </div>
+          <div class="password-actions">
+            <button type="button" class="link-btn" @click="router.push('/forgot-password')">忘记密码？</button>
+          </div>
         </div>
 
         <button
@@ -198,8 +242,8 @@ function switchTab(tab) {
         <p class="hint">注册后默认成为普通用户，可浏览商家、下单购物。</p>
 
         <div class="form-group">
-          <label>账号 <span class="required">*</span></label>
-          <input v-model="registerForm.username" placeholder="请输入账号" />
+          <label>展示名 <span class="required">*</span></label>
+          <input v-model="registerForm.username" placeholder="请输入展示名，可与他人重复" />
         </div>
 
         <div class="form-group">
@@ -208,7 +252,7 @@ function switchTab(tab) {
             <input
               v-model="registerForm.password"
               :type="showRegPassword ? 'text' : 'password'"
-              placeholder="请输入密码"
+              placeholder="至少6位，含大小写字母、数字、特殊符号"
             />
             <button
               type="button"
@@ -230,11 +274,55 @@ function switchTab(tab) {
               </svg>
             </button>
           </div>
+          <ul class="password-checks">
+            <li
+              v-for="item in registerPasswordChecks"
+              :key="item.key"
+              :class="{ ok: item.ok }"
+            >
+              {{ item.ok ? '✓' : '·' }} {{ item.label }}
+            </li>
+          </ul>
+        </div>
+
+        <div class="form-group">
+          <label>确认密码 <span class="required">*</span></label>
+          <div class="password-wrap">
+            <input
+              v-model="registerForm.confirmPassword"
+              :type="showRegConfirmPassword ? 'text' : 'password'"
+              placeholder="请再次输入密码"
+            />
+            <button
+              type="button"
+              class="toggle-pwd"
+              :class="{ visible: showRegConfirmPassword }"
+              @click="showRegConfirmPassword = !showRegConfirmPassword"
+              :title="showRegConfirmPassword ? '隐藏密码' : '显示密码'"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <template v-if="showRegConfirmPassword">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </template>
+                <template v-else>
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </template>
+              </svg>
+            </button>
+          </div>
+          <p
+            v-if="registerForm.confirmPassword"
+            class="match-tip"
+            :class="{ ok: registerPasswordMatches }"
+          >{{ registerPasswordMatches ? '两次密码一致' : '两次输入的密码不一致' }}</p>
         </div>
 
         <div class="form-group">
           <label>手机号 <span class="required">*</span></label>
-          <input v-model="registerForm.phone" placeholder="请输入手机号" />
+          <input v-model="registerForm.phone" placeholder="请输入手机号" maxlength="11" />
         </div>
 
         <div class="form-group">
@@ -249,7 +337,7 @@ function switchTab(tab) {
             <button
               type="button"
               class="resend-btn"
-              :disabled="codeCooldown > 0 || !registerForm.phone"
+              :disabled="codeCooldown > 0 || !validPhone(registerForm.phone)"
               @click="sendCode"
             >
               <span v-if="codeSending" class="spinner-small"></span>
@@ -303,11 +391,11 @@ function switchTab(tab) {
 }
 
 /* ============================== */
-/* 标签切换（两栏）                 */
+/* 标签切换                         */
 /* ============================== */
 .auth-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 28px;
   background: var(--bg-page, #f3f4f6);
@@ -430,6 +518,49 @@ input:focus {
 .toggle-pwd:hover,
 .toggle-pwd.visible {
   color: var(--color-primary, #f97316);
+}
+
+.password-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+}
+
+.password-checks li.ok {
+  color: var(--clas-success, #16a34a);
+}
+
+.match-tip {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--clas-error, #ef4444);
+}
+
+.match-tip.ok {
+  color: var(--clas-success, #16a34a);
+}
+
+.password-actions {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-primary, #f97316);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
 }
 
 /* ============================== */

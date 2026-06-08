@@ -12,7 +12,7 @@
 
 ## 技术栈
 
-- 后端：Spring Boot 3、MyBatis Plus、MySQL、Lombok
+- 后端：Spring Boot 3、MyBatis Plus、MySQL、Redis、Lombok
 - 前端：Vue3、Vite、axios
 - 数据库：8 张核心表，见 `database/schema.sql`
 
@@ -39,7 +39,7 @@ mysql -h127.0.0.1 -P3306 -uroot < database/schema.sql
 
 ## 启动后端
 
-确认 `backend/src/main/resources/application.yml` 中的 MySQL 用户名和密码正确后运行：
+确认 `backend/src/main/resources/application.yml` 中的 MySQL 用户名和密码正确，并启动本地 Redis（默认 `127.0.0.1:6379`）后运行：
 
 ```bash
 cd backend
@@ -60,11 +60,11 @@ npm run dev
 
 ## 演示账号
 
-| 角色 | 用户名 | 密码 |
-| --- | --- | --- |
-| 用户 | `user` | `123456` |
-| 商家 | `merchant` | `123456` |
-| 管理员 | `admin` | `123456` |
+| 角色 | 手机号 | 展示名 | 密码 |
+| --- | --- | --- | --- |
+| 用户 | `13800000001` | `user` | `Abc123!` |
+| 商家 | `13800000002` | `merchant` | `Abc123!` |
+| 管理员 | `13800000003` | `admin` | `Abc123!` |
 
 第一版没有鉴权，前端只把当前登录用户保存在 `localStorage`。
 
@@ -74,14 +74,16 @@ npm run dev
 
 | 接口 | 说明 |
 | --- | --- |
-| `POST /api/user/register` | 用户注册，默认角色为 `USER` |
-| `POST /api/user/login` | 用户登录，成功后返回当前用户信息 |
+| `POST /api/user/register/send-code` | 发送注册验证码，验证码存 Redis，控制台模拟短信输出 |
+| `POST /api/user/register` | 手机号注册，默认角色为 `USER` |
+| `POST /api/user/login` | 手机号登录，成功后返回当前用户信息 |
 
 注册规则：
 
-- `username` 必填且唯一。
-- `password` 必填，第一版暂时明文存储。
-- `phone` 可为空；填写时必须唯一。
+- `phone` 必填且唯一，是用户表主键。
+- `username` 必填，仅作为展示名，允许重复。
+- `password` 必填，至少 6 位，必须包含大小写英文字母、数字和特殊符号。
+- `code` 必填，必须匹配 Redis 中保存的验证码。
 - `role` 可为空；填写时只能是 `USER`、`MERCHANT`、`ADMIN`。
 - 所有用户响应都会隐藏 `password` 字段。
 
@@ -102,7 +104,7 @@ npm run dev
 ```json
 {
   "code": 400,
-  "message": "用户名或密码错误",
+  "message": "手机号或密码错误",
   "data": null
 }
 ```
@@ -111,7 +113,7 @@ npm run dev
 
 - 当前阶段不接入 JWT / Spring Security。
 - 前端登录后将用户信息写入 `localStorage` 的 `clas_user`。
-- 后端通过请求头 `Authorization: <userId>` 获取当前用户。
+- 后端通过请求头 `Authorization: <phone>` 获取当前用户。
 - 角色统一使用字符串：`USER`、`MERCHANT`、`ADMIN`。
 - 需要权限的接口使用 `@RequireRole` 注解控制。
 
@@ -149,7 +151,8 @@ npm run dev
 **入驻逻辑**
 
 - 已登录用户：自动关联当前账号，角色不足时自动升级 `USER → MERCHANT`
-- 未登录游客：提供 username + password，系统自动创建账号并入驻
+- 未登录游客：提供 accountPhone + 验证码 + username + password，系统自动创建商家账号并入驻
+- 商家账号手机号 `accountPhone` 与店铺联系电话 `contactPhone` 可分开填写
 - 防重复入驻：一个用户只能入驻一个商家
 - 唯一性校验：商家名称、联系电话不可重复
 - 参数校验：手机号格式（`^1[3-9]\d{9}$`）、银行账号格式（`\d{9,25}`）

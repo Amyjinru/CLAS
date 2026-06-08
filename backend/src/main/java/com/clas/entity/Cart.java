@@ -10,8 +10,7 @@ import lombok.Data;
 public class Cart {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long userId;
+    private String userId;
     private Long productId;
     private Integer quantity;
 }
-
