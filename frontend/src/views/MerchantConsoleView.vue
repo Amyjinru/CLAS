@@ -55,7 +55,7 @@ async function load() {
       // version_314: 并行加载订单 + 商品名映射
       const merchantId = merchant.value.id
       const [orderList, products] = await Promise.all([
-        listMerchantOrders(merchantId),
+        listMerchantOrders(),
         listProducts(merchantId)
       ])
       orders.value = orderList
@@ -75,7 +75,7 @@ async function handleAccept(orderId) {
     ElMessage.success('已接单')
     if (merchant.value) {
       const [orderList, products] = await Promise.all([
-        listMerchantOrders(merchant.value.id),
+        listMerchantOrders(),
         listProducts(merchant.value.id)
       ])
       orders.value = orderList

@@ -248,6 +248,7 @@ class ModuleIntegrationTest {
     @Test
     void cartUpdateAndDeleteItemWork() throws Exception {
         mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -258,6 +259,7 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.code").value(200));
 
         mockMvc.perform(post("/api/cart/update")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -268,7 +270,8 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.data[0].quantity").value(2))
             .andExpect(jsonPath("$.data[0].subtotal").value(5180));
 
-        mockMvc.perform(delete("/api/cart/item/" + USER_PHONE + "/1"))
+        mockMvc.perform(delete("/api/cart/item/" + USER_PHONE + "/1")
+                .header("Authorization", USER_PHONE))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.length()").value(0));
     }
@@ -282,6 +285,7 @@ class ModuleIntegrationTest {
             .path("data").get(0).path("stock").asInt();
 
         mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -291,6 +295,7 @@ class ModuleIntegrationTest {
             .andExpect(status().isOk());
 
         MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -307,7 +312,8 @@ class ModuleIntegrationTest {
         Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
             .path("data").path("order").path("id").asLong();
 
-        mockMvc.perform(post("/api/order/cancel/" + orderId))
+        mockMvc.perform(post("/api/order/cancel/" + orderId)
+                .header("Authorization", USER_PHONE))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("CANCELED"));
 
@@ -322,6 +328,7 @@ class ModuleIntegrationTest {
     @Test
     void paymentReviewFlowWorks() throws Exception {
         mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -332,6 +339,7 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.code").value(200));
 
         MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -347,12 +355,14 @@ class ModuleIntegrationTest {
         Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
             .path("data").path("order").path("id").asLong();
 
-        mockMvc.perform(get("/api/payment/status/" + orderId))
+        mockMvc.perform(get("/api/payment/status/" + orderId)
+                .header("Authorization", USER_PHONE))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"))
             .andExpect(jsonPath("$.data.orderStatus").value("PENDING_PAYMENT"));
 
         mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "orderId", orderId,
@@ -363,13 +373,16 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
             .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
 
-        mockMvc.perform(post("/api/order/accept/" + orderId))
+        mockMvc.perform(post("/api/order/accept/" + orderId)
+                .header("Authorization", MERCHANT_PHONE))
             .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
 
-        mockMvc.perform(post("/api/order/complete/" + orderId))
+        mockMvc.perform(post("/api/order/complete/" + orderId)
+                .header("Authorization", USER_PHONE))
             .andExpect(jsonPath("$.data.status").value("COMPLETED"));
 
         mockMvc.perform(post("/api/review/add")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "orderId", orderId,
@@ -385,6 +398,7 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.data.averageScore").value(5.0));
 
         mockMvc.perform(post("/api/review/add")
+                .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "orderId", orderId,

@@ -33,10 +33,7 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse mockPay(PaymentRequest request) {
-        Orders order = orderService.requireOrder(request.orderId());
-        if (!request.userId().equals(order.getUserId())) {
-            throw new BusinessException("只能支付自己的订单");
-        }
+        Orders order = orderService.requireUserOrder(request.orderId(), request.userId());
         if (!OrderService.STATUS_PENDING_PAYMENT.equals(order.getStatus())) {
             throw new BusinessException("订单当前不可支付，状态：" + order.getStatus());
         }
@@ -72,6 +69,15 @@ public class PaymentService {
 
     public PaymentResponse getPaymentStatus(Long orderId) {
         Orders order = orderService.requireOrder(orderId);
+        return paymentStatusForOrder(orderId, order);
+    }
+
+    public PaymentResponse getPaymentStatus(Long orderId, String userId) {
+        Orders order = orderService.requireUserOrder(orderId, userId);
+        return paymentStatusForOrder(orderId, order);
+    }
+
+    private PaymentResponse paymentStatusForOrder(Long orderId, Orders order) {
         return paymentRepository.findLatestByOrderId(orderId)
             .map(payment -> PaymentResponse.from(payment, order.getStatus()))
             .orElseGet(() -> new PaymentResponse(

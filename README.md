@@ -6,7 +6,7 @@
 浏览商家 -> 浏览商品 -> 加入购物车 -> 提交订单 -> 模拟支付 -> 商家接单 -> 确认完成 -> 评价
 ```
 
-暂不接入 Redis、JWT、Spring Security、支付、公告管理、数据统计、收藏功能。
+当前版本已接入 Redis 验证码、模拟支付、公告管理、数据统计与管理员后台；鉴权仍采用轻量级 `Authorization: <phone>` 演示方案，尚未接入 JWT / Spring Security。收藏功能暂未实现。
 
 > 第二阶段已实现商家入驻、5态状态机、管理员审核、RBAC 权限控制，详见下方「功能改进」章节。
 
@@ -14,7 +14,7 @@
 
 - 后端：Spring Boot 3、MyBatis Plus、MySQL、Redis、Lombok
 - 前端：Vue3、Vite、axios
-- 数据库：8 张核心表，见 `database/schema.sql`
+- 数据库：10 张业务表，见 `database/schema.sql`
 
 ## 项目结构
 
@@ -24,7 +24,7 @@ backend/src/main/java/com/clas
 ├── config      # CORS、AuthInterceptor、RequireRole、UserContext、MyMetaObjectHandler
 ├── controller  # REST API（用户、商家、商品、购物车、订单、评价、健康检查）
 ├── dto         # 请求与响应 DTO（含商家入驻、审核）
-├── entity      # 8 张核心表实体（含商家审核日志）
+├── entity      # 业务表实体（含商家审核日志、支付、公告）
 ├── mapper      # MyBatis Plus Mapper（含审核日志 Mapper）
 └── service     # 用户、商家、商品、购物车、订单、评价
 ```
@@ -35,7 +35,7 @@ backend/src/main/java/com/clas
 mysql -h127.0.0.1 -P3306 -uroot < database/schema.sql
 ```
 
-脚本会创建 `clas` 数据库、重建 7 张核心表并插入演示账号和商品数据。
+脚本会创建 `clas` 数据库、重建业务表并插入演示账号、商家、商品和公告数据。
 
 ## 启动后端
 
@@ -66,7 +66,7 @@ npm run dev
 | 商家 | `13800000002` | `merchant` | `Abc123!` |
 | 管理员 | `13800000003` | `admin` | `Abc123!` |
 
-第一版没有鉴权，前端只把当前登录用户保存在 `localStorage`。
+当前版本采用轻量级演示鉴权：前端把当前登录用户保存在 `localStorage`，请求时携带手机号作为 `Authorization` Header，后端按手机号加载用户并做角色校验。
 
 ## 同学 A 维护：用户模块与接口约定
 
@@ -111,9 +111,9 @@ npm run dev
 
 ### 简易鉴权与角色
 
-- 当前阶段不接入 JWT / Spring Security。
+- 当前阶段不接入 JWT / Spring Security，`Authorization: <phone>` 仅适合课程演示。
 - 前端登录后将用户信息写入 `localStorage` 的 `clas_user`。
-- 后端通过请求头 `Authorization: <phone>` 获取当前用户。
+- 后端通过请求头 `Authorization: <phone>` 获取当前用户，购物车、订单、支付、评价等私有操作以服务端当前用户为准，不信任请求体中的 `userId`。
 - 角色统一使用字符串：`USER`、`MERCHANT`、`ADMIN`。
 - 需要权限的接口使用 `@RequireRole` 注解控制。
 
@@ -205,7 +205,7 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 
 ### 五、RBAC 权限控制
 
-- `AuthInterceptor`：解析 `Authorization` Header（userId）→ 查 DB → 写入 `UserContext`（ThreadLocal）
+- `AuthInterceptor`：解析 `Authorization` Header（手机号）→ 查 DB → 写入 `UserContext`（ThreadLocal）
 - `@RequireRole`：声明式角色校验注解，标注在 Controller 方法上即可拦截非授权访问
 - 前端路由守卫：`meta.roles: ['ADMIN']` 拦截非管理员页面访问
 

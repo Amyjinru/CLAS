@@ -65,6 +65,11 @@ public class ReviewService {
             .eq(Review::getOrderId, orderId));
     }
 
+    public Review getByOrderId(Long orderId, String userId) {
+        orderService.requireUserOrder(orderId, userId);
+        return getByOrderId(orderId);
+    }
+
     public List<Review> listByMerchantId(Long merchantId) {
         List<Long> orderIds = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
                 .eq(Orders::getMerchantId, merchantId))

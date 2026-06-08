@@ -1,6 +1,8 @@
 package com.clas.controller;
 
 import com.clas.common.Result;
+import com.clas.config.RequireRole;
+import com.clas.config.UserContext;
 import com.clas.dto.AddCartRequest;
 import com.clas.dto.CartItemResponse;
 import com.clas.dto.RemoveCartRequest;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/cart")
+@RequireRole("USER")
 public class CartController {
     private final CartService cartService;
 
@@ -27,32 +30,36 @@ public class CartController {
 
     @PostMapping("/add")
     public Result<List<CartItemResponse>> add(@Valid @RequestBody AddCartRequest request) {
-        return Result.ok(cartService.add(request));
+        return Result.ok(cartService.add(new AddCartRequest(currentUserId(), request.productId(), request.quantity())));
     }
 
     @PostMapping("/remove")
     public Result<List<CartItemResponse>> remove(@Valid @RequestBody RemoveCartRequest request) {
-        return Result.ok(cartService.remove(request));
+        return Result.ok(cartService.remove(new RemoveCartRequest(currentUserId(), request.productId(), request.quantity())));
     }
 
     @PostMapping("/update")
     public Result<List<CartItemResponse>> update(@Valid @RequestBody UpdateCartRequest request) {
-        return Result.ok(cartService.update(request));
+        return Result.ok(cartService.update(new UpdateCartRequest(currentUserId(), request.productId(), request.quantity())));
     }
 
     @GetMapping("/list/{userId}")
     public Result<List<CartItemResponse>> list(@PathVariable String userId) {
-        return Result.ok(cartService.list(userId));
+        return Result.ok(cartService.list(currentUserId()));
     }
 
     @DeleteMapping("/item/{userId}/{productId}")
     public Result<List<CartItemResponse>> deleteItem(@PathVariable String userId, @PathVariable Long productId) {
-        return Result.ok(cartService.deleteItem(userId, productId));
+        return Result.ok(cartService.deleteItem(currentUserId(), productId));
     }
 
     @DeleteMapping("/clear/{userId}")
     public Result<Void> clear(@PathVariable String userId) {
-        cartService.clear(userId);
+        cartService.clear(currentUserId());
         return Result.ok();
+    }
+
+    private String currentUserId() {
+        return UserContext.getUserId();
     }
 }

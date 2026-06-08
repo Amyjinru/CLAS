@@ -126,8 +126,24 @@ public class OrderService {
         return order;
     }
 
+    public Orders accept(Long orderId, Long merchantId) {
+        Orders order = requireMerchantOrder(orderId, merchantId);
+        requireStatus(order, STATUS_PAID);
+        order.setStatus(STATUS_ACCEPTED);
+        ordersMapper.updateById(order);
+        return order;
+    }
+
     public Orders complete(Long orderId) {
         Orders order = requireOrder(orderId);
+        requireStatus(order, STATUS_ACCEPTED);
+        order.setStatus(STATUS_COMPLETED);
+        ordersMapper.updateById(order);
+        return order;
+    }
+
+    public Orders complete(Long orderId, String userId) {
+        Orders order = requireUserOrder(orderId, userId);
         requireStatus(order, STATUS_ACCEPTED);
         order.setStatus(STATUS_COMPLETED);
         ordersMapper.updateById(order);
@@ -137,6 +153,16 @@ public class OrderService {
     @Transactional
     public Orders cancel(Long orderId) {
         Orders order = requireOrder(orderId);
+        requireStatusIn(order, STATUS_PENDING_PAYMENT, STATUS_PAID);
+        restoreOrderStock(orderId);
+        order.setStatus(STATUS_CANCELED);
+        ordersMapper.updateById(order);
+        return order;
+    }
+
+    @Transactional
+    public Orders cancel(Long orderId, String userId) {
+        Orders order = requireUserOrder(orderId, userId);
         requireStatusIn(order, STATUS_PENDING_PAYMENT, STATUS_PAID);
         restoreOrderStock(orderId);
         order.setStatus(STATUS_CANCELED);
@@ -155,8 +181,28 @@ public class OrderService {
     }
 
     @Transactional
+    public Orders reject(Long orderId, Long merchantId) {
+        Orders order = requireMerchantOrder(orderId, merchantId);
+        requireStatus(order, STATUS_PAID);
+        restoreOrderStock(orderId);
+        order.setStatus(STATUS_REJECTED);
+        ordersMapper.updateById(order);
+        return order;
+    }
+
+    @Transactional
     public Orders refund(Long orderId) {
         Orders order = requireOrder(orderId);
+        requireStatusIn(order, STATUS_ACCEPTED, STATUS_COMPLETED);
+        restoreOrderStock(orderId);
+        order.setStatus(STATUS_REFUNDED);
+        ordersMapper.updateById(order);
+        return order;
+    }
+
+    @Transactional
+    public Orders refund(Long orderId, String userId) {
+        Orders order = requireUserOrder(orderId, userId);
         requireStatusIn(order, STATUS_ACCEPTED, STATUS_COMPLETED);
         restoreOrderStock(orderId);
         order.setStatus(STATUS_REFUNDED);
@@ -168,6 +214,22 @@ public class OrderService {
         Orders order = ordersMapper.selectById(orderId);
         if (order == null) {
             throw new BusinessException("订单不存在");
+        }
+        return order;
+    }
+
+    public Orders requireUserOrder(Long orderId, String userId) {
+        Orders order = requireOrder(orderId);
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException("只能操作自己的订单");
+        }
+        return order;
+    }
+
+    public Orders requireMerchantOrder(Long orderId, Long merchantId) {
+        Orders order = requireOrder(orderId);
+        if (!order.getMerchantId().equals(merchantId)) {
+            throw new BusinessException("只能操作自己店铺的订单");
         }
         return order;
     }

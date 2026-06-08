@@ -1,6 +1,8 @@
 package com.clas.controller;
 
 import com.clas.common.Result;
+import com.clas.config.RequireRole;
+import com.clas.config.UserContext;
 import com.clas.dto.MerchantRatingResponse;
 import com.clas.dto.ReviewRequest;
 import com.clas.entity.Review;
@@ -24,13 +26,20 @@ public class ReviewController {
     }
 
     @PostMapping("/add")
+    @RequireRole("USER")
     public Result<Review> add(@Valid @RequestBody ReviewRequest request) {
-        return Result.ok(reviewService.add(request));
+        return Result.ok(reviewService.add(new ReviewRequest(
+            request.orderId(),
+            UserContext.getUserId(),
+            request.score(),
+            request.content()
+        )));
     }
 
     @GetMapping("/order/{orderId}")
+    @RequireRole("USER")
     public Result<Review> getByOrder(@PathVariable Long orderId) {
-        return Result.ok(reviewService.getByOrderId(orderId));
+        return Result.ok(reviewService.getByOrderId(orderId, UserContext.getUserId()));
     }
 
     @GetMapping("/merchant/{merchantId}")

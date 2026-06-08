@@ -29,6 +29,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (authHeader != null && !authHeader.trim().isEmpty()) {
             User user = userMapper.selectById(authHeader.trim());
             if (user != null) {
+                if (Boolean.FALSE.equals(user.getEnabled())) {
+                    throw new BusinessException("账号已被禁用");
+                }
                 UserContext.setUser(user);
             }
         }

@@ -43,13 +43,15 @@ public class MerchantController {
     }
 
     @GetMapping("/order/{merchantId}")
+    @RequireRole("MERCHANT")
     public Result<List<OrderResponse>> listOrders(@PathVariable Long merchantId) {
-        return Result.ok(orderService.listForMerchant(merchantId));
+        return Result.ok(orderService.listForMerchant(merchantService.getCurrentMerchantId()));
     }
 
     @PostMapping("/order/accept/{orderId}")
+    @RequireRole("MERCHANT")
     public Result<Orders> accept(@PathVariable Long orderId) {
-        return Result.ok(orderService.accept(orderId));
+        return Result.ok(orderService.accept(orderId, merchantService.getCurrentMerchantId()));
     }
 
     // New merchant registration and status management endpoints

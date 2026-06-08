@@ -13,7 +13,7 @@ Controller -> Service -> Mapper -> MySQL
 - `controller`：提供 `/api/**` REST 接口。
 - `service`：实现库存校验、订单状态流转、评价限制等 MVP 业务规则。
 - `mapper`：继承 MyBatis Plus `BaseMapper`。
-- `entity`：一一对应 7 张核心表。
+- `entity`：一一对应业务表实体。
 - `common`：统一返回 `Result<T>` 和异常处理。
 
 ## 核心表
@@ -91,7 +91,7 @@ AdminLayout 采用固定侧边栏 + 内容区布局：
 - 普通用户和未登录商家入驻都需要先发送验证码，再用手机号 + 验证码注册。
 - 验证码使用 Redis 存储，后端控制台模拟短信发送；默认 Redis 地址为 `127.0.0.1:6379`。
 - 密码规则统一为：至少 6 位，包含大写字母、小写字母、数字和特殊符号，且不包含空白字符。
-- 鉴权请求头为 `Authorization: <phone>`。
+- 鉴权请求头为 `Authorization: <phone>`；购物车、订单、支付、评价等私有操作以服务端 `UserContext` 为准。
 
 ## 新增管理后台 API
 
