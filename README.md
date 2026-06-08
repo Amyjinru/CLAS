@@ -14,7 +14,7 @@
 
 - 后端：Spring Boot 3、MyBatis Plus、MySQL、Redis、Lombok
 - 前端：Vue3、Vite、axios
-- 数据库：10 张业务表，见 `database/schema.sql`
+- 数据库：16 张业务表，见 `database/schema.sql`；旧本地库请先执行 `database/migration-20260608.sql` 补齐字段。
 
 ## 项目结构
 
@@ -31,11 +31,25 @@ backend/src/main/java/com/clas
 
 ## 初始化数据库
 
+新同学首次初始化，或可以清空演示数据时，执行完整重建脚本：
+
 ```bash
-mysql -h127.0.0.1 -P3306 -uroot < database/schema.sql
+mysql -h127.0.0.1 -P3306 -uroot -p < database/schema.sql
 ```
 
-脚本会创建 `clas` 数据库、重建业务表并插入演示账号、商家、商品和公告数据。
+已经有本地旧数据、不想清空时，执行非破坏性迁移脚本补齐缺失字段和表：
+
+```bash
+mysql -h127.0.0.1 -P3306 -uroot -p < database/migration-20260608.sql
+```
+
+PowerShell 不能使用 `<` 重定向时，可以改用：
+
+```powershell
+Get-Content -Raw database\migration-20260608.sql | mysql --host=127.0.0.1 --port=3306 --user=root --password=你的密码
+```
+
+`schema.sql` 会重建 `clas` 数据库和 16 张业务表；`migration-20260608.sql` 只补字段/表并保留已有数据。
 
 ## 启动后端
 

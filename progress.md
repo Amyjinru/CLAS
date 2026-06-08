@@ -63,7 +63,7 @@
 
 协作同学拉取后需要注意：
 
-- 本地 MySQL 需要重新执行 `database/schema.sql`，或手动同步新增字段/表。
+- 新库或可清空演示数据时执行 `database/schema.sql`；已有旧数据时执行 `database/migration-20260608.sql` 非破坏性补齐新增字段/表。
 - H2 测试库同步更新在 `backend/src/test/resources/schema-test.sql`。
 - 该脚本是重建表脚本，会清空并重新插入演示数据；真实数据环境不要直接执行。
 
@@ -98,6 +98,6 @@
 
 - 鉴权仍为课程演示级 `Authorization: <phone>`，后续可接入 JWT / Spring Security。
 - 支付、配送、短信和退款均为模拟流程，后续可替换真实第三方服务或更完整的状态机。
-- `database/schema.sql` 当前是重建脚本，团队后续长期协作建议拆分为版本化 migration。
+- `database/schema.sql` 当前是重建脚本；已补充 `database/migration-20260608.sql` 供旧库升级，团队后续长期协作建议继续维护版本化 migration。
 - 推荐排序目前基于评分、价格、最新等简单规则，后续可结合收藏、购买、浏览历史做个性化推荐。
 - 可继续补充“AI 客服 / 智能问答”“商家服务项目配置”“管理员预约监管”等模块，增强生活助手平台完整度。
