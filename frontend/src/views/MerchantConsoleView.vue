@@ -7,6 +7,7 @@ import { ElMessage } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
 import OrderDetailContent from '../components/OrderDetailContent.vue'
+import MerchantReviewSection from '../components/MerchantReviewSection.vue'
 
 const router = useRouter()
 const merchant = ref(null)
@@ -404,7 +405,13 @@ onMounted(() => {
           </el-table>
         </el-card>
 
-        <el-card v-else class="box-card locked-card">
+        <MerchantReviewSection
+          v-if="merchant.status === 'OPEN'"
+          :merchant-id="merchant.id"
+          :show-merchant-actions="true"
+        />
+
+        <el-card v-if="merchant.status !== 'OPEN'" class="box-card locked-card">
           <div class="locked-content">
             <el-icon :size="50" color="#909399"><Lock /></el-icon>
             <h4>工作台锁定</h4>

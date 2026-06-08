@@ -8,7 +8,7 @@ const props = defineProps({
   },
   label: {
     type: String,
-    default: '返回'
+    default: '← 返回'
   }
 })
 
@@ -24,11 +24,30 @@ function goBack() {
 </script>
 
 <template>
-  <button class="back-btn secondary" type="button" @click="goBack">{{ label }}</button>
+  <button class="back-btn" type="button" @click="goBack">{{ label }}</button>
 </template>
 
 <style scoped>
 .back-btn {
-  margin-bottom: 14px;
+  align-self: start;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 12px;
+  width: auto;
+}
+
+.back-btn:hover {
+  background: var(--color-primary-soft);
+  border-color: var(--clas-amber-200);
+  color: var(--color-primary);
+  transform: none;
+  box-shadow: none;
 }
 </style>

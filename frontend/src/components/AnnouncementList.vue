@@ -26,30 +26,44 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="panel">
-    <h1>{{ title }}</h1>
-    <p>{{ description }}</p>
-    <p class="message">{{ message }}</p>
-  </section>
+  <div class="user-page announcements-page">
+    <section class="panel announcements-head">
+      <h1>{{ title }}</h1>
+      <p>{{ description }}</p>
+      <p class="message">{{ message }}</p>
+    </section>
 
-  <section class="list">
-    <article class="announcement-card" v-for="item in announcements" :key="item.id">
-      <div>
+    <section class="user-page-grid-2 announcements-grid">
+      <article class="announcement-card" v-for="item in announcements" :key="item.id">
         <h2>{{ item.title }}</h2>
         <p class="announcement-time">{{ item.createTime?.replace('T', ' ') }}</p>
-        <p>{{ item.content }}</p>
-      </div>
-    </article>
-    <p v-if="!announcements.length && !message" class="empty">暂无公告</p>
-  </section>
+        <p class="announcement-content">{{ item.content }}</p>
+      </article>
+    </section>
+
+    <el-empty v-if="!announcements.length && !message" description="暂无公告" />
+  </div>
 </template>
 
 <style scoped>
+.announcements-page {
+  display: grid;
+  gap: 20px;
+}
+
+.announcements-head {
+  margin-bottom: 0;
+}
+
 .announcement-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px 22px;
 }
 
 .announcement-card h2 {
@@ -60,17 +74,13 @@ onMounted(async () => {
 .announcement-time {
   color: #94a3b8;
   font-size: 13px;
-  margin: 0 0 8px;
+  margin: 0 0 10px;
 }
 
-.announcement-card p:last-child {
+.announcement-content {
   color: #667085;
+  flex: 1;
+  line-height: 1.6;
   margin: 0;
-}
-
-.empty {
-  color: #667085;
-  margin: 0;
-  text-align: center;
 }
 </style>

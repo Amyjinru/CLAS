@@ -63,7 +63,9 @@ api.interceptors.response.use(
     // Handle standard Result format with code !== 200 as error
     if (response.data && response.data.code && response.data.code !== 200) {
       const msg = response.data.message || '请求失败'
-      ElMessage.error(msg)
+      if (!response.config.silent) {
+        ElMessage.error(msg)
+      }
       const error = new Error(msg)
       error.response = response
       return Promise.reject(error)
@@ -77,7 +79,9 @@ api.interceptors.response.use(
     }
 
     const msg = error.response?.data?.message || error.message || '系统异常'
-    ElMessage.error(msg)
+    if (!error.config?.silent) {
+      ElMessage.error(msg)
+    }
     return Promise.reject(error)
   }
 )
