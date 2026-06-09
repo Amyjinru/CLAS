@@ -20,6 +20,8 @@ import com.clas.mapper.ProductMapper;
 import com.clas.mapper.UserAddressMapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,6 +79,7 @@ public class OrderService {
     public OrderResponse create(CreateOrderRequest request) {
         penaltyService.assertCanUsePlatform(request.userId());
         Merchant merchant = requireMerchant(request.merchantId());
+        assertMerchantOpenNow(merchant);
         List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, request.userId()));
         if (cartItems.isEmpty()) {
@@ -545,6 +548,37 @@ public class OrderService {
             throw new BusinessException("商家不存在");
         }
         return merchant;
+    }
+
+    private void assertMerchantOpenNow(Merchant merchant) {
+        String businessHours = trimToNull(merchant.getBusinessHours());
+        if (businessHours == null) {
+            return;
+        }
+        String[] parts = businessHours.split("-");
+        if (parts.length != 2) {
+            return;
+        }
+        try {
+            LocalTime start = LocalTime.parse(parts[0].trim());
+            LocalTime end = LocalTime.parse(parts[1].trim());
+            LocalTime now = LocalTime.now();
+            if (!isWithinBusinessHours(now, start, end)) {
+                throw new BusinessException("商家已休息，当前营业时间：" + businessHours);
+            }
+        } catch (DateTimeParseException exception) {
+            return;
+        }
+    }
+
+    private boolean isWithinBusinessHours(LocalTime now, LocalTime start, LocalTime end) {
+        if (start.equals(end)) {
+            return true;
+        }
+        if (start.isBefore(end)) {
+            return !now.isBefore(start) && now.isBefore(end);
+        }
+        return !now.isBefore(start) || now.isBefore(end);
     }
 
     private String trimToNull(String value) {

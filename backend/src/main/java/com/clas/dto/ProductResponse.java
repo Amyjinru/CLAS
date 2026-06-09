@@ -10,6 +10,8 @@ public record ProductResponse(
     Integer stock,
     String status,
     String imageUrl,
+    Long categoryId,
+    String categoryName,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {

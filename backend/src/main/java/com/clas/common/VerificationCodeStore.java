@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,7 +21,7 @@ public class VerificationCodeStore {
     private final Map<String, CodeEntry> fallbackStore = new ConcurrentHashMap<>();
 
     public VerificationCodeStore(
-        StringRedisTemplate redisTemplate,
+        @Autowired(required = false) StringRedisTemplate redisTemplate,
         @Value("${clas.verification.fixed-code:}") String fixedCode
     ) {
         this.redisTemplate = redisTemplate;
@@ -34,9 +35,13 @@ public class VerificationCodeStore {
             ? String.format("%06d", (int) (Math.random() * 1000000))
             : fixedCode;
 
-        try {
-            storeInRedis(normalizedPhone, normalizedScene, code);
-        } catch (RedisConnectionFailureException | IllegalStateException ex) {
+        if (redisTemplate != null) {
+            try {
+                storeInRedis(normalizedPhone, normalizedScene, code);
+            } catch (RedisConnectionFailureException | IllegalStateException ex) {
+                storeInMemory(normalizedPhone, normalizedScene, code);
+            }
+        } else {
             storeInMemory(normalizedPhone, normalizedScene, code);
         }
 
@@ -50,9 +55,13 @@ public class VerificationCodeStore {
         if (code == null || code.isBlank()) {
             throw new BusinessException("验证码不能为空");
         }
-        try {
-            return verifyRedis(normalizedPhone, normalizedScene, code.trim());
-        } catch (RedisConnectionFailureException | IllegalStateException ex) {
+        if (redisTemplate != null) {
+            try {
+                return verifyRedis(normalizedPhone, normalizedScene, code.trim());
+            } catch (RedisConnectionFailureException | IllegalStateException ex) {
+                return verifyMemory(normalizedPhone, normalizedScene, code.trim());
+            }
+        } else {
             return verifyMemory(normalizedPhone, normalizedScene, code.trim());
         }
     }

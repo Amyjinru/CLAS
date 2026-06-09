@@ -182,9 +182,9 @@ async function submitForm() {
       // If a visitor registered, auto log them in or redirect to login
       if (!user.value && data.userId) {
         ElMessage.info('系统已为您创建商家账号，请重新登录')
-        router.push('/login')
+        router.push({ path: '/login', query: { redirect: '/merchant/audit-status' } })
       } else {
-        router.push('/merchant-console')
+        router.push('/merchant/audit-status')
       }
     } catch (err) {
       // Error is handled in client.js response interceptor

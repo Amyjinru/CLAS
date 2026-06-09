@@ -14,7 +14,9 @@ const ProfileView = () => import('../views/ProfileView.vue')
 const PaymentView = () => import('../views/PaymentView.vue')
 const ReviewView = () => import('../views/ReviewView.vue')
 const MerchantRegisterView = () => import('../views/MerchantRegisterView.vue')
+const MerchantAuditStatusView = () => import('../views/MerchantAuditStatusView.vue')
 const MerchantConsoleView = () => import('../views/MerchantConsoleView.vue')
+const MerchantAnalyticsView = () => import('../views/MerchantAnalyticsView.vue')
 const MerchantProductsView = () => import('../views/MerchantProductsView.vue')
 const MerchantDealsView = () => import('../views/MerchantDealsView.vue')
 const MerchantBookingsView = () => import('../views/MerchantBookingsView.vue')
@@ -79,6 +81,8 @@ const routes = [
   },
 
   { path: '/merchant/products', component: MerchantProductsView, meta: { roles: ['MERCHANT'] } },
+  { path: '/merchant/analytics', component: MerchantAnalyticsView, meta: { roles: ['MERCHANT'] } },
+  { path: '/merchant/audit-status', component: MerchantAuditStatusView, meta: { roles: ['MERCHANT'] } },
   { path: '/merchant/deals', component: MerchantDealsView, meta: { roles: ['MERCHANT'] } },
   { path: '/merchant/bookings', component: MerchantBookingsView, meta: { roles: ['MERCHANT'] } },
 

@@ -2,7 +2,7 @@
 import BackButton from '../components/BackButton.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { addCart, addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listProducts, removeCart, removeFavorite } from '../api/clas'
+import { addCart, addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listGroupedProducts, listProducts, removeCart, removeFavorite } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
 import MerchantRouteMap from '../components/MerchantRouteMap.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
@@ -15,6 +15,8 @@ const router = useRouter()
 const merchantId = computed(() => Number(route.params.id))
 const merchant = ref(null)
 const products = ref([])
+const productGroups = ref({})
+const activeProductCategory = ref('')
 const cartItems = ref([])
 const cartOpen = ref(false)
 const message = ref('')
@@ -36,6 +38,11 @@ const cartCount = computed(() =>
 const cartTotal = computed(() =>
   merchantCartItems.value.reduce((sum, item) => sum + item.subtotal, 0)
 )
+const productCategories = computed(() => Object.keys(productGroups.value))
+const visibleProducts = computed(() => {
+  if (!productCategories.value.length) return products.value
+  return productGroups.value[activeProductCategory.value] || []
+})
 const isFavorite = computed(() => favoriteMerchantIds.value.has(merchantId.value))
 const deliveryDistance = computed(() =>
   deliveryEstimate.value?.routeDistanceMeters || deliveryEstimate.value?.distanceMeters
@@ -71,14 +78,55 @@ function fieldText(value, fallback = '暂无信息') {
   return value || fallback
 }
 
+const businessStatus = computed(() => resolveBusinessStatus(merchant.value?.businessHours))
+
+function parseTimeToMinutes(value) {
+  const match = /^(\d{2}):(\d{2})$/.exec((value || '').trim())
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+function resolveBusinessStatus(hoursText) {
+  const fallback = { open: true, label: '营业中', type: 'success', nextOpenText: '' }
+  if (!hoursText || !hoursText.includes('-')) return fallback
+  const [startText, endText] = hoursText.split('-').map((item) => item.trim())
+  const start = parseTimeToMinutes(startText)
+  const end = parseTimeToMinutes(endText)
+  if (start === null || end === null || start === end) return fallback
+
+  const nowDate = new Date()
+  const now = nowDate.getHours() * 60 + nowDate.getMinutes()
+  const open = start < end
+    ? now >= start && now < end
+    : now >= start || now < end
+  return {
+    open,
+    label: open ? '营业中' : '已休息',
+    type: open ? 'success' : 'info',
+    nextOpenText: open ? '' : `${startText} 开始营业`
+  }
+}
+
 function productImageStyle(product) {
-  if (!product.image) return {}
-  return { backgroundImage: `url("${product.image}")` }
+  const image = product.image || product.imageUrl
+  if (!image) return {}
+  return { backgroundImage: `url("${image}")` }
 }
 
 async function loadProducts() {
   merchant.value = await getMerchant(route.params.id)
-  products.value = await listProducts(route.params.id)
+  try {
+    productGroups.value = await listGroupedProducts(route.params.id)
+    products.value = Object.values(productGroups.value).flat()
+    activeProductCategory.value = Object.keys(productGroups.value)[0] || ''
+  } catch {
+    productGroups.value = {}
+    products.value = await listProducts(route.params.id)
+    activeProductCategory.value = ''
+  }
   try {
     const favorites = await listFavorites()
     favoriteMerchantIds.value = new Set(favorites.map((item) => item.id))
@@ -101,6 +149,8 @@ async function load() {
   message.value = ''
   merchant.value = null
   products.value = []
+  productGroups.value = {}
+  activeProductCategory.value = ''
   deliveryEstimate.value = null
   try {
     await Promise.all([loadProducts(), loadCart()])
@@ -182,6 +232,10 @@ function isSoldOut(product) {
 
 async function add(product) {
   if (isSoldOut(product)) return
+  if (!businessStatus.value.open) {
+    message.value = `商家已休息，${businessStatus.value.nextOpenText}`
+    return
+  }
   try {
     await addCart({ productId: product.id, quantity: 1 })
     message.value = `${product.name} 已加入购物车`
@@ -192,6 +246,10 @@ async function add(product) {
 }
 
 async function increaseCartItem(item) {
+  if (!businessStatus.value.open) {
+    message.value = `商家已休息，${businessStatus.value.nextOpenText}`
+    return
+  }
   try {
     await addCart({ productId: item.productId, quantity: 1 })
     await load()
@@ -220,6 +278,10 @@ async function removeCartItem(item) {
 
 async function submitOrder() {
   if (!merchantCartItems.value.length) return
+  if (!businessStatus.value.open) {
+    message.value = `商家已休息，${businessStatus.value.nextOpenText}`
+    return
+  }
   submitting.value = true
   message.value = ''
   try {
@@ -325,7 +387,12 @@ watch(
         <div class="merchant-stats">
           <div>
             <span>营业时间</span>
-            <strong>{{ fieldText(merchant.businessHours, '暂无') }}</strong>
+            <strong class="business-hours">
+              {{ fieldText(merchant.businessHours, '暂无') }}
+              <el-tag :type="businessStatus.type" size="small" effect="plain">
+                {{ businessStatus.label }}
+              </el-tag>
+            </strong>
           </div>
           <div>
             <span>人均消费</span>
@@ -385,10 +452,22 @@ watch(
         </div>
       </div>
 
-      <div class="product-grid" v-if="products.length">
-        <article class="product-card" v-for="product in products" :key="product.id">
-          <div class="product-thumb" :class="{ placeholder: !product.image }" :style="productImageStyle(product)">
-            <span v-if="!product.image">{{ product.name?.slice(0, 1) || '品' }}</span>
+      <div class="category-tabs" v-if="productCategories.length">
+        <button
+          v-for="category in productCategories"
+          :key="category"
+          type="button"
+          :class="{ active: activeProductCategory === category }"
+          @click="activeProductCategory = category"
+        >
+          {{ category }}
+        </button>
+      </div>
+
+      <div class="product-grid" v-if="visibleProducts.length">
+        <article class="product-card" v-for="product in visibleProducts" :key="product.id">
+          <div class="product-thumb" :class="{ placeholder: !(product.image || product.imageUrl) }" :style="productImageStyle(product)">
+            <span v-if="!(product.image || product.imageUrl)">{{ product.name?.slice(0, 1) || '品' }}</span>
           </div>
           <div class="product-info">
             <div class="product-title-row">
@@ -400,11 +479,11 @@ watch(
             <div class="product-bottom">
               <strong>{{ priceText(product.price) }}</strong>
               <button
-                :disabled="isSoldOut(product)"
-                :class="{ 'btn-sold-out': isSoldOut(product) }"
+                :disabled="isSoldOut(product) || !businessStatus.open"
+                :class="{ 'btn-sold-out': isSoldOut(product) || !businessStatus.open }"
                 @click="add(product)"
               >
-                {{ isSoldOut(product) ? '已售罄' : '加入购物车' }}
+                {{ isSoldOut(product) ? '已售罄' : (businessStatus.open ? '加入购物车' : businessStatus.nextOpenText) }}
               </button>
             </div>
           </div>
@@ -439,7 +518,7 @@ watch(
               <div class="cart-qty-control">
                 <button class="qty-btn" type="button" @click="decreaseCartItem(item)">−</button>
                 <span>{{ item.quantity }}</span>
-                <button class="qty-btn" type="button" @click="increaseCartItem(item)">+</button>
+                <button class="qty-btn" type="button" :disabled="!businessStatus.open" @click="increaseCartItem(item)">+</button>
               </div>
             </div>
             <div class="cart-panel-item-side">
@@ -457,10 +536,10 @@ watch(
           </div>
           <div class="cart-panel-actions">
             <button
-              :disabled="!merchantCartItems.length || submitting"
+              :disabled="!merchantCartItems.length || submitting || !businessStatus.open"
               @click="submitOrder"
             >
-              {{ submitting ? '提交中...' : '提交订单' }}
+              {{ submitting ? '提交中...' : (businessStatus.open ? '提交订单' : businessStatus.nextOpenText) }}
             </button>
             <RouterLink class="button secondary" to="/orders" @click="closeCart">
               我的订单
@@ -566,6 +645,13 @@ watch(
   font-size: 15px;
 }
 
+.business-hours {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .delivery-actions {
   align-items: center;
   display: flex;
@@ -607,6 +693,28 @@ watch(
 .section-head p {
   color: var(--text-secondary);
   margin: 6px 0 0;
+}
+
+.category-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.category-tabs button {
+  background: #fff;
+  border: 1px solid #efe4d5;
+  color: var(--text-secondary);
+  min-height: 36px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.category-tabs button.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
 }
 
 .product-grid {

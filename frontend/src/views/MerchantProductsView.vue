@@ -8,9 +8,14 @@ import {
   updateProduct,
   updateProductStatus,
   deleteProduct,
+  listProductCategories,
+  createProductCategory,
+  updateProductCategory,
+  deleteProductCategory,
+  uploadProductImage,
   currentUser
 } from '../api/clas'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const merchant = ref(null)
@@ -23,12 +28,16 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const searchKeyword = ref('')
+const categoryFilter = ref('')
+const categories = ref([])
+const categoryForm = ref({ name: '', sortOrder: 0 })
 
 // Dialog state
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增商品')
 const formRef = ref(null)
 const isEdit = ref(false)
+const uploadLoading = ref(false)
 
 const form = ref({
   id: null,
@@ -36,6 +45,7 @@ const form = ref({
   description: '',
   price: 0,
   stock: 0,
+  categoryId: null,
   imageUrl: ''
 })
 
@@ -75,7 +85,7 @@ async function loadMerchant() {
     const data = await getMyMerchant()
     merchant.value = data
     if (merchant.value) {
-      await loadProducts()
+      await Promise.all([loadCategories(), loadProducts()])
     }
   } catch (error) {
     // API client handles errors
@@ -87,16 +97,24 @@ async function loadMerchant() {
 async function loadProducts() {
   if (!merchant.value) return
   try {
-    const res = await getMerchantProducts({
+    const params = {
       page: currentPage.value,
       size: pageSize.value,
       keyword: searchKeyword.value
-    })
+    }
+    if (categoryFilter.value !== '') {
+      params.categoryId = categoryFilter.value
+    }
+    const res = await getMerchantProducts(params)
     products.value = res.list
     total.value = res.total
   } catch (error) {
     // API client handles errors
   }
+}
+
+async function loadCategories() {
+  categories.value = await listProductCategories()
 }
 
 function handleSearch() {
@@ -124,6 +142,7 @@ function openAddDialog() {
     description: '',
     price: 0,
     stock: 0,
+    categoryId: null,
     imageUrl: ''
   }
   dialogVisible.value = true
@@ -139,6 +158,7 @@ function openEditDialog(row) {
     description: row.description || '',
     price: row.price / 100, // Convert cents to Yuan for display
     stock: row.stock,
+    categoryId: row.categoryId || null,
     imageUrl: row.imageUrl || ''
   }
   dialogVisible.value = true
@@ -170,6 +190,68 @@ async function handleDelete(id) {
   }
 }
 
+async function handleCreateCategory() {
+  if (!categoryForm.value.name.trim()) {
+    ElMessage.warning('请填写分类名称')
+    return
+  }
+  await createProductCategory({
+    name: categoryForm.value.name.trim(),
+    sortOrder: categoryForm.value.sortOrder
+  })
+  ElMessage.success('分类已创建')
+  categoryForm.value = { name: '', sortOrder: 0 }
+  await loadCategories()
+}
+
+async function handleUpdateCategory(category) {
+  await updateProductCategory({
+    id: category.id,
+    name: category.name,
+    sortOrder: category.sortOrder
+  })
+  ElMessage.success('分类已保存')
+  await loadCategories()
+}
+
+async function handleDeleteCategory(category) {
+  await ElMessageBox.confirm(
+    `删除分类「${category.name}」后，分类下商品将变为未分类。确定删除吗？`,
+    '删除分类',
+    { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+  )
+  await deleteProductCategory(category.id)
+  ElMessage.success('分类已删除')
+  if (categoryFilter.value === category.id) {
+    categoryFilter.value = ''
+  }
+  await Promise.all([loadCategories(), loadProducts()])
+}
+
+function beforeImageUpload(file) {
+  const allowed = ['image/jpeg', 'image/png']
+  if (!allowed.includes(file.type)) {
+    ElMessage.warning('仅支持 jpg/png 图片')
+    return false
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.warning('图片不能超过 5MB')
+    return false
+  }
+  return true
+}
+
+async function handleImageUpload({ file }) {
+  uploadLoading.value = true
+  try {
+    const data = await uploadProductImage(file)
+    form.value.imageUrl = data.url
+    ElMessage.success('图片上传成功')
+  } finally {
+    uploadLoading.value = false
+  }
+}
+
 function submitForm() {
   if (!formRef.value) return
   formRef.value.validate(async (valid) => {
@@ -178,6 +260,7 @@ function submitForm() {
     // Prepare payload (convert Yuan back to cents/fen for price)
     const payload = {
       ...form.value,
+      categoryId: form.value.categoryId || null,
       price: Math.round(form.value.price * 100)
     }
 
@@ -296,6 +379,30 @@ onMounted(loadMerchant)
           class="status-alert"
         />
 
+        <el-card class="box-card work-card category-card">
+          <template #header>
+            <div class="card-header justify-between">
+              <h3>分类管理</h3>
+            </div>
+          </template>
+
+          <div class="category-create-row">
+            <el-input v-model="categoryForm.name" placeholder="分类名称，如 主食、饮品、小食" maxlength="50" />
+            <el-input-number v-model="categoryForm.sortOrder" :min="0" :step="1" />
+            <el-button type="primary" @click="handleCreateCategory">添加分类</el-button>
+          </div>
+
+          <div class="category-list" v-if="categories.length">
+            <div v-for="category in categories" :key="category.id" class="category-item">
+              <el-input v-model="category.name" maxlength="50" />
+              <el-input-number v-model="category.sortOrder" :min="0" :step="1" />
+              <el-button type="primary" plain @click="handleUpdateCategory(category)">保存</el-button>
+              <el-button type="danger" plain @click="handleDeleteCategory(category)">删除</el-button>
+            </div>
+          </div>
+          <el-empty v-else description="暂无商品分类" />
+        </el-card>
+
         <el-card class="box-card work-card">
           <template #header>
             <div class="card-header justify-between">
@@ -326,6 +433,22 @@ onMounted(loadMerchant)
               </template>
             </el-input>
             <el-button type="primary" icon="Search" @click="handleSearch">搜索</el-button>
+            <el-select
+              v-model="categoryFilter"
+              placeholder="全部分类"
+              clearable
+              style="width: 180px; margin-left: 12px;"
+              @change="handleSearch"
+              @clear="handleSearch"
+            >
+              <el-option label="未分类" :value="0" />
+              <el-option
+                v-for="category in categories"
+                :key="category.id"
+                :label="category.name"
+                :value="category.id"
+              />
+            </el-select>
           </div>
 
           <!-- Product Table -->
@@ -365,6 +488,12 @@ onMounted(loadMerchant)
             </el-table-column>
 
             <el-table-column prop="stock" label="库存" width="100" />
+
+            <el-table-column label="所属分类" width="120">
+              <template #default="scope">
+                <el-tag effect="plain">{{ scope.row.categoryName || '未分类' }}</el-tag>
+              </template>
+            </el-table-column>
 
             <el-table-column label="状态" width="100">
               <template #default="scope">
@@ -468,8 +597,35 @@ onMounted(loadMerchant)
           />
         </el-form-item>
 
+        <el-form-item label="所属分类" prop="categoryId">
+          <el-select v-model="form.categoryId" placeholder="请选择分类" clearable style="width: 100%">
+            <el-option label="未分类" :value="null" />
+            <el-option
+              v-for="category in categories"
+              :key="category.id"
+              :label="category.name"
+              :value="category.id"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="商品图片" prop="imageUrl">
-          <el-input v-model="form.imageUrl" placeholder="请输入图片URL或相对路径，如 /images/product.jpg" />
+          <div class="image-upload-box">
+            <el-image
+              v-if="form.imageUrl"
+              :src="form.imageUrl"
+              fit="cover"
+              class="product-preview-img"
+            />
+            <el-upload
+              :show-file-list="false"
+              :before-upload="beforeImageUpload"
+              :http-request="handleImageUpload"
+            >
+              <el-button :loading="uploadLoading" type="primary" plain>上传图片</el-button>
+            </el-upload>
+            <el-input v-model="form.imageUrl" placeholder="图片 URL 会在上传后自动填入，也可手动输入" />
+          </div>
         </el-form-item>
 
         <el-form-item label="商品描述" prop="description">
@@ -607,8 +763,28 @@ onMounted(loadMerchant)
   border-radius: 12px;
 }
 
+.category-card {
+  margin-bottom: 20px;
+}
+
+.category-create-row,
+.category-item {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 140px auto auto;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.category-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .search-bar {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 20px;
 }
 
@@ -617,6 +793,19 @@ onMounted(loadMerchant)
   height: 50px;
   border-radius: 6px;
   border: 1px solid #e4e7ed;
+}
+
+.image-upload-box {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.product-preview-img {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  height: 120px;
+  width: 120px;
 }
 
 .image-slot {

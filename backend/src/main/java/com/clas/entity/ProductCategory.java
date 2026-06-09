@@ -9,18 +9,13 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
-@TableName("product")
-public class Product {
+@TableName("product_category")
+public class ProductCategory {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long merchantId;
-    private Long categoryId;
     private String name;
-    private String description;
-    private Integer price;
-    private Integer stock;
-    private String image;
-    private String status;
+    private Integer sortOrder;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
@@ -28,4 +23,3 @@ public class Product {
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 }
-

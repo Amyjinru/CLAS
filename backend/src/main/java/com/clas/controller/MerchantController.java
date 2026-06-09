@@ -8,14 +8,18 @@ import com.clas.dto.MerchantAuditRequest;
 import com.clas.dto.DeliveryEstimateResponse;
 import com.clas.dto.MerchantRegisterRequest;
 import com.clas.dto.MerchantResponse;
+import com.clas.dto.MerchantStatsDTO;
 import com.clas.dto.OrderResponse;
 import com.clas.entity.MerchantAuditLog;
 import com.clas.entity.Orders;
 import com.clas.service.MerchantService;
 import com.clas.service.OrderService;
+import com.clas.service.StatisticsService;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,10 +33,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class MerchantController {
     private final MerchantService merchantService;
     private final OrderService orderService;
+    private final StatisticsService statisticsService;
 
-    public MerchantController(MerchantService merchantService, OrderService orderService) {
+    public MerchantController(MerchantService merchantService, OrderService orderService, StatisticsService statisticsService) {
         this.merchantService = merchantService;
         this.orderService = orderService;
+        this.statisticsService = statisticsService;
     }
 
     @GetMapping("/list")
@@ -90,6 +96,30 @@ public class MerchantController {
         }
         MerchantResponse response = merchantService.getMerchantByUserId(loggedInUserId);
         return Result.ok(response);
+    }
+
+    @GetMapping("/my/audit-status")
+    @RequireRole("MERCHANT")
+    public Result<Map<String, Object>> getMyAuditStatus() {
+        String loggedInUserId = UserContext.getUserId();
+        if (loggedInUserId == null) {
+            throw new BusinessException("鏈櫥褰曪紝璇峰厛鐧诲綍");
+        }
+        MerchantResponse merchant = merchantService.getMerchantByUserId(loggedInUserId);
+        if (merchant == null) {
+            throw new BusinessException("褰撳墠鐢ㄦ埛鏈叆椹讳负鍟嗗");
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", merchant.status());
+        response.put("adminRemarks", merchant.adminRemarks());
+        response.put("auditTimeline", merchantService.getAuditLogs(merchant.id()));
+        return Result.ok(response);
+    }
+
+    @GetMapping("/my/stats")
+    @RequireRole("MERCHANT")
+    public Result<MerchantStatsDTO> getMyStats() {
+        return Result.ok(statisticsService.getMerchantStats(merchantService.getCurrentMerchantId()));
     }
 
     @GetMapping("/admin/list")

@@ -8,10 +8,12 @@ import com.clas.dto.ProductUpdateRequest;
 import com.clas.dto.ProductResponse;
 import com.clas.dto.ProductListResponse;
 import com.clas.entity.Product;
+import com.clas.entity.ProductCategory;
 import com.clas.service.MerchantService;
 import com.clas.service.ProductService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,27 +31,29 @@ public class ProductController {
         return Result.ok(productService.listByMerchant(merchantId));
     }
 
+    @GetMapping("/api/product/list")
+    public Result<Map<String, List<ProductResponse>>> listGrouped(@RequestParam Long merchantId) {
+        return Result.ok(productService.listGroupedByMerchant(merchantId));
+    }
+
+    @GetMapping("/api/product/categories")
+    public Result<List<ProductCategory>> listCategories(@RequestParam(required = false) Long merchantId) {
+        Long resolvedMerchantId = merchantId == null ? merchantService.getCurrentMerchantId() : merchantId;
+        return Result.ok(productService.listCategories(resolvedMerchantId));
+    }
+
     @GetMapping("/api/merchant/products/list")
     @RequireRole("MERCHANT")
     public Result<ProductListResponse> getMerchantProducts(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId) {
         Long merchantId = merchantService.getCurrentMerchantId();
-        Page<Product> productPage = productService.getMerchantProducts(merchantId, page, size, keyword);
+        Page<Product> productPage = productService.getMerchantProducts(merchantId, page, size, keyword, categoryId);
 
         List<ProductResponse> responses = productPage.getRecords().stream()
-                .map(p -> new ProductResponse(
-                        p.getId(),
-                        p.getName(),
-                        p.getDescription(),
-                        p.getPrice(),
-                        p.getStock(),
-                        p.getStatus(),
-                        p.getImage(),
-                        p.getCreatedAt(),
-                        p.getUpdatedAt()
-                )).toList();
+                .map(productService::toResponse).toList();
 
         return Result.ok(new ProductListResponse(
                 responses,
@@ -64,17 +68,7 @@ public class ProductController {
     public Result<ProductResponse> createProduct(@Valid @RequestBody ProductCreateRequest request) {
         Long merchantId = merchantService.getCurrentMerchantId();
         Product product = productService.createProduct(request, merchantId);
-        return Result.ok(new ProductResponse(
-                product.getId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getStock(),
-                product.getStatus(),
-                product.getImage(),
-                product.getCreatedAt(),
-                product.getUpdatedAt()
-        ));
+        return Result.ok(productService.toResponse(product));
     }
 
     @PutMapping("/api/merchant/products/update")
@@ -82,17 +76,31 @@ public class ProductController {
     public Result<ProductResponse> updateProduct(@Valid @RequestBody ProductUpdateRequest request) {
         Long merchantId = merchantService.getCurrentMerchantId();
         Product product = productService.updateProduct(request, merchantId);
-        return Result.ok(new ProductResponse(
-                product.getId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getStock(),
-                product.getStatus(),
-                product.getImage(),
-                product.getCreatedAt(),
-                product.getUpdatedAt()
-        ));
+        return Result.ok(productService.toResponse(product));
+    }
+
+    public record CategoryRequest(Long id, String name, Integer sortOrder) {}
+
+    @PostMapping("/api/product/categories")
+    @RequireRole("MERCHANT")
+    public Result<ProductCategory> createCategory(@Valid @RequestBody CategoryRequest request) {
+        Long merchantId = merchantService.getCurrentMerchantId();
+        return Result.ok(productService.createCategory(merchantId, request.name(), request.sortOrder()));
+    }
+
+    @PutMapping("/api/product/categories")
+    @RequireRole("MERCHANT")
+    public Result<ProductCategory> updateCategory(@Valid @RequestBody CategoryRequest request) {
+        Long merchantId = merchantService.getCurrentMerchantId();
+        return Result.ok(productService.updateCategory(merchantId, request.id(), request.name(), request.sortOrder()));
+    }
+
+    @DeleteMapping("/api/product/categories/{categoryId}")
+    @RequireRole("MERCHANT")
+    public Result<Void> deleteCategory(@PathVariable Long categoryId) {
+        Long merchantId = merchantService.getCurrentMerchantId();
+        productService.deleteCategory(merchantId, categoryId);
+        return Result.ok();
     }
 
     public record StatusUpdateRequest(Long productId, String status) {}

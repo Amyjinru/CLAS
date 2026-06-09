@@ -18,6 +18,8 @@ public record ProductCreateRequest(
     @Min(value = 0, message = "库存不能小于0")
     Integer stock,
 
+    Long categoryId,
+
     String imageUrl
 ) {
 }

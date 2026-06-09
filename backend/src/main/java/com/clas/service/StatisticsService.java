@@ -270,4 +270,72 @@ public class StatisticsService {
 
         return new TopProductDTO(ranks);
     }
+
+    public MerchantStatsDTO getMerchantStats(Long merchantId) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime todayEnd = today.atTime(LocalTime.MAX);
+
+        List<Orders> paidOrders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
+            .eq(Orders::getMerchantId, merchantId)
+            .ne(Orders::getStatus, "PENDING_PAYMENT"));
+
+        long todayOrders = paidOrders.stream()
+            .filter(order -> order.getCreateTime() != null)
+            .filter(order -> !order.getCreateTime().isBefore(todayStart) && !order.getCreateTime().isAfter(todayEnd))
+            .count();
+        long todaySales = paidOrders.stream()
+            .filter(order -> order.getCreateTime() != null)
+            .filter(order -> !order.getCreateTime().isBefore(todayStart) && !order.getCreateTime().isAfter(todayEnd))
+            .mapToLong(order -> order.getTotalPrice() == null ? 0 : order.getTotalPrice())
+            .sum();
+
+        List<MerchantStatsDTO.DailySale> dailySales = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            LocalDateTime dayStart = date.atStartOfDay();
+            LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
+            List<Orders> dayOrders = paidOrders.stream()
+                .filter(order -> order.getCreateTime() != null)
+                .filter(order -> !order.getCreateTime().isBefore(dayStart) && !order.getCreateTime().isAfter(dayEnd))
+                .toList();
+            long amount = dayOrders.stream()
+                .mapToLong(order -> order.getTotalPrice() == null ? 0 : order.getTotalPrice())
+                .sum();
+            dailySales.add(new MerchantStatsDTO.DailySale(date.toString(), (long) dayOrders.size(), amount));
+        }
+
+        Set<Long> paidOrderIds = paidOrders.stream()
+            .map(Orders::getId)
+            .collect(Collectors.toSet());
+        List<Product> merchantProducts = productMapper.selectList(new LambdaQueryWrapper<Product>()
+            .eq(Product::getMerchantId, merchantId));
+        Map<Long, String> productNames = merchantProducts.stream()
+            .collect(Collectors.toMap(Product::getId, Product::getName));
+        Set<Long> merchantProductIds = productNames.keySet();
+
+        Map<Long, Long> soldCounts = new HashMap<>();
+        Map<Long, Long> amounts = new HashMap<>();
+        List<OrderItem> allItems = orderItemMapper.selectList(null);
+        for (OrderItem item : allItems) {
+            if (!paidOrderIds.contains(item.getOrderId()) || !merchantProductIds.contains(item.getProductId())) {
+                continue;
+            }
+            soldCounts.merge(item.getProductId(), (long) item.getQuantity(), Long::sum);
+            amounts.merge(item.getProductId(), (long) item.getPrice() * item.getQuantity(), Long::sum);
+        }
+
+        List<MerchantStatsDTO.ProductRank> topProducts = soldCounts.entrySet().stream()
+            .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
+            .limit(10)
+            .map(entry -> new MerchantStatsDTO.ProductRank(
+                entry.getKey(),
+                productNames.getOrDefault(entry.getKey(), "未知商品"),
+                entry.getValue(),
+                amounts.getOrDefault(entry.getKey(), 0L)
+            ))
+            .toList();
+
+        return new MerchantStatsDTO(todayOrders, todaySales, dailySales, topProducts);
+    }
 }

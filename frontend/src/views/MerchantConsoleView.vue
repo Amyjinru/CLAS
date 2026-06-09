@@ -226,6 +226,13 @@ onMounted(() => {
             </div>
             <div
               class="menu-item"
+              @click="router.push('/merchant/analytics')"
+            >
+              <el-icon><TrendCharts /></el-icon>
+              <span>经营分析</span>
+            </div>
+            <div
+              class="menu-item"
               @click="router.push('/merchant/products')"
             >
               <el-icon><Goods /></el-icon>
@@ -318,6 +325,12 @@ onMounted(() => {
           :closable="false"
           class="status-alert"
         />
+
+        <div v-if="merchant.status !== 'OPEN'" class="status-actions">
+          <el-button type="primary" plain @click="router.push('/merchant/audit-status')">
+            查看审核进度
+          </el-button>
+        </div>
 
         <!-- Orders Work List (Only show when status is OPEN) -->
         <el-card v-if="merchant.status === 'OPEN'" class="box-card work-card">
@@ -601,6 +614,10 @@ onMounted(() => {
 .status-alert {
   margin-bottom: 20px;
   border-radius: 8px;
+}
+
+.status-actions {
+  margin: -8px 0 20px;
 }
 
 .work-card {

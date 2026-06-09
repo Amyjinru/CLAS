@@ -8,10 +8,14 @@ import com.clas.dto.PaymentResponse;
 import com.clas.entity.DealOrder;
 import com.clas.entity.DealRedeemLog;
 import com.clas.entity.GroupDeal;
+import com.clas.entity.Merchant;
 import com.clas.mapper.DealOrderMapper;
 import com.clas.mapper.DealRedeemLogMapper;
 import com.clas.mapper.GroupDealMapper;
+import com.clas.mapper.MerchantMapper;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -28,6 +32,7 @@ public class DealService {
     private final GroupDealMapper groupDealMapper;
     private final DealOrderMapper dealOrderMapper;
     private final DealRedeemLogMapper dealRedeemLogMapper;
+    private final MerchantMapper merchantMapper;
     private final MerchantService merchantService;
     private final NotificationService notificationService;
     private final PenaltyService penaltyService;
@@ -36,6 +41,7 @@ public class DealService {
         GroupDealMapper groupDealMapper,
         DealOrderMapper dealOrderMapper,
         DealRedeemLogMapper dealRedeemLogMapper,
+        MerchantMapper merchantMapper,
         MerchantService merchantService,
         NotificationService notificationService,
         PenaltyService penaltyService
@@ -43,6 +49,7 @@ public class DealService {
         this.groupDealMapper = groupDealMapper;
         this.dealOrderMapper = dealOrderMapper;
         this.dealRedeemLogMapper = dealRedeemLogMapper;
+        this.merchantMapper = merchantMapper;
         this.merchantService = merchantService;
         this.notificationService = notificationService;
         this.penaltyService = penaltyService;
@@ -89,6 +96,7 @@ public class DealService {
         if (deal == null || !"ON_SALE".equals(deal.getStatus())) {
             throw new BusinessException("团购券不存在或已下架");
         }
+        assertMerchantOpenNow(deal.getMerchantId());
         if (deal.getStock() <= 0) {
             throw new BusinessException("团购券库存不足");
         }
@@ -281,5 +289,48 @@ public class DealService {
             order.setStatus(STATUS_EXPIRED);
             dealOrderMapper.updateById(order);
         }
+    }
+
+    private void assertMerchantOpenNow(Long merchantId) {
+        Merchant merchant = merchantMapper.selectById(merchantId);
+        if (merchant == null) {
+            throw new BusinessException("鍟嗗涓嶅瓨鍦?");
+        }
+        String businessHours = trimToNull(merchant.getBusinessHours());
+        if (businessHours == null) {
+            return;
+        }
+        String[] parts = businessHours.split("-");
+        if (parts.length != 2) {
+            return;
+        }
+        try {
+            LocalTime start = LocalTime.parse(parts[0].trim());
+            LocalTime end = LocalTime.parse(parts[1].trim());
+            LocalTime now = LocalTime.now();
+            if (!isWithinBusinessHours(now, start, end)) {
+                throw new BusinessException("商家已休息，当前营业时间：" + businessHours);
+            }
+        } catch (DateTimeParseException exception) {
+            return;
+        }
+    }
+
+    private boolean isWithinBusinessHours(LocalTime now, LocalTime start, LocalTime end) {
+        if (start.equals(end)) {
+            return true;
+        }
+        if (start.isBefore(end)) {
+            return !now.isBefore(start) && now.isBefore(end);
+        }
+        return !now.isBefore(start) || now.isBefore(end);
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

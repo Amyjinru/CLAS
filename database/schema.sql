@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS order_item;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS cart;
 DROP TABLE IF EXISTS product;
+DROP TABLE IF EXISTS product_category;
 DROP TABLE IF EXISTS merchant_audit_log;
 DROP TABLE IF EXISTS merchant;
 DROP TABLE IF EXISTS `user`;
@@ -60,9 +61,20 @@ CREATE TABLE merchant_audit_log (
     created_at DATETIME NOT NULL
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE product_category (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    merchant_id BIGINT NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uk_product_category_merchant_name (merchant_id, name)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE product (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     merchant_id BIGINT NOT NULL,
+    category_id BIGINT,
     name VARCHAR(100) NOT NULL,
     description VARCHAR(255),
     price INT NOT NULL,
@@ -214,12 +226,17 @@ INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, long
     (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 116.397428, 39.909230, 10000, '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', NOW(), NOW()),
     (2, '13800000012', '城市咖啡站', '13800000023', '饮品', '创新街 18 号', 116.405285, 39.904989, 10000, '08:30-22:30', 200, 1200, 2200, 4.50, 'OPEN', NOW(), NOW());
 
-INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
-    (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', NOW(), NOW()),
-    (2, 1, '牛油果沙拉', '新鲜牛油果配时蔬', 2290, 24, '/images/product-2.jpg', 'ON_SALE', NOW(), NOW()),
-    (3, 1, '低糖酸奶杯', '低糖酸奶搭配燕麦', 1290, 40, '/images/product-3.jpg', 'ON_SALE', NOW(), NOW()),
-    (4, 2, '拿铁', '经典意式拿铁', 1800, 50, '/images/product-4.jpg', 'ON_SALE', NOW(), NOW()),
-    (5, 2, '冷萃咖啡', '低温慢萃咖啡', 2200, 35, '/images/product-5.jpg', 'ON_SALE', NOW(), NOW());
+INSERT INTO product_category (id, merchant_id, name, sort_order, created_at, updated_at) VALUES
+    (1, 1, '主食', 10, NOW(), NOW()),
+    (2, 1, '饮品', 20, NOW(), NOW()),
+    (3, 2, '咖啡', 10, NOW(), NOW());
+
+INSERT INTO product (id, merchant_id, category_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
+    (1, 1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', NOW(), NOW()),
+    (2, 1, 1, '牛油果沙拉', '新鲜牛油果配时蔬', 2290, 24, '/images/product-2.jpg', 'ON_SALE', NOW(), NOW()),
+    (3, 1, 2, '低糖酸奶杯', '低糖酸奶搭配燕麦', 1290, 40, '/images/product-3.jpg', 'ON_SALE', NOW(), NOW()),
+    (4, 2, 3, '拿铁', '经典意式拿铁', 1800, 50, '/images/product-4.jpg', 'ON_SALE', NOW(), NOW()),
+    (5, 2, 3, '冷萃咖啡', '低温慢萃咖啡', 2200, 35, '/images/product-5.jpg', 'ON_SALE', NOW(), NOW());
 
 INSERT INTO user_address (id, user_id, contact_name, phone, address, longitude, latitude, is_default, created_at, updated_at) VALUES
     (1, '13800000001', '张同学', '13800000001', '软件学院 A 座 302', 116.398000, 39.910000, 1, NOW(), NOW());
