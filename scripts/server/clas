@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="${APP_DIR:-/opt/clas}"
+BACKEND_DIR="$APP_DIR/backend"
+FRONTEND_DIR="$APP_DIR/frontend"
+SERVICE_NAME="${SERVICE_NAME:-clas-backend}"
+JAR_PATH="$BACKEND_DIR/target/clas-backend-0.1.0.jar"
+
+usage() {
+  cat <<'USAGE'
+Usage: clas <command>
+
+Commands:
+  deploy       Build frontend/backend, migrate database, install service, restart app
+  build        Build frontend and backend
+  migrate      Apply database migration files in database/migration-*.sql
+  install      Install systemd service, nginx config, env file, and command link
+  start        Start backend service
+  stop         Stop backend service
+  restart      Restart backend and reload nginx
+  status       Show backend/nginx/mysql/redis status
+  logs         Follow backend logs
+  health       Check local backend and public HTTP health
+USAGE
+}
+
+need_root() {
+  if [ "$(id -u)" != "0" ]; then
+    echo "Please run as root." >&2
+    exit 1
+  fi
+}
+
+build_app() {
+  cd "$FRONTEND_DIR"
+  if [ -f package-lock.json ]; then
+    npm ci
+  else
+    npm install
+  fi
+  npm run build
+
+  cd "$BACKEND_DIR"
+  mvn clean package -DskipTests
+  test -f "$JAR_PATH"
+}
+
+migrate_db() {
+  local env_file="/etc/clas/clas.env"
+  if [ -f "$env_file" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$env_file"
+    set +a
+  fi
+
+  local mysql_user="${MYSQL_USER:-root}"
+  local mysql_password="${MYSQL_PASSWORD:-123456}"
+  local mysql_host="${MYSQL_HOST:-127.0.0.1}"
+  local mysql_port="${MYSQL_PORT:-3306}"
+
+  shopt -s nullglob
+  local migrations=("$APP_DIR"/database/migration-*.sql)
+  if [ "${#migrations[@]}" -eq 0 ]; then
+    echo "No migration files found."
+    return
+  fi
+
+  for migration in "${migrations[@]}"; do
+    echo "Applying $(basename "$migration")"
+    MYSQL_PWD="$mysql_password" mysql \
+      --host="$mysql_host" \
+      --port="$mysql_port" \
+      --user="$mysql_user" \
+      < "$migration"
+  done
+}
+
+install_runtime() {
+  need_root
+  mkdir -p /etc/clas /var/log/clas
+
+  if [ ! -f /etc/clas/clas.env ]; then
+    cp "$APP_DIR/scripts/server/clas.env.example" /etc/clas/clas.env
+    chmod 600 /etc/clas/clas.env
+  fi
+
+  cp "$APP_DIR/scripts/server/clas-backend.service" /etc/systemd/system/"$SERVICE_NAME".service
+  systemctl daemon-reload
+  systemctl enable "$SERVICE_NAME"
+
+  if [ -d /etc/nginx/sites-available ]; then
+    cp "$APP_DIR/scripts/server/clas-nginx.conf" /etc/nginx/sites-available/clas
+    ln -sfn /etc/nginx/sites-available/clas /etc/nginx/sites-enabled/default
+  else
+    cp "$APP_DIR/scripts/server/clas-nginx.conf" /etc/nginx/conf.d/clas.conf
+  fi
+  nginx -t
+  systemctl reload nginx
+
+  install -m 0755 "$APP_DIR/scripts/server/clas" /usr/local/bin/clas
+}
+
+restart_app() {
+  need_root
+  systemctl restart "$SERVICE_NAME"
+  systemctl reload nginx
+}
+
+status_app() {
+  systemctl --no-pager --full status "$SERVICE_NAME" || true
+  systemctl --no-pager --full status nginx mysql redis-server || true
+}
+
+health_check() {
+  curl -fsS http://127.0.0.1:8080/api/health
+  echo
+  curl -fsS http://127.0.0.1/api/health
+  echo
+}
+
+wait_for_health() {
+  local attempts="${1:-60}"
+  local delay="${2:-2}"
+  local i
+  for ((i = 1; i <= attempts; i++)); do
+    if curl -fsS http://127.0.0.1:8080/api/health >/dev/null 2>&1; then
+      health_check
+      return 0
+    fi
+    sleep "$delay"
+  done
+  echo "Backend did not become healthy in time." >&2
+  systemctl --no-pager --full status "$SERVICE_NAME" || true
+  return 1
+}
+
+case "${1:-}" in
+  deploy)
+    need_root
+    install_runtime
+    build_app
+    migrate_db
+    restart_app
+    wait_for_health
+    ;;
+  build)
+    build_app
+    ;;
+  migrate)
+    migrate_db
+    ;;
+  install)
+    install_runtime
+    ;;
+  start)
+    need_root
+    systemctl start "$SERVICE_NAME"
+    ;;
+  stop)
+    need_root
+    systemctl stop "$SERVICE_NAME"
+    ;;
+  restart)
+    restart_app
+    ;;
+  status)
+    status_app
+    ;;
+  logs)
+    journalctl -u "$SERVICE_NAME" -f
+    ;;
+  health)
+    health_check
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
