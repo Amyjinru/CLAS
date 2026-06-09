@@ -6,6 +6,7 @@ import { addCart, addFavorite, createOrder, getCart, getDeliveryEstimate, getMer
 import LocationSelector from '../components/LocationSelector.vue'
 import MerchantRouteMap from '../components/MerchantRouteMap.vue'
 import { loadAmap } from '../utils/amap'
+import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
 
 const route = useRoute()
@@ -16,7 +17,10 @@ const products = ref([])
 const cartItems = ref([])
 const cartOpen = ref(false)
 const message = ref('')
+const loading = ref(false)
+const loadError = ref('')
 const submitting = ref(false)
+const favoriteLoading = ref(false)
 const favoriteMerchantIds = ref(new Set())
 const currentLocation = ref(getCurrentLocation())
 const deliveryEstimate = ref(null)
@@ -31,6 +35,45 @@ const cartCount = computed(() =>
 const cartTotal = computed(() =>
   merchantCartItems.value.reduce((sum, item) => sum + item.subtotal, 0)
 )
+const isFavorite = computed(() => favoriteMerchantIds.value.has(merchantId.value))
+const deliveryDistance = computed(() =>
+  deliveryEstimate.value?.routeDistanceMeters || deliveryEstimate.value?.distanceMeters
+)
+const deliveryStatus = computed(() => {
+  if (!currentLocation.value?.longitude || !currentLocation.value?.latitude) {
+    return { type: 'info', label: '选择位置查看配送' }
+  }
+  if (!deliveryEstimate.value) {
+    return { type: 'warning', label: '配送估算暂不可用' }
+  }
+  return deliveryEstimate.value.deliveryAvailable
+    ? { type: 'success', label: '可配送' }
+    : { type: 'danger', label: '超出配送范围' }
+})
+
+function moneyText(amount, fallback = '未设置') {
+  if (amount === null || amount === undefined) return fallback
+  return `¥${(amount / 100).toFixed(0)}`
+}
+
+function priceText(amount) {
+  if (amount === null || amount === undefined) return '价格待定'
+  return `¥${(amount / 100).toFixed(2)}`
+}
+
+function distanceText(distance) {
+  if (distance === null || distance === undefined) return '距离未知'
+  return distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`
+}
+
+function fieldText(value, fallback = '暂无信息') {
+  return value || fallback
+}
+
+function productImageStyle(product) {
+  if (!product.image) return {}
+  return { backgroundImage: `url("${product.image}")` }
+}
 
 async function loadProducts() {
   merchant.value = await getMerchant(route.params.id)
@@ -52,9 +95,21 @@ async function loadCart() {
 }
 
 async function load() {
-  await Promise.all([loadProducts(), loadCart()])
-  await ensureLocation()
-  await loadDeliveryEstimate()
+  loading.value = true
+  loadError.value = ''
+  message.value = ''
+  merchant.value = null
+  products.value = []
+  deliveryEstimate.value = null
+  try {
+    await Promise.all([loadProducts(), loadCart()])
+    await ensureLocation()
+    await loadDeliveryEstimate()
+  } catch (error) {
+    loadError.value = error.response?.data?.message || '商家信息加载失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 
 async function ensureLocation() {
@@ -66,10 +121,14 @@ async function ensureLocation() {
     const address = addresses.find((item) => item.isDefault) || addresses[0]
     if (address?.longitude && address?.latitude) {
       currentLocation.value = {
+        province: '',
+        city: '',
+        district: '',
+        street: address.address,
         address: address.address,
         longitude: Number(address.longitude),
         latitude: Number(address.latitude),
-        source: 'address'
+        source: 'manual'
       }
       setCurrentLocation(currentLocation.value)
     }
@@ -91,15 +150,7 @@ async function autoLocate() {
         message.value = '自动定位失败，请手动选择位置'
         return
       }
-      currentLocation.value = {
-        province: result.addressComponent?.province || '',
-        city: result.addressComponent?.city || '',
-        district: result.addressComponent?.district || '',
-        address: result.formattedAddress || '当前位置',
-        longitude: result.position.lng,
-        latitude: result.position.lat,
-        source: 'auto'
-      }
+      currentLocation.value = await resolveAutoLocationFromAmap(AMap, result)
       setCurrentLocation(currentLocation.value)
       await loadDeliveryEstimate()
     })
@@ -120,6 +171,7 @@ async function loadDeliveryEstimate() {
     })
   } catch {
     deliveryEstimate.value = null
+    message.value = '配送估算暂不可用，可继续浏览商品'
   }
 }
 
@@ -203,14 +255,22 @@ function closeCart() {
 }
 
 async function toggleFavorite() {
-  if (favoriteMerchantIds.value.has(merchantId.value)) {
-    await removeFavorite(merchantId.value)
-    message.value = '已取消收藏'
-  } else {
-    await addFavorite(merchantId.value)
-    message.value = '已收藏商家'
+  if (favoriteLoading.value) return
+  favoriteLoading.value = true
+  try {
+    if (isFavorite.value) {
+      await removeFavorite(merchantId.value)
+      message.value = '已取消收藏'
+    } else {
+      await addFavorite(merchantId.value)
+      message.value = '已收藏商家'
+    }
+    await loadProducts()
+  } catch (error) {
+    message.value = error.response?.data?.message || '收藏操作失败，请先登录'
+  } finally {
+    favoriteLoading.value = false
   }
-  await loadProducts()
 }
 
 onMounted(load)
@@ -230,17 +290,83 @@ watch(
   <div class="merchant-page">
     <BackButton to="/home" label="返回首页" />
 
-    <section class="panel" v-if="merchant">
-      <h1>{{ merchant.merchantName }}</h1>
-      <p>{{ merchant.category }} · {{ merchant.address }} · {{ merchant.score }} 分</p>
-      <p>{{ merchant.businessHours }} · 起送 ¥{{ ((merchant.minOrderPrice || 0) / 100).toFixed(0) }} · 配送费 ¥{{ ((merchant.deliveryFee || 0) / 100).toFixed(0) }}</p>
-      <button class="secondary" @click="toggleFavorite">
-        {{ favoriteMerchantIds.has(merchantId) ? '取消收藏' : '收藏商家' }}
-      </button>
+    <section class="panel loading-panel" v-if="loading">
+      <el-skeleton :rows="5" animated />
+    </section>
+
+    <section class="panel error-panel" v-else-if="loadError">
+      <el-alert :title="loadError" type="error" show-icon :closable="false" />
+      <button type="button" @click="load">重新加载</button>
+    </section>
+
+    <section class="panel merchant-hero" v-else-if="merchant">
+      <div class="merchant-hero-main">
+        <div class="merchant-title-row">
+          <div>
+            <div class="merchant-tags">
+              <el-tag effect="plain">{{ fieldText(merchant.category, '生活服务') }}</el-tag>
+              <el-tag type="warning" effect="plain">评分 {{ merchant.score ?? '暂无' }}</el-tag>
+              <el-tag :type="deliveryStatus.type" effect="plain">{{ deliveryStatus.label }}</el-tag>
+            </div>
+            <h1>{{ merchant.merchantName }}</h1>
+            <p class="merchant-address">{{ fieldText(merchant.address, '暂无地址') }}</p>
+          </div>
+          <button
+            class="favorite-button secondary"
+            :class="{ active: isFavorite }"
+            :disabled="favoriteLoading"
+            @click="toggleFavorite"
+          >
+            {{ favoriteLoading ? '处理中...' : (isFavorite ? '已收藏' : '收藏商家') }}
+          </button>
+        </div>
+
+        <div class="merchant-stats">
+          <div>
+            <span>营业时间</span>
+            <strong>{{ fieldText(merchant.businessHours, '暂无') }}</strong>
+          </div>
+          <div>
+            <span>人均消费</span>
+            <strong>{{ moneyText(merchant.averagePrice) }}</strong>
+          </div>
+          <div>
+            <span>起送价</span>
+            <strong>{{ moneyText(merchant.minOrderPrice, '无起送') }}</strong>
+          </div>
+          <div>
+            <span>配送费</span>
+            <strong>{{ moneyText(merchant.deliveryFee, '免配送费') }}</strong>
+          </div>
+          <div>
+            <span>配送范围</span>
+            <strong>{{ distanceText(merchant.deliveryRadiusM) }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="delivery-summary">
+        <div>
+          <span>当前位置</span>
+          <strong>{{ currentLocation?.address || '尚未选择位置' }}</strong>
+        </div>
+        <div>
+          <span>配送距离</span>
+          <strong>{{ distanceText(deliveryDistance) }}</strong>
+        </div>
+        <div>
+          <span>预计送达</span>
+          <strong>{{ deliveryEstimate?.estimatedMinutes ? `${deliveryEstimate.estimatedMinutes} 分钟` : '待估算' }}</strong>
+        </div>
+        <div class="delivery-actions">
+          <button type="button" class="secondary" @click="autoLocate">自动定位</button>
+          <button type="button" @click="locationDialogVisible = true">选择位置</button>
+        </div>
+      </div>
     </section>
 
     <MerchantRouteMap
-      v-if="merchant"
+      v-if="merchant && !loadError"
       :merchant="merchant"
       :user-location="currentLocation"
       :estimate="deliveryEstimate"
@@ -248,27 +374,48 @@ watch(
       @select="locationDialogVisible = true"
     />
 
-    <p class="message">{{ message }}</p>
+    <p class="message" v-if="message">{{ message }}</p>
 
-    <section class="list">
-      <article class="row" v-for="product in products" :key="product.id">
+    <section class="panel product-section" v-if="merchant && !loadError">
+      <div class="section-head">
         <div>
-          <h2>{{ product.name }}</h2>
-          <p>¥{{ (product.price / 100).toFixed(2) }}</p>
+          <h2>店内商品</h2>
+          <p>{{ products.length ? `共 ${products.length} 件可选商品` : '暂无可选商品' }}</p>
         </div>
-        <div class="row-actions">
-          <button
-            :disabled="isSoldOut(product)"
-            :class="{ 'btn-sold-out': isSoldOut(product) }"
-            @click="add(product)"
-          >
-            {{ isSoldOut(product) ? '已售罄' : '加入' }}
-          </button>
-        </div>
-      </article>
+      </div>
+
+      <div class="product-grid" v-if="products.length">
+        <article class="product-card" v-for="product in products" :key="product.id">
+          <div class="product-thumb" :class="{ placeholder: !product.image }" :style="productImageStyle(product)">
+            <span v-if="!product.image">{{ product.name?.slice(0, 1) || '品' }}</span>
+          </div>
+          <div class="product-info">
+            <div class="product-title-row">
+              <h3>{{ product.name }}</h3>
+              <el-tag v-if="isSoldOut(product)" type="danger" effect="plain">已售罄</el-tag>
+              <el-tag v-else type="success" effect="plain">库存 {{ product.stock }}</el-tag>
+            </div>
+            <p class="product-desc">{{ product.description || '暂无商品介绍' }}</p>
+            <div class="product-bottom">
+              <strong>{{ priceText(product.price) }}</strong>
+              <button
+                :disabled="isSoldOut(product)"
+                :class="{ 'btn-sold-out': isSoldOut(product) }"
+                @click="add(product)"
+              >
+                {{ isSoldOut(product) ? '已售罄' : '加入购物车' }}
+              </button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <el-empty v-else description="商家暂未上架商品">
+        <RouterLink class="button secondary" to="/home">返回首页看看其他商家</RouterLink>
+      </el-empty>
     </section>
 
-    <div class="cart-dock">
+    <div class="cart-dock" v-if="merchant && !loadError">
       <button class="cart-dock-toggle" type="button" @click="toggleCart">
         本店购物车
         <span v-if="cartCount" class="cart-badge">{{ cartCount }}</span>
@@ -333,6 +480,206 @@ watch(
 <style scoped>
 .merchant-page {
   padding-bottom: 88px;
+}
+
+.loading-panel,
+.error-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.error-panel button {
+  justify-self: start;
+}
+
+.merchant-hero {
+  display: grid;
+  gap: 22px;
+}
+
+.merchant-title-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+
+.merchant-title-row h1 {
+  color: var(--text-primary);
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 12px 0 8px;
+}
+
+.merchant-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.merchant-address {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.favorite-button {
+  min-width: 108px;
+  white-space: nowrap;
+}
+
+.favorite-button.active {
+  background: #fff7ed;
+  border: 1px solid #fb923c;
+  color: #ea580c;
+}
+
+.merchant-stats,
+.delivery-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+
+.merchant-stats div,
+.delivery-summary div {
+  background: #fffaf4;
+  border: 1px solid #f4dfc5;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.merchant-stats span,
+.delivery-summary span {
+  color: var(--text-secondary);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.merchant-stats strong,
+.delivery-summary strong {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.delivery-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.delivery-actions button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.message {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  line-height: 1.5;
+  margin: 14px 0;
+  padding: 12px 14px;
+}
+
+.product-section {
+  display: grid;
+  gap: 18px;
+}
+
+.section-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.section-head h2 {
+  color: var(--text-primary);
+  font-size: 20px;
+  margin: 0;
+}
+
+.section-head p {
+  color: var(--text-secondary);
+  margin: 6px 0 0;
+}
+
+.product-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.product-card {
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid #efe4d5;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 112px 1fr;
+  padding: 14px;
+}
+
+.product-thumb {
+  align-items: center;
+  aspect-ratio: 1;
+  background-position: center;
+  background-size: cover;
+  border-radius: 8px;
+  color: #9a3412;
+  display: flex;
+  font-size: 30px;
+  font-weight: 800;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.product-thumb.placeholder {
+  background: linear-gradient(135deg, #fff7ed, #fde68a);
+}
+
+.product-info {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.product-title-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.product-title-row h3 {
+  color: var(--text-primary);
+  font-size: 18px;
+  margin: 0;
+  min-width: 0;
+}
+
+.product-desc {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.product-bottom {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.product-bottom strong {
+  color: #ea580c;
+  font-size: 22px;
+}
+
+.product-bottom button {
+  white-space: nowrap;
 }
 
 .btn-sold-out:disabled,
@@ -528,6 +875,25 @@ button:disabled {
 
   .cart-overlay {
     padding: 14px;
+  }
+
+  .merchant-title-row,
+  .product-bottom {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .favorite-button,
+  .product-bottom button {
+    width: 100%;
+  }
+
+  .product-card {
+    grid-template-columns: 1fr;
+  }
+
+  .product-thumb {
+    max-height: 180px;
   }
 }
 </style>

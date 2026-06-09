@@ -6,6 +6,7 @@ import com.clas.entity.Notification;
 import com.clas.mapper.NotificationMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NotificationService {
@@ -36,6 +37,16 @@ public class NotificationService {
         if (notification != null && UserContext.getUserId().equals(notification.getUserId())) {
             notification.setReadFlag(true);
             notificationMapper.updateById(notification);
+        }
+    }
+
+    @Transactional
+    public void markAllRead() {
+        for (Notification notification : mine()) {
+            if (!Boolean.TRUE.equals(notification.getReadFlag())) {
+                notification.setReadFlag(true);
+                notificationMapper.updateById(notification);
+            }
         }
     }
 }
