@@ -19,6 +19,18 @@ const brandLink = computed(() => {
   if (role.value === 'ADMIN') return '/admin/dashboard'
   return '/home'
 })
+const userPrimaryNav = [
+  { label: '外卖', to: '/home' },
+  { label: '团购', to: '/deals' },
+  { label: '预订/到店', to: '/bookings' },
+  { label: '消息', to: '/user/announcements' },
+  { label: '我的', to: '/profile' }
+]
+const userUtilityNav = [
+  { label: '购物车', to: '/cart' },
+  { label: '订单', to: '/orders' },
+  { label: '商家入驻', to: '/merchant-register' }
+]
 
 function updateUser() {
   // sessionUser 为响应式 computed，路由变化时自动更新
@@ -60,14 +72,22 @@ async function handleLogout() {
 
         <!-- ===== USER 普通用户 ===== -->
         <template v-else-if="role === 'USER'">
-          <RouterLink to="/home">浏览商家</RouterLink>
-          <RouterLink to="/deals">团购</RouterLink>
-          <RouterLink to="/bookings">生活预约</RouterLink>
-          <RouterLink to="/cart">购物车</RouterLink>
-          <RouterLink to="/orders">我的订单</RouterLink>
-          <RouterLink to="/profile">个人中心</RouterLink>
-          <RouterLink to="/user/announcements">平台公告</RouterLink>
-          <RouterLink to="/merchant-register">商家入驻</RouterLink>
+          <RouterLink
+            v-for="item in userPrimaryNav"
+            :key="item.to"
+            class="primary-nav-link"
+            :to="item.to"
+          >
+            {{ item.label }}
+          </RouterLink>
+          <span class="nav-divider" aria-hidden="true"></span>
+          <RouterLink
+            v-for="item in userUtilityNav"
+            :key="item.to"
+            :to="item.to"
+          >
+            {{ item.label }}
+          </RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
 
@@ -156,7 +176,9 @@ async function handleLogout() {
 nav {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
+  justify-content: flex-end;
 }
 
 nav a {
@@ -185,8 +207,54 @@ nav a.router-link-active {
   background-color: var(--clas-danger-light) !important;
 }
 
+.primary-nav-link {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.nav-divider {
+  background: var(--border-color);
+  height: 20px;
+  margin: 0 4px;
+  width: 1px;
+}
+
 .main-content {
   flex: 1;
+}
+
+@media (max-width: 980px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    height: auto;
+    padding: 12px 18px;
+  }
+
+  .header-left {
+    flex-wrap: wrap;
+  }
+
+  nav {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  nav a {
+    padding: 7px 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .user-welcome {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .nav-divider {
+    display: none;
+  }
 }
 
 /* version_314 兼容 */

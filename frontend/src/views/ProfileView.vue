@@ -12,14 +12,12 @@ import {
   listMyDealOrders,
   listMyReviews,
   listNotifications,
-  listOrders,
+  markAllNotificationsRead,
   markNotificationRead,
+  removeFavorite,
   setDefaultAddress,
   sessionUser,
-  setSessionUser,
-  submitAppeal,
-  updateProfile,
-  uploadAvatar
+  updateAddress
 } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import LocationSelector from '../components/LocationSelector.vue'
@@ -28,40 +26,17 @@ const addresses = ref([])
 const dealOrders = ref([])
 const favorites = ref([])
 const notifications = ref([])
-const orders = ref([])
-const reviews = ref([])
-const appeals = ref([])
-const penalties = ref([])
-const profileForm = reactive({ nickname: '', avatar: '' })
-const appealForm = reactive({ penaltyId: null, content: '' })
-const avatarInputRef = ref(null)
-const avatarUploading = ref(false)
-const nicknameSaving = ref(false)
-
-const orderStatusLabel = {
-  PENDING_PAYMENT: '待支付',
-  PAID: '已支付',
-  ACCEPTED: '商家已接单',
-  COMPLETED: '已完成',
-  CANCELED: '已取消',
-  REJECTED: '商家已拒单',
-  REFUNDED: '已退款',
-  REFUND_PENDING: '退款处理中'
-}
-
-const dealStatusLabel = {
-  PENDING_PAYMENT: '待支付',
-  UNUSED: '待使用',
-  USED: '已核销'
-}
-
-const penaltyTypeLabel = {
-  MUTE: '禁言',
-  BAN: '封禁',
-  SERVICE_STOP: '停止服务'
-}
-
-const appealablePenalties = computed(() => penalties.value.filter((item) => item.active))
+const loading = ref(false)
+const loadError = ref('')
+const savingAddress = ref(false)
+const addressActionId = ref('')
+const favoriteActionId = ref(null)
+const notificationActionId = ref(null)
+const markingAllRead = ref(false)
+const editingAddressId = ref(null)
+const locationKey = ref(0)
+const addressFormRef = ref(null)
+const activeProfileTab = ref('transactions')
 
 const form = reactive({
   contactName: '',
@@ -82,133 +57,266 @@ const locationData = reactive({
   latitude: null
 })
 
-const displayName = computed(() => profileForm.nickname || sessionUser.value?.username || sessionUser.value?.phone)
-
-const NOTIFICATION_PREVIEW_LIMIT = 5
-const previewNotifications = computed(() => notifications.value.slice(0, NOTIFICATION_PREVIEW_LIMIT))
-const hiddenNotificationCount = computed(() =>
-  Math.max(notifications.value.length - NOTIFICATION_PREVIEW_LIMIT, 0)
-)
-
-function avatarText() {
-  return (displayName.value || '?').slice(0, 1).toUpperCase()
+const currentUser = computed(() => sessionUser.value || {})
+const unreadCount = computed(() => notifications.value.filter(item => !item.readFlag).length)
+const summaryCards = computed(() => [
+  { label: '收货地址', value: addresses.value.length, targetTab: 'addresses' },
+  { label: '收藏店铺', value: favorites.value.length, targetTab: 'shopping' },
+  { label: '券包', value: dealOrders.value.length, targetTab: 'vouchers' },
+  { label: '未读通知', value: unreadCount.value, targetTab: 'messages' }
+])
+const transactionShortcuts = computed(() => [
+  { label: '全部订单', value: '查看外卖与到店订单', to: '/orders', type: 'primary' },
+  { label: '购物车', value: '继续结算已选商品', to: '/cart', type: 'success' },
+  { label: '生活预约', value: '查看预约记录', to: '/bookings', type: 'warning' }
+])
+const addressRules = {
+  contactName: [{ required: true, message: '请填写联系人', trigger: 'blur' }],
+  phone: [{ required: true, message: '请填写联系电话', trigger: 'blur' }],
+  address: [{ required: true, message: '请选择或定位收货地址', trigger: 'change' }]
 }
 
-function avatarStyle() {
-  if (profileForm.avatar) {
-    return { backgroundImage: `url(${profileForm.avatar})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-  }
-  return {}
+function getErrorMessage(error, fallback = '操作失败，请稍后重试') {
+  return error?.response?.data?.message || error?.message || fallback
+}
+
+function hasCoordinate(longitude, latitude) {
+  return longitude !== null && longitude !== undefined && longitude !== ''
+    && latitude !== null && latitude !== undefined && latitude !== ''
+}
+
+function resetLocationData() {
+  Object.assign(locationData, {
+    province: '',
+    city: '',
+    district: '',
+    street: '',
+    address: '',
+    longitude: null,
+    latitude: null
+  })
+  locationKey.value += 1
+}
+
+function resetForm() {
+  Object.assign(form, {
+    contactName: '',
+    phone: '',
+    address: '',
+    longitude: null,
+    latitude: null,
+    isDefault: false
+  })
+  editingAddressId.value = null
+  resetLocationData()
 }
 
 function onLocationConfirm(loc) {
-  form.address = loc.address
-  form.longitude = loc.longitude
-  form.latitude = loc.latitude
+  syncLocationDraft(loc)
   ElMessage.success('收货位置已确认')
 }
 
-async function loadProfile() {
-  const profile = await getProfile()
-  profileForm.nickname = profile.nickname || profile.username || ''
-  profileForm.avatar = profile.avatar || ''
-  setSessionUser({ ...sessionUser.value, ...profile, password: undefined })
+function syncLocationDraft(loc) {
+  Object.assign(form, {
+    address: loc.address,
+    longitude: loc.longitude,
+    latitude: loc.latitude
+  })
+  addressFormRef.value?.clearValidate?.('address')
 }
 
-async function saveProfile() {
-  if (!profileForm.nickname.trim()) {
-    ElMessage.warning('昵称不能为空')
-    return
-  }
-  nicknameSaving.value = true
-  try {
-    const profile = await updateProfile({ nickname: profileForm.nickname.trim() })
-    profileForm.nickname = profile.nickname || profile.username || ''
-    setSessionUser({ ...sessionUser.value, ...profile, password: undefined })
-    ElMessage.success('昵称已更新')
-  } finally {
-    nicknameSaving.value = false
-  }
+function openSummaryCard(item) {
+  activeProfileTab.value = item.targetTab
 }
 
-function openAvatarPicker() {
-  avatarInputRef.value?.click()
-}
-
-async function onAvatarSelected(event) {
-  const file = event.target.files?.[0]
-  event.target.value = ''
-  if (!file) return
-  if (!file.type.startsWith('image/')) {
-    ElMessage.warning('请选择图片文件')
-    return
+function validateAddressForm() {
+  const contactName = form.contactName.trim()
+  const phone = form.phone.trim()
+  const address = form.address.trim()
+  if (!contactName) {
+    ElMessage.warning('请填写联系人')
+    return false
   }
-  if (file.size > 2 * 1024 * 1024) {
-    ElMessage.warning('头像不能超过 2MB')
-    return
+  if (!phone) {
+    ElMessage.warning('请填写联系电话')
+    return false
   }
-  avatarUploading.value = true
-  try {
-    const profile = await uploadAvatar(file)
-    profileForm.avatar = profile.avatar || ''
-    setSessionUser({ ...sessionUser.value, ...profile, password: undefined })
-    ElMessage.success('头像已更新')
-  } catch (error) {
-    ElMessage.error(error.response?.data?.message || '头像上传失败')
-  } finally {
-    avatarUploading.value = false
+  if (!address || !hasCoordinate(form.longitude, form.latitude)) {
+    ElMessage.warning('请选择或定位收货地址')
+    return false
   }
+  Object.assign(form, {
+    contactName,
+    phone,
+    address
+  })
+  return true
 }
 
 async function load() {
-  const results = await Promise.allSettled([
-    listAddresses(),
-    listMyDealOrders(),
-    listFavorites(),
-    listNotifications(),
-    listOrders(),
-    listMyReviews(),
-    listMyAppeals(),
-    listMyPenalties()
-  ])
-  const pick = (index, fallback = []) => (results[index].status === 'fulfilled' ? results[index].value : fallback)
-  addresses.value = pick(0)
-  dealOrders.value = pick(1)
-  favorites.value = pick(2)
-  notifications.value = pick(3)
-  orders.value = pick(4)
-  reviews.value = pick(5)
-  appeals.value = pick(6)
-  penalties.value = pick(7)
-  if (results.some((item) => item.status === 'rejected')) {
-    ElMessage.warning('部分资料加载失败，请稍后刷新')
+  loading.value = true
+  loadError.value = ''
+  try {
+    const [addressList, orderList, favoriteList, notificationList] = await Promise.all([
+      listAddresses(),
+      listMyDealOrders(),
+      listFavorites(),
+      listNotifications()
+    ])
+    addresses.value = addressList
+    dealOrders.value = orderList
+    favorites.value = favoriteList
+    notifications.value = notificationList
+  } catch (error) {
+    loadError.value = getErrorMessage(error, '个人中心数据加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
 async function submitAddress() {
-  if (!form.longitude || !form.latitude) {
-    ElMessage.warning('请在地图中选择收货位置')
+  if (!validateAddressForm()) {
     return
   }
-  await createAddress(form)
-  ElMessage.success('地址已保存')
-  Object.assign(form, { contactName: '', phone: '', address: '', longitude: null, latitude: null, isDefault: false })
-  await load()
+  savingAddress.value = true
+  try {
+    if (editingAddressId.value) {
+      await updateAddress(editingAddressId.value, form)
+      ElMessage.success('地址已更新')
+    } else {
+      await createAddress(form)
+      ElMessage.success('地址已保存')
+    }
+    resetForm()
+    await load()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '地址保存失败'))
+  } finally {
+    savingAddress.value = false
+  }
+}
+
+function editAddress(item) {
+  editingAddressId.value = item.id
+  Object.assign(form, {
+    contactName: item.contactName,
+    phone: item.phone,
+    address: item.address,
+    longitude: item.longitude,
+    latitude: item.latitude,
+    isDefault: Boolean(item.isDefault)
+  })
+  Object.assign(locationData, {
+    province: '',
+    city: '',
+    district: '',
+    street: item.address || '',
+    address: item.address || '',
+    longitude: item.longitude,
+    latitude: item.latitude
+  })
+  locationKey.value += 1
 }
 
 async function markDefault(id) {
-  await setDefaultAddress(id)
-  await load()
+  addressActionId.value = `default-${id}`
+  try {
+    await setDefaultAddress(id)
+    ElMessage.success('默认地址已更新')
+    await load()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '设置默认地址失败'))
+  } finally {
+    addressActionId.value = ''
+  }
 }
 
 async function removeAddress(id) {
-  await deleteAddress(id)
-  await load()
+  try {
+    await ElMessageBox.confirm('删除后需要重新添加该收货地址，确定删除吗？', '删除地址', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+
+  addressActionId.value = `delete-${id}`
+  try {
+    await deleteAddress(id)
+    if (editingAddressId.value === id) {
+      resetForm()
+    }
+    ElMessage.success('地址已删除')
+    await load()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '删除地址失败'))
+  } finally {
+    addressActionId.value = ''
+  }
+}
+
+async function removeFavoriteMerchant(id) {
+  favoriteActionId.value = id
+  try {
+    await removeFavorite(id)
+    ElMessage.success('已取消收藏')
+    await load()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '取消收藏失败'))
+  } finally {
+    favoriteActionId.value = null
+  }
 }
 
 async function readNotification(id) {
-  await markNotificationRead(id)
-  await load()
+  notificationActionId.value = id
+  try {
+    await markNotificationRead(id)
+    ElMessage.success('通知已标记为已读')
+    await load()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '标记已读失败'))
+  } finally {
+    notificationActionId.value = null
+  }
+}
+
+async function readAllNotifications() {
+  if (!unreadCount.value) return
+  markingAllRead.value = true
+  try {
+    await markAllNotificationsRead()
+    ElMessage.success('全部通知已标记为已读')
+    await load()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '全部已读失败'))
+  } finally {
+    markingAllRead.value = false
+  }
+}
+
+function formatMoney(cents) {
+  return `¥${((cents || 0) / 100).toFixed(2)}`
+}
+
+function dealStatusLabel(status) {
+  return {
+    UNUSED: '待使用',
+    USED: '已使用',
+    EXPIRED: '已过期',
+    REFUNDED: '已退款'
+  }[status] || status || '未知'
+}
+
+function dealStatusType(status) {
+  return {
+    UNUSED: 'success',
+    USED: 'info',
+    EXPIRED: 'warning',
+    REFUNDED: 'danger'
+  }[status] || 'info'
 }
 
 async function removeNotification(id) {
@@ -254,230 +362,360 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="hero profile-hero">
-    <div class="profile-head">
-      <button
-        type="button"
-        class="avatar-btn"
-        :class="{ uploading: avatarUploading }"
-        :disabled="avatarUploading"
-        @click="openAvatarPicker"
-      >
-        <div class="avatar" :style="avatarStyle()">{{ profileForm.avatar ? '' : avatarText() }}</div>
-        <span class="avatar-tip">{{ avatarUploading ? '上传中...' : '点击更换头像' }}</span>
-      </button>
-      <input
-        ref="avatarInputRef"
-        type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp"
-        class="avatar-input"
-        @change="onAvatarSelected"
-      />
-      <div class="profile-meta">
-        <h1>个人中心</h1>
-        <p>{{ displayName }} · {{ sessionUser?.phone }}</p>
-        <div class="nickname-row">
-          <el-input
-            v-model="profileForm.nickname"
-            maxlength="50"
-            show-word-limit
-            placeholder="设置昵称"
-            @keyup.enter="saveProfile"
-          />
-          <el-button type="primary" :loading="nicknameSaving" @click="saveProfile">保存昵称</el-button>
-        </div>
-      </div>
+  <section class="hero">
+    <div>
+      <h1>个人中心</h1>
+      <p>{{ currentUser.username || '未命名用户' }} · {{ currentUser.phone || '未绑定手机号' }}</p>
     </div>
   </section>
 
-  <section class="profile-grid">
-    <div class="panel">
-      <div class="section-head"><h2>历史订单</h2></div>
-      <article class="list-row" v-for="item in orders" :key="item.order.id">
-        <div>
-          <strong>订单 #{{ item.order.id }}</strong>
-          <p>
-            ¥{{ ((item.order.totalPrice || 0) / 100).toFixed(2) }}
-            · {{ orderStatusLabel[item.order.status] || item.order.status }}
-            · {{ item.items?.length || 0 }} 件商品
-          </p>
-        </div>
-        <RouterLink class="button secondary" to="/orders">查看</RouterLink>
-      </article>
-      <el-empty v-if="!orders.length" description="暂无历史订单" />
-    </div>
+  <section class="profile-summary">
+    <button
+      v-for="item in summaryCards"
+      :key="item.label"
+      type="button"
+      class="summary-item"
+      :class="{ active: activeProfileTab === item.targetTab }"
+      @click="openSummaryCard(item)"
+    >
+      <strong>{{ item.value }}</strong>
+      <span>{{ item.label }}</span>
+    </button>
+  </section>
 
-    <div class="panel">
-      <div class="section-head"><h2>历史评价</h2></div>
-      <article class="list-row" v-for="item in reviews" :key="item.id">
-        <div>
-          <strong>{{ item.score }} 星</strong>
-          <p>{{ item.content || '（无文字评价）' }}</p>
-        </div>
-      </article>
-      <el-empty v-if="!reviews.length" description="暂无历史评价" />
-    </div>
+  <section v-if="loading" class="panel state-panel">
+    <el-skeleton :rows="8" animated />
+  </section>
 
-    <div class="panel">
-      <div class="section-head"><h2>处罚记录</h2></div>
-      <article class="list-row" v-for="item in penalties" :key="item.id">
-        <div>
-          <strong>{{ penaltyTypeLabel[item.penaltyType] || item.penaltyType }}</strong>
-          <p>{{ item.reason }}</p>
-          <p class="muted">
-            {{ item.active ? '生效中' : '已失效' }}
-            <span v-if="item.endTime"> · 至 {{ new Date(item.endTime).toLocaleString('zh-CN', { hour12: false }) }}</span>
-          </p>
-        </div>
-        <el-tag :type="item.active ? 'danger' : 'info'">{{ item.active ? '生效中' : '已结束' }}</el-tag>
-      </article>
-      <el-empty v-if="!penalties.length" description="暂无处罚记录" />
-    </div>
+  <section v-else-if="loadError" class="panel state-panel">
+    <el-alert :title="loadError" type="error" show-icon :closable="false" />
+    <el-button type="primary" plain @click="load">重新加载</el-button>
+  </section>
 
-    <div class="panel">
-      <div class="section-head"><h2>处罚申诉</h2></div>
-      <div v-if="appealablePenalties.length" class="appeal-penalty-select">
-        <span>关联处罚（可选）</span>
-        <el-select v-model="appealForm.penaltyId" clearable placeholder="选择要申诉的处罚">
-          <el-option
-            v-for="item in appealablePenalties"
-            :key="item.id"
-            :label="`#${item.id} ${penaltyTypeLabel[item.penaltyType] || item.penaltyType}：${item.reason}`"
-            :value="item.id"
-          />
-        </el-select>
-      </div>
-      <el-input v-model="appealForm.content" type="textarea" rows="3" placeholder="如对禁言、封禁等处理有异议，请向客服申诉" />
-      <el-button type="primary" style="margin-top: 10px" @click="sendAppeal">提交申诉</el-button>
-      <article class="list-row" v-for="item in appeals" :key="item.id">
-        <div>
-          <strong>{{ item.status }}</strong>
-          <p>{{ item.content }}</p>
-          <p v-if="item.adminReply" class="muted">管理员回复：{{ item.adminReply }}</p>
+  <section v-else class="panel profile-workspace">
+    <el-tabs v-model="activeProfileTab" class="profile-tabs">
+      <el-tab-pane label="我的交易" name="transactions">
+        <div class="shortcut-grid">
+          <RouterLink
+            v-for="item in transactionShortcuts"
+            :key="item.label"
+            class="shortcut-card"
+            :to="item.to"
+          >
+            <strong>{{ item.label }}</strong>
+            <span>{{ item.value }}</span>
+          </RouterLink>
         </div>
-      </article>
-    </div>
+      </el-tab-pane>
 
-    <div class="panel">
-      <div class="section-head">
-        <h2>收货地址</h2>
-      </div>
-      <el-form class="address-form" :model="form" label-position="top">
-        <el-form-item label="联系人">
-          <el-input v-model="form.contactName" />
-        </el-form-item>
-        <el-form-item label="电话">
-          <el-input v-model="form.phone" />
-        </el-form-item>
-        <el-form-item label="收货位置">
-          <LocationSelector
-            v-model="locationData"
-            @confirm="onLocationConfirm"
-          />
-          <div v-if="form.address" class="address-preview">
-            已选位置: {{ form.address }}
+      <el-tab-pane label="我的购物" name="shopping">
+        <div class="section-head">
+          <div>
+            <h2>我的收藏</h2>
+            <p>常用商家和购物入口集中在这里</p>
           </div>
-        </el-form-item>
-        <el-checkbox v-model="form.isDefault">设为默认地址</el-checkbox>
-        <el-button type="primary" @click="submitAddress">保存地址</el-button>
-      </el-form>
+          <RouterLink class="button secondary" to="/cart">查看购物车</RouterLink>
+        </div>
 
-      <article class="list-row" v-for="item in addresses" :key="item.id">
-        <div>
-          <strong>{{ item.contactName }}</strong>
-          <p>{{ item.phone }} · {{ item.address }}</p>
-        </div>
-        <div class="row-actions">
-          <el-tag v-if="item.isDefault" type="success">默认</el-tag>
-          <el-button v-else text @click="markDefault(item.id)">设默认</el-button>
-          <el-button text type="danger" @click="removeAddress(item.id)">删除</el-button>
-        </div>
-      </article>
-    </div>
+        <el-empty v-if="!favorites.length" description="暂无收藏商家">
+          <RouterLink class="button secondary" to="/">去首页浏览</RouterLink>
+        </el-empty>
 
-    <div class="panel">
-      <div class="section-head"><h2>我的收藏</h2></div>
-      <article class="list-row" v-for="item in favorites" :key="item.id">
-        <div>
-          <strong>{{ item.merchantName }}</strong>
-          <p>{{ item.category }} · {{ item.address }}</p>
-        </div>
-        <RouterLink class="button secondary" :to="`/merchant/${item.id}`">进入</RouterLink>
-      </article>
-    </div>
+        <article v-for="item in favorites" v-else :key="item.id" class="list-row">
+          <div>
+            <strong>{{ item.merchantName }}</strong>
+            <p>{{ item.category || '未分类' }} · {{ item.address || '暂无地址' }}</p>
+          </div>
+          <div class="row-actions">
+            <RouterLink class="button secondary" :to="`/merchant/${item.id}`">进入店铺</RouterLink>
+            <el-button
+              text
+              type="danger"
+              :loading="favoriteActionId === item.id"
+              @click="removeFavoriteMerchant(item.id)"
+            >
+              取消收藏
+            </el-button>
+          </div>
+        </article>
+      </el-tab-pane>
 
-    <div class="panel">
-      <div class="section-head"><h2>我的团购券</h2></div>
-      <article class="list-row" v-for="item in dealOrders" :key="item.id">
-        <div>
-          <strong>{{ item.status === 'PENDING_PAYMENT' ? `团购订单 #${item.id}` : item.voucherCode }}</strong>
-          <p>¥{{ (item.payAmount / 100).toFixed(2) }} · {{ dealStatusLabel[item.status] || item.status }}</p>
+      <el-tab-pane label="我的券包" name="vouchers">
+        <div class="section-head">
+          <div>
+            <h2>优惠券 / 团购券</h2>
+            <p>当前展示已购买团购券，后续可接入平台优惠券</p>
+          </div>
+          <el-tag type="warning">{{ dealOrders.length }} 张</el-tag>
         </div>
-        <RouterLink
-          v-if="item.status === 'PENDING_PAYMENT'"
-          class="button secondary"
-          :to="`/payment/deal/${item.id}`"
+
+        <el-empty v-if="!dealOrders.length" description="暂无团购券">
+          <RouterLink class="button secondary" to="/deals">去团购页看看</RouterLink>
+        </el-empty>
+
+        <article v-for="item in dealOrders" v-else :key="item.id" class="list-row voucher-row">
+          <div>
+            <strong>{{ item.voucherCode }}</strong>
+            <p>支付金额 {{ formatMoney(item.payAmount) }}</p>
+          </div>
+          <el-tag :type="dealStatusType(item.status)">
+            {{ dealStatusLabel(item.status) }}
+          </el-tag>
+        </article>
+      </el-tab-pane>
+
+      <el-tab-pane label="地址与资料" name="addresses">
+        <div class="section-head">
+          <div>
+            <h2>收货地址</h2>
+            <p>{{ editingAddressId ? '正在编辑已保存地址' : '新增常用收货地址' }}</p>
+          </div>
+          <el-tag type="success">{{ addresses.length }} 个地址</el-tag>
+        </div>
+
+        <el-form
+          ref="addressFormRef"
+          class="address-form"
+          :model="form"
+          :rules="addressRules"
+          label-position="top"
         >
-          去支付
-        </RouterLink>
-        <el-tag v-else :type="item.status === 'USED' ? 'info' : 'warning'">
-          {{ dealStatusLabel[item.status] || item.status }}
-        </el-tag>
-      </article>
-    </div>
+          <div class="form-row">
+            <el-form-item label="联系人" prop="contactName" required>
+              <el-input v-model="form.contactName" placeholder="收货人姓名" />
+            </el-form-item>
+            <el-form-item label="联系电话" prop="phone" required>
+              <el-input v-model="form.phone" placeholder="收货人手机号" />
+            </el-form-item>
+          </div>
+          <el-form-item label="收货位置" prop="address" required>
+            <LocationSelector
+              :key="locationKey"
+              v-model="locationData"
+              @update:modelValue="syncLocationDraft"
+              @confirm="onLocationConfirm"
+            />
+          </el-form-item>
+          <div class="form-actions">
+            <el-checkbox v-model="form.isDefault">设为默认地址</el-checkbox>
+            <div>
+              <el-button @click="resetForm">
+                {{ editingAddressId ? '取消编辑' : '重置' }}
+              </el-button>
+              <el-button type="primary" :loading="savingAddress" @click="submitAddress">
+                {{ editingAddressId ? '保存修改' : '保存地址' }}
+              </el-button>
+            </div>
+          </div>
+        </el-form>
 
-    <div class="panel">
-      <div class="section-head"><h2>通知中心</h2></div>
-      <article class="list-row" v-for="item in previewNotifications" :key="item.id">
-        <div>
-          <strong>{{ item.title }}</strong>
-          <p>{{ item.content }}</p>
+        <el-empty v-if="!addresses.length" description="暂无收货地址">
+          <el-button type="primary" plain @click="resetForm">添加地址</el-button>
+        </el-empty>
+
+        <article v-for="item in addresses" v-else :key="item.id" class="list-row address-row">
+          <div>
+            <div class="row-title">
+              <strong>{{ item.contactName }}</strong>
+              <el-tag v-if="item.isDefault" type="success" size="small">默认</el-tag>
+            </div>
+            <p>{{ item.phone }} · {{ item.address }}</p>
+            <p v-if="hasCoordinate(item.longitude, item.latitude)" class="coord-line">
+              {{ Number(item.longitude).toFixed(6) }}, {{ Number(item.latitude).toFixed(6) }}
+            </p>
+          </div>
+          <div class="row-actions">
+            <el-button text type="primary" @click="editAddress(item)">编辑</el-button>
+            <el-button
+              v-if="!item.isDefault"
+              text
+              :loading="addressActionId === `default-${item.id}`"
+              @click="markDefault(item.id)"
+            >
+              设默认
+            </el-button>
+            <el-button
+              text
+              type="danger"
+              :loading="addressActionId === `delete-${item.id}`"
+              @click="removeAddress(item.id)"
+            >
+              删除
+            </el-button>
+          </div>
+        </article>
+      </el-tab-pane>
+
+      <el-tab-pane label="消息与服务" name="messages">
+        <div class="section-head">
+          <div>
+            <h2>通知中心</h2>
+            <p>{{ unreadCount }} 条未读</p>
+          </div>
+          <div class="row-actions">
+            <RouterLink class="button secondary" to="/user/announcements">平台公告</RouterLink>
+            <el-button
+              type="primary"
+              plain
+              :disabled="!unreadCount"
+              :loading="markingAllRead"
+              @click="readAllNotifications"
+            >
+              全部已读
+            </el-button>
+          </div>
         </div>
-        <div class="row-actions">
-          <el-button v-if="!item.readFlag" text type="primary" @click="readNotification(item.id)">标记已读</el-button>
-          <el-tag v-else type="info">已读</el-tag>
-          <el-button class="btn-delete-soft" size="small" type="danger" @click="removeNotification(item.id)">删除</el-button>
-        </div>
-      </article>
-      <div v-if="hiddenNotificationCount" class="notification-fold">
-        <p>还有 {{ hiddenNotificationCount }} 条通知已折叠</p>
-        <RouterLink class="button secondary compact-btn" to="/profile/notifications">查看全部通知</RouterLink>
-      </div>
-      <el-empty v-if="!notifications.length" description="暂无通知" />
-    </div>
+
+        <el-empty v-if="!notifications.length" description="暂无通知" />
+
+        <article
+          v-for="item in notifications"
+          v-else
+          :key="item.id"
+          class="list-row notification-row"
+          :class="{ unread: !item.readFlag }"
+        >
+          <div>
+            <div class="row-title">
+              <strong>{{ item.title }}</strong>
+              <el-tag v-if="!item.readFlag" type="danger" size="small">未读</el-tag>
+              <el-tag v-else type="info" size="small">已读</el-tag>
+            </div>
+            <p>{{ item.content }}</p>
+          </div>
+          <el-button
+            v-if="!item.readFlag"
+            text
+            type="primary"
+            :loading="notificationActionId === item.id"
+            @click="readNotification(item.id)"
+          >
+            标记已读
+          </el-button>
+        </article>
+      </el-tab-pane>
+    </el-tabs>
   </section>
 </template>
 
 <style scoped>
-.profile-hero { display: grid; gap: 16px; }
-.profile-head { align-items: center; display: flex; gap: 20px; flex-wrap: wrap; }
-.avatar-btn {
-  align-items: center; background: transparent; border: 0; cursor: pointer;
-  display: flex; flex-direction: column; gap: 8px; padding: 0;
+.profile-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 18px;
 }
-.avatar-btn.uploading { cursor: wait; opacity: 0.75; }
-.avatar-input { display: none; }
-.avatar {
-  align-items: center; background: #dbeafe; border: 2px solid #bfdbfe; border-radius: 50%;
-  color: #1d4ed8; display: flex; height: 88px; justify-content: center;
-  width: 88px; font-size: 28px; font-weight: 700; transition: border-color 0.2s, box-shadow 0.2s;
+.summary-item {
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: block;
+  padding: 16px;
+  text-align: left;
+  width: 100%;
 }
-.avatar-btn:hover .avatar { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12); }
-.avatar-tip { color: var(--text-secondary); font-size: 12px; }
-.profile-meta { display: grid; gap: 10px; min-width: 240px; }
-.profile-meta h1 { margin: 0; }
-.profile-meta p { color: var(--text-secondary); margin: 0; }
-.nickname-row { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; max-width: 420px; }
-.nickname-row .el-input { flex: 1; min-width: 180px; }
-.profile-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.section-head h2 { margin: 0 0 16px; }
-.compact-btn { font-size: 13px; padding: 8px 14px; }
-.notification-fold {
+.summary-item:hover,
+.summary-item:focus-visible {
+  background: #fff;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  outline: none;
+  transform: none;
+}
+.summary-item.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+.summary-item strong {
+  color: var(--text-primary);
+  display: block;
+  font-size: 24px;
+  line-height: 1.1;
+}
+.summary-item span {
+  color: var(--text-secondary);
+  display: block;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.profile-workspace {
+  overflow: hidden;
+}
+.profile-tabs :deep(.el-tabs__header) {
+  margin-bottom: 18px;
+}
+.profile-tabs :deep(.el-tabs__nav-wrap::after) {
+  height: 1px;
+}
+.shortcut-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.shortcut-card {
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: var(--text-primary);
+  display: grid;
+  gap: 8px;
+  min-height: 104px;
+  padding: 16px;
+  text-decoration: none;
+}
+.shortcut-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+.shortcut-card strong {
+  font-size: 18px;
+}
+.shortcut-card span {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.state-panel {
+  display: grid;
+  gap: 16px;
+}
+.section-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.section-head h2 {
+  margin: 0;
+}
+.section-head p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+.address-form {
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 6px;
+  padding-bottom: 16px;
+}
+.form-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.form-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+.list-row {
   align-items: center;
   border-top: 1px dashed var(--border-light);
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   justify-content: space-between;
   margin-top: 8px;
   padding-top: 14px;
@@ -491,14 +729,65 @@ onMounted(async () => {
   align-items: center; border-top: 1px solid var(--border-light);
   display: flex; justify-content: space-between; padding: 14px 0;
 }
-.list-row p, .muted { color: var(--text-secondary); margin: 6px 0 0; }
-.row-actions { align-items: center; display: flex; gap: 8px; }
-.appeal-penalty-select {
+.row-title {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+}
+.row-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.address-preview {
+  background: #f0f9eb;
+  border: 1px solid #d1edc4;
+  border-radius: 8px;
+  color: #529b2e;
+  display: grid;
+  font-size: 13px;
+  gap: 4px;
+  line-height: 1.4;
+  margin-top: 10px;
+  padding: 10px 12px;
+  width: 100%;
+}
+.address-preview small {
+  color: #67c23a;
+}
+.notification-row.unread {
+  background: #fff7f0;
+  margin-left: -12px;
+  margin-right: -12px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.voucher-row strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+@media (max-width: 900px) {
+  .shortcut-grid,
+  .profile-summary {
+    grid-template-columns: 1fr;
+  }
+  .form-row,
+  .form-actions {
+    grid-template-columns: 1fr;
+  }
+  .form-actions {
+    align-items: stretch;
+    display: grid;
+  }
+  .list-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .row-actions {
+    justify-content: flex-start;
+  }
 }
 .appeal-penalty-select .el-select { min-width: 280px; }
 .address-preview { margin-top: 8px; font-size: 13px; color: #67c23a; }

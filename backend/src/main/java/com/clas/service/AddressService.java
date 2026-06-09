@@ -47,6 +47,28 @@ public class AddressService {
     }
 
     @Transactional
+    public UserAddress update(Long id, AddressRequest request) {
+        UserAddress address = userAddressMapper.selectById(id);
+        if (address == null || !UserContext.getUserId().equals(address.getUserId())) {
+            throw new BusinessException("地址不存在或无权操作");
+        }
+        if (!GeoUtils.hasCoordinate(request.longitude(), request.latitude())) {
+            throw new BusinessException("请选择收货地址地图位置");
+        }
+        if (Boolean.TRUE.equals(request.isDefault())) {
+            clearDefaults();
+        }
+        address.setContactName(request.contactName());
+        address.setPhone(request.phone());
+        address.setAddress(request.address());
+        address.setLongitude(request.longitude());
+        address.setLatitude(request.latitude());
+        address.setIsDefault(Boolean.TRUE.equals(request.isDefault()));
+        userAddressMapper.updateById(address);
+        return address;
+    }
+
+    @Transactional
     public void setDefault(Long id) {
         UserAddress address = userAddressMapper.selectById(id);
         if (address == null || !UserContext.getUserId().equals(address.getUserId())) {

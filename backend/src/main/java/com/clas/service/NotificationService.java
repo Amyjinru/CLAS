@@ -9,6 +9,7 @@ import com.clas.mapper.NotificationMapper;
 import com.clas.mapper.UserMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NotificationService {
@@ -52,16 +53,13 @@ public class NotificationService {
         }
     }
 
-    public void deleteOne(Long id) {
-        Notification notification = notificationMapper.selectById(id);
-        if (notification == null || !UserContext.getUserId().equals(notification.getUserId())) {
-            throw new BusinessException("通知不存在或无权删除");
+    @Transactional
+    public void markAllRead() {
+        for (Notification notification : mine()) {
+            if (!Boolean.TRUE.equals(notification.getReadFlag())) {
+                notification.setReadFlag(true);
+                notificationMapper.updateById(notification);
+            }
         }
-        notificationMapper.deleteById(id);
-    }
-
-    public void deleteAllMine() {
-        notificationMapper.delete(new LambdaQueryWrapper<Notification>()
-            .eq(Notification::getUserId, UserContext.getUserId()));
     }
 }

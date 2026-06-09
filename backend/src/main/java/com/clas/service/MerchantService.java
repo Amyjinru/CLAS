@@ -73,23 +73,25 @@ public class MerchantService {
         Long addressId,
         Boolean onlyDeliverable
     ) {
+        String normalizedKeyword = keyword == null ? null : keyword.trim();
+        String normalizedCategory = category == null ? null : category.trim();
+        String normalizedSort = normalizeSort(sort);
         LambdaQueryWrapper<Merchant> wrapper = new LambdaQueryWrapper<Merchant>()
             .eq(Merchant::getStatus, MerchantStatusEnum.OPEN);
-        if (keyword != null && !keyword.isBlank()) {
-            wrapper.and(w -> w.like(Merchant::getMerchantName, keyword)
+        if (normalizedKeyword != null && !normalizedKeyword.isBlank()) {
+            wrapper.and(w -> w.like(Merchant::getMerchantName, normalizedKeyword)
                 .or()
-                .like(Merchant::getAddress, keyword)
+                .like(Merchant::getAddress, normalizedKeyword)
                 .or()
-                .like(Merchant::getCategory, keyword));
+                .like(Merchant::getCategory, normalizedKeyword));
         }
-        if (category != null && !category.isBlank()) {
-            wrapper.eq(Merchant::getCategory, category);
+        if (normalizedCategory != null && !normalizedCategory.isBlank()) {
+            wrapper.eq(Merchant::getCategory, normalizedCategory);
         }
-        boolean distanceSort = "distance".equals(sort);
-        boolean recommendSort = sort == null || sort.isBlank() || "recommend".equals(sort);
-        if ("price".equals(sort)) {
+        boolean distanceSort = "distance".equals(normalizedSort);
+        if ("price".equals(normalizedSort)) {
             wrapper.orderByAsc(Merchant::getAveragePrice);
-        } else if ("latest".equals(sort)) {
+        } else if ("latest".equals(normalizedSort)) {
             wrapper.orderByDesc(Merchant::getId);
         } else if (!distanceSort && !recommendSort) {
             wrapper.orderByDesc(Merchant::getScore);
@@ -106,6 +108,18 @@ public class MerchantService {
                 .comparing((MerchantResponse response) -> response.distanceMeters() == null ? Integer.MAX_VALUE : response.distanceMeters())
                 .thenComparing(MerchantResponse::score, Comparator.nullsLast(Comparator.reverseOrder())) : (left, right) -> 0)
             .collect(Collectors.toList());
+    }
+
+    private String normalizeSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return "score";
+        }
+        String normalized = sort.trim();
+        if ("distance".equals(normalized) || "score".equals(normalized) ||
+            "price".equals(normalized) || "latest".equals(normalized)) {
+            return normalized;
+        }
+        return "score";
     }
 
     public List<MerchantResponse> listAll() {
