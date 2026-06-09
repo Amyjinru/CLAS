@@ -1,6 +1,13 @@
-# 复制本文件为 application-local.yml，并填写你的 MySQL 密码。
+# 复制本文件为 application-local.yml，并填写你的本地配置。
 # application-local.yml 已被 .gitignore 忽略，不会提交到仓库。
 spring:
   datasource:
     username: root
     password: 在这里填写MySQL密码
+
+jwt:
+  secret: 在这里填写JWT签名密钥（至少32字符的随机字符串）
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173

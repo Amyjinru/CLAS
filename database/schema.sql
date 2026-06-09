@@ -217,10 +217,10 @@ CREATE TABLE deal_order (
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `user` (phone, username, password, role, enabled) VALUES
-    ('13800000001', 'user', 'Abc123!', 'USER', 1),
-    ('13800000002', 'merchant', 'Abc123!', 'MERCHANT', 1),
-    ('13800000003', 'admin', 'Abc123!', 'ADMIN', 1),
-    ('13800000012', 'merchant2', 'Abc123!', 'MERCHANT', 1);
+    ('13800000001', 'user', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'USER', 1),
+    ('13800000002', 'merchant', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'MERCHANT', 1),
+    ('13800000003', 'admin', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'ADMIN', 1),
+    ('13800000012', 'merchant2', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'MERCHANT', 1);
 
 INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, longitude, latitude, delivery_radius_m, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES
     (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 116.397428, 39.909230, 10000, '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', NOW(), NOW()),

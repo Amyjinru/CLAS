@@ -63,7 +63,7 @@ async function submitLogin() {
   showMessage('')
   try {
     const data = await login(loginForm)
-    setSessionUser(data.user)
+    setSessionUser({ ...data.user, token: data.token })
     showMessage(`已登录：${data.user.username}（${data.user.role}）`, 'success')
     setTimeout(() => redirectByRole(data.user), 400)
   } catch (error) {
@@ -142,9 +142,9 @@ async function submitRegister() {
       phone: registerForm.phone,
       code: registerForm.code
     }
-    const user = await register(payload)
-    setSessionUser(user)
-    showMessage(`注册成功：${user.username}`, 'success')
+    const data = await register(payload)
+    setSessionUser({ ...data.user, token: data.token })
+    showMessage(`注册成功：${data.user.username}`, 'success')
     setTimeout(() => router.push('/home'), 600)
   } catch (error) {
     showMessage(error.response?.data?.message || '注册失败', 'error')

@@ -104,7 +104,7 @@ async function submitReset() {
       newPassword: form.newPassword,
       confirmPassword: form.confirmPassword
     })
-    setSessionUser(data.user)
+    setSessionUser({ ...data.user, token: data.token })
     showMessage('密码已重置，已自动登录', 'success')
     setTimeout(() => redirectByRole(data.user), 600)
   } catch (error) {

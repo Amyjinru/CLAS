@@ -13,6 +13,7 @@ import com.clas.dto.SendCodeRequest;
 import com.clas.entity.User;
 import com.clas.mapper.UserMapper;
 import java.util.Set;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -22,26 +23,49 @@ public class UserService {
 
     private final UserMapper userMapper;
     private final VerificationCodeStore verificationCodeStore;
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final com.clas.common.JwtUtil jwtUtil;
 
-    public UserService(UserMapper userMapper, VerificationCodeStore verificationCodeStore) {
+    public UserService(UserMapper userMapper, VerificationCodeStore verificationCodeStore, BCryptPasswordEncoder passwordEncoder, com.clas.common.JwtUtil jwtUtil) {
         this.userMapper = userMapper;
         this.verificationCodeStore = verificationCodeStore;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     public LoginResponse login(LoginRequest request) {
         String phone = PhoneValidator.normalizeAndValidate(request.phone());
         User user = userMapper.selectById(phone);
-        if (user == null || !request.password().equals(user.getPassword())) {
+        if (user == null) {
+            throw new BusinessException("手机号或密码错误");
+        }
+
+        // 渐进式密码迁移：BCrypt 哈希以 $2 开头（兼容 $2a$/$2b$/$2x$/$2y$）
+        String storedPassword = user.getPassword();
+        boolean passwordMatches;
+        if (storedPassword != null && storedPassword.startsWith("$2")) {
+            passwordMatches = passwordEncoder.matches(request.password(), storedPassword);
+        } else {
+            // 旧明文密码 —— 验证通过后自动升级为 BCrypt
+            passwordMatches = request.password().equals(storedPassword);
+            if (passwordMatches) {
+                user.setPassword(passwordEncoder.encode(request.password()));
+                userMapper.updateById(user);
+            }
+        }
+
+        if (!passwordMatches) {
             throw new BusinessException("手机号或密码错误");
         }
         if (user.getEnabled() != null && !user.getEnabled()) {
             throw new BusinessException("账号已被禁用，请联系管理员");
         }
         user.setPassword(null);
-        return new LoginResponse(user);
+        String token = jwtUtil.generateToken(user.getPhone(), user.getRole());
+        return new LoginResponse(user, token);
     }
 
-    public User register(RegisterRequest request) {
+    public LoginResponse register(RegisterRequest request) {
         String phone = PhoneValidator.normalizeAndValidate(request.phone());
         PasswordValidator.validate(request.password());
         if (!request.password().equals(request.confirmPassword())) {
@@ -65,11 +89,12 @@ public class UserService {
         User user = new User();
         user.setPhone(phone);
         user.setUsername(request.username());
-        user.setPassword(request.password());
+        user.setPassword(passwordEncoder.encode(request.password()));
         user.setRole(role);
         userMapper.insert(user);
         user.setPassword(null);
-        return user;
+        String token = jwtUtil.generateToken(user.getPhone(), user.getRole());
+        return new LoginResponse(user, token);
     }
 
     /**
@@ -122,15 +147,23 @@ public class UserService {
         if (user.getEnabled() != null && !user.getEnabled()) {
             throw new BusinessException("账号已被禁用，无法重置密码");
         }
-        // 3. 新密码不能与旧密码相同
-        if (request.newPassword().equals(user.getPassword())) {
+        // 3. 新密码不能与旧密码相同（兼容明文和 BCrypt）
+        String oldPassword = user.getPassword();
+        boolean samePassword;
+        if (oldPassword != null && oldPassword.startsWith("$2")) {
+            samePassword = passwordEncoder.matches(request.newPassword(), oldPassword);
+        } else {
+            samePassword = request.newPassword().equals(oldPassword);
+        }
+        if (samePassword) {
             throw new BusinessException("新密码不能与旧密码相同");
         }
         // 4. 更新密码
-        user.setPassword(request.newPassword());
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
         userMapper.updateById(user);
         user.setPassword(null);
         // 5. 返回登录信息（自动登录）
-        return new LoginResponse(user);
+        String token = jwtUtil.generateToken(user.getPhone(), user.getRole());
+        return new LoginResponse(user, token);
     }
 }

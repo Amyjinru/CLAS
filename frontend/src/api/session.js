@@ -18,10 +18,14 @@ export function currentRole() {
   return currentUser()?.role || null
 }
 
-export function setSessionUser(user) {
-  sessionUser.value = user
-  if (user) {
-    localStorage.setItem('clas_user', JSON.stringify(user))
+export function currentToken() {
+  return sessionUser.value?.token || null
+}
+
+export function setSessionUser(data) {
+  sessionUser.value = data
+  if (data) {
+    localStorage.setItem('clas_user', JSON.stringify(data))
   } else {
     localStorage.removeItem('clas_user')
   }

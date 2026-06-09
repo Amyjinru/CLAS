@@ -82,7 +82,7 @@ npm run dev
 
 当前版本采用轻量级演示鉴权：前端把当前登录用户保存在 `localStorage`，请求时携带手机号作为 `Authorization` Header，后端按手机号加载用户并做角色校验。
 
-## 同学 A 维护：用户模块与接口约定
+## 用户模块与接口约定
 
 ### 用户接口
 
@@ -237,7 +237,7 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 - `MyMetaObjectHandler` 自动填充 `created_at` / `updated_at` 时间戳
 ---
 
-## 功能改进：管理后台 + 数据统计 + 前端整合（同学E）
+## 功能改进：管理后台 + 数据统计 + 前端整合
 
 ### 一、管理后台仪表盘
 

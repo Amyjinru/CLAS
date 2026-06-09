@@ -20,6 +20,7 @@ import com.clas.mapper.MerchantAuditLogMapper;
 import com.clas.mapper.UserAddressMapper;
 import com.clas.mapper.UserMapper;
 import com.clas.config.UserContext;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -37,6 +38,7 @@ public class MerchantService {
     private final VerificationCodeStore verificationCodeStore;
     private final AmapRouteService amapRouteService;
     private final RecommendService recommendService;
+    private final BCryptPasswordEncoder passwordEncoder;
 
     public MerchantService(
         MerchantMapper merchantMapper,
@@ -45,7 +47,8 @@ public class MerchantService {
         UserAddressMapper userAddressMapper,
         VerificationCodeStore verificationCodeStore,
         AmapRouteService amapRouteService,
-        RecommendService recommendService
+        RecommendService recommendService,
+        BCryptPasswordEncoder passwordEncoder
     ) {
         this.merchantMapper = merchantMapper;
         this.merchantAuditLogMapper = merchantAuditLogMapper;
@@ -54,6 +57,7 @@ public class MerchantService {
         this.verificationCodeStore = verificationCodeStore;
         this.amapRouteService = amapRouteService;
         this.recommendService = recommendService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<MerchantResponse> list() {
@@ -189,7 +193,7 @@ public class MerchantService {
             User user = new User();
             user.setPhone(accountPhone);
             user.setUsername(request.username());
-            user.setPassword(request.password());
+            user.setPassword(passwordEncoder.encode(request.password()));
             user.setRole("MERCHANT");
             userMapper.insert(user);
             finalUserId = accountPhone;

@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 管理员后台统一控制器 — 同学E实现
+ * 管理员后台统一控制器
  * 所有接口均需 ADMIN 角色
  */
 @RestController

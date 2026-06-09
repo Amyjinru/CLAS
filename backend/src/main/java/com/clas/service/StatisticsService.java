@@ -15,7 +15,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 数据统计服务 — 同学E实现的管理后台数据统计模块
+ * 数据统计服务 — 管理后台数据统计模块
  */
 @Service
 public class StatisticsService {

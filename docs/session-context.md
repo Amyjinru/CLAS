@@ -12,7 +12,7 @@ dev (最新提交 62bfaee3，已推送 upstream/dev)
 
 ## 上次会话摘要
 
-同学E 完成了管理后台 + 数据统计 + UI全面优化。全部代码已提交并推送到 GitHub。
+管理后台 + 数据统计 + UI全面优化已完成。全部代码已提交并推送到 GitHub。
 
 > **本次会话 (2026-06-10)**：重新梳理了 `enhance-admin-governance-package` 的 openspec 工作流，补充了公告置顶/有效期的完整 specs/design/tasks，并部署到云服务器。
 
@@ -97,7 +97,7 @@ npm run dev   # 端口 5173，API 代理到 8080
 6. **数据库**：merchant 表扩展、merchant_audit_log 新表、user.phone UNIQUE
 7. **其他**：清空购物车 DELETE /api/cart/clear/{userId}、时间戳自动填充
 
-## 第三阶段新增功能（同学E）
+## 第三阶段新增功能
 
 1. **管理后台仪表盘**：统计卡片 + 今日概览 + 订单状态饼图 + 近7天销售额柱线图 + 商家排行 + 热销商品
 2. **管理员API**：10个新端点（/api/admin/*），全部 @RequireRole("ADMIN")

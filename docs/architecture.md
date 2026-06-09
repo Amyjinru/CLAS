@@ -66,7 +66,7 @@ PENDING_PAYMENT -> PAID -> ACCEPTED -> COMPLETED
 
 评价只允许在 `COMPLETED` 状态后提交，同一订单只能评价一次。
 
-## 管理后台子系统（同学E）
+## 管理后台子系统
 
 AdminLayout 采用固定侧边栏 + 内容区布局：
 

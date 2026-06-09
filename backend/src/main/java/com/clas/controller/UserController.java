@@ -6,7 +6,6 @@ import com.clas.dto.LoginResponse;
 import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
 import com.clas.dto.SendCodeRequest;
-import com.clas.entity.User;
 import com.clas.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,7 +28,7 @@ public class UserController {
     }
 
     @PostMapping("/register")
-    public Result<User> register(@Valid @RequestBody RegisterRequest request) {
+    public Result<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
         return Result.ok(userService.register(request));
     }
 

@@ -9,6 +9,14 @@ public class UserContext {
         THREAD_LOCAL.set(user);
     }
 
+    /** JWT 模式：无需查 DB 即可设置上下文 */
+    public static void setUser(String phone, String role) {
+        User user = new User();
+        user.setPhone(phone);
+        user.setRole(role);
+        THREAD_LOCAL.set(user);
+    }
+
     public static User getUser() {
         return THREAD_LOCAL.get();
     }
