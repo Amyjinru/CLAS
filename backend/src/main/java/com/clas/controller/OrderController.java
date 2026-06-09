@@ -4,10 +4,13 @@ import com.clas.common.Result;
 import com.clas.config.RequireRole;
 import com.clas.config.UserContext;
 import com.clas.dto.CreateOrderRequest;
+import com.clas.dto.OrderPreviewResponse;
 import com.clas.dto.OrderResponse;
 import com.clas.dto.PaymentRequest;
 import com.clas.dto.PaymentResponse;
 import com.clas.dto.RefundRequest;
+import com.clas.dto.RefundResolveRequest;
+import com.clas.dto.RejectOrderRequest;
 import com.clas.entity.Orders;
 import com.clas.service.MerchantService;
 import com.clas.service.OrderService;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -41,8 +45,20 @@ public class OrderController {
             currentUserId(),
             request.merchantId(),
             request.addressId(),
-            request.deliveryAddress()
+            request.deliveryAddress(),
+            request.remark(),
+            request.userCouponId()
         )));
+    }
+
+    @GetMapping("/preview")
+    @RequireRole("USER")
+    public Result<OrderPreviewResponse> preview(
+        @RequestParam Long merchantId,
+        @RequestParam(required = false) Long addressId,
+        @RequestParam(required = false) Long userCouponId
+    ) {
+        return Result.ok(orderService.previewCheckout(currentUserId(), merchantId, addressId, userCouponId));
     }
 
     @GetMapping("/list/{userId}")
@@ -85,8 +101,8 @@ public class OrderController {
 
     @PostMapping("/reject/{orderId}")
     @RequireRole("MERCHANT")
-    public Result<Orders> reject(@PathVariable Long orderId) {
-        return Result.ok(orderService.reject(orderId, merchantService.getCurrentMerchantId()));
+    public Result<Orders> reject(@PathVariable Long orderId, @Valid @RequestBody RejectOrderRequest request) {
+        return Result.ok(orderService.reject(orderId, merchantService.getCurrentMerchantId(), request.reason()));
     }
 
     @PostMapping("/deliver/{orderId}")
@@ -110,8 +126,12 @@ public class OrderController {
 
     @PostMapping("/refund/{orderId}/reject")
     @RequireRole("MERCHANT")
-    public Result<Orders> rejectRefund(@PathVariable Long orderId) {
-        return Result.ok(orderService.resolveRefund(orderId, merchantService.getCurrentMerchantId(), false));
+    public Result<Orders> rejectRefund(
+        @PathVariable Long orderId,
+        @RequestBody(required = false) RefundResolveRequest request
+    ) {
+        String reason = request == null ? null : request.reason();
+        return Result.ok(orderService.resolveRefund(orderId, merchantService.getCurrentMerchantId(), false, reason));
     }
 
     private String currentUserId() {

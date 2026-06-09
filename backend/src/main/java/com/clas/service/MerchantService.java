@@ -76,6 +76,8 @@ public class MerchantService {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
         String normalizedCategory = category == null ? null : category.trim();
         String normalizedSort = normalizeSort(sort);
+        boolean distanceSort = "distance".equals(normalizedSort);
+        boolean recommendSort = "recommend".equals(normalizedSort);
         LambdaQueryWrapper<Merchant> wrapper = new LambdaQueryWrapper<Merchant>()
             .eq(Merchant::getStatus, MerchantStatusEnum.OPEN);
         if (normalizedKeyword != null && !normalizedKeyword.isBlank()) {
@@ -88,7 +90,6 @@ public class MerchantService {
         if (normalizedCategory != null && !normalizedCategory.isBlank()) {
             wrapper.eq(Merchant::getCategory, normalizedCategory);
         }
-        boolean distanceSort = "distance".equals(normalizedSort);
         if ("price".equals(normalizedSort)) {
             wrapper.orderByAsc(Merchant::getAveragePrice);
         } else if ("latest".equals(normalizedSort)) {
@@ -116,7 +117,8 @@ public class MerchantService {
         }
         String normalized = sort.trim();
         if ("distance".equals(normalized) || "score".equals(normalized) ||
-            "price".equals(normalized) || "latest".equals(normalized)) {
+            "price".equals(normalized) || "latest".equals(normalized) ||
+            "recommend".equals(normalized)) {
             return normalized;
         }
         return "score";

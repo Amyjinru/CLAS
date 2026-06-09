@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.GeoUtils;
 import com.clas.dto.CreateOrderRequest;
+import com.clas.dto.OrderPreviewResponse;
 import com.clas.dto.OrderResponse;
 import com.clas.entity.Cart;
 import com.clas.entity.Merchant;
@@ -46,6 +47,7 @@ public class OrderService {
     private final UserAddressMapper userAddressMapper;
     private final AmapRouteService amapRouteService;
     private final PenaltyService penaltyService;
+    private final CouponService couponService;
 
     public OrderService(
         OrdersMapper ordersMapper,
@@ -56,7 +58,8 @@ public class OrderService {
         MerchantMapper merchantMapper,
         UserAddressMapper userAddressMapper,
         AmapRouteService amapRouteService,
-        PenaltyService penaltyService
+        PenaltyService penaltyService,
+        CouponService couponService
     ) {
         this.ordersMapper = ordersMapper;
         this.orderItemMapper = orderItemMapper;
@@ -67,11 +70,13 @@ public class OrderService {
         this.userAddressMapper = userAddressMapper;
         this.amapRouteService = amapRouteService;
         this.penaltyService = penaltyService;
+        this.couponService = couponService;
     }
 
     @Transactional
     public OrderResponse create(CreateOrderRequest request) {
         penaltyService.assertCanUsePlatform(request.userId());
+        Merchant merchant = requireMerchant(request.merchantId());
         List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, request.userId()));
         if (cartItems.isEmpty()) {
@@ -89,7 +94,7 @@ public class OrderService {
         }
         DeliverySnapshot deliverySnapshot = resolveDeliverySnapshot(request);
 
-        int totalPrice = 0;
+        int subtotal = 0;
         for (Cart item : merchantCartItems) {
             Product product = products.get(item.getProductId());
             if (!"ON_SALE".equals(product.getStatus())) {
@@ -98,13 +103,31 @@ public class OrderService {
             if (product.getStock() < item.getQuantity()) {
                 throw new BusinessException("库存不足：" + product.getName());
             }
-            totalPrice += product.getPrice() * item.getQuantity();
+            subtotal += product.getPrice() * item.getQuantity();
         }
+
+        int deliveryFee = calculateDeliveryFee(merchant, deliverySnapshot.distanceMeters());
+        int minOrderPrice = merchant.getMinOrderPrice() == null ? 0 : merchant.getMinOrderPrice();
+        if (subtotal < minOrderPrice) {
+            throw new BusinessException("未达到起送价，还差 ¥" + String.format("%.2f", (minOrderPrice - subtotal) / 100.0));
+        }
+        int couponDiscount = couponService.calculateDiscount(
+            request.userCouponId(),
+            request.userId(),
+            request.merchantId(),
+            subtotal
+        );
+        int totalPrice = Math.max(subtotal + deliveryFee - couponDiscount, 0);
 
         Orders order = new Orders();
         order.setUserId(request.userId());
         order.setMerchantId(request.merchantId());
+        order.setSubtotal(subtotal);
+        order.setDeliveryFee(deliveryFee);
+        order.setCouponDiscount(couponDiscount);
+        order.setUserCouponId(request.userCouponId());
         order.setTotalPrice(totalPrice);
+        order.setRemark(trimToNull(request.remark()));
         order.setStatus(STATUS_PENDING_PAYMENT);
         order.setDeliveryAddress(deliverySnapshot.address());
         order.setDeliveryLongitude(deliverySnapshot.longitude());
@@ -116,6 +139,7 @@ public class OrderService {
         order.setRefundStatus("NONE");
         order.setCreateTime(LocalDateTime.now());
         ordersMapper.insert(order);
+        couponService.reserveForOrder(request.userCouponId(), request.userId(), order.getId());
 
         List<OrderItem> orderItems = merchantCartItems.stream().map(cart -> {
             Product product = products.get(cart.getProductId());
@@ -132,6 +156,83 @@ public class OrderService {
 
         notificationService.send(order.getUserId(), "订单已创建", "订单 " + order.getId() + " 已创建，请及时完成支付。");
         return new OrderResponse(order, orderItems);
+    }
+
+    public OrderPreviewResponse previewCheckout(String userId, Long merchantId, Long addressId, Long userCouponId) {
+        Merchant merchant = requireMerchant(merchantId);
+        List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
+            .eq(Cart::getUserId, userId));
+        List<Long> productIds = cartItems.stream().map(Cart::getProductId).toList();
+        Map<Long, Product> products = productIds.isEmpty()
+            ? Map.of()
+            : productMapper.selectBatchIds(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, product -> product));
+
+        int subtotal = 0;
+        for (Cart item : cartItems) {
+            Product product = products.get(item.getProductId());
+            if (product == null || !merchantId.equals(product.getMerchantId())) {
+                continue;
+            }
+            if (!"ON_SALE".equals(product.getStatus()) || product.getStock() < item.getQuantity()) {
+                continue;
+            }
+            subtotal += product.getPrice() * item.getQuantity();
+        }
+
+        Integer distanceMeters = null;
+        int deliveryFee = calculateDeliveryFee(merchant, null);
+        int minOrderPrice = merchant.getMinOrderPrice() == null ? 0 : merchant.getMinOrderPrice();
+        int minOrderGap = Math.max(minOrderPrice - subtotal, 0);
+        boolean canCheckout = subtotal > 0 && minOrderGap == 0;
+        String message = subtotal <= 0
+            ? "当前商家购物车为空"
+            : (minOrderGap > 0 ? "未达到起送价，还差 ¥" + String.format("%.2f", minOrderGap / 100.0) : "可以提交订单");
+
+        if (addressId != null && canCheckout) {
+            try {
+                DeliverySnapshot snapshot = resolveDeliverySnapshot(new CreateOrderRequest(
+                    userId, merchantId, addressId, null, null, userCouponId
+                ));
+                distanceMeters = snapshot.distanceMeters();
+                deliveryFee = calculateDeliveryFee(merchant, distanceMeters);
+            } catch (BusinessException exception) {
+                canCheckout = false;
+                message = exception.getMessage();
+                deliveryFee = 0;
+                distanceMeters = null;
+            }
+        }
+
+        int couponDiscount = 0;
+        if (userCouponId != null && subtotal > 0) {
+            try {
+                couponDiscount = couponService.calculateDiscount(userCouponId, userId, merchantId, subtotal);
+            } catch (BusinessException exception) {
+                canCheckout = false;
+                message = exception.getMessage();
+            }
+        }
+
+        int totalPrice = Math.max(subtotal + deliveryFee - couponDiscount, 0);
+        List<com.clas.dto.UserCouponResponse> availableCoupons = subtotal > 0
+            ? couponService.listAvailableForCheckout(userId, merchantId, subtotal)
+            : List.of();
+
+        return new OrderPreviewResponse(
+            merchantId,
+            subtotal,
+            deliveryFee,
+            distanceMeters,
+            minOrderPrice,
+            minOrderGap,
+            couponDiscount,
+            userCouponId,
+            totalPrice,
+            canCheckout,
+            message,
+            availableCoupons
+        );
     }
 
     public List<OrderResponse> listForUser(String userId) {
@@ -203,6 +304,7 @@ public class OrderService {
         }
         order.setStatus(STATUS_CANCELED);
         ordersMapper.updateById(order);
+        couponService.releaseForOrder(order.getUserCouponId());
         return order;
     }
 
@@ -215,26 +317,20 @@ public class OrderService {
         }
         order.setStatus(STATUS_CANCELED);
         ordersMapper.updateById(order);
+        couponService.releaseForOrder(order.getUserCouponId());
         return order;
     }
 
     @Transactional
-    public Orders reject(Long orderId) {
-        Orders order = requireOrder(orderId);
-        requireStatus(order, STATUS_PAID);
-        restoreOrderStock(orderId);
-        order.setStatus(STATUS_REJECTED);
-        ordersMapper.updateById(order);
-        return order;
-    }
-
-    @Transactional
-    public Orders reject(Long orderId, Long merchantId) {
+    public Orders reject(Long orderId, Long merchantId, String reason) {
         Orders order = requireMerchantOrder(orderId, merchantId);
         requireStatus(order, STATUS_PAID);
         restoreOrderStock(orderId);
         order.setStatus(STATUS_REJECTED);
+        order.setRejectReason(trimToNull(reason));
         ordersMapper.updateById(order);
+        String rejectText = order.getRejectReason() == null ? "商家暂时无法接单" : order.getRejectReason();
+        notificationService.send(order.getUserId(), "商家已拒单", "订单 " + order.getId() + " 已被拒单：" + rejectText);
         return order;
     }
 
@@ -260,26 +356,39 @@ public class OrderService {
         order.setStatus(STATUS_REFUND_PENDING);
         order.setRefundStatus("PENDING");
         order.setRefundReason(reason);
+        order.setRefundRequestedAt(LocalDateTime.now());
+        order.setRefundResolvedAt(null);
+        order.setRefundRejectReason(null);
         ordersMapper.updateById(order);
         notificationService.send(userId, "退款申请已提交", "订单 " + orderId + " 的退款申请已提交，等待商家处理。");
         return order;
     }
 
     @Transactional
-    public Orders resolveRefund(Long orderId, Long merchantId, boolean approved) {
+    public Orders resolveRefund(Long orderId, Long merchantId, boolean approved, String rejectReason) {
         Orders order = requireMerchantOrder(orderId, merchantId);
         requireStatus(order, STATUS_REFUND_PENDING);
         order.setRefundStatus(approved ? "APPROVED" : "REJECTED");
+        order.setRefundResolvedAt(LocalDateTime.now());
         if (approved) {
             restoreOrderStock(orderId);
             order.setStatus(STATUS_REFUNDED);
             notificationService.send(order.getUserId(), "退款已通过", "订单 " + orderId + " 已退款。");
         } else {
             order.setStatus(resolveStatusAfterRefundReject(order));
-            notificationService.send(order.getUserId(), "退款被拒绝", "订单 " + orderId + " 的退款申请未通过。");
+            order.setRefundRejectReason(trimToNull(rejectReason));
+            String reasonText = trimToNull(rejectReason);
+            String content = reasonText == null
+                ? "订单 " + orderId + " 的退款申请未通过。"
+                : "订单 " + orderId + " 的退款申请未通过：" + reasonText;
+            notificationService.send(order.getUserId(), "退款被拒绝", content);
         }
         ordersMapper.updateById(order);
         return order;
+    }
+
+    public Orders resolveRefund(Long orderId, Long merchantId, boolean approved) {
+        return resolveRefund(orderId, merchantId, approved, null);
     }
 
     public Orders requireOrder(Long orderId) {
@@ -414,6 +523,36 @@ public class OrderService {
 
     private int estimateMinutes(int distanceMeters) {
         return Math.max(20, 20 + (int) Math.ceil(distanceMeters / 500.0) * 5);
+    }
+
+    public static int calculateDeliveryFee(Merchant merchant, Integer distanceMeters) {
+        int baseFee = merchant.getDeliveryFee() == null ? 0 : merchant.getDeliveryFee();
+        if (distanceMeters == null || distanceMeters <= 2000) {
+            return baseFee;
+        }
+        int extraKm = (int) Math.ceil((distanceMeters - 2000) / 1000.0);
+        return baseFee + extraKm * 100;
+    }
+
+    public void markCouponUsed(Long orderId) {
+        Orders order = requireOrder(orderId);
+        couponService.markUsed(order.getUserCouponId(), orderId);
+    }
+
+    private Merchant requireMerchant(Long merchantId) {
+        Merchant merchant = merchantMapper.selectById(merchantId);
+        if (merchant == null) {
+            throw new BusinessException("商家不存在");
+        }
+        return merchant;
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private record DeliverySnapshot(

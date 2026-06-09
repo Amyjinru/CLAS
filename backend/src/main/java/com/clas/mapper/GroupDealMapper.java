@@ -14,4 +14,11 @@ public interface GroupDealMapper extends BaseMapper<GroupDeal> {
         WHERE id = #{dealId} AND stock >= 1 AND status = 'ON_SALE'
         """)
     int deductStock(@Param("dealId") Long dealId);
+
+    @Update("""
+        UPDATE group_deal
+        SET stock = stock + 1
+        WHERE id = #{dealId}
+        """)
+    int restoreStock(@Param("dealId") Long dealId);
 }

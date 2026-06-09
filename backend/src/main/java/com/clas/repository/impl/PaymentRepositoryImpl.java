@@ -28,9 +28,19 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 
     @Override
     public Optional<Payment> findLatestByOrderId(Long orderId) {
-        // 一个订单可能有多次模拟支付记录，状态查询取最新一条。
         Payment payment = paymentMapper.selectOne(new LambdaQueryWrapper<Payment>()
             .eq(Payment::getOrderId, orderId)
+            .orderByDesc(Payment::getCreateTime)
+            .orderByDesc(Payment::getId)
+            .last("LIMIT 1"));
+        return Optional.ofNullable(payment);
+    }
+
+    @Override
+    public Optional<Payment> findSuccessfulByOrderId(Long orderId) {
+        Payment payment = paymentMapper.selectOne(new LambdaQueryWrapper<Payment>()
+            .eq(Payment::getOrderId, orderId)
+            .eq(Payment::getStatus, "SUCCESS")
             .orderByDesc(Payment::getCreateTime)
             .orderByDesc(Payment::getId)
             .last("LIMIT 1"));

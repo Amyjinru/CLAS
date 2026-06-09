@@ -1,6 +1,6 @@
 import { api, unwrap } from './client'
 
-export const getProfile = () => api.get('/user/profile').then(unwrap)
+export const getProfile = (config = {}) => api.get('/user/profile', config).then(unwrap)
 export const updateProfile = (payload) => api.put('/user/profile', payload).then(unwrap)
 export async function uploadAvatar(file) {
   const formData = new FormData()

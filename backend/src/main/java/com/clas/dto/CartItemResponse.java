@@ -10,6 +10,8 @@ public record CartItemResponse(
     Integer stock,
     String image,
     Integer quantity,
-    Integer subtotal
+    Integer subtotal,
+    boolean valid,
+    String invalidReason
 ) {
 }

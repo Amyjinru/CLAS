@@ -15,6 +15,10 @@ public class Orders {
     private String userId;
     private Long merchantId;
     private Integer totalPrice;
+    private Integer subtotal;
+    private Integer deliveryFee;
+    private Integer couponDiscount;
+    private Long userCouponId;
     private String status;
     private String deliveryAddress;
     private BigDecimal deliveryLongitude;
@@ -25,5 +29,10 @@ public class Orders {
     private Integer estimatedMinutes;
     private String refundReason;
     private String refundStatus;
+    private LocalDateTime refundRequestedAt;
+    private LocalDateTime refundResolvedAt;
+    private String remark;
+    private String rejectReason;
+    private String refundRejectReason;
     private LocalDateTime createTime;
 }

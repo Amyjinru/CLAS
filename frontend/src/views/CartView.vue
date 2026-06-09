@@ -1,14 +1,18 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import {
   cancelOrder,
+  claimCoupon,
+  clearInvalidCart,
   createOrder,
   deleteCartItem,
   getCart,
   listAddresses,
+  listClaimableCoupons,
   listMyDealOrders,
   listOrders,
+  previewOrder,
   updateCart
 } from '../api/clas'
 
@@ -20,13 +24,54 @@ const message = ref('')
 const updatingProductId = ref(null)
 const addresses = ref([])
 const selectedAddressId = ref('')
+const orderRemark = ref('')
+const selectedUserCouponId = ref('')
+const claimableCoupons = ref([])
+const checkoutPreview = ref(null)
 
-const total = () => items.value.reduce((sum, item) => sum + item.subtotal, 0)
 const merchantIds = () => [...new Set(items.value.map((item) => item.merchantId).filter(Boolean))]
+const activeMerchantId = computed(() => merchantIds()[0] || null)
+const invalidCount = computed(() => items.value.filter((item) => item.valid === false).length)
 const hasPendingPayments = computed(
   () => pendingFoodOrders.value.length > 0 || pendingDealOrders.value.length > 0
 )
 const hasCartContent = computed(() => items.value.length > 0 || hasPendingPayments.value)
+const canSubmit = computed(() => checkoutPreview.value?.canCheckout && !invalidCount.value)
+
+async function loadPreview() {
+  if (!activeMerchantId.value) {
+    checkoutPreview.value = null
+    return
+  }
+  try {
+    checkoutPreview.value = await previewOrder(
+      activeMerchantId.value,
+      selectedAddressId.value || undefined,
+      selectedUserCouponId.value || undefined
+    )
+  } catch {
+    checkoutPreview.value = null
+  }
+}
+
+async function loadClaimableCoupons() {
+  try {
+    claimableCoupons.value = await listClaimableCoupons()
+  } catch {
+    claimableCoupons.value = []
+  }
+}
+
+async function handleClaimCoupon(couponId) {
+  try {
+    await claimCoupon(couponId)
+    message.value = '优惠券领取成功'
+    await loadClaimableCoupons()
+    await loadPreview()
+  } catch (error) {
+    message.value = error.response?.data?.message || '领取失败'
+  }
+}
 
 async function load() {
   try {
@@ -42,21 +87,48 @@ async function load() {
     addresses.value = addressList
     selectedAddressId.value = addresses.value.find((item) => item.isDefault)?.id || addresses.value[0]?.id || ''
     message.value = ''
+    await loadPreview()
   } catch {
     message.value = '请先登录后查看购物车'
   }
 }
 
 async function submit() {
-  if (!items.value.length) return
+  if (!items.value.length || !activeMerchantId.value) return
   if (!selectedAddressId.value) {
     message.value = '请先在个人中心添加并选择配送地址'
     return
   }
-  const merchantId = merchantIds()[0]
-  const data = await createOrder({ merchantId, addressId: selectedAddressId.value })
-  message.value = `订单 ${data.order.id} 已创建，请完成支付`
-  await router.push(`/payment/${data.order.id}`)
+  if (invalidCount.value) {
+    message.value = '请先清理失效商品'
+    return
+  }
+  if (!checkoutPreview.value?.canCheckout) {
+    message.value = checkoutPreview.value?.message || '当前订单不满足下单条件'
+    return
+  }
+  try {
+    const data = await createOrder({
+      merchantId: activeMerchantId.value,
+      addressId: selectedAddressId.value,
+      remark: orderRemark.value.trim() || undefined,
+      userCouponId: selectedUserCouponId.value || undefined
+    })
+    message.value = `订单 ${data.order.id} 已创建，请完成支付`
+    await router.push(`/payment/${data.order.id}`)
+  } catch (error) {
+    message.value = error.response?.data?.message || '提交订单失败'
+  }
+}
+
+async function removeInvalidItems() {
+  try {
+    items.value = await clearInvalidCart()
+    message.value = '失效商品已清理'
+    await loadPreview()
+  } catch (error) {
+    message.value = error.response?.data?.message || '清理失败'
+  }
 }
 
 async function changeQuantity(item, quantity) {
@@ -70,6 +142,7 @@ async function changeQuantity(item, quantity) {
   try {
     items.value = await updateCart({ productId: item.productId, quantity: nextQuantity })
     message.value = '购物车数量已更新'
+    await loadPreview()
   } catch (error) {
     message.value = error.response?.data?.message || '更新数量失败'
     await load()
@@ -83,6 +156,7 @@ async function deleteItem(item) {
   try {
     items.value = await deleteCartItem(item.productId)
     message.value = '商品已从购物车删除'
+    await loadPreview()
   } catch (error) {
     message.value = error.response?.data?.message || '删除商品失败'
   } finally {
@@ -96,7 +170,12 @@ async function cancelPendingFood(order) {
   await load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  await loadClaimableCoupons()
+  await load()
+})
+
+watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
 </script>
 
 <template>
@@ -150,11 +229,12 @@ onMounted(load)
           <div class="section-title compact">
             <h2>购物车商品</h2>
           </div>
-          <div class="cart-item" v-for="item in items" :key="item.productId">
+          <div class="cart-item" :class="{ invalid: item.valid === false }" v-for="item in items" :key="item.productId">
             <div class="item-main">
               <div class="item-info">
                 <h2 class="item-name">{{ item.productName }}</h2>
                 <p class="item-meta">库存 {{ item.stock }} · 单价 ¥{{ (item.price / 100).toFixed(2) }}</p>
+                <p v-if="item.valid === false" class="invalid-tip">{{ item.invalidReason || '商品不可购买' }}</p>
               </div>
               <div class="item-price">¥{{ (item.subtotal / 100).toFixed(2) }}</div>
             </div>
@@ -179,6 +259,10 @@ onMounted(load)
               </button>
             </div>
           </div>
+          <div v-if="invalidCount" class="invalid-actions">
+            <p>有 {{ invalidCount }} 件商品已失效或库存不足</p>
+            <button class="secondary" type="button" @click="removeInvalidItems">清理失效商品</button>
+          </div>
         </div>
 
         <div class="cart-empty" v-if="!hasCartContent">
@@ -199,11 +283,59 @@ onMounted(load)
               </option>
             </select>
           </label>
-          <div class="checkout-total">
-            <span class="total-label">合计</span>
-            <span class="total-price">¥{{ (total() / 100).toFixed(2) }}</span>
+          <label class="address-select address-select-block">
+            <span class="total-label">订单备注</span>
+            <textarea v-model="orderRemark" rows="2" placeholder="口味、送达要求等（可选）" />
+          </label>
+          <label class="address-select address-select-block">
+            <span class="total-label">优惠券</span>
+            <select v-model="selectedUserCouponId">
+              <option value="">不使用优惠券</option>
+              <option
+                v-for="coupon in checkoutPreview?.availableCoupons || []"
+                :key="coupon.id"
+                :value="coupon.id"
+              >
+                {{ coupon.title }} · 减 ¥{{ (coupon.discountAmount / 100).toFixed(2) }}
+              </option>
+            </select>
+          </label>
+          <div v-if="claimableCoupons.length" class="claimable-coupons">
+            <p class="claimable-title">可领取优惠券</p>
+            <div v-for="coupon in claimableCoupons" :key="coupon.id" class="claimable-item">
+              <span>{{ coupon.title }}</span>
+              <button type="button" class="secondary compact" @click="handleClaimCoupon(coupon.id)">领取</button>
+            </div>
           </div>
-          <button class="submit-btn" @click="submit">提交订单</button>
+          <div v-if="checkoutPreview" class="checkout-breakdown">
+            <div class="breakdown-row">
+              <span>商品小计</span>
+              <span>¥{{ (checkoutPreview.subtotal / 100).toFixed(2) }}</span>
+            </div>
+            <div v-if="checkoutPreview.deliveryFee > 0 || checkoutPreview.distanceMeters" class="breakdown-row">
+              <span>
+                配送费
+                <small v-if="checkoutPreview.distanceMeters">
+                  · {{ checkoutPreview.distanceMeters < 1000 ? `${checkoutPreview.distanceMeters}m` : `${(checkoutPreview.distanceMeters / 1000).toFixed(1)}km` }}
+                </small>
+              </span>
+              <span>¥{{ (checkoutPreview.deliveryFee / 100).toFixed(2) }}</span>
+            </div>
+            <div v-if="checkoutPreview.couponDiscount > 0" class="breakdown-row discount">
+              <span>优惠券抵扣</span>
+              <span>-¥{{ (checkoutPreview.couponDiscount / 100).toFixed(2) }}</span>
+            </div>
+            <div v-if="checkoutPreview.minOrderGap > 0" class="breakdown-row warn">
+              <span>距起送价还差</span>
+              <span>¥{{ (checkoutPreview.minOrderGap / 100).toFixed(2) }}</span>
+            </div>
+          </div>
+          <div class="checkout-total">
+            <span class="total-label">应付合计</span>
+            <span class="total-price">¥{{ ((checkoutPreview?.totalPrice || 0) / 100).toFixed(2) }}</span>
+          </div>
+          <p v-if="checkoutPreview && !checkoutPreview.canCheckout" class="checkout-tip">{{ checkoutPreview.message }}</p>
+          <button class="submit-btn" :disabled="!canSubmit" @click="submit">提交订单</button>
         </footer>
       </aside>
     </div>
@@ -459,6 +591,108 @@ onMounted(load)
   border-radius: var(--radius-lg);
   padding: 20px 24px;
   box-shadow: var(--shadow-md);
+}
+
+.checkout-bar-side textarea {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  min-height: 64px;
+  padding: 8px 10px;
+  resize: vertical;
+  width: 100%;
+}
+
+.checkout-breakdown {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.breakdown-row {
+  color: var(--text-secondary);
+  display: flex;
+  font-size: 13px;
+  justify-content: space-between;
+}
+
+.breakdown-row.warn {
+  color: var(--clas-warning);
+}
+
+.checkout-tip {
+  color: var(--clas-warning);
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+
+.cart-item.invalid {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.invalid-tip {
+  color: var(--clas-warning);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.invalid-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.invalid-actions p {
+  color: var(--clas-warning);
+  margin: 0;
+}
+
+.submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.breakdown-row.discount {
+  color: var(--clas-success);
+}
+
+.breakdown-row small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.claimable-coupons {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--clas-warning-light);
+}
+
+.claimable-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.claimable-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.claimable-item + .claimable-item {
+  margin-top: 6px;
+}
+
+button.compact {
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 .checkout-bar-side {

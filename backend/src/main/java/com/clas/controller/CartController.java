@@ -4,6 +4,7 @@ import com.clas.common.Result;
 import com.clas.config.RequireRole;
 import com.clas.config.UserContext;
 import com.clas.dto.AddCartRequest;
+import com.clas.dto.CartValidationResponse;
 import com.clas.dto.CartItemResponse;
 import com.clas.dto.RemoveCartRequest;
 import com.clas.dto.UpdateCartRequest;
@@ -51,6 +52,16 @@ public class CartController {
     @DeleteMapping("/item/{userId}/{productId}")
     public Result<List<CartItemResponse>> deleteItem(@PathVariable String userId, @PathVariable Long productId) {
         return Result.ok(cartService.deleteItem(currentUserId(), productId));
+    }
+
+    @GetMapping("/validate/{userId}")
+    public Result<CartValidationResponse> validate(@PathVariable String userId) {
+        return Result.ok(cartService.validate(currentUserId()));
+    }
+
+    @DeleteMapping("/invalid/{userId}")
+    public Result<List<CartItemResponse>> clearInvalid(@PathVariable String userId) {
+        return Result.ok(cartService.clearInvalid(currentUserId()));
     }
 
     @DeleteMapping("/clear/{userId}")

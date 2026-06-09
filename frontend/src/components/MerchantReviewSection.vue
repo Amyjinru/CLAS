@@ -46,8 +46,16 @@ async function load() {
 }
 
 async function vote(targetType, targetId, voteType) {
-  await voteReviewTarget(targetType, targetId, voteType)
-  await load()
+  if (!currentRole()) {
+    ElMessage.warning('请先登录后再点赞或点踩')
+    return
+  }
+  try {
+    await voteReviewTarget(targetType, targetId, voteType)
+    await load()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '投票失败')
+  }
 }
 
 async function submitMerchantReply(review) {
@@ -62,9 +70,14 @@ async function submitMerchantReply(review) {
 async function submitComment(review) {
   const text = commentDrafts.value[review.id]
   if (!text?.trim()) return
-  await addReviewComment(review.id, { content: text.trim() })
-  commentDrafts.value[review.id] = ''
-  await load()
+  try {
+    await addReviewComment(review.id, { content: text.trim() })
+    commentDrafts.value[review.id] = ''
+    ElMessage.success('评论已发布')
+    await load()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '评论失败')
+  }
 }
 
 async function hideOrDelete(review) {

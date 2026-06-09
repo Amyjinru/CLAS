@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
 import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund } from '../api/clas'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
 import OrderDetailContent from '../components/OrderDetailContent.vue'
@@ -95,11 +95,22 @@ async function handleAccept(orderId) {
 
 async function handleReject(orderId) {
   try {
-    await rejectOrder(orderId)
+    const { value } = await ElMessageBox.prompt('请输入拒单理由', '拒单', {
+      confirmButtonText: '确认拒单',
+      cancelButtonText: '取消',
+      inputPlaceholder: '例如：商品售罄、超出配送范围'
+    })
+    if (!value?.trim()) {
+      ElMessage.warning('请填写拒单理由')
+      return
+    }
+    await rejectOrder(orderId, value.trim())
     ElMessage.success('已拒单')
     await load()
   } catch (error) {
-    // API client handles errors
+    if (error !== 'cancel') {
+      ElMessage.error('拒单失败')
+    }
   }
 }
 
@@ -114,8 +125,20 @@ async function handleRefund(orderId, approved) {
     await approveRefund(orderId)
     ElMessage.success('已通过退款')
   } else {
-    await rejectRefund(orderId)
-    ElMessage.success('已拒绝退款')
+    try {
+      const { value } = await ElMessageBox.prompt('请输入拒绝退款的理由（可选）', '拒绝退款', {
+        confirmButtonText: '确认拒绝',
+        cancelButtonText: '取消',
+        inputPlaceholder: '例如：订单已完成配送'
+      })
+      await rejectRefund(orderId, value?.trim() || undefined)
+      ElMessage.success('已拒绝退款')
+    } catch (error) {
+      if (error !== 'cancel') {
+        ElMessage.error('操作失败')
+      }
+      return
+    }
   }
   await load()
 }
@@ -145,7 +168,10 @@ async function handleReply(review) {
 // ===== version_314: 通用订单操作方法 =====
 async function operate(action, order) {
   if (action === 'accept') await acceptOrder(order.order.id)
-  if (action === 'reject') await rejectOrder(order.order.id)
+  if (action === 'reject') {
+    await handleReject(order.order.id)
+    return
+  }
   if (selectedOrder.value?.order.id === order.order.id) {
     selectedOrder.value = orders.value.find((item) => item.order.id === order.order.id) || null
   }

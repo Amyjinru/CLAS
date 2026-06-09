@@ -64,7 +64,7 @@ public class UserProfileController {
     @GetMapping("/penalties/mine")
     @RequireRole({"USER", "MERCHANT", "ADMIN"})
     public Result<List<UserPenalty>> myPenalties() {
-        return Result.ok(penaltyService.listActivePenalties(UserContext.getUserId()));
+        return Result.ok(penaltyService.listPenaltiesForUser(UserContext.getUserId()));
     }
 
     @PostMapping("/appeals")

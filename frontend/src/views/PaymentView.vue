@@ -53,7 +53,11 @@ async function submitPay() {
     paymentInfo.value = isDealPayment.value
       ? await payDealOrder(orderId.value, payMethod.value)
       : await mockPay({ orderId: orderId.value, payMethod: payMethod.value })
-    message.value = isDealPayment.value ? '支付成功，团购券已生成' : '支付成功'
+    if (paymentInfo.value.paymentStatus === 'FAILED') {
+      message.value = '模拟支付失败，请更换方式后重试'
+    } else {
+      message.value = isDealPayment.value ? '支付成功，团购券已生成' : '支付成功'
+    }
   } catch (error) {
     message.value = error.response?.data?.message || '支付失败'
   } finally {
@@ -91,6 +95,7 @@ onMounted(loadStatus)
         <option value="MOCK">模拟支付</option>
         <option value="WECHAT">微信支付（模拟）</option>
         <option value="ALIPAY">支付宝（模拟）</option>
+        <option value="FAIL_MOCK">模拟支付失败</option>
       </select>
     </label>
 
