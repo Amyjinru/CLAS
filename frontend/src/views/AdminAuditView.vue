@@ -179,9 +179,8 @@ onMounted(load)
           v-model="filters.keyword"
           clearable
           placeholder="搜索商家名称、电话、品类或地址"
-          style="width: 340px"
-        />
-        <el-select v-model="filters.status" placeholder="状态筛选" clearable style="width: 160px">
+          />
+        <el-select v-model="filters.status" placeholder="状态筛选" clearable>
           <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <el-button @click="resetFilters">重置</el-button>
@@ -371,27 +370,27 @@ onMounted(load)
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 14px;
+  align-items: center;
 }
 
-/* 搜索栏：强制内部wrapper填满外层容器，消除聚焦/非聚焦宽度差异 */
+/* 搜索栏 —— 聚焦/非聚焦宽度一致 */
 .toolbar > .el-input {
   width: 340px;
-  display: inline-flex;
 }
 .toolbar > .el-input :deep(.el-input__wrapper) {
   width: 100% !important;
-  box-sizing: border-box;
+  box-sizing: border-box !important;
 }
 .toolbar > .el-input :deep(.el-input__wrapper.is-focus) {
   box-shadow: 0 0 0 1px #f97316 !important;
 }
 
-/* 筛选栏：保持原始宽度，仅统一高度对齐搜索栏 */
+/* 筛选栏 —— 与搜索栏高度对齐 */
 .toolbar > .el-select {
   width: 160px;
 }
 .toolbar > .el-select :deep(.el-input__wrapper) {
-  box-sizing: border-box;
+  box-sizing: border-box !important;
 }
 
 .detail-panel {
