@@ -177,7 +177,6 @@ onMounted(load)
       <div class="toolbar">
         <el-input
           v-model="filters.keyword"
-          clearable
           placeholder="搜索商家名称、电话、品类或地址"
           />
         <el-select v-model="filters.status" placeholder="状态筛选" clearable>
@@ -373,19 +372,27 @@ onMounted(load)
   align-items: center;
 }
 
-/* 搜索栏 —— 聚焦/非聚焦宽度一致 */
+/* 工具栏子元素统一高度与对齐 */
+.toolbar > .el-input,
+.toolbar > .el-select,
+.toolbar > .el-button {
+  height: 32px;
+}
+
+/* 搜索栏 */
 .toolbar > .el-input {
   width: 340px;
+  display: flex;
 }
 .toolbar > .el-input :deep(.el-input__wrapper) {
-  width: 100% !important;
+  flex: 1;
   box-sizing: border-box !important;
 }
 .toolbar > .el-input :deep(.el-input__wrapper.is-focus) {
   box-shadow: 0 0 0 1px #f97316 !important;
 }
 
-/* 筛选栏 —— 与搜索栏高度对齐 */
+/* 筛选栏 */
 .toolbar > .el-select {
   width: 160px;
 }
