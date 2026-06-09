@@ -371,11 +371,27 @@ onMounted(load)
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 14px;
-  align-items: center;
 }
 
-.toolbar :deep(.el-input__wrapper) {
-  height: 32px;
+/* 搜索栏：强制内部wrapper填满外层容器，消除聚焦/非聚焦宽度差异 */
+.toolbar > .el-input {
+  width: 340px;
+  display: inline-flex;
+}
+.toolbar > .el-input :deep(.el-input__wrapper) {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+.toolbar > .el-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #f97316 !important;
+}
+
+/* 筛选栏：保持原始宽度，仅统一高度对齐搜索栏 */
+.toolbar > .el-select {
+  width: 160px;
+}
+.toolbar > .el-select :deep(.el-input__wrapper) {
+  box-sizing: border-box;
 }
 
 .detail-panel {
