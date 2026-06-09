@@ -1,0 +1,22 @@
+name: Deploy to Cloud Server
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.15
+        with:
+          host: 8.141.112.182
+          username: root
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            cd /opt/clas
+            git pull upstream dev
+            clas deploy
+            sleep 2
+            curl -s http://127.0.0.1:8080/api/health
