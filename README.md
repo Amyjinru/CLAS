@@ -337,16 +337,31 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 
 ---
 
-## One-Click Deploy
+## 部署
 
-Use `scripts/deploy.ps1` for quick deployment:
+### 自动部署（推荐）
+
+推送 `dev` 分支后 **GitHub Actions 自动触发**部署，无需手动操作。
+
+```
+git push upstream dev  →  GitHub Actions  →  SSH 服务器  →  clas deploy  →  ✅
+```
+
+**首次配置**：在仓库 Settings → Secrets → Actions 中添加 `SSH_PASSWORD`。
+**手动触发**：GitHub Actions → Deploy to Cloud Server → Run workflow。
+**查看状态**：`gh run list --repo Amyjinru/CLAS --workflow deploy.yml`
+
+工作流文件：`.github/workflows/deploy.yml`
+
+### 手动部署（备选）
+
 ```powershell
 .\scripts\deploy.ps1 "your commit message"
 ```
 
-What it does: commit + push + SSH to server + git pull + build + restart.
+流程：commit → push → SSH 交互式连接 → git pull → build → restart。
 
-Server info:
-- Frontend: http://8.141.112.182
-- Health: http://8.141.112.182/api/health
-- Server command: `clas status | deploy | restart`
+服务器信息：
+- 前端: http://8.141.112.182
+- 健康检查: http://8.141.112.182/api/health
+- 服务器命令: `clas status | deploy | restart`

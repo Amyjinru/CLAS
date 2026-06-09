@@ -25,24 +25,58 @@ CLAS（Comprehensive Life Assistant System）— 外卖电商 MVP + 第二阶段
 - **数据库**：8 张表（user, merchant, merchant_audit_log, product, cart, orders, order_item, review）
 
 
-## Deploy Script (IMPORTANT FOR AI)
+## 部署方式
 
-Project root has `scripts/deploy.ps1` for **one-click deployment**:
+### 方式一：GitHub Actions 自动部署（推荐）
 
-Workflow:
+推送 `dev` 分支后 **自动触发**，无需手动操作。
+
+**工作原理**：
+```
+git push upstream dev
+    ↓
+GitHub Actions 触发 `.github/workflows/deploy.yml`
+    ↓
+ubuntu-latest runner 通过 sshpass + SSH 连接服务器
+    ↓
+服务器执行: git pull upstream dev → clas deploy
+    ↓
+健康检查: curl http://127.0.0.1:8080/api/health
+```
+
+**首次配置**：
+1. 在 GitHub 仓库 Settings → Secrets → Actions 中添加 `SSH_PASSWORD`
+2. 工作流文件 `.github/workflows/deploy.yml` 中 `on.push.branches: [dev]` 自动触发
+3. 也支持手动触发：GitHub Actions → Deploy to Cloud Server → Run workflow
+
+**查看状态**：
+```powershell
+gh run list --repo Amyjinru/CLAS --workflow deploy.yml --limit 3
+```
+
+### 方式二：手动一键部署脚本
+
+项目根目录 `scripts/deploy.ps1` 用于**本地手动部署**：
+
+工作流：
 1. Auto `git add` + `git commit` + `git push upstream dev`
-2. SSH to cloud server (8.141.112.182, root/abc123456!)
-3. Server auto `git pull` + `clas deploy` (mvn build, npm build, systemctl restart, nginx reload)
+2. SSH 交互式连接服务器（需输入密码）
+3. 服务器 auto `git pull` + `clas deploy` (mvn build, npm build, systemctl restart, nginx reload)
 
-One command:
 ```powershell
 .\scripts\deploy.ps1 "your commit message"
 ```
 
-After deploy: http://8.141.112.182
-Health check: http://8.141.112.182/api/health
+### 方式三：直接 SSH
 
-Server has `clas` command: `clas status`, `clas deploy`, `clas restart`
+```bash
+ssh root@8.141.112.182 "cd /opt/clas && clas deploy"
+```
+
+部署后验证：
+- 前端: http://8.141.112.182
+- 接口: http://8.141.112.182/api/health
+- 服务器: `clas status`, `clas deploy`, `clas restart`
 
 ## 本地环境
 

@@ -1,13 +1,19 @@
-﻿# CLAS 一键部署脚本
+﻿# CLAS 一键部署脚本（手动版）
 # 用法: .\scripts\deploy.ps1 ["提交信息"]
+#
+# 注意：项目已配置 GitHub Actions 自动部署（推荐）
+#   推送 dev 分支后自动触发，无需手动操作。
+#   详见 .github/workflows/deploy.yml 和 docs/session-context.md
+#
+# 本脚本作为手动备选方案。
 #
 # 工作流:
 #   本地: git add + commit + push → upstream dev
-#   服务器: git pull + clas deploy
+#   服务器: SSH 交互式连接 → git pull + clas deploy
 #
 # 前置条件:
 #   - 确保 GitHub 远程已配置 credential.helper（自动凭证）
-#   - SSH 密钥认证已配置；或者用密码交互输入
+#   - SSH 交互式密码输入
 
 param(
     [string]$CommitMessage = ""
