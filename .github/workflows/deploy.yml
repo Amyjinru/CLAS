@@ -9,15 +9,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Network connectivity check
+        run: |
+          echo "Testing TCP reachability to server..."
+          timeout 10 bash -c 'echo >/dev/tcp/8.141.112.182/22 && echo "SSH port reachable" || echo "SSH port unreachable"'
+        continue-on-error: true
+
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v0.1.15
-        with:
-          host: 8.141.112.182
-          username: root
-          password: ${{ secrets.SSH_PASSWORD }}
-          script: |
+        run: |
+          sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@8.141.112.182 "
             cd /opt/clas
             git pull upstream dev
             clas deploy
             sleep 2
             curl -s http://127.0.0.1:8080/api/health
+          "
