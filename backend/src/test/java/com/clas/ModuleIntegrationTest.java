@@ -337,7 +337,7 @@ class ModuleIntegrationTest {
 
         mockMvc.perform(get("/api/product/list/1"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data[0].stock").value(beforeStock - 1));
+            .andExpect(jsonPath("$.data[0].stock").value(beforeStock));
 
         Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
             .path("data").path("order").path("id").asLong();
@@ -380,7 +380,7 @@ class ModuleIntegrationTest {
             .andReturn();
 
         mockMvc.perform(get("/api/product/list/1"))
-            .andExpect(jsonPath("$.data[0].stock").value(29));
+            .andExpect(jsonPath("$.data[0].stock").value(30));
 
         Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
             .path("data").path("order").path("id").asLong();
@@ -402,6 +402,9 @@ class ModuleIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
             .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
+
+        mockMvc.perform(get("/api/product/list/1"))
+            .andExpect(jsonPath("$.data[0].stock").value(29));
 
         mockMvc.perform(post("/api/order/accept/" + orderId)
                 .header("Authorization", MERCHANT_PHONE))

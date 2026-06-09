@@ -294,7 +294,7 @@ public class DealService {
     private void assertMerchantOpenNow(Long merchantId) {
         Merchant merchant = merchantMapper.selectById(merchantId);
         if (merchant == null) {
-            throw new BusinessException("鍟嗗涓嶅瓨鍦?");
+            throw new BusinessException("商家不存在");
         }
         String businessHours = trimToNull(merchant.getBusinessHours());
         if (businessHours == null) {

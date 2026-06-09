@@ -1,12 +1,12 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import {
   deleteAdminReview,
   listAdminReviews,
   listReviewDeleteRequests,
   processReviewDeleteRequest,
   resolveReviewReport
-} from '../../api/clas'
+} from '../../api/admin'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const reviews = ref([])
@@ -14,10 +14,15 @@ const total = ref(0)
 const page = ref(1)
 const size = ref(10)
 const loading = ref(false)
-
-const deleteRequests = ref([])
-const requestStatus = ref('PENDING')
 const requestLoading = ref(false)
+const deleteRequests = ref([])
+
+const reviewFilters = reactive({
+  reportStatus: '',
+  keyword: ''
+})
+
+const requestStatus = ref('PENDING')
 
 const requestStatusOptions = [
   { label: '待审核', value: 'PENDING' },
@@ -37,25 +42,6 @@ const requestTypeMap = {
   USER: '用户举报'
 }
 
-function requestSummary(row) {
-  if (row.requestType === 'USER') {
-    return `用户 ${row.reporterUserId || '-'} 举报`
-  }
-  return `商家 #${row.merchantId}`
-}
-
-function requestTargetText(row) {
-  if (row.replyId) {
-    return `评价 #${row.reviewId} / 回复 #${row.replyId}`
-  }
-  return `评价 #${row.reviewId}`
-}
-
-function formatTime(value) {
-  if (!value) return '-'
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
-}
-
 async function loadDeleteRequests() {
   requestLoading.value = true
   try {
@@ -67,36 +53,15 @@ async function loadDeleteRequests() {
   }
 }
 
-async function handleProcessRequest(row, approve) {
-  const action = approve ? '通过' : '驳回'
-  try {
-    const { value: remarks } = await ElMessageBox.prompt(
-      `确定${action}${requestSummary(row)} 对 ${requestTargetText(row)} 的删评申请吗？`,
-      `${action}删评申请`,
-      {
-        confirmButtonText: `确认${action}`,
-        cancelButtonText: '取消',
-        inputPlaceholder: '可选：填写处理备注',
-        type: approve ? 'warning' : 'info'
-      }
-    )
-    await processReviewDeleteRequest(row.id, {
-      approve,
-      remarks: remarks || undefined
-    })
-    ElMessage.success(`已${action}该删评申请`)
-    await Promise.all([loadDeleteRequests(), load()])
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('处理失败')
-    }
-  }
-}
-
-async function load() {
+async function loadReviews() {
   loading.value = true
   try {
-    const data = await listAdminReviews({ page: page.value, size: size.value })
+    const data = await listAdminReviews({
+      page: page.value,
+      size: size.value,
+      reportStatus: reviewFilters.reportStatus || undefined,
+      keyword: reviewFilters.keyword.trim() || undefined
+    })
     reviews.value = data.records
     total.value = data.total
   } catch {
@@ -106,76 +71,124 @@ async function load() {
   }
 }
 
-async function handleDelete(review) {
+async function processRequest(row, approve) {
+  const action = approve ? '通过' : '驳回'
+  try {
+    const { value: remarks } = await ElMessageBox.prompt(
+      `确定${action}${requestSummary(row)}对${requestTargetText(row)}的处理申请吗？`,
+      `${action}删评申请`,
+      {
+        confirmButtonText: `确认${action}`,
+        cancelButtonText: '取消',
+        inputPlaceholder: '可选：填写处理备注',
+        type: approve ? 'warning' : 'info'
+      }
+    )
+    await processReviewDeleteRequest(row.id, { approve, remarks: remarks || undefined })
+    ElMessage.success(`已${action}该申请`)
+    await Promise.all([loadDeleteRequests(), loadReviews()])
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error('处理失败')
+  }
+}
+
+async function deleteReview(review) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除用户 "${review.username}" 的评价吗？此操作不可恢复，商家评分将重新计算。`,
-      '确认删除', { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
+      `确定删除用户「${review.username || review.userId}」的评价吗？删除后商家评分会重新计算。`,
+      '删除评价',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
     )
     await deleteAdminReview(review.id)
-    ElMessage.success('评价已删除，商家评分已重新计算')
-    await load()
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.error('删除失败')
+    ElMessage.success('评价已删除')
+    await loadReviews()
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error('删除失败')
   }
 }
 
-async function handleResolve(review) {
+async function resolveReport(review) {
   try {
     await resolveReviewReport(review.id, 'RESOLVED')
-    ElMessage.success('举报已标记处理')
-    await load()
+    ElMessage.success('举报已标记为已处理')
+    await loadReviews()
   } catch {
-    ElMessage.error('处理失败')
+    ElMessage.error('处理举报失败')
   }
 }
 
-function onPageChange(p) {
-  page.value = p
-  load()
+function searchReviews() {
+  page.value = 1
+  loadReviews()
 }
 
-function onRequestStatusChange() {
-  loadDeleteRequests()
+function resetReviewFilters() {
+  reviewFilters.reportStatus = ''
+  reviewFilters.keyword = ''
+  searchReviews()
 }
 
-onMounted(async () => {
-  await Promise.all([loadDeleteRequests(), load()])
-})
+async function refreshAll() {
+  await Promise.all([loadDeleteRequests(), loadReviews()])
+}
+
+function onPageChange(value) {
+  page.value = value
+  loadReviews()
+}
+
+function requestSummary(row) {
+  return row.requestType === 'USER'
+    ? `用户 ${row.reporterUserId || '-'} 发起`
+    : `商家 #${row.merchantId} 发起`
+}
+
+function requestTargetText(row) {
+  return row.replyId ? `评价 #${row.reviewId} / 回复 #${row.replyId}` : `评价 #${row.reviewId}`
+}
+
+function formatTime(value) {
+  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-'
+}
+
+onMounted(refreshAll)
 </script>
 
 <template>
   <div class="admin-page">
-    <h1 class="page-title">评价管理</h1>
+    <section class="page-head">
+      <div>
+        <h1>评价治理</h1>
+        <p>集中处理用户举报、商家删评申请和违规评价删除。</p>
+      </div>
+      <el-button :loading="loading || requestLoading" @click="refreshAll">刷新</el-button>
+    </section>
 
-    <el-card shadow="hover" class="section-card">
+    <el-card shadow="never" class="section-card">
       <template #header>
         <div class="card-header">
           <div>
-            <h2>删评申请</h2>
-            <p class="card-desc">商家申请删评与用户举报不当评论均会进入此列表，审核通过后删除对应评价或回复。</p>
+            <h2>删评与举报申请</h2>
+            <p>商家申请删评、用户举报评价或回复后，管理员在此审核处理。</p>
           </div>
-          <el-segmented v-model="requestStatus" :options="requestStatusOptions" @change="onRequestStatusChange" />
+          <el-segmented v-model="requestStatus" :options="requestStatusOptions" @change="loadDeleteRequests" />
         </div>
       </template>
 
-      <el-table :data="deleteRequests" stripe v-loading="requestLoading" size="small" empty-text="暂无删评申请">
+      <el-table :data="deleteRequests" stripe v-loading="requestLoading" size="small" empty-text="暂无删评或举报申请">
         <el-table-column prop="id" label="申请ID" width="80" />
-        <el-table-column label="来源" width="120">
+        <el-table-column label="来源" width="110">
           <template #default="{ row }">
             <el-tag size="small" :type="row.requestType === 'USER' ? 'danger' : 'warning'">
-              {{ requestTypeMap[row.requestType] || row.requestType || '商家申请' }}
+              {{ requestTypeMap[row.requestType] || '商家申请' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="对象" min-width="160">
+        <el-table-column label="对象" min-width="150">
           <template #default="{ row }">{{ requestTargetText(row) }}</template>
         </el-table-column>
-        <el-table-column prop="merchantId" label="商家ID" width="80" />
-        <el-table-column label="发起人" width="120">
-          <template #default="{ row }">
-            {{ row.requestType === 'USER' ? (row.reporterUserId || '-') : `商家 #${row.merchantId}` }}
-          </template>
+        <el-table-column label="发起人" min-width="130">
+          <template #default="{ row }">{{ requestSummary(row) }}</template>
         </el-table-column>
         <el-table-column prop="reason" label="理由" min-width="200" show-overflow-tooltip />
         <el-table-column label="状态" width="100">
@@ -188,12 +201,14 @@ onMounted(async () => {
         <el-table-column label="申请时间" width="170">
           <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column prop="adminRemarks" label="处理备注" min-width="140" show-overflow-tooltip />
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column prop="adminRemarks" label="处理备注" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.adminRemarks || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
             <template v-if="row.status === 'PENDING'">
-              <el-button type="primary" size="small" @click="handleProcessRequest(row, true)">通过</el-button>
-              <el-button size="small" @click="handleProcessRequest(row, false)">驳回</el-button>
+              <el-button type="primary" size="small" @click="processRequest(row, true)">通过</el-button>
+              <el-button size="small" @click="processRequest(row, false)">驳回</el-button>
             </template>
             <span v-else class="processed-text">已处理</span>
           </template>
@@ -201,73 +216,79 @@ onMounted(async () => {
       </el-table>
     </el-card>
 
-    <el-card shadow="hover" class="section-card">
+    <el-card shadow="never" class="section-card">
       <template #header>
-        <h2>评价列表</h2>
+        <div class="card-header">
+          <div>
+            <h2>评价列表</h2>
+            <p>查看全平台评价和举报状态，可删除明确违规内容。</p>
+          </div>
+        </div>
       </template>
-      <el-table :data="reviews" stripe v-loading="loading" size="small">
+
+      <div class="toolbar">
+        <el-input v-model="reviewFilters.keyword" clearable placeholder="搜索用户、评价内容或举报原因" style="max-width: 300px" @keyup.enter="searchReviews" />
+        <el-select v-model="reviewFilters.reportStatus" placeholder="举报状态" clearable style="width: 150px" @change="searchReviews">
+          <el-option label="待处理" value="PENDING" />
+          <el-option label="已处理" value="RESOLVED" />
+          <el-option label="已驳回" value="REJECTED" />
+        </el-select>
+        <el-button type="primary" @click="searchReviews">查询</el-button>
+        <el-button @click="resetReviewFilters">重置</el-button>
+      </div>
+
+      <el-table :data="reviews" stripe v-loading="loading" size="small" empty-text="暂无匹配评价">
         <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="username" label="用户" width="100" />
-        <el-table-column prop="orderId" label="订单ID" width="80" />
-        <el-table-column prop="merchantId" label="商家ID" width="80" />
-        <el-table-column label="评分" width="80">
+        <el-table-column prop="username" label="用户" width="120" show-overflow-tooltip />
+        <el-table-column prop="orderId" label="订单ID" width="90" />
+        <el-table-column prop="merchantId" label="商家ID" width="90" />
+        <el-table-column label="评分" width="130">
           <template #default="{ row }">
             <el-rate :model-value="row.score" disabled show-score text-color="#ff9900" />
           </template>
         </el-table-column>
         <el-table-column prop="content" label="评价内容" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="merchantReply" label="商家回复" min-width="140" show-overflow-tooltip />
-        <el-table-column label="举报" width="180">
+        <el-table-column prop="merchantReply" label="商家回复" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.merchantReply || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="举报状态" width="150">
           <template #default="{ row }">
-            <el-tag :type="row.reportStatus === 'PENDING' ? 'warning' : 'info'">{{ row.reportStatus }}</el-tag>
-            <div class="report-reason" v-if="row.reportReason">{{ row.reportReason }}</div>
+            <el-tag :type="row.reportStatus === 'PENDING' ? 'warning' : row.reportStatus === 'RESOLVED' ? 'success' : 'info'" size="small">
+              {{ row.reportStatus || '无举报' }}
+            </el-tag>
+            <div v-if="row.reportReason" class="report-reason">{{ row.reportReason }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.reportStatus === 'PENDING'" type="primary" size="small" @click="handleResolve(row)">处理</el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.reportStatus === 'PENDING'" type="primary" size="small" @click="resolveReport(row)">处理</el-button>
+            <el-button type="danger" size="small" @click="deleteReview(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+
       <el-pagination
         v-model:current-page="page"
         :page-size="size"
         :total="total"
         layout="total, prev, pager, next"
         @current-change="onPageChange"
-        style="margin-top: 16px; justify-content: flex-end;"
+        class="pager"
       />
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.page-title { font-size: 22px; margin: 0 0 20px 0; }
-.section-card { margin-bottom: 20px; }
-.section-card h2 {
-  font-size: 16px;
-  margin: 0;
-}
-.card-header {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  justify-content: space-between;
-}
-.card-desc {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin: 6px 0 0;
-}
-.report-reason {
-  color: var(--text-secondary);
-  font-size: 12px;
-  margin-top: 4px;
-}
-.processed-text {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
+.admin-page { display: grid; gap: 16px; }
+.page-head { align-items: flex-end; display: flex; justify-content: space-between; }
+.page-head h1 { font-size: 22px; margin: 0 0 6px; }
+.page-head p,
+.card-header p { color: var(--text-secondary); margin: 0; }
+.section-card h2 { font-size: 16px; margin: 0 0 6px; }
+.card-header { align-items: center; display: flex; gap: 16px; justify-content: space-between; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.report-reason { color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
+.processed-text { color: var(--text-secondary); font-size: 13px; }
+.pager { justify-content: flex-end; margin-top: 16px; }
 </style>

@@ -1,8 +1,8 @@
 import { api, unwrap } from './client'
 
-export const getDashboard = () => api.get('/admin/dashboard').then(unwrap)
-export const getOrderStats = () => api.get('/admin/stats/orders').then(unwrap)
-export const getSalesOverview = () => api.get('/admin/stats/sales').then(unwrap)
+export const getDashboard = (params) => api.get('/admin/dashboard', { params }).then(unwrap)
+export const getOrderStats = (params) => api.get('/admin/stats/orders', { params }).then(unwrap)
+export const getSalesOverview = (params) => api.get('/admin/stats/sales', { params }).then(unwrap)
 export const getMerchantRanking = () => api.get('/admin/stats/merchants').then(unwrap)
 export const getTopProducts = () => api.get('/admin/stats/products').then(unwrap)
 export const listAdminOrders = (params) => api.get('/admin/orders', { params }).then(unwrap)

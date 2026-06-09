@@ -1,44 +1,80 @@
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import * as echarts from 'echarts'
-import { api, unwrap } from '../../api/client'
+import { getDashboard, getMerchantRanking, getOrderStats, getSalesOverview, getTopProducts } from '../../api/admin'
+import { ElMessage } from 'element-plus'
 
-// 仪表盘数据
+const today = new Date()
+const start = new Date()
+start.setDate(today.getDate() - 6)
+
+const dateRange = ref([toDateInput(start), toDateInput(today)])
 const stats = ref({
-  totalUsers: 0, totalMerchants: 0, totalOrders: 0, totalSales: 0,
-  todayOrders: 0, todaySales: 0, pendingPaymentOrders: 0, paidOrders: 0, completedOrders: 0
+  totalUsers: 0,
+  totalMerchants: 0,
+  totalOrders: 0,
+  totalSales: 0,
+  todayOrders: 0,
+  todaySales: 0,
+  pendingPaymentOrders: 0,
+  paidOrders: 0,
+  completedOrders: 0
 })
 const orderStats = ref({ statusCounts: [], dailyOrders: [] })
 const salesOverview = ref({ dailySales: [], totalSales: 0, monthlySales: 0, weeklySales: 0 })
 const merchantRanking = ref({ bySales: [], byRating: [] })
 const topProducts = ref({ products: [] })
-
-const loading = ref(true)
+const loading = ref(false)
+const fullscreen = ref(false)
 let salesChart = null
 let orderChart = null
 
-onMounted(async () => {
+const rangeParams = computed(() => ({
+  startDate: dateRange.value?.[0],
+  endDate: dateRange.value?.[1]
+}))
+
+const hasSalesData = computed(() => (salesOverview.value.dailySales || []).some((item) => item.amount || item.orderCount))
+const hasOrderStatusData = computed(() => (orderStats.value.statusCounts || []).some((item) => item.count))
+
+const statCards = computed(() => [
+  { label: '总订单数', value: stats.value.totalOrders, tone: 'orange' },
+  { label: '总销售额', value: `¥${formatFen(stats.value.totalSales)}`, tone: 'teal' },
+  { label: '总用户数', value: stats.value.totalUsers, tone: 'violet' },
+  { label: '总商家数', value: stats.value.totalMerchants, tone: 'green' }
+])
+
+const todayCards = computed(() => [
+  { label: '筛选区间订单', value: stats.value.todayOrders },
+  { label: '筛选区间销售额', value: `¥${formatFen(stats.value.todaySales)}` },
+  { label: '待支付订单', value: stats.value.pendingPaymentOrders },
+  { label: '待接单订单', value: stats.value.paidOrders }
+])
+
+async function load() {
+  loading.value = true
   try {
+    const params = rangeParams.value
     const [dash, orders, sales, merchants, products] = await Promise.all([
-      api.get('/admin/dashboard').then(unwrap),
-      api.get('/admin/stats/orders').then(unwrap),
-      api.get('/admin/stats/sales').then(unwrap),
-      api.get('/admin/stats/merchants').then(unwrap),
-      api.get('/admin/stats/products').then(unwrap)
+      getDashboard(params),
+      getOrderStats(params),
+      getSalesOverview(params),
+      getMerchantRanking(),
+      getTopProducts()
     ])
     stats.value = dash
     orderStats.value = orders
     salesOverview.value = sales
     merchantRanking.value = merchants
     topProducts.value = products
-  } catch (e) {
-    console.error('加载仪表盘数据失败:', e)
-  } finally {
-    loading.value = false
     await nextTick()
     initCharts()
+  } catch (error) {
+    ElMessage.error('加载仪表盘数据失败')
+  } finally {
+    loading.value = false
   }
-})
+}
 
 function initCharts() {
   initSalesChart()
@@ -47,33 +83,34 @@ function initCharts() {
 
 function initSalesChart() {
   const dom = document.getElementById('salesChart')
-  if (!dom) return
-  if (salesChart) salesChart.dispose()
+  if (!dom || !hasSalesData.value) return
+  salesChart?.dispose()
   salesChart = echarts.init(dom)
-
   const data = salesOverview.value.dailySales || []
   salesChart.setOption({
-    color: ['#f97316', '#0d9488', '#7c3aed', '#059669'],
-    tooltip: { trigger: 'axis', backgroundColor: '#fff', borderColor: '#ebe3d5', textStyle: { color: '#1a1510' } },
-    legend: { data: ['销售额(元)', '订单数'], textStyle: { color: '#6b5c49' } },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: data.map(d => d.date), axisLine: { lineStyle: { color: '#d6ccb8' } }, axisLabel: { color: '#8c7a64' } },
+    color: ['#f97316', '#0d9488'],
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['销售额(元)', '订单数'] },
+    grid: { left: 36, right: 36, top: 48, bottom: 28, containLabel: true },
+    xAxis: { type: 'category', data: data.map((item) => item.date) },
     yAxis: [
-      { type: 'value', name: '销售额(元)', nameTextStyle: { color: '#8c7a64' }, axisLabel: { color: '#8c7a64' }, splitLine: { lineStyle: { color: '#f5f0e8' } } },
-      { type: 'value', name: '订单数', nameTextStyle: { color: '#8c7a64' }, axisLabel: { color: '#8c7a64' }, splitLine: { show: false } }
+      { type: 'value', name: '销售额' },
+      { type: 'value', name: '订单数' }
     ],
     series: [
       {
-        name: '销售额(元)', type: 'bar', barWidth: '40%',
-        data: data.map(d => (d.amount / 100).toFixed(2)),
-        itemStyle: { borderRadius: [6, 6, 0, 0], color: '#f97316' }
+        name: '销售额(元)',
+        type: 'bar',
+        barWidth: 22,
+        data: data.map((item) => Number((item.amount / 100).toFixed(2))),
+        itemStyle: { borderRadius: [5, 5, 0, 0] }
       },
       {
-        name: '订单数', type: 'line', yAxisIndex: 1, smooth: true,
-        data: data.map(d => d.orderCount),
-        lineStyle: { color: '#0d9488', width: 2 },
-        itemStyle: { color: '#0d9488' },
-        symbol: 'circle', symbolSize: 6
+        name: '订单数',
+        type: 'line',
+        yAxisIndex: 1,
+        smooth: true,
+        data: data.map((item) => item.orderCount)
       }
     ]
   })
@@ -81,129 +118,150 @@ function initSalesChart() {
 
 function initOrderStatusChart() {
   const dom = document.getElementById('orderStatusChart')
-  if (!dom) return
-  if (orderChart) orderChart.dispose()
+  if (!dom || !hasOrderStatusData.value) return
+  orderChart?.dispose()
   orderChart = echarts.init(dom)
-
-  const data = orderStats.value.statusCounts || []
-  const statusNames = {
-    PENDING_PAYMENT: '待支付', PAID: '已支付',
-    ACCEPTED: '已接单', COMPLETED: '已完成'
+  const labels = {
+    PENDING_PAYMENT: '待支付',
+    PAID: '待接单',
+    ACCEPTED: '已接单',
+    COMPLETED: '已完成',
+    REFUND_REQUESTED: '退款中',
+    REFUNDED: '已退款'
   }
-
   orderChart.setOption({
-    color: ['#f97316', '#0d9488', '#7c3aed', '#059669'],
-    tooltip: { trigger: 'item', backgroundColor: '#fff', borderColor: '#ebe3d5', textStyle: { color: '#1a1510' } },
+    color: ['#f97316', '#0d9488', '#2563eb', '#65a30d', '#d97706', '#dc2626'],
+    tooltip: { trigger: 'item' },
     series: [{
       type: 'pie',
-      radius: ['45%', '75%'],
-      center: ['50%', '50%'],
-      data: data.map(d => ({
-        name: statusNames[d.status] || d.status,
-        value: d.count
-      })),
-      label: { color: '#6b5c49', fontSize: 12 },
-      emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.1)' } }
+      radius: ['48%', '76%'],
+      data: (orderStats.value.statusCounts || []).map((item) => ({
+        name: labels[item.status] || item.status,
+        value: item.count
+      }))
     }]
   })
 }
 
+function toggleFullscreen() {
+  fullscreen.value = !fullscreen.value
+  nextTick(() => {
+    salesChart?.resize()
+    orderChart?.resize()
+  })
+}
+
+function handleResize() {
+  salesChart?.resize()
+  orderChart?.resize()
+}
+
+function formatFen(value) {
+  return value ? (value / 100).toFixed(2) : '0.00'
+}
+
+function toDateInput(date) {
+  return date.toISOString().slice(0, 10)
+}
+
+onMounted(() => {
+  load()
+  window.addEventListener('resize', handleResize)
+})
+
 onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
   salesChart?.dispose()
   orderChart?.dispose()
 })
-
-function formatFen(v) {
-  return v ? (v / 100).toFixed(2) : '0.00'
-}
-
-const statCards = computed(() => [
-  { label: '总订单数', value: stats.value.totalOrders, color: 'var(--clas-amber-500)', bg: 'var(--clas-amber-50)' },
-  { label: '总销售额(元)', value: formatFen(stats.value.totalSales), color: 'var(--clas-teal-600)', bg: 'var(--clas-teal-50)' },
-  { label: '总用户数', value: stats.value.totalUsers, color: '#7c3aed', bg: '#f5f3ff' },
-  { label: '总商家数', value: stats.value.totalMerchants, color: '#059669', bg: '#ecfdf5' }
-])
 </script>
 
 <template>
-  <div v-loading="loading" class="dashboard">
-    <h1 class="page-title">仪表盘</h1>
+  <div :class="['dashboard', { fullscreen }]" v-loading="loading">
+    <section class="dashboard-head">
+      <div>
+        <h1>管理后台仪表盘</h1>
+        <p>按时间区间观察平台订单、销售、商家和商品表现。</p>
+      </div>
+      <div class="head-actions">
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          value-format="YYYY-MM-DD"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          range-separator="至"
+          style="width: 280px"
+          @change="load"
+        />
+        <el-button :loading="loading" @click="load">刷新</el-button>
+        <el-button type="primary" plain @click="toggleFullscreen">
+          {{ fullscreen ? '退出大屏' : '大屏模式' }}
+        </el-button>
+      </div>
+    </section>
 
-    <!-- 统计卡片 -->
-    <el-row :gutter="16" class="card-row">
-      <el-col :span="6" v-for="card in statCards" :key="card.label">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-value" :style="{ color: card.color }">{{ card.value }}</div>
-          <div class="stat-label">{{ card.label }}</div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <section class="stat-grid">
+      <article v-for="card in statCards" :key="card.label" :class="['stat-card', card.tone]">
+        <span>{{ card.label }}</span>
+        <strong>{{ card.value }}</strong>
+      </article>
+    </section>
 
-    <!-- 今日数据 -->
-    <el-row :gutter="16" class="card-row">
-      <el-col :span="12">
-        <el-card shadow="hover">
-          <template #header>今日概览</template>
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="今日新增订单">{{ stats.todayOrders }}</el-descriptions-item>
-            <el-descriptions-item label="今日销售额(元)">{{ formatFen(stats.todaySales) }}</el-descriptions-item>
-            <el-descriptions-item label="待支付订单">{{ stats.pendingPaymentOrders }}</el-descriptions-item>
-            <el-descriptions-item label="待接单数">{{ stats.paidOrders }}</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-col>
-      <el-col :span="12">
-        <el-card shadow="hover">
-          <template #header>订单状态分布</template>
-          <div id="orderStatusChart" style="height: 260px;"></div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <section class="today-grid">
+      <article v-for="card in todayCards" :key="card.label">
+        <span>{{ card.label }}</span>
+        <strong>{{ card.value }}</strong>
+      </article>
+    </section>
 
-    <!-- 销售额图表 -->
-    <el-card shadow="hover" class="chart-card">
-      <template #header>近7天销售额趋势</template>
-      <div id="salesChart" style="height: 340px;"></div>
-    </el-card>
+    <section class="chart-grid">
+      <el-card shadow="never" class="chart-card">
+        <template #header>订单状态分布</template>
+        <div v-if="hasOrderStatusData" id="orderStatusChart" class="chart"></div>
+        <el-empty v-else description="当前区间暂无订单状态数据" />
+      </el-card>
 
-    <!-- 商家排行 -->
-    <el-row :gutter="16" class="card-row">
-      <el-col :span="12">
-        <el-card shadow="hover">
-          <template #header>商家销售额 TOP 10</template>
-          <el-table :data="merchantRanking.bySales" stripe size="small">
-            <el-table-column type="index" label="#" width="40" />
-            <el-table-column prop="merchantName" label="商家名称" />
-            <el-table-column label="销售额(元)" width="120">
-              <template #default="{ row }">{{ formatFen(row.totalSales) }}</template>
-            </el-table-column>
-            <el-table-column prop="orderCount" label="订单数" width="80" />
-          </el-table>
-        </el-card>
-      </el-col>
-      <el-col :span="12">
-        <el-card shadow="hover">
-          <template #header>商家评分 TOP 10</template>
-          <el-table :data="merchantRanking.byRating" stripe size="small">
-            <el-table-column type="index" label="#" width="40" />
-            <el-table-column prop="merchantName" label="商家名称" />
-            <el-table-column prop="score" label="评分" width="80" />
-            <el-table-column prop="orderCount" label="订单数" width="80" />
-          </el-table>
-        </el-card>
-      </el-col>
-    </el-row>
+      <el-card shadow="never" class="chart-card wide">
+        <template #header>销售额趋势</template>
+        <div v-if="hasSalesData" id="salesChart" class="chart"></div>
+        <el-empty v-else description="当前区间暂无销售趋势数据" />
+      </el-card>
+    </section>
 
-    <!-- 热销商品 -->
-    <el-card shadow="hover" class="chart-card">
+    <section class="rank-grid">
+      <el-card shadow="never">
+        <template #header>商家销售额 TOP 10</template>
+        <el-table :data="merchantRanking.bySales" stripe size="small" empty-text="暂无排行数据">
+          <el-table-column type="index" label="#" width="48" />
+          <el-table-column prop="merchantName" label="商家名称" show-overflow-tooltip />
+          <el-table-column label="销售额" width="110">
+            <template #default="{ row }">¥{{ formatFen(row.totalSales) }}</template>
+          </el-table-column>
+          <el-table-column prop="orderCount" label="订单" width="80" />
+        </el-table>
+      </el-card>
+
+      <el-card shadow="never">
+        <template #header>商家评分 TOP 10</template>
+        <el-table :data="merchantRanking.byRating" stripe size="small" empty-text="暂无评分数据">
+          <el-table-column type="index" label="#" width="48" />
+          <el-table-column prop="merchantName" label="商家名称" show-overflow-tooltip />
+          <el-table-column prop="score" label="评分" width="80" />
+          <el-table-column prop="orderCount" label="订单" width="80" />
+        </el-table>
+      </el-card>
+    </section>
+
+    <el-card shadow="never">
       <template #header>热销商品 TOP 10</template>
-      <el-table :data="topProducts.products" stripe size="small">
+      <el-table :data="topProducts.products" stripe size="small" empty-text="暂无商品销量数据">
         <el-table-column type="index" label="#" width="50" />
-        <el-table-column prop="productName" label="商品名称" />
-        <el-table-column prop="merchantName" label="所属商家" />
-        <el-table-column prop="soldCount" label="销量" width="80" />
-        <el-table-column label="销售额(元)" width="120">
-          <template #default="{ row }">{{ formatFen(row.totalAmount) }}</template>
+        <el-table-column prop="productName" label="商品名称" show-overflow-tooltip />
+        <el-table-column prop="merchantName" label="所属商家" show-overflow-tooltip />
+        <el-table-column prop="soldCount" label="销量" width="90" />
+        <el-table-column label="销售额" width="120">
+          <template #default="{ row }">¥{{ formatFen(row.totalAmount) }}</template>
         </el-table-column>
       </el-table>
     </el-card>
@@ -211,36 +269,122 @@ const statCards = computed(() => [
 </template>
 
 <style scoped>
-.page-title {
+.dashboard {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard.fullscreen {
+  background: var(--bg-page);
+  inset: 0;
+  overflow: auto;
+  padding: 24px;
+  position: fixed;
+  z-index: 50;
+}
+
+.dashboard-head {
+  align-items: flex-end;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.dashboard-head h1 {
   font-size: 22px;
-  margin: 0 0 24px 0;
+  margin: 0 0 6px;
 }
-.card-row {
-  margin-bottom: 20px;
+
+.dashboard-head p {
+  color: var(--text-secondary);
+  margin: 0;
 }
-.chart-card {
-  margin-bottom: 20px;
+
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
 }
-.stat-card {
-  text-align: center;
-  transition: transform var(--transition-base), box-shadow var(--transition-base);
+
+.stat-grid,
+.today-grid,
+.rank-grid,
+.chart-grid {
+  display: grid;
+  gap: 16px;
 }
-.stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-lg) !important;
+
+.stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.stat-value {
-  font-size: 36px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+
+.today-grid,
+.rank-grid,
+.chart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.stat-label {
+
+.stat-card,
+.today-grid article {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.stat-card span,
+.today-grid span {
+  color: var(--text-secondary);
+  display: block;
   font-size: 13px;
-  color: var(--text-muted);
+}
+
+.stat-card strong,
+.today-grid strong {
+  display: block;
+  font-size: 28px;
   margin-top: 8px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-weight: 500;
+}
+
+.stat-card.orange strong { color: #f97316; }
+.stat-card.teal strong { color: #0d9488; }
+.stat-card.violet strong { color: #7c3aed; }
+.stat-card.green strong { color: #059669; }
+
+.chart-card.wide {
+  grid-column: span 1;
+}
+
+.chart {
+  height: 320px;
+}
+
+.fullscreen .chart {
+  height: 420px;
+}
+
+@media (max-width: 1100px) {
+  .stat-grid,
+  .today-grid,
+  .rank-grid,
+  .chart-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-head,
+  .head-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stat-grid,
+  .today-grid,
+  .rank-grid,
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { api, unwrap } from '../../api/client'
+import { onMounted, reactive, ref } from 'vue'
+import { listAdminOrders } from '../../api/admin'
 import { ElMessage } from 'element-plus'
 
 const orders = ref([])
@@ -8,56 +8,77 @@ const total = ref(0)
 const page = ref(1)
 const size = ref(10)
 const loading = ref(false)
-const filterStatus = ref('')
+const filters = reactive({
+  status: '',
+  keyword: '',
+  dateRange: []
+})
 
 const statusOptions = [
-  { label: '全部', value: '' },
+  { label: '全部状态', value: '' },
   { label: '待支付', value: 'PENDING_PAYMENT' },
-  { label: '已支付', value: 'PAID' },
+  { label: '待接单', value: 'PAID' },
   { label: '已接单', value: 'ACCEPTED' },
-  { label: '已完成', value: 'COMPLETED' }
+  { label: '已完成', value: 'COMPLETED' },
+  { label: '退款中', value: 'REFUND_REQUESTED' },
+  { label: '已退款', value: 'REFUNDED' }
 ]
 
 const statusTagTypes = {
-  PENDING_PAYMENT: 'warning', PAID: 'primary',
-  ACCEPTED: 'info', COMPLETED: 'success'
+  PENDING_PAYMENT: 'warning',
+  PAID: 'primary',
+  ACCEPTED: 'info',
+  COMPLETED: 'success',
+  REFUND_REQUESTED: 'warning',
+  REFUNDED: 'danger'
 }
-const statusLabels = {
-  PENDING_PAYMENT: '待支付', PAID: '已支付',
-  ACCEPTED: '已接单', COMPLETED: '已完成'
-}
+
+const statusLabels = Object.fromEntries(statusOptions.filter((item) => item.value).map((item) => [item.value, item.label]))
 
 async function load() {
   loading.value = true
   try {
-    const params = { page: page.value, size: size.value }
-    if (filterStatus.value) params.status = filterStatus.value
-    const data = await api.get('/admin/orders', { params }).then(unwrap)
+    const params = {
+      page: page.value,
+      size: size.value,
+      status: filters.status || undefined,
+      keyword: filters.keyword.trim() || undefined,
+      startDate: filters.dateRange?.[0],
+      endDate: filters.dateRange?.[1]
+    }
+    const data = await listAdminOrders(params)
     orders.value = data.records
     total.value = data.total
-  } catch (e) {
+  } catch {
     ElMessage.error('加载订单列表失败')
   } finally {
     loading.value = false
   }
 }
 
-function onFilterChange() {
+function search() {
   page.value = 1
   load()
 }
 
-function onPageChange(p) {
-  page.value = p
+function resetFilters() {
+  filters.status = ''
+  filters.keyword = ''
+  filters.dateRange = []
+  search()
+}
+
+function onPageChange(value) {
+  page.value = value
   load()
 }
 
-function formatFen(v) {
-  return v ? (v / 100).toFixed(2) : '0.00'
+function formatFen(value) {
+  return value ? (value / 100).toFixed(2) : '0.00'
 }
 
-function formatTime(t) {
-  return t ? new Date(t).toLocaleString('zh-CN') : '-'
+function formatTime(value) {
+  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-'
 }
 
 onMounted(load)
@@ -65,44 +86,77 @@ onMounted(load)
 
 <template>
   <div class="admin-page">
-    <h1 class="page-title">订单管理</h1>
-    <el-card shadow="hover">
-      <div class="toolbar">
-        <el-select v-model="filterStatus" placeholder="订单状态" clearable @change="onFilterChange" style="width: 160px;">
-          <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
-        </el-select>
+    <section class="page-head">
+      <div>
+        <h1>订单管理</h1>
+        <p>按状态、时间和关键词查看平台订单；此页面仅用于运营观察。</p>
       </div>
-      <el-table :data="orders" stripe v-loading="loading" size="small">
-        <el-table-column prop="id" label="订单号" width="80" />
-        <el-table-column prop="userId" label="用户ID" width="80" />
-        <el-table-column prop="merchantId" label="商家ID" width="80" />
-        <el-table-column label="金额(元)" width="100">
+      <el-button :loading="loading" @click="load">刷新</el-button>
+    </section>
+
+    <el-card shadow="never">
+      <div class="toolbar">
+        <el-input v-model="filters.keyword" clearable placeholder="搜索订单号、用户、商家或地址" style="max-width: 300px" @keyup.enter="search" />
+        <el-select v-model="filters.status" placeholder="订单状态" clearable style="width: 150px" @change="search">
+          <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+        <el-date-picker
+          v-model="filters.dateRange"
+          type="daterange"
+          value-format="YYYY-MM-DD"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          style="width: 260px"
+          @change="search"
+        />
+        <el-button type="primary" @click="search">查询</el-button>
+        <el-button @click="resetFilters">重置</el-button>
+      </div>
+
+      <el-table :data="orders" stripe v-loading="loading" size="small" empty-text="暂无匹配订单">
+        <el-table-column prop="id" label="订单号" width="90" />
+        <el-table-column prop="userId" label="用户" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="merchantId" label="商家ID" width="90" />
+        <el-table-column label="金额" width="110">
           <template #default="{ row }">¥{{ formatFen(row.totalPrice) }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="110">
           <template #default="{ row }">
-            <el-tag :type="statusTagTypes[row.status]" size="small">
+            <el-tag :type="statusTagTypes[row.status] || 'info'" size="small">
               {{ statusLabels[row.status] || row.status }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="180">
+        <el-table-column prop="deliveryAddress" label="配送地址" min-width="190" show-overflow-tooltip />
+        <el-table-column prop="rejectReason" label="拒单原因" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.rejectReason || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="refundStatus" label="退款状态" width="110">
+          <template #default="{ row }">{{ row.refundStatus || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="下单时间" width="170">
           <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
         </el-table-column>
       </el-table>
+
       <el-pagination
         v-model:current-page="page"
         :page-size="size"
         :total="total"
         layout="total, prev, pager, next"
         @current-change="onPageChange"
-        style="margin-top: 16px; justify-content: flex-end;"
+        class="pager"
       />
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.page-title { font-size: 22px; margin: 0 0 20px 0; }
-.toolbar { margin-bottom: 16px; }
+.admin-page { display: grid; gap: 16px; }
+.page-head { align-items: flex-end; display: flex; justify-content: space-between; }
+.page-head h1 { font-size: 22px; margin: 0 0 6px; }
+.page-head p { color: var(--text-secondary); margin: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.pager { justify-content: flex-end; margin-top: 16px; }
 </style>

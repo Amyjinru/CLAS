@@ -7,10 +7,10 @@ import com.clas.mapper.*;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -50,6 +50,10 @@ public class StatisticsService {
      * 仪表盘汇总数据
      */
     public DashboardStats getDashboardStats() {
+        return getDashboardStats(null, null);
+    }
+
+    public DashboardStats getDashboardStats(LocalDate startDate, LocalDate endDate) {
         Long totalUsers = userMapper.selectCount(null);
         Long totalMerchants = merchantMapper.selectCount(null);
         Long totalOrders = ordersMapper.selectCount(null);
@@ -64,8 +68,9 @@ public class StatisticsService {
         }
 
         // 今日数据
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
-        LocalDateTime todayEnd = LocalDate.now().atTime(LocalTime.MAX);
+        DateRange range = resolveRange(startDate, endDate);
+        LocalDateTime todayStart = range.startDate().atStartOfDay();
+        LocalDateTime todayEnd = range.endDate().atTime(LocalTime.MAX);
 
         Long todayOrders = ordersMapper.selectCount(
             new LambdaQueryWrapper<Orders>()
@@ -102,8 +107,15 @@ public class StatisticsService {
      * 订单统计：按状态分布 + 近7天每日订单数
      */
     public OrderStatsDTO getOrderStats() {
+        return getOrderStats(null, null);
+    }
+
+    public OrderStatsDTO getOrderStats(LocalDate startDate, LocalDate endDate) {
         // 各状态数量
-        List<Orders> allOrders = ordersMapper.selectList(null);
+        DateRange range = resolveRange(startDate, endDate);
+        List<Orders> allOrders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
+            .ge(Orders::getCreateTime, range.startDate().atStartOfDay())
+            .le(Orders::getCreateTime, range.endDate().atTime(LocalTime.MAX)));
         Map<String, Long> statusMap = allOrders.stream()
             .collect(Collectors.groupingBy(
                 o -> o.getStatus() != null ? o.getStatus() : "UNKNOWN",
@@ -116,16 +128,14 @@ public class StatisticsService {
 
         // 近7天每日订单数
         List<OrderStatsDTO.DailyCount> dailyOrders = new ArrayList<>();
-        for (int i = 6; i >= 0; i--) {
-            LocalDate date = LocalDate.now().minusDays(i);
+        for (LocalDate date : daysInRange(range)) {
             LocalDateTime dayStart = date.atStartOfDay();
             LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
 
-            List<Orders> dayOrders = ordersMapper.selectList(
-                new LambdaQueryWrapper<Orders>()
-                    .ge(Orders::getCreateTime, dayStart)
-                    .le(Orders::getCreateTime, dayEnd)
-            );
+            List<Orders> dayOrders = allOrders.stream()
+                .filter(o -> o.getCreateTime() != null)
+                .filter(o -> !o.getCreateTime().isBefore(dayStart) && !o.getCreateTime().isAfter(dayEnd))
+                .toList();
             long count = dayOrders.size();
             long amount = dayOrders.stream()
                 .mapToLong(o -> o.getTotalPrice() != null ? o.getTotalPrice() : 0)
@@ -178,6 +188,48 @@ public class StatisticsService {
         totalSales = allOrders.stream()
             .filter(o -> !"PENDING_PAYMENT".equals(o.getStatus()))
             .mapToLong(o -> o.getTotalPrice() != null ? o.getTotalPrice() : 0)
+            .sum();
+
+        return new SalesOverviewDTO(dailySales, totalSales, monthlySales, weeklySales);
+    }
+
+    public SalesOverviewDTO getSalesOverview(LocalDate startDate, LocalDate endDate) {
+        DateRange range = resolveRange(startDate, endDate);
+        List<SalesOverviewDTO.DailySale> dailySales = new ArrayList<>();
+        List<Orders> allOrders = ordersMapper.selectList(null);
+
+        for (LocalDate date : daysInRange(range)) {
+            LocalDateTime dayStart = date.atStartOfDay();
+            LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
+            List<Orders> dayOrders = allOrders.stream()
+                .filter(order -> order.getCreateTime() != null)
+                .filter(order -> !order.getCreateTime().isBefore(dayStart) && !order.getCreateTime().isAfter(dayEnd))
+                .toList();
+            long amount = dayOrders.stream()
+                .filter(order -> !"PENDING_PAYMENT".equals(order.getStatus()))
+                .mapToLong(order -> order.getTotalPrice() != null ? order.getTotalPrice() : 0)
+                .sum();
+            dailySales.add(new SalesOverviewDTO.DailySale(date.toString(), amount, (long) dayOrders.size()));
+        }
+
+        long totalSales = allOrders.stream()
+            .filter(order -> !"PENDING_PAYMENT".equals(order.getStatus()))
+            .mapToLong(order -> order.getTotalPrice() != null ? order.getTotalPrice() : 0)
+            .sum();
+        LocalDate today = LocalDate.now();
+        LocalDate weekStart = today.minusDays(6);
+        LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+        long weeklySales = allOrders.stream()
+            .filter(order -> order.getCreateTime() != null)
+            .filter(order -> !order.getCreateTime().toLocalDate().isBefore(weekStart))
+            .filter(order -> !"PENDING_PAYMENT".equals(order.getStatus()))
+            .mapToLong(order -> order.getTotalPrice() != null ? order.getTotalPrice() : 0)
+            .sum();
+        long monthlySales = allOrders.stream()
+            .filter(order -> order.getCreateTime() != null)
+            .filter(order -> !order.getCreateTime().isBefore(monthStart))
+            .filter(order -> !"PENDING_PAYMENT".equals(order.getStatus()))
+            .mapToLong(order -> order.getTotalPrice() != null ? order.getTotalPrice() : 0)
             .sum();
 
         return new SalesOverviewDTO(dailySales, totalSales, monthlySales, weeklySales);
@@ -337,5 +389,32 @@ public class StatisticsService {
             .toList();
 
         return new MerchantStatsDTO(todayOrders, todaySales, dailySales, topProducts);
+    }
+
+    private DateRange resolveRange(LocalDate startDate, LocalDate endDate) {
+        LocalDate end = endDate == null ? LocalDate.now() : endDate;
+        LocalDate start = startDate == null ? end.minusDays(6) : startDate;
+        if (start.isAfter(end)) {
+            LocalDate tmp = start;
+            start = end;
+            end = tmp;
+        }
+        if (ChronoUnit.DAYS.between(start, end) > 30) {
+            start = end.minusDays(30);
+        }
+        return new DateRange(start, end);
+    }
+
+    private List<LocalDate> daysInRange(DateRange range) {
+        List<LocalDate> days = new ArrayList<>();
+        LocalDate cursor = range.startDate();
+        while (!cursor.isAfter(range.endDate())) {
+            days.add(cursor);
+            cursor = cursor.plusDays(1);
+        }
+        return days;
+    }
+
+    private record DateRange(LocalDate startDate, LocalDate endDate) {
     }
 }

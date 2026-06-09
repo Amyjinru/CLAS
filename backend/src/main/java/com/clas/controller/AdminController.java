@@ -17,9 +17,12 @@ import com.clas.service.PenaltyService;
 import com.clas.service.ReviewService;
 import com.clas.service.StatisticsService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
@@ -70,20 +73,29 @@ public class AdminController {
     // ==================== 仪表盘 ====================
 
     @GetMapping("/dashboard")
-    public Result<DashboardStats> dashboard() {
-        return Result.ok(statisticsService.getDashboardStats());
+    public Result<DashboardStats> dashboard(
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        return Result.ok(statisticsService.getDashboardStats(startDate, endDate));
     }
 
     // ==================== 订单统计 ====================
 
     @GetMapping("/stats/orders")
-    public Result<OrderStatsDTO> orderStats() {
-        return Result.ok(statisticsService.getOrderStats());
+    public Result<OrderStatsDTO> orderStats(
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        return Result.ok(statisticsService.getOrderStats(startDate, endDate));
     }
 
     @GetMapping("/stats/sales")
-    public Result<SalesOverviewDTO> salesOverview() {
-        return Result.ok(statisticsService.getSalesOverview());
+    public Result<SalesOverviewDTO> salesOverview(
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        return Result.ok(statisticsService.getSalesOverview(startDate, endDate));
     }
 
     @GetMapping("/stats/merchants")
@@ -102,11 +114,34 @@ public class AdminController {
     public Result<Map<String, Object>> listOrders(
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int size,
-        @RequestParam(required = false) String status
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+        @RequestParam(required = false) String keyword
     ) {
         LambdaQueryWrapper<Orders> wrapper = new LambdaQueryWrapper<>();
         if (status != null && !status.isBlank()) {
             wrapper.eq(Orders::getStatus, status);
+        }
+        if (startDate != null) {
+            wrapper.ge(Orders::getCreateTime, startDate.atStartOfDay());
+        }
+        if (endDate != null) {
+            wrapper.le(Orders::getCreateTime, endDate.atTime(LocalTime.MAX));
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            String normalizedKeyword = keyword.trim();
+            wrapper.and(w -> {
+                w.like(Orders::getUserId, normalizedKeyword)
+                    .or()
+                    .like(Orders::getDeliveryAddress, normalizedKeyword);
+                try {
+                    Long numeric = Long.valueOf(normalizedKeyword);
+                    w.or().eq(Orders::getId, numeric).or().eq(Orders::getMerchantId, numeric);
+                } catch (NumberFormatException ignored) {
+                    // Non-numeric keywords only search text fields.
+                }
+            });
         }
         wrapper.orderByDesc(Orders::getCreateTime);
 
@@ -124,9 +159,26 @@ public class AdminController {
     @GetMapping("/users")
     public Result<Map<String, Object>> listUsers(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int size
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(required = false) String role,
+        @RequestParam(required = false) Boolean enabled,
+        @RequestParam(required = false) String keyword
     ) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        if (role != null && !role.isBlank()) {
+            wrapper.eq(User::getRole, role);
+        }
+        if (enabled != null) {
+            wrapper.eq(User::getEnabled, enabled);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            String normalizedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(User::getPhone, normalizedKeyword)
+                .or()
+                .like(User::getUsername, normalizedKeyword)
+                .or()
+                .like(User::getNickname, normalizedKeyword));
+        }
         wrapper.orderByAsc(User::getPhone);
         wrapper.select(User.class, info -> !"password".equals(info.getColumn()));
 
@@ -156,9 +208,22 @@ public class AdminController {
     @GetMapping("/reviews")
     public Result<Map<String, Object>> listReviews(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int size
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(required = false) String reportStatus,
+        @RequestParam(required = false) String keyword
     ) {
         LambdaQueryWrapper<Review> wrapper = new LambdaQueryWrapper<>();
+        if (reportStatus != null && !reportStatus.isBlank()) {
+            wrapper.eq(Review::getReportStatus, reportStatus);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            String normalizedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(Review::getUserId, normalizedKeyword)
+                .or()
+                .like(Review::getContent, normalizedKeyword)
+                .or()
+                .like(Review::getReportReason, normalizedKeyword));
+        }
         wrapper.orderByDesc(Review::getId);
 
         Page<Review> result = reviewMapper.selectPage(new Page<>(page, size), wrapper);

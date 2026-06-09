@@ -103,11 +103,11 @@ public class MerchantController {
     public Result<Map<String, Object>> getMyAuditStatus() {
         String loggedInUserId = UserContext.getUserId();
         if (loggedInUserId == null) {
-            throw new BusinessException("鏈櫥褰曪紝璇峰厛鐧诲綍");
+            throw new BusinessException("未登录，请先登录");
         }
         MerchantResponse merchant = merchantService.getMerchantByUserId(loggedInUserId);
         if (merchant == null) {
-            throw new BusinessException("褰撳墠鐢ㄦ埛鏈叆椹讳负鍟嗗");
+            throw new BusinessException("当前用户未入驻为商家");
         }
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", merchant.status());
