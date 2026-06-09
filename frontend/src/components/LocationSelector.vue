@@ -3,6 +3,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createAddress } from '../api/clas'
 import { hasAmapKey, loadAmap } from '../utils/amap'
+import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 
 const props = defineProps({
   modelValue: {
@@ -17,6 +18,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'confirm'])
 
+const mode = ref('auto')
 const locating = ref(false)
 const loadingDistrict = ref(false)
 const provinces = ref([])
@@ -32,8 +34,10 @@ const current = reactive({
   street: '',
   address: '',
   longitude: null,
-  latitude: null
+  latitude: null,
+  source: ''
 })
+const selectedLocation = ref(null)
 const saveForm = reactive({
   contactName: '',
   phone: '',
@@ -45,7 +49,9 @@ const districtCache = new Map()
 
 function syncCurrent(next) {
   if (!next) return
-  Object.assign(current, next)
+  const normalized = normalizeLocation(next, next.source || 'manual')
+  Object.assign(current, normalized)
+  mode.value = normalized.source === 'auto' ? 'auto' : 'manual'
   selectedProvince.value = current.province
   selectedCity.value = current.city
   selectedDistrict.value = current.district
@@ -57,14 +63,69 @@ function syncCurrent(next) {
       current.street = current.address.substring(prefix.length)
     }
   }
+  selectedLocation.value = normalizeLocation(current, current.source || 'manual')
 }
 
 function updateFullAddress() {
   current.address = `${current.province}${current.city}${current.district}${current.street}`
-  emit('update:modelValue', { ...current })
 }
 
 watch(() => current.street, updateFullAddress)
+
+function hasCoordinate(longitude, latitude) {
+  return longitude !== null && longitude !== undefined && longitude !== ''
+    && latitude !== null && latitude !== undefined && latitude !== ''
+}
+
+function normalizeLocation(location, source = mode.value) {
+  const normalizedSource = source === 'auto' ? 'auto' : 'manual'
+  const province = location?.province || ''
+  const city = location?.city || ''
+  const district = location?.district || ''
+  const street = location?.street || ''
+  const address = location?.address || `${province}${city}${district}${street}`
+  return {
+    province,
+    city,
+    district,
+    street,
+    address,
+    longitude: location?.longitude ?? null,
+    latitude: location?.latitude ?? null,
+    source: normalizedSource
+  }
+}
+
+function emitSelection(location, source, shouldConfirm = false) {
+  const next = normalizeLocation(location, source)
+  selectedLocation.value = next
+  Object.assign(current, next)
+  emit('update:modelValue', next)
+  if (shouldConfirm) {
+    emit('confirm', next)
+  }
+}
+
+function confirmSelectedLocation() {
+  if (!selectedLocation.value?.address || !hasCoordinate(selectedLocation.value.longitude, selectedLocation.value.latitude)) {
+    ElMessage.warning('请先生成可用地址')
+    return
+  }
+  emit('confirm', { ...selectedLocation.value })
+}
+
+function sortAdministrativeAreas(items) {
+  return [...(items || [])].sort((a, b) => (a.name || '').localeCompare(
+    b.name || '',
+    'zh-Hans-CN-u-co-pinyin',
+    { sensitivity: 'base' }
+  ))
+}
+
+function markManualDraft() {
+  mode.value = 'manual'
+  current.source = 'manual'
+}
 
 async function ensureAmap() {
   if (!hasAmapKey()) {
@@ -88,7 +149,7 @@ function queryDistrict(keyword, level) {
       extensions: 'base'
     })
     search.search(keyword, (status, result) => {
-      const districts = status === 'complete' ? result?.districtList?.[0]?.districtList || [] : []
+      const districts = status === 'complete' ? sortAdministrativeAreas(result?.districtList?.[0]?.districtList || []) : []
       districtCache.set(cacheKey, districts)
       resolve(districts)
     })
@@ -99,7 +160,7 @@ async function loadProvinces() {
   try {
     await ensureAmap()
     loadingDistrict.value = true
-    provinces.value = await queryDistrict('中国', 'country')
+    provinces.value = sortAdministrativeAreas(await queryDistrict('中国', 'country'))
   } catch {
     provinces.value = []
   } finally {
@@ -108,33 +169,46 @@ async function loadProvinces() {
 }
 
 async function selectProvince(province) {
+  mode.value = 'manual'
   selectedProvince.value = province.name
   selectedCity.value = ''
   selectedDistrict.value = ''
-  cities.value = await queryDistrict(province.adcode, 'province')
+  cities.value = sortAdministrativeAreas(await queryDistrict(province.adcode, 'province'))
   districts.value = []
   current.province = province.name
   current.city = ''
   current.district = ''
+  current.longitude = null
+  current.latitude = null
+  current.source = 'manual'
   updateFullAddress()
 }
 
 async function selectCity(city) {
+  mode.value = 'manual'
   selectedCity.value = city.name
   selectedDistrict.value = ''
-  districts.value = await queryDistrict(city.adcode, 'city')
+  districts.value = sortAdministrativeAreas(await queryDistrict(city.adcode, 'city'))
   current.city = city.name
   current.district = ''
+  current.longitude = null
+  current.latitude = null
+  current.source = 'manual'
   updateFullAddress()
 }
 
 function selectDistrict(district) {
+  mode.value = 'manual'
   selectedDistrict.value = district.name
   current.district = district.name
+  current.longitude = null
+  current.latitude = null
+  current.source = 'manual'
   updateFullAddress()
 }
 
 async function locateCurrent() {
+  mode.value = 'auto'
   try {
     await ensureAmap()
     locating.value = true
@@ -146,52 +220,37 @@ async function locateCurrent() {
     geolocation.getCurrentPosition(async (status, result) => {
       locating.value = false
       if (status !== 'complete') {
-        ElMessage.warning('自动定位失败，请手动选择位置')
+        ElMessage.warning(current.address ? '自动定位失败，已保留当前收货位置' : '自动定位失败，请手动选择位置')
         return
       }
       
-      const component = result.addressComponent || {}
-      const provinceName = component.province || ''
-      const cityName = Array.isArray(component.city) ? component.province || '' : component.city || component.province || ''
-      const districtName = component.district || ''
+      const autoLocation = await resolveAutoLocationFromAmap(AMapRef, result)
       
       // Update basic fields
-      current.province = provinceName
-      current.city = cityName
-      current.district = districtName
-      current.longitude = result.position.lng
-      current.latitude = result.position.lat
+      Object.assign(current, autoLocation)
       
       // Set selection state for wheels
-      selectedProvince.value = provinceName
-      selectedCity.value = cityName
-      selectedDistrict.value = districtName
+      selectedProvince.value = current.province
+      selectedCity.value = current.city
+      selectedDistrict.value = current.district
       
       // Load wheels data for the UI
-      const provinceObj = provinces.value.find(p => p.name === provinceName)
+      const provinceObj = provinces.value.find(p => p.name === current.province)
       if (provinceObj) {
-        cities.value = await queryDistrict(provinceObj.adcode, 'province')
-        const cityObj = cities.value.find(c => c.name === cityName)
+        cities.value = sortAdministrativeAreas(await queryDistrict(provinceObj.adcode, 'province'))
+        const cityObj = cities.value.find(c => c.name === current.city)
         if (cityObj) {
-          districts.value = await queryDistrict(cityObj.adcode, 'city')
+          districts.value = sortAdministrativeAreas(await queryDistrict(cityObj.adcode, 'city'))
         }
-      }
-
-      // Calculate street
-      const fullAddress = result.formattedAddress || ''
-      const prefix = `${provinceName}${cityName}${districtName}`
-      if (fullAddress.startsWith(prefix)) {
-        current.street = fullAddress.substring(prefix.length)
-      } else {
-        current.street = fullAddress
       }
       
       updateFullAddress()
+      emitSelection(current, 'auto')
       ElMessage.success('已获取当前位置')
     })
   } catch {
     locating.value = false
-    ElMessage.warning('未配置或无法加载高德地图')
+    ElMessage.warning(current.address ? '未配置或无法加载高德地图，已保留当前收货位置' : '未配置或无法加载高德地图，请手动选择位置')
   }
 }
 
@@ -214,6 +273,7 @@ async function geocode() {
 }
 
 async function confirmLocation() {
+  mode.value = 'manual'
   if (!current.province || !current.city || !current.district) {
     ElMessage.warning('请完整选择省市区')
     return
@@ -229,16 +289,22 @@ async function confirmLocation() {
     return
   }
   
-  emit('confirm', { ...current })
+  emitSelection(current, 'manual', true)
 }
 
 async function saveAddress() {
+  const contactName = saveForm.contactName.trim()
+  const phone = saveForm.phone.trim()
   if (!current.province || !current.city || !current.district || !current.street) {
     ElMessage.warning('请完善地址信息')
     return
   }
-  if (!saveForm.contactName || !saveForm.phone) {
-    ElMessage.warning('请填写联系人和电话')
+  if (!contactName) {
+    ElMessage.warning('请填写联系人')
+    return
+  }
+  if (!phone) {
+    ElMessage.warning('请填写联系电话')
     return
   }
   
@@ -247,10 +313,14 @@ async function saveAddress() {
     ElMessage.warning('无法解析该地址的坐标，请检查地址是否正确')
     return
   }
+  if (!hasCoordinate(current.longitude, current.latitude)) {
+    ElMessage.warning('请确认收货地址地图位置')
+    return
+  }
 
   await createAddress({
-    contactName: saveForm.contactName,
-    phone: saveForm.phone,
+    contactName,
+    phone,
     address: current.address,
     longitude: current.longitude,
     latitude: current.latitude,
@@ -269,62 +339,110 @@ onMounted(async () => {
 
 <template>
   <div class="location-selector">
-    <div class="location-actions top-actions">
-      <el-button type="primary" plain :loading="locating" @click="locateCurrent">
-        自动定位
-      </el-button>
-      <span class="tip-text">快速获取当前位置</span>
-    </div>
+    <el-segmented
+      v-model="mode"
+      :options="[
+        { label: '自动定位', value: 'auto' },
+        { label: '手动选择', value: 'manual' }
+      ]"
+      class="mode-switch"
+    />
 
-    <div class="district-picker-label">或手动选择省市区：</div>
-    <div class="district-picker" v-loading="loadingDistrict">
-      <div class="wheel">
-        <button
-          v-for="province in provinces"
-          :key="province.adcode"
-          type="button"
-          :class="{ active: selectedProvince === province.name }"
-          @click="selectProvince(province)"
+    <div v-if="mode === 'auto'" class="mode-panel auto-panel">
+      <div class="location-actions top-actions">
+        <el-button type="primary" plain :loading="locating" @click="locateCurrent">
+          自动定位
+        </el-button>
+        <el-button
+          v-if="selectedLocation?.source === 'auto'"
+          type="primary"
+          @click="confirmSelectedLocation"
         >
-          {{ province.name }}
-        </button>
-      </div>
-      <div class="wheel">
-        <button
-          v-for="city in cities"
-          :key="city.adcode"
-          type="button"
-          :class="{ active: selectedCity === city.name }"
-          @click="selectCity(city)"
-        >
-          {{ city.name }}
-        </button>
-      </div>
-      <div class="wheel">
-        <button
-          v-for="district in districts"
-          :key="district.adcode"
-          type="button"
-          :class="{ active: selectedDistrict === district.name }"
-          @click="selectDistrict(district)"
-        >
-          {{ district.name }}
-        </button>
+          确认使用自动定位
+        </el-button>
+        <span class="tip-text">快速获取当前位置并汇成最终地址</span>
       </div>
     </div>
 
-    <div class="street-input-box">
-      <div class="label">详细街道位置：</div>
-      <el-input
-        v-model="current.street"
-        type="textarea"
-        :rows="2"
-        placeholder="请输入详细的街道、门牌号等信息"
-      />
+    <div v-else class="mode-panel manual-panel">
+      <div class="district-picker-label">手动选择省市区：</div>
+      <div class="district-picker" v-loading="loadingDistrict">
+        <div class="wheel">
+          <button
+            v-for="province in provinces"
+            :key="province.adcode"
+            type="button"
+            :class="{ active: selectedProvince === province.name }"
+            @click="selectProvince(province)"
+          >
+            {{ province.name }}
+          </button>
+        </div>
+        <div class="wheel">
+          <button
+            v-for="city in cities"
+            :key="city.adcode"
+            type="button"
+            :class="{ active: selectedCity === city.name }"
+            @click="selectCity(city)"
+          >
+            {{ city.name }}
+          </button>
+        </div>
+        <div class="wheel">
+          <button
+            v-for="district in districts"
+            :key="district.adcode"
+            type="button"
+            :class="{ active: selectedDistrict === district.name }"
+            @click="selectDistrict(district)"
+          >
+            {{ district.name }}
+          </button>
+        </div>
+      </div>
+
+      <div class="street-input-box">
+        <div class="label">详细街道位置：</div>
+        <el-input
+          v-model="current.street"
+          type="textarea"
+          :rows="2"
+          placeholder="请输入详细的街道、门牌号等信息"
+          @input="markManualDraft"
+        />
+      </div>
+
+      <div class="location-actions">
+        <el-button type="primary" @click="confirmLocation" class="confirm-btn">确定并使用此位置</el-button>
+      </div>
     </div>
 
-    <div class="location-actions">
-      <el-button type="primary" @click="confirmLocation" class="confirm-btn">确定并使用此位置</el-button>
+    <div v-if="selectedLocation?.address" class="final-location-preview">
+      <strong>最终地址</strong>
+      <dl class="location-fields">
+        <div>
+          <dt>省</dt>
+          <dd>{{ selectedLocation.province || '-' }}</dd>
+        </div>
+        <div>
+          <dt>市</dt>
+          <dd>{{ selectedLocation.city || '-' }}</dd>
+        </div>
+        <div>
+          <dt>区</dt>
+          <dd>{{ selectedLocation.district || '-' }}</dd>
+        </div>
+        <div>
+          <dt>街道</dt>
+          <dd>{{ selectedLocation.street || '-' }}</dd>
+        </div>
+      </dl>
+      <span>{{ selectedLocation.address }}</span>
+      <small v-if="hasCoordinate(selectedLocation.longitude, selectedLocation.latitude)">
+        {{ selectedLocation.source === 'auto' ? '自动定位' : '手动选择' }} ·
+        {{ Number(selectedLocation.longitude).toFixed(6) }}, {{ Number(selectedLocation.latitude).toFixed(6) }}
+      </small>
     </div>
 
     <div v-if="saveEnabled" class="save-address-box">
@@ -346,6 +464,15 @@ onMounted(async () => {
   gap: 16px;
   background: #fff;
   padding: 4px;
+}
+
+.mode-switch {
+  align-self: flex-start;
+}
+
+.mode-panel {
+  display: grid;
+  gap: 16px;
 }
 
 .top-actions {
@@ -430,6 +557,47 @@ onMounted(async () => {
   margin-top: 16px;
 }
 
+.final-location-preview {
+  background: #f0f9eb;
+  border: 1px solid #d1edc4;
+  border-radius: 8px;
+  color: #529b2e;
+  display: grid;
+  font-size: 13px;
+  gap: 4px;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
+.final-location-preview small {
+  color: #67c23a;
+}
+
+.location-fields {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.location-fields div {
+  display: grid;
+  gap: 2px;
+}
+
+.location-fields dt {
+  color: #67c23a;
+  font-size: 12px;
+}
+
+.location-fields dd {
+  color: #3f7f24;
+  font-weight: 600;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .save-form {
   display: grid;
   gap: 12px;
@@ -438,6 +606,10 @@ onMounted(async () => {
 @media (max-width: 640px) {
   .district-picker {
     height: 180px;
+  }
+
+  .location-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

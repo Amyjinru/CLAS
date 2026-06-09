@@ -33,14 +33,19 @@ const locationData = reactive({
   street: '',
   address: '',
   longitude: null,
-  latitude: null
+  latitude: null,
+  source: ''
 })
 
 function onLocationConfirm(loc) {
+  syncLocationDraft(loc)
+  ElMessage.success('地址位置已确认')
+}
+
+function syncLocationDraft(loc) {
   form.address = loc.address
   form.longitude = loc.longitude
   form.latitude = loc.latitude
-  ElMessage.success('地址位置已确认')
 }
 
 const phonePattern = /^1[3-9]\d{9}$/
@@ -293,11 +298,9 @@ async function submitForm() {
         <el-form-item label="商家地址" prop="address">
           <LocationSelector
             v-model="locationData"
+            @update:modelValue="syncLocationDraft"
             @confirm="onLocationConfirm"
           />
-          <div v-if="form.address" class="address-preview">
-            已选地址: {{ form.address }}
-          </div>
         </el-form-item>
 
         <el-form-item label="配送范围(米)" prop="deliveryRadiusM">
@@ -404,10 +407,4 @@ async function submitForm() {
   padding-right: 32px;
 }
 
-.address-preview {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #67c23a;
-  line-height: 1.4;
-}
 </style>

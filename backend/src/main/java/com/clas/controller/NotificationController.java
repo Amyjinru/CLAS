@@ -31,4 +31,10 @@ public class NotificationController {
         notificationService.markRead(id);
         return Result.ok();
     }
+
+    @PostMapping("/read-all")
+    public Result<Void> markAllRead() {
+        notificationService.markAllRead();
+        return Result.ok();
+    }
 }
