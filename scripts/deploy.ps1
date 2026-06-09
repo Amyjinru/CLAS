@@ -1,19 +1,27 @@
-﻿# CLAS 一键部署脚本（手动版）
+# CLAS 一键部署脚本
 # 用法: .\scripts\deploy.ps1 ["提交信息"]
 #
-# 注意：项目已配置 GitHub Actions 自动部署（推荐）
-#   推送 dev 分支后自动触发，无需手动操作。
-#   详见 .github/workflows/deploy.yml 和 docs/session-context.md
-#
-# 本脚本作为手动备选方案。
+# 支持两种认证方式（自动检测）:
+#   1. SSH 密钥免密登录（推荐）—— 配置后无需输入密码
+#   2. SSH 密码交互式输入 —— 作为备选
 #
 # 工作流:
 #   本地: git add + commit + push → upstream dev
-#   服务器: SSH 交互式连接 → git pull + clas deploy
+#   服务器: SSH → git pull + clas deploy
 #
 # 前置条件:
 #   - 确保 GitHub 远程已配置 credential.helper（自动凭证）
-#   - SSH 交互式密码输入
+#   - SSH 密钥已配置（推荐）: ssh-keygen + ssh-copy-id root@<server>
+#
+# 首次配置 SSH 免密登录:
+#   ssh-keygen -t rsa -b 4096  (如无密钥)
+#   type $env:USERPROFILE\.ssh\id_rsa.pub | ssh root@8.141.112.182 "mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys"
+#   验证: ssh root@8.141.112.182 "echo success"
+#
+# 故障排查:
+#   如果部署后行为未变，检查是否有残留的旧 Java 进程占用端口:
+#   ssh root@8.141.112.182 "ps aux | grep java | grep -v grep"
+#   如有多个进程，杀掉旧进程后重启: systemctl restart clas-backend
 
 param(
     [string]$CommitMessage = ""
@@ -54,18 +62,51 @@ try {
             Write-Host "用法: .\scripts\deploy.ps1 `"提交信息`"" -ForegroundColor Yellow
             exit 1
         }
-        Prompt-Message "Step 1/3: 无新提交"
+        Prompt-Message "Step 1/3: 无新提交，直接同步服务器"
     }
 } finally { Pop-Location }
 
-# ---- Step 2-3: SSH deploy ----
-Prompt-Message "Step 2/3: SSH 连接服务器 (输入密码)"
-Write-Host "命令: ssh $SERVER_USER@$SERVER_IP" -ForegroundColor Gray
-Write-Host "请在 SSH 密码提示后输入密码，然后服务器会自动执行:" -ForegroundColor Gray
-Write-Host "  cd /opt/clas && git pull upstream dev && clas deploy" -ForegroundColor Gray
-Write-Host ""
+# ---- Step 2: 检查 SSH 连接方式 ----
+# 使用 BatchMode 试探密钥认证是否可用
+$useKey = $false
+$keyTest = ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} "echo KEY_OK" 2>$null
+if ($keyTest -eq "KEY_OK") {
+    $useKey = $true
+    Prompt-Message "Step 2/3: SSH 密钥免密连接"
+} else {
+    Prompt-Message "Step 2/3: SSH 密码连接（需输入密码）"
+    Write-Host "提示: 配置免密登录后可跳过此步骤，参见本脚本顶部注释" -ForegroundColor Yellow
+}
 
-ssh ${SERVER_USER}@${SERVER_IP} -o StrictHostKeyChecking=no @"
+# ---- Step 3: 部署 ----
+# 先检查并清理可能残留的旧进程
+if ($useKey) {
+    $cleanup = ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @"
+# 检查是否有多个 Java 进程（可能是旧 nohup 进程残留）
+old_count=\$(ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | wc -l)
+if [ "\$old_count" -gt 0 ]; then
+    echo ">>> 发现 \$old_count 个非 systemd 管理的 Java 进程，正在清理..."
+    ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | awk '{print \$2}' | xargs -r kill -9 2>/dev/null
+    sleep 2
+    systemctl restart clas-backend
+    echo '>>> 已重启服务'
+fi
+"@
+    Write-Host $cleanup
+
+    Prompt-Message "Step 3/3: 同步代码并部署"
+    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @"
+cd /opt/clas
+echo '>>> 拉取最新代码...'
+git pull upstream dev
+echo '>>> 构建并部署...'
+clas deploy 2>&1
+"@
+} else {
+    Prompt-Message "Step 3/3: SSH 连接服务器（输入密码）"
+    Write-Host "命令: ssh $SERVER_USER@$SERVER_IP" -ForegroundColor Gray
+
+    ssh ${SERVER_USER}@${SERVER_IP} -o StrictHostKeyChecking=no @"
 cd /opt/clas
 echo '>>> Connected'
 git stash 2>/dev/null || true
@@ -78,6 +119,7 @@ curl -s http://127.0.0.1:8080/api/health
 echo ''
 echo '>>> Done!'
 "@
+}
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`n================================" -ForegroundColor Green

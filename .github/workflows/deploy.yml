@@ -1,3 +1,13 @@
+# CLAS 自动部署工作流
+# 推送 dev 分支后自动触发，通过 SSH 连接服务器执行部署。
+#
+# 认证方式: SSH 密码（存储在 GitHub Secrets → SSH_PASSWORD）
+#   本地开发机另配置了 SSH 密钥免密登录，可运行 scripts/deploy.ps1 手动部署。
+#
+# 故障排查:
+#   若部署成功但服务行为未变 → 可能是旧 nohup 进程残留占端口
+#   本工作流已内置清理逻辑，部署前自动杀掉非 systemd 管理的 Java 进程
+
 name: Deploy to Cloud Server
 
 on:
@@ -11,19 +21,34 @@ jobs:
     steps:
       - name: Network connectivity check
         run: |
-          echo "Testing TCP reachability to server..."
-          timeout 10 bash -c 'echo >/dev/tcp/8.141.112.182/22 && echo "SSH port reachable" || echo "SSH port unreachable"'
+          echo "Testing TCP reachability..."
+          timeout 10 bash -c 'echo >/dev/tcp/8.141.112.182/22 && echo "OK" || echo "UNREACHABLE"'
         continue-on-error: true
 
       - name: Install sshpass
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
 
-      - name: Deploy via SSH
+      - name: Cleanup zombie Java processes & Deploy
         run: |
           sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@8.141.112.182 "
+            echo '>>> 清理残留的非 systemd Java 进程...'
+            old_pids=\$(ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | awk '{print \$2}')
+            if [ -n \"\$old_pids\" ]; then
+              echo \"Killing: \$old_pids\"
+              kill -9 \$old_pids 2>/dev/null || true
+              sleep 2
+              systemctl restart clas-backend
+              echo '>>> 服务已重启'
+            fi
+
             cd /opt/clas
+            echo '>>> 拉取代码...'
             git pull upstream dev
+
+            echo '>>> 构建并部署...'
             clas deploy
+
+            echo '>>> 健康检查...'
             sleep 2
             curl -s http://127.0.0.1:8080/api/health
           "
