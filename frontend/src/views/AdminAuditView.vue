@@ -371,6 +371,11 @@ onMounted(load)
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 14px;
+  align-items: center;
+}
+
+.toolbar :deep(.el-input__wrapper) {
+  height: 32px;
 }
 
 .detail-panel {
