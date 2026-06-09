@@ -179,7 +179,7 @@ onMounted(load)
           v-model="filters.keyword"
           clearable
           placeholder="搜索商家名称、电话、品类或地址"
-          style="max-width: 340px"
+          style="width: 340px"
         />
         <el-select v-model="filters.status" placeholder="状态筛选" clearable style="width: 160px">
           <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
