@@ -45,6 +45,7 @@ public class OrderService {
     private final MerchantMapper merchantMapper;
     private final UserAddressMapper userAddressMapper;
     private final AmapRouteService amapRouteService;
+    private final PenaltyService penaltyService;
 
     public OrderService(
         OrdersMapper ordersMapper,
@@ -54,7 +55,8 @@ public class OrderService {
         NotificationService notificationService,
         MerchantMapper merchantMapper,
         UserAddressMapper userAddressMapper,
-        AmapRouteService amapRouteService
+        AmapRouteService amapRouteService,
+        PenaltyService penaltyService
     ) {
         this.ordersMapper = ordersMapper;
         this.orderItemMapper = orderItemMapper;
@@ -64,10 +66,12 @@ public class OrderService {
         this.merchantMapper = merchantMapper;
         this.userAddressMapper = userAddressMapper;
         this.amapRouteService = amapRouteService;
+        this.penaltyService = penaltyService;
     }
 
     @Transactional
     public OrderResponse create(CreateOrderRequest request) {
+        penaltyService.assertCanUsePlatform(request.userId());
         List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, request.userId()));
         if (cartItems.isEmpty()) {
@@ -115,10 +119,6 @@ public class OrderService {
 
         List<OrderItem> orderItems = merchantCartItems.stream().map(cart -> {
             Product product = products.get(cart.getProductId());
-            int rows = productMapper.deductStock(product.getId(), cart.getQuantity());
-            if (rows == 0) {
-                throw new BusinessException("库存不足：" + product.getName());
-            }
 
             OrderItem orderItem = new OrderItem();
             orderItem.setOrderId(order.getId());
@@ -198,7 +198,9 @@ public class OrderService {
     public Orders cancel(Long orderId) {
         Orders order = requireOrder(orderId);
         requireStatusIn(order, STATUS_PENDING_PAYMENT, STATUS_PAID);
-        restoreOrderStock(orderId);
+        if (STATUS_PAID.equals(order.getStatus())) {
+            restoreOrderStock(orderId);
+        }
         order.setStatus(STATUS_CANCELED);
         ordersMapper.updateById(order);
         return order;
@@ -208,7 +210,9 @@ public class OrderService {
     public Orders cancel(Long orderId, String userId) {
         Orders order = requireUserOrder(orderId, userId);
         requireStatusIn(order, STATUS_PENDING_PAYMENT, STATUS_PAID);
-        restoreOrderStock(orderId);
+        if (STATUS_PAID.equals(order.getStatus())) {
+            restoreOrderStock(orderId);
+        }
         order.setStatus(STATUS_CANCELED);
         ordersMapper.updateById(order);
         return order;
@@ -271,7 +275,7 @@ public class OrderService {
             order.setStatus(STATUS_REFUNDED);
             notificationService.send(order.getUserId(), "退款已通过", "订单 " + orderId + " 已退款。");
         } else {
-            order.setStatus(STATUS_ACCEPTED);
+            order.setStatus(resolveStatusAfterRefundReject(order));
             notificationService.send(order.getUserId(), "退款被拒绝", "订单 " + orderId + " 的退款申请未通过。");
         }
         ordersMapper.updateById(order);
@@ -330,6 +334,30 @@ public class OrderService {
         for (OrderItem item : orderItems) {
             productMapper.restoreStock(item.getProductId(), item.getQuantity());
         }
+    }
+
+    @Transactional
+    public void deductStockForPayment(Long orderId) {
+        List<OrderItem> orderItems = orderItemMapper.selectList(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        for (OrderItem item : orderItems) {
+            Product product = productMapper.selectById(item.getProductId());
+            String productName = product != null ? product.getName() : "商品#" + item.getProductId();
+            int rows = productMapper.deductStock(item.getProductId(), item.getQuantity());
+            if (rows == 0) {
+                throw new BusinessException("库存不足：" + productName);
+            }
+        }
+    }
+
+    private String resolveStatusAfterRefundReject(Orders order) {
+        if ("DELIVERED".equals(order.getDeliveryStatus())) {
+            return STATUS_COMPLETED;
+        }
+        if ("DELIVERING".equals(order.getDeliveryStatus()) || "PREPARING".equals(order.getDeliveryStatus())) {
+            return STATUS_ACCEPTED;
+        }
+        return STATUS_PAID;
     }
 
     private DeliverySnapshot resolveDeliverySnapshot(CreateOrderRequest request) {

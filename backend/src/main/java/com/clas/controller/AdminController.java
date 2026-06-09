@@ -8,8 +8,15 @@ import com.clas.config.RequireRole;
 import com.clas.dto.*;
 import com.clas.entity.*;
 import com.clas.mapper.*;
+import com.clas.entity.Appeal;
+import com.clas.entity.DeletedReviewBackup;
+import com.clas.entity.ReviewDeleteRequest;
+import com.clas.entity.UserPenalty;
+import com.clas.service.AppealService;
+import com.clas.service.PenaltyService;
 import com.clas.service.ReviewService;
 import com.clas.service.StatisticsService;
+import jakarta.validation.Valid;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +40,8 @@ public class AdminController {
     private final ReviewMapper reviewMapper;
     private final ReviewService reviewService;
     private final ProductMapper productMapper;
+    private final PenaltyService penaltyService;
+    private final AppealService appealService;
 
     public AdminController(
         StatisticsService statisticsService,
@@ -42,7 +51,9 @@ public class AdminController {
         MerchantMapper merchantMapper,
         ReviewMapper reviewMapper,
         ReviewService reviewService,
-        ProductMapper productMapper
+        ProductMapper productMapper,
+        PenaltyService penaltyService,
+        AppealService appealService
     ) {
         this.statisticsService = statisticsService;
         this.userMapper = userMapper;
@@ -52,6 +63,8 @@ public class AdminController {
         this.reviewMapper = reviewMapper;
         this.reviewService = reviewService;
         this.productMapper = productMapper;
+        this.penaltyService = penaltyService;
+        this.appealService = appealService;
     }
 
     // ==================== 仪表盘 ====================
@@ -179,22 +192,60 @@ public class AdminController {
     @DeleteMapping("/reviews/{id}")
     @Transactional
     public Result<Void> deleteReview(@PathVariable Long id) {
-        Review review = reviewMapper.selectById(id);
-        if (review == null) {
-            throw new BusinessException("评价不存在");
-        }
-        // 获取关联订单以重新计算商家评分
-        Orders order = ordersMapper.selectById(review.getOrderId());
-        reviewMapper.deleteById(id);
-        // 删除后重新计算商家评分
-        if (order != null) {
-            reviewService.recalculateMerchantScorePublic(order.getMerchantId());
-        }
+        reviewService.adminDeleteReview(id);
         return Result.ok();
     }
 
     @PutMapping("/reviews/{id}/report-status")
     public Result<Review> resolveReviewReport(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return Result.ok(reviewService.resolveReport(id, body.getOrDefault("status", "RESOLVED")));
+    }
+
+    @GetMapping("/reviews/deleted-backups")
+    public Result<List<DeletedReviewBackup>> deletedBackups() {
+        return Result.ok(reviewService.listDeletedBackups());
+    }
+
+    @GetMapping("/reviews/delete-requests")
+    public Result<List<ReviewDeleteRequest>> deleteRequests(@RequestParam(required = false) String status) {
+        return Result.ok(reviewService.listDeleteRequests(status));
+    }
+
+    @PostMapping("/reviews/delete-requests/{id}/process")
+    public Result<Void> processDeleteRequest(
+        @PathVariable Long id,
+        @RequestBody Map<String, Object> body
+    ) {
+        boolean approve = Boolean.TRUE.equals(body.get("approve"));
+        String remarks = body.get("remarks") == null ? null : String.valueOf(body.get("remarks"));
+        reviewService.approveDeleteRequest(id, com.clas.config.UserContext.getUserId(), approve, remarks);
+        return Result.ok();
+    }
+
+    @PostMapping("/users/{phone}/penalties")
+    public Result<UserPenalty> applyPenalty(@PathVariable String phone, @Valid @RequestBody PenaltyRequest request) {
+        PenaltyRequest payload = new PenaltyRequest(phone, request.penaltyType(), request.reason(), request.durationHours());
+        return Result.ok(penaltyService.applyPenalty(payload, com.clas.config.UserContext.getUserId()));
+    }
+
+    @PostMapping("/penalties/{id}/revoke")
+    public Result<Void> revokePenalty(@PathVariable Long id) {
+        penaltyService.revokePenalty(id, com.clas.config.UserContext.getUserId());
+        return Result.ok();
+    }
+
+    @GetMapping("/appeals")
+    public Result<List<Appeal>> listAppeals() {
+        return Result.ok(appealService.listPending());
+    }
+
+    @PostMapping("/appeals/{id}/process")
+    public Result<Appeal> processAppeal(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return Result.ok(appealService.process(
+            id,
+            body.getOrDefault("status", "APPROVED"),
+            body.get("adminReply"),
+            com.clas.config.UserContext.getUserId()
+        ));
     }
 }

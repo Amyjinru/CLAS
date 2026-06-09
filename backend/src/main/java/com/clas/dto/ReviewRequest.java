@@ -1,13 +1,14 @@
 package com.clas.dto;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.util.List;
 
 public record ReviewRequest(
-    @NotNull Long orderId,
+    @jakarta.validation.constraints.NotNull Long orderId,
     String userId,
-    @NotNull @Min(1) @Max(5) Integer score,
-    String content
+    @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(5) Integer score,
+    String content,
+    @Size(max = 9) List<String> images
 ) {
 }

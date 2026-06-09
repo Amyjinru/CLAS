@@ -36,6 +36,7 @@ public class MerchantService {
     private final UserAddressMapper userAddressMapper;
     private final VerificationCodeStore verificationCodeStore;
     private final AmapRouteService amapRouteService;
+    private final RecommendService recommendService;
 
     public MerchantService(
         MerchantMapper merchantMapper,
@@ -43,7 +44,8 @@ public class MerchantService {
         UserMapper userMapper,
         UserAddressMapper userAddressMapper,
         VerificationCodeStore verificationCodeStore,
-        AmapRouteService amapRouteService
+        AmapRouteService amapRouteService,
+        RecommendService recommendService
     ) {
         this.merchantMapper = merchantMapper;
         this.merchantAuditLogMapper = merchantAuditLogMapper;
@@ -51,10 +53,11 @@ public class MerchantService {
         this.userAddressMapper = userAddressMapper;
         this.verificationCodeStore = verificationCodeStore;
         this.amapRouteService = amapRouteService;
+        this.recommendService = recommendService;
     }
 
     public List<MerchantResponse> list() {
-        return search(null, null, "score", null, null, null, false);
+        return search(null, null, "recommend", null, null, null, false);
     }
 
     public List<MerchantResponse> search(String keyword, String category, String sort) {
@@ -90,10 +93,13 @@ public class MerchantService {
             wrapper.orderByAsc(Merchant::getAveragePrice);
         } else if ("latest".equals(normalizedSort)) {
             wrapper.orderByDesc(Merchant::getId);
-        } else if (!distanceSort) {
+        } else if (!distanceSort && !recommendSort) {
             wrapper.orderByDesc(Merchant::getScore);
         }
         List<Merchant> merchants = merchantMapper.selectList(wrapper);
+        if (recommendSort && !distanceSort) {
+            merchants = recommendService.sortByRecommend(merchants, UserContext.getUserId());
+        }
         Coordinate coordinate = resolveCoordinate(latitude, longitude, addressId);
         return merchants.stream()
             .map(merchant -> convertToResponse(merchant, coordinate))

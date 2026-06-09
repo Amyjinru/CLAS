@@ -1,11 +1,15 @@
 package com.clas.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusinessException(BusinessException exception) {
         return Result.fail(exception.getMessage());
@@ -22,7 +26,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception exception) {
-        // 普通异常不直接暴露堆栈或 SQL 等内部信息，前端只需要稳定的兜底提示。
+        log.error("Unhandled exception", exception);
         return Result.fail("系统异常，请稍后重试");
     }
 }

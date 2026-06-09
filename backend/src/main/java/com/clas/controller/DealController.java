@@ -2,7 +2,9 @@ package com.clas.controller;
 
 import com.clas.common.Result;
 import com.clas.config.RequireRole;
+import com.clas.config.UserContext;
 import com.clas.dto.DealRequest;
+import com.clas.dto.PaymentResponse;
 import com.clas.entity.DealOrder;
 import com.clas.entity.GroupDeal;
 import com.clas.service.DealService;
@@ -41,6 +43,19 @@ public class DealController {
     @RequireRole("MERCHANT")
     public Result<GroupDeal> create(@Valid @RequestBody DealRequest request) {
         return Result.ok(dealService.create(request));
+    }
+
+    @GetMapping("/orders/{dealOrderId}/payment-status")
+    @RequireRole("USER")
+    public Result<PaymentResponse> paymentStatus(@PathVariable Long dealOrderId) {
+        return Result.ok(dealService.getDealPaymentStatus(dealOrderId, UserContext.getUserId()));
+    }
+
+    @PostMapping("/orders/{dealOrderId}/pay")
+    @RequireRole("USER")
+    public Result<PaymentResponse> pay(@PathVariable Long dealOrderId, @RequestBody(required = false) Map<String, String> body) {
+        String payMethod = body == null ? null : body.get("payMethod");
+        return Result.ok(dealService.payDealOrder(dealOrderId, UserContext.getUserId(), payMethod));
     }
 
     @PostMapping("/{dealId}/buy")

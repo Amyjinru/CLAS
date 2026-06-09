@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { api, unwrap } from '../../api/client'
+import { applyPenalty } from '../../api/profile'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const users = ref([])
@@ -12,7 +13,7 @@ const loading = ref(false)
 async function load() {
   loading.value = true
   try {
-    const data = await api.get('/admin/users', { params: { page: page.value, size: size.value } }).then(unwrap)
+    const data = await api.get('/admin/users', { params: { page: page.value, size: size.value }, silent: true }).then(unwrap)
     users.value = data.records
     total.value = data.total
   } catch (e) {
@@ -28,11 +29,36 @@ async function toggleStatus(user) {
     await ElMessageBox.confirm(`确定要${action}用户 "${user.username}" 吗？`, '确认操作', {
       confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
     })
-    await api.put(`/admin/users/${user.phone}/status`, { enabled: !user.enabled })
+    await api.put(`/admin/users/${user.phone}/status`, { enabled: !user.enabled }, { silent: true })
     ElMessage.success(`${action}成功`)
     await load()
   } catch (e) {
     if (e !== 'cancel') ElMessage.error('操作失败')
+  }
+}
+
+async function applyUserPenalty(user, type) {
+  const labels = { MUTE: '禁言', BAN: '封禁', SERVICE_STOP: '停止服务' }
+  try {
+    const { value } = await ElMessageBox.prompt(`请输入对 ${user.username} 执行${labels[type]}的原因`, '处罚用户', {
+      confirmButtonText: '确定', cancelButtonText: '取消'
+    })
+    let durationHours = 24
+    if (type !== 'SERVICE_STOP') {
+      const { value: hours } = await ElMessageBox.prompt('请输入处罚时长（小时）', '处罚时长', {
+        confirmButtonText: '确定', cancelButtonText: '取消', inputValue: '24'
+      })
+      durationHours = Number(hours) || 24
+    }
+    await applyPenalty(user.phone, {
+      userId: user.phone,
+      penaltyType: type,
+      reason: value,
+      durationHours
+    })
+    ElMessage.success('处罚已生效')
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error('处罚失败')
   }
 }
 
@@ -52,6 +78,7 @@ onMounted(load)
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="phone" label="手机号" />
+        <el-table-column prop="nickname" label="昵称" />
         <el-table-column prop="role" label="角色" width="100">
           <template #default="{ row }">
             <el-tag :type="row.role === 'ADMIN' ? 'danger' : row.role === 'MERCHANT' ? 'warning' : 'primary'" size="small">
@@ -66,7 +93,7 @@ onMounted(load)
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120">
+        <el-table-column label="操作" width="320">
           <template #default="{ row }">
             <el-button
               :type="row.enabled ? 'danger' : 'success'"
@@ -75,6 +102,9 @@ onMounted(load)
             >
               {{ row.enabled ? '禁用' : '启用' }}
             </el-button>
+            <el-button size="small" @click="applyUserPenalty(row, 'MUTE')">禁言</el-button>
+            <el-button size="small" type="warning" @click="applyUserPenalty(row, 'BAN')">封禁</el-button>
+            <el-button size="small" type="danger" @click="applyUserPenalty(row, 'SERVICE_STOP')">停服</el-button>
           </template>
         </el-table-column>
       </el-table>

@@ -1,8 +1,21 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { createOrder, deleteCartItem, getCart, listAddresses, updateCart } from '../api/clas'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import {
+  cancelOrder,
+  createOrder,
+  deleteCartItem,
+  getCart,
+  listAddresses,
+  listMyDealOrders,
+  listOrders,
+  updateCart
+} from '../api/clas'
 
+const router = useRouter()
 const items = ref([])
+const pendingFoodOrders = ref([])
+const pendingDealOrders = ref([])
 const message = ref('')
 const updatingProductId = ref(null)
 const addresses = ref([])
@@ -10,13 +23,26 @@ const selectedAddressId = ref('')
 
 const total = () => items.value.reduce((sum, item) => sum + item.subtotal, 0)
 const merchantIds = () => [...new Set(items.value.map((item) => item.merchantId).filter(Boolean))]
+const hasPendingPayments = computed(
+  () => pendingFoodOrders.value.length > 0 || pendingDealOrders.value.length > 0
+)
+const hasCartContent = computed(() => items.value.length > 0 || hasPendingPayments.value)
 
 async function load() {
   try {
-    items.value = await getCart()
-    addresses.value = await listAddresses()
+    const [cartItems, orderList, dealList, addressList] = await Promise.all([
+      getCart(),
+      listOrders(),
+      listMyDealOrders(),
+      listAddresses()
+    ])
+    items.value = cartItems
+    pendingFoodOrders.value = orderList.filter((entry) => entry.order.status === 'PENDING_PAYMENT')
+    pendingDealOrders.value = dealList.filter((entry) => entry.status === 'PENDING_PAYMENT')
+    addresses.value = addressList
     selectedAddressId.value = addresses.value.find((item) => item.isDefault)?.id || addresses.value[0]?.id || ''
-  } catch (error) {
+    message.value = ''
+  } catch {
     message.value = '请先登录后查看购物车'
   }
 }
@@ -29,8 +55,8 @@ async function submit() {
   }
   const merchantId = merchantIds()[0]
   const data = await createOrder({ merchantId, addressId: selectedAddressId.value })
-  message.value = `订单 ${data.order.id} 已创建，库存已扣减，请前往支付`
-  await load()
+  message.value = `订单 ${data.order.id} 已创建，请完成支付`
+  await router.push(`/payment/${data.order.id}`)
 }
 
 async function changeQuantity(item, quantity) {
@@ -64,11 +90,17 @@ async function deleteItem(item) {
   }
 }
 
+async function cancelPendingFood(order) {
+  await cancelOrder(order.order.id)
+  message.value = `订单 ${order.order.id} 已取消`
+  await load()
+}
+
 onMounted(load)
 </script>
 
 <template>
-  <div class="cart-container">
+  <div class="user-page cart-page">
     <div class="cart-header">
       <h1>购物车</h1>
       <p v-if="merchantIds().length > 1" class="multi-merchant-warn">
@@ -76,68 +108,111 @@ onMounted(load)
       </p>
     </div>
 
-    <div class="cart-items" v-if="items.length">
-      <div class="cart-item" v-for="item in items" :key="item.productId">
-        <div class="item-main">
-          <div class="item-info">
-            <h2 class="item-name">{{ item.productName }}</h2>
-            <p class="item-meta">库存 {{ item.stock }} · 单价 ¥{{ (item.price / 100).toFixed(2) }}</p>
+    <div class="user-page-split cart-layout">
+      <div class="cart-main">
+        <section v-if="hasPendingPayments" class="pending-section">
+          <div class="section-title">
+            <h2>待支付</h2>
+            <span>下单或购买后未完成的订单会集中显示在这里</span>
           </div>
-          <div class="item-price">¥{{ (item.subtotal / 100).toFixed(2) }}</div>
+
+          <div class="pending-grid">
+            <article v-for="order in pendingFoodOrders" :key="`food-${order.order.id}`" class="pending-card">
+              <div class="pending-main">
+                <div>
+                  <strong>外卖订单 #{{ order.order.id }}</strong>
+                  <p>{{ order.items.length }} 件商品 · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p>
+                </div>
+                <span class="pending-tag">待支付</span>
+              </div>
+              <div class="pending-actions">
+                <RouterLink class="pay-btn" :to="`/payment/${order.order.id}`">去支付</RouterLink>
+                <button class="cancel-btn" type="button" @click="cancelPendingFood(order)">取消订单</button>
+              </div>
+            </article>
+
+            <article v-for="deal in pendingDealOrders" :key="`deal-${deal.id}`" class="pending-card">
+              <div class="pending-main">
+                <div>
+                  <strong>团购券订单 #{{ deal.id }}</strong>
+                  <p>团购商品 #{{ deal.dealId }} · ¥{{ (deal.payAmount / 100).toFixed(2) }}</p>
+                </div>
+                <span class="pending-tag deal">团购待支付</span>
+              </div>
+              <div class="pending-actions">
+                <RouterLink class="pay-btn" :to="`/payment/deal/${deal.id}`">去支付</RouterLink>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <div class="cart-items" v-if="items.length">
+          <div class="section-title compact">
+            <h2>购物车商品</h2>
+          </div>
+          <div class="cart-item" v-for="item in items" :key="item.productId">
+            <div class="item-main">
+              <div class="item-info">
+                <h2 class="item-name">{{ item.productName }}</h2>
+                <p class="item-meta">库存 {{ item.stock }} · 单价 ¥{{ (item.price / 100).toFixed(2) }}</p>
+              </div>
+              <div class="item-price">¥{{ (item.subtotal / 100).toFixed(2) }}</div>
+            </div>
+            <div class="cart-actions">
+              <label class="quantity-field">
+                数量
+                <input
+                  type="number"
+                  min="1"
+                  :max="item.stock"
+                  :value="item.quantity"
+                  :disabled="updatingProductId === item.productId"
+                  @change="changeQuantity(item, $event.target.value)"
+                />
+              </label>
+              <button
+                class="delete-btn"
+                :disabled="updatingProductId === item.productId"
+                @click="deleteItem(item)"
+              >
+                删除
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="cart-actions">
-          <label class="quantity-field">
-            数量
-            <input
-              type="number"
-              min="1"
-              :max="item.stock"
-              :value="item.quantity"
-              :disabled="updatingProductId === item.productId"
-              @change="changeQuantity(item, $event.target.value)"
-            />
+
+        <div class="cart-empty" v-if="!hasCartContent">
+          <p>购物车暂无商品，也没有待支付订单</p>
+        </div>
+
+        <p class="cart-message" v-if="message">{{ message }}</p>
+      </div>
+
+      <aside v-if="items.length" class="cart-sidebar">
+        <footer class="checkout-bar checkout-bar-side">
+          <label class="address-select address-select-block">
+            <span class="total-label">配送地址</span>
+            <select v-model="selectedAddressId">
+              <option value="">暂不选择</option>
+              <option v-for="item in addresses" :key="item.id" :value="item.id">
+                {{ item.contactName }} · {{ item.address }}
+              </option>
+            </select>
           </label>
-          <button
-            class="delete-btn"
-            :disabled="updatingProductId === item.productId"
-            @click="deleteItem(item)"
-          >
-            删除
-          </button>
-        </div>
-      </div>
+          <div class="checkout-total">
+            <span class="total-label">合计</span>
+            <span class="total-price">¥{{ (total() / 100).toFixed(2) }}</span>
+          </div>
+          <button class="submit-btn" @click="submit">提交订单</button>
+        </footer>
+      </aside>
     </div>
-
-    <div class="cart-empty" v-else>
-      <p>购物车暂无商品</p>
-    </div>
-
-    <footer class="checkout-bar" v-if="items.length">
-      <label class="address-select">
-        <span class="total-label">配送地址</span>
-        <select v-model="selectedAddressId">
-          <option value="">暂不选择</option>
-          <option v-for="item in addresses" :key="item.id" :value="item.id">
-            {{ item.contactName }} · {{ item.address }}
-          </option>
-        </select>
-      </label>
-      <div class="checkout-total">
-        <span class="total-label">合计</span>
-        <span class="total-price">¥{{ (total() / 100).toFixed(2) }}</span>
-      </div>
-      <button class="submit-btn" @click="submit">提交订单</button>
-    </footer>
-
-    <p class="cart-message" v-if="message">{{ message }}</p>
   </div>
 </template>
 
 <style scoped>
-.cart-container {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px;
+.cart-page {
+  width: 100%;
 }
 
 .cart-header h1 {
@@ -166,6 +241,94 @@ onMounted(load)
   padding: 8px 14px;
   border-radius: var(--radius-sm);
   margin: 12px 0 0 16px;
+}
+
+.section-title {
+  margin: 24px 0 12px;
+}
+.section-title.compact {
+  margin-top: 8px;
+}
+.section-title h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.section-title span {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.pending-section {
+  margin-top: 0;
+}
+
+.pending-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pending-card {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  padding: 16px 18px;
+}
+
+.pending-main {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pending-main p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+
+.pending-tag {
+  background: #fef3c7;
+  border-radius: 999px;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+.pending-tag.deal {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.pending-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.pay-btn {
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  text-decoration: none;
+}
+
+.cancel-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 8px 14px;
 }
 
 .cart-items {
@@ -218,7 +381,6 @@ onMounted(load)
   margin-left: 24px;
 }
 
-/* 购物车操作区：数量输入 + 删除按钮 */
 .cart-actions {
   display: flex;
   align-items: center;
@@ -296,10 +458,29 @@ onMounted(load)
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 20px 24px;
-  margin-top: 20px;
   box-shadow: var(--shadow-md);
+}
+
+.checkout-bar-side {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 16px;
   position: sticky;
-  bottom: 80px;
+  top: 88px;
+}
+
+.address-select-block {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.address-select-block select {
+  max-width: none;
+  width: 100%;
+}
+
+.cart-sidebar {
+  min-width: 0;
 }
 
 .checkout-total {
@@ -345,6 +526,7 @@ onMounted(load)
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;
+  width: 100%;
 }
 .submit-btn:hover {
   background: var(--color-primary-hover);
@@ -366,10 +548,13 @@ onMounted(load)
   border-radius: var(--radius-sm);
 }
 
-@media (max-width: 480px) {
-  .cart-container {
-    padding: 12px;
+@media (max-width: 768px) {
+  .pending-grid {
+    grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 480px) {
   .cart-item {
     padding: 14px 16px;
   }

@@ -1,6 +1,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { deleteAdminReview, listAdminReviews, resolveReviewReport } from '../../api/clas'
+import {
+  deleteAdminReview,
+  listAdminReviews,
+  listReviewDeleteRequests,
+  processReviewDeleteRequest,
+  resolveReviewReport
+} from '../../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const reviews = ref([])
@@ -9,13 +15,91 @@ const page = ref(1)
 const size = ref(10)
 const loading = ref(false)
 
+const deleteRequests = ref([])
+const requestStatus = ref('PENDING')
+const requestLoading = ref(false)
+
+const requestStatusOptions = [
+  { label: '待审核', value: 'PENDING' },
+  { label: '已通过', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+  { label: '全部', value: '' }
+]
+
+const requestStatusMap = {
+  PENDING: { text: '待审核', type: 'warning' },
+  APPROVED: { text: '已通过', type: 'success' },
+  REJECTED: { text: '已驳回', type: 'info' }
+}
+
+const requestTypeMap = {
+  MERCHANT: '商家申请',
+  USER: '用户举报'
+}
+
+function requestSummary(row) {
+  if (row.requestType === 'USER') {
+    return `用户 ${row.reporterUserId || '-'} 举报`
+  }
+  return `商家 #${row.merchantId}`
+}
+
+function requestTargetText(row) {
+  if (row.replyId) {
+    return `评价 #${row.reviewId} / 回复 #${row.replyId}`
+  }
+  return `评价 #${row.reviewId}`
+}
+
+function formatTime(value) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+}
+
+async function loadDeleteRequests() {
+  requestLoading.value = true
+  try {
+    deleteRequests.value = await listReviewDeleteRequests(requestStatus.value || undefined)
+  } catch {
+    ElMessage.error('加载删评申请失败')
+  } finally {
+    requestLoading.value = false
+  }
+}
+
+async function handleProcessRequest(row, approve) {
+  const action = approve ? '通过' : '驳回'
+  try {
+    const { value: remarks } = await ElMessageBox.prompt(
+      `确定${action}${requestSummary(row)} 对 ${requestTargetText(row)} 的删评申请吗？`,
+      `${action}删评申请`,
+      {
+        confirmButtonText: `确认${action}`,
+        cancelButtonText: '取消',
+        inputPlaceholder: '可选：填写处理备注',
+        type: approve ? 'warning' : 'info'
+      }
+    )
+    await processReviewDeleteRequest(row.id, {
+      approve,
+      remarks: remarks || undefined
+    })
+    ElMessage.success(`已${action}该删评申请`)
+    await Promise.all([loadDeleteRequests(), load()])
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('处理失败')
+    }
+  }
+}
+
 async function load() {
   loading.value = true
   try {
     const data = await listAdminReviews({ page: page.value, size: size.value })
     reviews.value = data.records
     total.value = data.total
-  } catch (e) {
+  } catch {
     ElMessage.error('加载评价列表失败')
   } finally {
     loading.value = false
@@ -37,9 +121,13 @@ async function handleDelete(review) {
 }
 
 async function handleResolve(review) {
-  await resolveReviewReport(review.id, 'RESOLVED')
-  ElMessage.success('举报已标记处理')
-  await load()
+  try {
+    await resolveReviewReport(review.id, 'RESOLVED')
+    ElMessage.success('举报已标记处理')
+    await load()
+  } catch {
+    ElMessage.error('处理失败')
+  }
 }
 
 function onPageChange(p) {
@@ -47,13 +135,76 @@ function onPageChange(p) {
   load()
 }
 
-onMounted(load)
+function onRequestStatusChange() {
+  loadDeleteRequests()
+}
+
+onMounted(async () => {
+  await Promise.all([loadDeleteRequests(), load()])
+})
 </script>
 
 <template>
   <div class="admin-page">
     <h1 class="page-title">评价管理</h1>
-    <el-card shadow="hover">
+
+    <el-card shadow="hover" class="section-card">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <h2>删评申请</h2>
+            <p class="card-desc">商家申请删评与用户举报不当评论均会进入此列表，审核通过后删除对应评价或回复。</p>
+          </div>
+          <el-segmented v-model="requestStatus" :options="requestStatusOptions" @change="onRequestStatusChange" />
+        </div>
+      </template>
+
+      <el-table :data="deleteRequests" stripe v-loading="requestLoading" size="small" empty-text="暂无删评申请">
+        <el-table-column prop="id" label="申请ID" width="80" />
+        <el-table-column label="来源" width="120">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.requestType === 'USER' ? 'danger' : 'warning'">
+              {{ requestTypeMap[row.requestType] || row.requestType || '商家申请' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="对象" min-width="160">
+          <template #default="{ row }">{{ requestTargetText(row) }}</template>
+        </el-table-column>
+        <el-table-column prop="merchantId" label="商家ID" width="80" />
+        <el-table-column label="发起人" width="120">
+          <template #default="{ row }">
+            {{ row.requestType === 'USER' ? (row.reporterUserId || '-') : `商家 #${row.merchantId}` }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="reason" label="理由" min-width="200" show-overflow-tooltip />
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="requestStatusMap[row.status]?.type || 'info'" size="small">
+              {{ requestStatusMap[row.status]?.text || row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="申请时间" width="170">
+          <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+        </el-table-column>
+        <el-table-column prop="adminRemarks" label="处理备注" min-width="140" show-overflow-tooltip />
+        <el-table-column label="操作" width="180" fixed="right">
+          <template #default="{ row }">
+            <template v-if="row.status === 'PENDING'">
+              <el-button type="primary" size="small" @click="handleProcessRequest(row, true)">通过</el-button>
+              <el-button size="small" @click="handleProcessRequest(row, false)">驳回</el-button>
+            </template>
+            <span v-else class="processed-text">已处理</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card shadow="hover" class="section-card">
+      <template #header>
+        <h2>评价列表</h2>
+      </template>
       <el-table :data="reviews" stripe v-loading="loading" size="small">
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="username" label="用户" width="100" />
@@ -93,9 +244,30 @@ onMounted(load)
 
 <style scoped>
 .page-title { font-size: 22px; margin: 0 0 20px 0; }
+.section-card { margin-bottom: 20px; }
+.section-card h2 {
+  font-size: 16px;
+  margin: 0;
+}
+.card-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+}
+.card-desc {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 6px 0 0;
+}
 .report-reason {
   color: var(--text-secondary);
   font-size: 12px;
   margin-top: 4px;
+}
+.processed-text {
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 </style>

@@ -19,13 +19,16 @@ import org.springframework.stereotype.Service;
 public class CartService {
     private final CartMapper cartMapper;
     private final ProductMapper productMapper;
+    private final PenaltyService penaltyService;
 
-    public CartService(CartMapper cartMapper, ProductMapper productMapper) {
+    public CartService(CartMapper cartMapper, ProductMapper productMapper, PenaltyService penaltyService) {
         this.cartMapper = cartMapper;
         this.productMapper = productMapper;
+        this.penaltyService = penaltyService;
     }
 
     public List<CartItemResponse> add(AddCartRequest request) {
+        penaltyService.assertCanUsePlatform(request.userId());
         Product product = productMapper.selectById(request.productId());
         if (product == null || !"ON_SALE".equals(product.getStatus())) {
             throw new BusinessException("商品不存在或已下架");

@@ -34,21 +34,25 @@ public class BookingService {
     private final MerchantMapper merchantMapper;
     private final MerchantService merchantService;
     private final NotificationService notificationService;
+    private final PenaltyService penaltyService;
 
     public BookingService(
         ServiceBookingMapper bookingMapper,
         MerchantMapper merchantMapper,
         MerchantService merchantService,
-        NotificationService notificationService
+        NotificationService notificationService,
+        PenaltyService penaltyService
     ) {
         this.bookingMapper = bookingMapper;
         this.merchantMapper = merchantMapper;
         this.merchantService = merchantService;
         this.notificationService = notificationService;
+        this.penaltyService = penaltyService;
     }
 
     @Transactional
     public ServiceBooking create(BookingRequest request) {
+        penaltyService.assertCanUsePlatform(UserContext.getUserId());
         if (request.merchantId() == null) {
             throw new BusinessException("请选择预约商家");
         }

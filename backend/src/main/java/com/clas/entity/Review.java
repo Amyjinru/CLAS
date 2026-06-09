@@ -17,4 +17,5 @@ public class Review {
     private String merchantReply;
     private String reportReason;
     private String reportStatus;
+    private java.time.LocalDateTime createdAt;
 }

@@ -3,9 +3,14 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import {
   createAddress,
   deleteAddress,
+  deleteNotification,
+  getProfile,
+  listMyAppeals,
+  listMyPenalties,
   listFavorites,
   listAddresses,
   listMyDealOrders,
+  listMyReviews,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -314,7 +319,46 @@ function dealStatusType(status) {
   }[status] || 'info'
 }
 
-onMounted(load)
+async function removeNotification(id) {
+  try {
+    await ElMessageBox.confirm('确定删除这条通知吗？', '删除通知', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await deleteNotification(id)
+    ElMessage.success('通知已删除')
+    await load()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
+async function sendAppeal() {
+  if (!appealForm.content.trim()) {
+    ElMessage.warning('请填写申诉内容')
+    return
+  }
+  try {
+    await submitAppeal({
+      penaltyId: appealForm.penaltyId || undefined,
+      content: appealForm.content.trim()
+    })
+    appealForm.content = ''
+    appealForm.penaltyId = null
+    ElMessage.success('申诉已提交')
+    await load()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '申诉提交失败')
+  }
+}
+
+onMounted(async () => {
+  await loadProfile()
+  await load()
+})
 </script>
 
 <template>
@@ -669,19 +713,21 @@ onMounted(load)
 }
 .list-row {
   align-items: center;
-  border-top: 1px solid var(--border-light);
+  border-top: 1px dashed var(--border-light);
   display: flex;
   gap: 16px;
   justify-content: space-between;
-  padding: 14px 0;
+  margin-top: 8px;
+  padding-top: 14px;
 }
-.list-row p {
+.notification-fold p {
   color: var(--text-secondary);
-  margin: 6px 0 0;
+  margin: 0;
 }
-.list-row .coord-line {
-  color: var(--text-muted);
-  font-size: 12px;
+.address-form { margin-bottom: 18px; }
+.list-row {
+  align-items: center; border-top: 1px solid var(--border-light);
+  display: flex; justify-content: space-between; padding: 14px 0;
 }
 .row-title {
   align-items: center;
@@ -743,4 +789,7 @@ onMounted(load)
     justify-content: flex-start;
   }
 }
+.appeal-penalty-select .el-select { min-width: 280px; }
+.address-preview { margin-top: 8px; font-size: 13px; color: #67c23a; }
+@media (max-width: 900px) { .profile-grid { grid-template-columns: 1fr; } }
 </style>
