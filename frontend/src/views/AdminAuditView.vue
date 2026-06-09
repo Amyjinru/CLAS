@@ -179,9 +179,9 @@ onMounted(load)
           v-model="filters.keyword"
           clearable
           placeholder="搜索商家名称、电话、品类或地址"
-          style="width: 340px"
+          class="search-input"
         />
-        <el-select v-model="filters.status" placeholder="状态筛选" clearable style="width: 160px">
+        <el-select v-model="filters.status" placeholder="状态筛选" clearable class="filter-select">
           <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <el-button @click="resetFilters">重置</el-button>
@@ -371,6 +371,16 @@ onMounted(load)
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.search-input {
+  flex: 1 1 260px;
+  max-width: 400px;
+  min-width: 200px;
+}
+
+.filter-select {
+  flex: 0 0 140px;
 }
 
 .detail-panel {
