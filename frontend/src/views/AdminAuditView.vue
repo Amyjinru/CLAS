@@ -373,6 +373,14 @@ onMounted(load)
   margin-bottom: 14px;
 }
 
+.toolbar .el-input {
+  width: 340px !important;
+}
+.toolbar .el-input__wrapper {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 .detail-panel {
   display: grid;
   gap: 18px;
