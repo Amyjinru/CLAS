@@ -382,17 +382,16 @@ onMounted(load)
 /* 搜索栏 */
 .toolbar > .el-input {
   width: 340px;
-  display: flex;
 }
 .toolbar > .el-input :deep(.el-input__wrapper) {
-  flex: 1;
+  width: 100% !important;
   box-sizing: border-box !important;
 }
 .toolbar > .el-input :deep(.el-input__wrapper:hover) {
   box-shadow: 0 0 0 1px var(--border-color) inset !important;
 }
 .toolbar > .el-input :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #f97316 !important;
+  box-shadow: 0 0 0 1px #f97316 inset !important;
 }
 
 /* 筛选栏 */
