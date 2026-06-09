@@ -1,4 +1,4 @@
-# CLAS 项目会话上下文（2026-06-04）
+﻿# CLAS 项目会话上下文（2026-06-04）
 
 > 供 Claude 下次唤醒时快速恢复上下文。记录本次会话的关键决策、环境信息和操作要点。
 
@@ -7,12 +7,14 @@
 ## 当前分支
 
 ```
-E (已推送 upstream/dev → PR #2)
+dev (最新提交 62bfaee3，已推送 upstream/dev)
 ```
 
 ## 上次会话摘要
 
 同学E 完成了管理后台 + 数据统计 + UI全面优化。全部代码已提交并推送到 GitHub。
+
+> **本次会话 (2026-06-10)**：重新梳理了 `enhance-admin-governance-package` 的 openspec 工作流，补充了公告置顶/有效期的完整 specs/design/tasks，并部署到云服务器。
 
 ## 项目概览
 
@@ -21,6 +23,26 @@ CLAS（Comprehensive Life Assistant System）— 外卖电商 MVP + 第二阶段
 - **后端**：Spring Boot 3.3.5, MyBatis Plus 3.5.9, MySQL 8.0, Lombok, Java 17 目标
 - **前端**：Vue 3 + Vite 5 + Element Plus + ECharts + Pinia + Vue Router + Axios
 - **数据库**：8 张表（user, merchant, merchant_audit_log, product, cart, orders, order_item, review）
+
+
+## Deploy Script (IMPORTANT FOR AI)
+
+Project root has `scripts/deploy.ps1` for **one-click deployment**:
+
+Workflow:
+1. Auto `git add` + `git commit` + `git push upstream dev`
+2. SSH to cloud server (8.141.112.182, root/abc123456!)
+3. Server auto `git pull` + `clas deploy` (mvn build, npm build, systemctl restart, nginx reload)
+
+One command:
+```powershell
+.\scripts\deploy.ps1 "your commit message"
+```
+
+After deploy: http://8.141.112.182
+Health check: http://8.141.112.182/api/health
+
+Server has `clas` command: `clas status`, `clas deploy`, `clas restart`
 
 ## 本地环境
 

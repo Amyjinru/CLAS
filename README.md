@@ -334,3 +334,19 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 | MERCHANT | `/merchant/deals` | 团购券管理 |
 | MERCHANT | `/merchant/bookings` | 预约管理 |
 | ADMIN | `/admin/reviews` | 评价举报处理 |
+
+---
+
+## One-Click Deploy
+
+Use `scripts/deploy.ps1` for quick deployment:
+```powershell
+.\scripts\deploy.ps1 "your commit message"
+```
+
+What it does: commit + push + SSH to server + git pull + build + restart.
+
+Server info:
+- Frontend: http://8.141.112.182
+- Health: http://8.141.112.182/api/health
+- Server command: `clas status | deploy | restart`
