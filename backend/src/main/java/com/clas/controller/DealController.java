@@ -75,4 +75,16 @@ public class DealController {
     public Result<DealOrder> redeem(@RequestBody Map<String, String> body) {
         return Result.ok(dealService.redeem(body.get("voucherCode")));
     }
+
+    @PostMapping("/orders/{dealOrderId}/refund")
+    @RequireRole("USER")
+    public Result<DealOrder> refund(@PathVariable Long dealOrderId) {
+        return Result.ok(dealService.refundDealOrder(dealOrderId, UserContext.getUserId()));
+    }
+
+    @GetMapping("/redeem-logs")
+    @RequireRole("MERCHANT")
+    public Result<List<com.clas.dto.DealRedeemLogResponse>> redeemLogs() {
+        return Result.ok(dealService.redeemLogs());
+    }
 }

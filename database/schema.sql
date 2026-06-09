@@ -211,8 +211,8 @@ INSERT INTO `user` (phone, username, password, role, enabled) VALUES
     ('13800000012', 'merchant2', 'Abc123!', 'MERCHANT', 1);
 
 INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, longitude, latitude, delivery_radius_m, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES
-    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 116.397428, 39.909230, 3000, '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', NOW(), NOW()),
-    (2, '13800000012', '城市咖啡站', '13800000023', '饮品', '创新街 18 号', 116.405285, 39.904989, 5000, '08:30-22:30', 200, 1200, 2200, 4.50, 'OPEN', NOW(), NOW());
+    (1, '13800000002', '校园轻食铺', '13800000022', '美食', '软件园东门 1 号', 116.397428, 39.909230, 10000, '09:00-21:00', 300, 1500, 2800, 4.70, 'OPEN', NOW(), NOW()),
+    (2, '13800000012', '城市咖啡站', '13800000023', '饮品', '创新街 18 号', 116.405285, 39.904989, 10000, '08:30-22:30', 200, 1200, 2200, 4.50, 'OPEN', NOW(), NOW());
 
 INSERT INTO product (id, merchant_id, name, description, price, stock, image, status, created_at, updated_at) VALUES
     (1, 1, '鸡胸肉能量碗', '健康低卡能量满满', 2590, 30, '/images/product-1.jpg', 'ON_SALE', NOW(), NOW()),

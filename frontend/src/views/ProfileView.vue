@@ -1,23 +1,28 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import {
   createAddress,
   deleteAddress,
   deleteNotification,
+  deleteAllNotifications,
   getProfile,
-  listMyAppeals,
-  listMyPenalties,
   listFavorites,
   listAddresses,
+  listMyAppeals,
   listMyDealOrders,
-  listMyReviews,
+  listMyPenalties,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
   removeFavorite,
   setDefaultAddress,
   sessionUser,
-  updateAddress
+  setSessionUser,
+  submitAppeal,
+  updateAddress,
+  updateProfile,
+  uploadAvatar
 } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import LocationSelector from '../components/LocationSelector.vue'
@@ -26,6 +31,8 @@ const addresses = ref([])
 const dealOrders = ref([])
 const favorites = ref([])
 const notifications = ref([])
+const penalties = ref([])
+const appeals = ref([])
 const loading = ref(false)
 const loadError = ref('')
 const savingAddress = ref(false)
@@ -33,10 +40,16 @@ const addressActionId = ref('')
 const favoriteActionId = ref(null)
 const notificationActionId = ref(null)
 const markingAllRead = ref(false)
+const deletingAllNotifications = ref(false)
 const editingAddressId = ref(null)
 const locationKey = ref(0)
 const addressFormRef = ref(null)
 const activeProfileTab = ref('transactions')
+const profileForm = reactive({ nickname: '', avatar: '' })
+const appealForm = reactive({ penaltyId: null, content: '' })
+const avatarInputRef = ref(null)
+const avatarUploading = ref(false)
+const nicknameSaving = ref(false)
 
 const form = reactive({
   contactName: '',
@@ -70,6 +83,18 @@ const transactionShortcuts = computed(() => [
   { label: '购物车', value: '继续结算已选商品', to: '/cart', type: 'success' },
   { label: '生活预约', value: '查看预约记录', to: '/bookings', type: 'warning' }
 ])
+const penaltyTypeLabel = {
+  MUTE: '禁言',
+  BAN: '封禁',
+  SERVICE_STOP: '停止服务'
+}
+const appealStatusLabel = {
+  PENDING: '待处理',
+  APPROVED: '已通过',
+  REJECTED: '已驳回'
+}
+const appealablePenalties = computed(() => penalties.value.filter((item) => item.active))
+const displayName = computed(() => profileForm.nickname || currentUser.value?.username || currentUser.value?.phone || '未命名用户')
 const addressRules = {
   contactName: [{ required: true, message: '请填写联系人', trigger: 'blur' }],
   phone: [{ required: true, message: '请填写联系电话', trigger: 'blur' }],
@@ -153,25 +178,103 @@ function validateAddressForm() {
   return true
 }
 
+const silentConfig = { silent: true }
+
+async function loadProfile() {
+  try {
+    const profile = await getProfile(silentConfig)
+    profileForm.nickname = profile.nickname || profile.username || ''
+    profileForm.avatar = profile.avatar || ''
+    if (profile && sessionUser.value) {
+      setSessionUser({ ...sessionUser.value, ...profile, password: undefined })
+    }
+  } catch {
+    // 资料接口失败时不阻塞个人中心其余内容加载
+  }
+}
+
+async function saveProfile() {
+  if (!profileForm.nickname.trim()) {
+    ElMessage.warning('昵称不能为空')
+    return
+  }
+  nicknameSaving.value = true
+  try {
+    const profile = await updateProfile({ nickname: profileForm.nickname.trim() })
+    profileForm.nickname = profile.nickname || profile.username || ''
+    setSessionUser({ ...sessionUser.value, ...profile, password: undefined })
+    ElMessage.success('昵称已更新')
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '昵称更新失败'))
+  } finally {
+    nicknameSaving.value = false
+  }
+}
+
+function openAvatarPicker() {
+  avatarInputRef.value?.click()
+}
+
+async function onAvatarSelected(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    ElMessage.warning('头像不能超过 2MB')
+    return
+  }
+  avatarUploading.value = true
+  try {
+    const profile = await uploadAvatar(file)
+    profileForm.avatar = profile.avatar || ''
+    setSessionUser({ ...sessionUser.value, ...profile, password: undefined })
+    ElMessage.success('头像已更新')
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '头像上传失败'))
+  } finally {
+    avatarUploading.value = false
+  }
+}
+
+function avatarText() {
+  return (displayName.value || '?').slice(0, 1).toUpperCase()
+}
+
+function avatarStyle() {
+  if (profileForm.avatar) {
+    return { backgroundImage: `url(${profileForm.avatar})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+  }
+  return {}
+}
+
 async function load() {
   loading.value = true
   loadError.value = ''
-  try {
-    const [addressList, orderList, favoriteList, notificationList] = await Promise.all([
-      listAddresses(),
-      listMyDealOrders(),
-      listFavorites(),
-      listNotifications()
-    ])
-    addresses.value = addressList
-    dealOrders.value = orderList
-    favorites.value = favoriteList
-    notifications.value = notificationList
-  } catch (error) {
-    loadError.value = getErrorMessage(error, '个人中心数据加载失败')
-  } finally {
-    loading.value = false
+  const results = await Promise.allSettled([
+    listAddresses(silentConfig),
+    listMyDealOrders(silentConfig),
+    listFavorites(silentConfig),
+    listNotifications(silentConfig),
+    listMyPenalties(silentConfig),
+    listMyAppeals(silentConfig)
+  ])
+  addresses.value = results[0].status === 'fulfilled' ? results[0].value : []
+  dealOrders.value = results[1].status === 'fulfilled' ? results[1].value : []
+  favorites.value = results[2].status === 'fulfilled' ? results[2].value : []
+  notifications.value = results[3].status === 'fulfilled' ? results[3].value : []
+  penalties.value = results[4].status === 'fulfilled' ? results[4].value : []
+  appeals.value = results[5].status === 'fulfilled' ? results[5].value : []
+  const failedCount = results.filter((item) => item.status === 'rejected').length
+  if (failedCount === results.length) {
+    loadError.value = '个人中心数据加载失败，请确认已登录后重试'
+  } else if (failedCount > 0) {
+    ElMessage.warning('部分个人中心数据加载失败')
   }
+  loading.value = false
 }
 
 async function submitAddress() {
@@ -297,6 +400,68 @@ async function readAllNotifications() {
   }
 }
 
+async function removeNotification(id) {
+  try {
+    await ElMessageBox.confirm('确定删除这条通知吗？', '删除通知', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await deleteNotification(id)
+    ElMessage.success('通知已删除')
+    await load()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(getErrorMessage(error, '删除失败'))
+    }
+  }
+}
+
+async function clearAllNotifications() {
+  if (!notifications.value.length) return
+  try {
+    await ElMessageBox.confirm('确定清空全部通知吗？', '清空通知', {
+      confirmButtonText: '清空',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    deletingAllNotifications.value = true
+    await deleteAllNotifications()
+    ElMessage.success('通知已清空')
+    await load()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(getErrorMessage(error, '清空失败'))
+    }
+  } finally {
+    deletingAllNotifications.value = false
+  }
+}
+
+async function sendAppeal() {
+  if (!appealForm.content.trim()) {
+    ElMessage.warning('请填写申诉内容')
+    return
+  }
+  try {
+    await submitAppeal({
+      penaltyId: appealForm.penaltyId || undefined,
+      content: appealForm.content.trim()
+    })
+    appealForm.content = ''
+    appealForm.penaltyId = null
+    ElMessage.success('申诉已提交')
+    await load()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '申诉提交失败'))
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) return ''
+  return String(value).replace('T', ' ').slice(0, 16)
+}
+
 function formatMoney(cents) {
   return `¥${((cents || 0) / 100).toFixed(2)}`
 }
@@ -319,53 +484,46 @@ function dealStatusType(status) {
   }[status] || 'info'
 }
 
-async function removeNotification(id) {
-  try {
-    await ElMessageBox.confirm('确定删除这条通知吗？', '删除通知', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    await deleteNotification(id)
-    ElMessage.success('通知已删除')
-    await load()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-    }
-  }
-}
-
-async function sendAppeal() {
-  if (!appealForm.content.trim()) {
-    ElMessage.warning('请填写申诉内容')
-    return
-  }
-  try {
-    await submitAppeal({
-      penaltyId: appealForm.penaltyId || undefined,
-      content: appealForm.content.trim()
-    })
-    appealForm.content = ''
-    appealForm.penaltyId = null
-    ElMessage.success('申诉已提交')
-    await load()
-  } catch (error) {
-    ElMessage.error(error.response?.data?.message || '申诉提交失败')
-  }
-}
-
 onMounted(async () => {
-  await loadProfile()
-  await load()
+  await Promise.all([loadProfile(), load()])
 })
 </script>
 
 <template>
-  <section class="hero">
-    <div>
-      <h1>个人中心</h1>
-      <p>{{ currentUser.username || '未命名用户' }} · {{ currentUser.phone || '未绑定手机号' }}</p>
+  <div class="user-page profile-page">
+  <section class="hero profile-hero">
+    <div class="profile-head">
+      <button
+        type="button"
+        class="avatar-btn"
+        :class="{ uploading: avatarUploading }"
+        :disabled="avatarUploading"
+        @click="openAvatarPicker"
+      >
+        <div class="avatar" :style="avatarStyle()">{{ profileForm.avatar ? '' : avatarText() }}</div>
+        <span class="avatar-tip">{{ avatarUploading ? '上传中...' : '点击更换头像' }}</span>
+      </button>
+      <input
+        ref="avatarInputRef"
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        class="avatar-input"
+        @change="onAvatarSelected"
+      />
+      <div class="profile-meta">
+        <h1>个人中心</h1>
+        <p>{{ displayName }} · {{ currentUser.phone || '未绑定手机号' }}</p>
+        <div class="nickname-row">
+          <el-input
+            v-model="profileForm.nickname"
+            maxlength="50"
+            show-word-limit
+            placeholder="设置昵称"
+            @keyup.enter="saveProfile"
+          />
+          <el-button type="primary" :loading="nicknameSaving" @click="saveProfile">保存昵称</el-button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -464,7 +622,55 @@ onMounted(async () => {
         </article>
       </el-tab-pane>
 
-      <el-tab-pane label="地址与资料" name="addresses">
+      <el-tab-pane label="账号与申诉" name="account">
+        <div class="section-head">
+          <div>
+            <h2>处罚记录</h2>
+            <p>查看平台对账号的限制状态</p>
+          </div>
+        </div>
+        <el-empty v-if="!penalties.length" description="暂无处罚记录" />
+        <article v-for="item in penalties" v-else :key="item.id" class="list-row">
+          <div>
+            <strong>{{ penaltyTypeLabel[item.penaltyType] || item.penaltyType }}</strong>
+            <p>{{ item.reason }}</p>
+            <p class="muted">
+              {{ item.active ? '生效中' : '已失效' }}
+              <span v-if="item.endTime"> · 至 {{ formatDateTime(item.endTime) }}</span>
+            </p>
+          </div>
+          <el-tag :type="item.active ? 'danger' : 'info'">{{ item.active ? '生效中' : '已结束' }}</el-tag>
+        </article>
+
+        <div class="section-head" style="margin-top: 20px">
+          <div>
+            <h2>处罚申诉</h2>
+            <p>如对禁言、封禁等处理有异议，可提交申诉</p>
+          </div>
+        </div>
+        <div v-if="appealablePenalties.length" class="appeal-penalty-select">
+          <span>关联处罚（可选）</span>
+          <el-select v-model="appealForm.penaltyId" clearable placeholder="选择要申诉的处罚">
+            <el-option
+              v-for="item in appealablePenalties"
+              :key="item.id"
+              :label="`#${item.id} ${penaltyTypeLabel[item.penaltyType] || item.penaltyType}：${item.reason}`"
+              :value="item.id"
+            />
+          </el-select>
+        </div>
+        <el-input v-model="appealForm.content" type="textarea" rows="3" placeholder="请描述申诉理由" />
+        <el-button type="primary" style="margin-top: 10px" @click="sendAppeal">提交申诉</el-button>
+        <article v-for="item in appeals" :key="item.id" class="list-row">
+          <div>
+            <strong>{{ appealStatusLabel[item.status] || item.status }}</strong>
+            <p>{{ item.content }}</p>
+            <p v-if="item.adminReply" class="muted">管理员回复：{{ item.adminReply }}</p>
+          </div>
+        </article>
+      </el-tab-pane>
+
+      <el-tab-pane label="地址与资料" name="addresses" lazy>
         <div class="section-head">
           <div>
             <h2>收货地址</h2>
@@ -563,6 +769,15 @@ onMounted(async () => {
             >
               全部已读
             </el-button>
+            <el-button
+              type="danger"
+              plain
+              :disabled="!notifications.length"
+              :loading="deletingAllNotifications"
+              @click="clearAllNotifications"
+            >
+              清空通知
+            </el-button>
           </div>
         </div>
 
@@ -592,13 +807,35 @@ onMounted(async () => {
           >
             标记已读
           </el-button>
+          <el-button text type="danger" @click="removeNotification(item.id)">删除</el-button>
         </article>
       </el-tab-pane>
     </el-tabs>
   </section>
+  </div>
 </template>
 
 <style scoped>
+.profile-hero { display: grid; gap: 16px; }
+.profile-head { align-items: center; display: flex; gap: 20px; flex-wrap: wrap; }
+.avatar-btn {
+  align-items: center; background: transparent; border: 0; cursor: pointer;
+  display: flex; flex-direction: column; gap: 8px; padding: 0;
+}
+.avatar-btn.uploading { cursor: wait; opacity: 0.75; }
+.avatar-input { display: none; }
+.avatar {
+  align-items: center; background: #dbeafe; border: 2px solid #bfdbfe; border-radius: 50%;
+  color: #1d4ed8; display: flex; height: 88px; justify-content: center;
+  width: 88px; font-size: 28px; font-weight: 700; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.avatar-btn:hover .avatar { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12); }
+.avatar-tip { color: var(--text-secondary); font-size: 12px; }
+.profile-meta { display: grid; gap: 10px; min-width: 240px; }
+.profile-meta h1 { margin: 0; }
+.profile-meta p { color: var(--text-secondary); margin: 0; }
+.nickname-row { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; max-width: 420px; }
+.nickname-row .el-input { flex: 1; min-width: 180px; }
 .profile-summary {
   display: grid;
   gap: 12px;
@@ -788,6 +1025,13 @@ onMounted(async () => {
   .row-actions {
     justify-content: flex-start;
   }
+}
+.appeal-penalty-select {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 .appeal-penalty-select .el-select { min-width: 280px; }
 .address-preview { margin-top: 8px; font-size: 13px; color: #67c23a; }

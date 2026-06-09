@@ -416,6 +416,8 @@ watch(
       </el-empty>
     </section>
 
+    <MerchantReviewSection v-if="merchant" :merchant-id="merchantId" />
+
     <div class="cart-dock" v-if="merchant && !loadError">
       <button class="cart-dock-toggle" type="button" @click="toggleCart">
         本店购物车

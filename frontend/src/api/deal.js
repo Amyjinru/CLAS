@@ -7,5 +7,7 @@ export const buyDeal = (id) => api.post(`/deals/${id}/buy`).then(unwrap)
 export const getDealPaymentStatus = (dealOrderId) => api.get(`/deals/orders/${dealOrderId}/payment-status`).then(unwrap)
 export const payDealOrder = (dealOrderId, payMethod) =>
   api.post(`/deals/orders/${dealOrderId}/pay`, { payMethod }).then(unwrap)
-export const listMyDealOrders = () => api.get('/deals/mine').then(unwrap)
+export const listMyDealOrders = (config = {}) => api.get('/deals/mine', config).then(unwrap)
 export const redeemDeal = (voucherCode) => api.post('/deals/redeem', { voucherCode }).then(unwrap)
+export const refundDealOrder = (dealOrderId) => api.post(`/deals/orders/${dealOrderId}/refund`).then(unwrap)
+export const listDealRedeemLogs = () => api.get('/deals/redeem-logs').then(unwrap)

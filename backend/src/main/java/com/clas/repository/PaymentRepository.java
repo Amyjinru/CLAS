@@ -10,4 +10,6 @@ public interface PaymentRepository {
     Payment save(Payment payment);
 
     Optional<Payment> findLatestByOrderId(Long orderId);
+
+    Optional<Payment> findSuccessfulByOrderId(Long orderId);
 }

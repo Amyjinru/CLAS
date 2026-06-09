@@ -72,6 +72,13 @@ public class PenaltyService {
             .last("LIMIT 1"));
     }
 
+    public List<UserPenalty> listPenaltiesForUser(String userId) {
+        expireOutdatedPenalties(userId);
+        return userPenaltyMapper.selectList(new LambdaQueryWrapper<UserPenalty>()
+            .eq(UserPenalty::getUserId, userId)
+            .orderByDesc(UserPenalty::getId));
+    }
+
     public List<UserPenalty> listActivePenalties(String userId) {
         expireOutdatedPenalties(userId);
         LocalDateTime now = LocalDateTime.now();

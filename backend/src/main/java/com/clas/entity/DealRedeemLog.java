@@ -7,18 +7,13 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
-@TableName("deal_order")
-public class DealOrder {
+@TableName("deal_redeem_log")
+public class DealRedeemLog {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long dealId;
-    private String userId;
+    private Long dealOrderId;
     private Long merchantId;
     private String voucherCode;
-    private String status;
-    private Integer payAmount;
-    private LocalDateTime paidTime;
-    private LocalDateTime expireTime;
-    private LocalDateTime createTime;
-    private LocalDateTime usedTime;
+    private String operatorId;
+    private LocalDateTime redeemedAt;
 }

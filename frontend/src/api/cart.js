@@ -6,4 +6,6 @@ export const removeCart = (payload) => api.post('/cart/remove', { userId: curren
 export const updateCart = (payload) => api.post('/cart/update', { userId: currentUserId(), ...payload }).then(unwrap)
 export const deleteCartItem = (productId) => api.delete(`/cart/item/${currentUserId()}/${productId}`).then(unwrap)
 export const getCart = () => api.get(`/cart/list/${currentUserId()}`).then(unwrap)
+export const validateCart = () => api.get(`/cart/validate/${currentUserId()}`).then(unwrap)
+export const clearInvalidCart = () => api.delete(`/cart/invalid/${currentUserId()}`).then(unwrap)
 export const clearCart = () => api.delete(`/cart/clear/${currentUserId()}`).then(unwrap)

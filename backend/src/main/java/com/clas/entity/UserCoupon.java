@@ -7,18 +7,14 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
-@TableName("deal_order")
-public class DealOrder {
+@TableName("user_coupon")
+public class UserCoupon {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long dealId;
     private String userId;
-    private Long merchantId;
-    private String voucherCode;
+    private Long couponId;
     private String status;
-    private Integer payAmount;
-    private LocalDateTime paidTime;
-    private LocalDateTime expireTime;
-    private LocalDateTime createTime;
-    private LocalDateTime usedTime;
+    private Long orderId;
+    private LocalDateTime claimedAt;
+    private LocalDateTime usedAt;
 }

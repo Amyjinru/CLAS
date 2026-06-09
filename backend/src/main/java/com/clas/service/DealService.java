@@ -3,11 +3,13 @@ package com.clas.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.config.UserContext;
-import com.clas.dto.DealRequest;
+import com.clas.dto.DealRedeemLogResponse;
 import com.clas.dto.PaymentResponse;
 import com.clas.entity.DealOrder;
+import com.clas.entity.DealRedeemLog;
 import com.clas.entity.GroupDeal;
 import com.clas.mapper.DealOrderMapper;
+import com.clas.mapper.DealRedeemLogMapper;
 import com.clas.mapper.GroupDealMapper;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,9 +22,12 @@ public class DealService {
     public static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
     public static final String STATUS_UNUSED = "UNUSED";
     public static final String STATUS_USED = "USED";
+    public static final String STATUS_EXPIRED = "EXPIRED";
+    public static final String STATUS_REFUNDED = "REFUNDED";
 
     private final GroupDealMapper groupDealMapper;
     private final DealOrderMapper dealOrderMapper;
+    private final DealRedeemLogMapper dealRedeemLogMapper;
     private final MerchantService merchantService;
     private final NotificationService notificationService;
     private final PenaltyService penaltyService;
@@ -30,12 +35,14 @@ public class DealService {
     public DealService(
         GroupDealMapper groupDealMapper,
         DealOrderMapper dealOrderMapper,
+        DealRedeemLogMapper dealRedeemLogMapper,
         MerchantService merchantService,
         NotificationService notificationService,
         PenaltyService penaltyService
     ) {
         this.groupDealMapper = groupDealMapper;
         this.dealOrderMapper = dealOrderMapper;
+        this.dealRedeemLogMapper = dealRedeemLogMapper;
         this.merchantService = merchantService;
         this.notificationService = notificationService;
         this.penaltyService = penaltyService;
@@ -57,7 +64,7 @@ public class DealService {
             .orderByDesc(GroupDeal::getId));
     }
 
-    public GroupDeal create(DealRequest request) {
+    public GroupDeal create(com.clas.dto.DealRequest request) {
         String status = request.status() == null || request.status().isBlank() ? "ON_SALE" : request.status();
         if (!"ON_SALE".equals(status) && !"OFF_SALE".equals(status)) {
             throw new BusinessException("团购状态只能是 ON_SALE 或 OFF_SALE");
@@ -107,6 +114,9 @@ public class DealService {
     public PaymentResponse payDealOrder(Long dealOrderId, String userId, String payMethod) {
         DealOrder order = requireUserDealOrder(dealOrderId, userId);
         if (!STATUS_PENDING_PAYMENT.equals(order.getStatus())) {
+            if (STATUS_UNUSED.equals(order.getStatus()) || STATUS_USED.equals(order.getStatus())) {
+                return getDealPaymentStatus(dealOrderId, userId);
+            }
             throw new BusinessException("团购订单当前不可支付，状态：" + order.getStatus());
         }
         GroupDeal deal = groupDealMapper.selectById(order.getDealId());
@@ -115,6 +125,18 @@ public class DealService {
         }
 
         String method = payMethod == null || payMethod.isBlank() ? "MOCK" : payMethod;
+        if ("FAIL_MOCK".equals(method)) {
+            return new PaymentResponse(
+                null,
+                order.getId(),
+                order.getPayAmount(),
+                method,
+                "FAILED",
+                order.getStatus(),
+                LocalDateTime.now()
+            );
+        }
+
         try {
             Thread.sleep(1200);
         } catch (InterruptedException exception) {
@@ -127,14 +149,18 @@ public class DealService {
             throw new BusinessException("团购券库存不足");
         }
 
+        LocalDateTime paidTime = LocalDateTime.now();
         order.setStatus(STATUS_UNUSED);
         order.setVoucherCode("CLAS-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        order.setPaidTime(paidTime);
+        order.setExpireTime(paidTime.plusDays(deal.getValidDays() == null ? 30 : deal.getValidDays()));
         dealOrderMapper.updateById(order);
         try {
             notificationService.send(
                 order.getUserId(),
                 "团购券购买成功",
-                "券码 " + order.getVoucherCode() + " 已生成，可到店核销。"
+                "券码 " + order.getVoucherCode() + " 已生成，有效期至 "
+                    + order.getExpireTime().toLocalDate() + "，可到店核销。"
             );
         } catch (RuntimeException ignored) {
             // 通知失败不应影响支付结果。
@@ -146,12 +172,13 @@ public class DealService {
             method,
             "SUCCESS",
             order.getStatus(),
-            LocalDateTime.now()
+            paidTime
         );
     }
 
     public PaymentResponse getDealPaymentStatus(Long dealOrderId, String userId) {
         DealOrder order = requireUserDealOrder(dealOrderId, userId);
+        refreshExpiredStatus(order);
         String paymentStatus = STATUS_PENDING_PAYMENT.equals(order.getStatus())
             ? "PENDING"
             : (STATUS_UNUSED.equals(order.getStatus()) || STATUS_USED.equals(order.getStatus()) ? "SUCCESS" : "FAILED");
@@ -162,7 +189,7 @@ public class DealService {
             null,
             paymentStatus,
             order.getStatus(),
-            order.getCreateTime()
+            order.getPaidTime() == null ? order.getCreateTime() : order.getPaidTime()
         );
     }
 
@@ -178,9 +205,11 @@ public class DealService {
     }
 
     public List<DealOrder> myOrders() {
-        return dealOrderMapper.selectList(new LambdaQueryWrapper<DealOrder>()
+        List<DealOrder> orders = dealOrderMapper.selectList(new LambdaQueryWrapper<DealOrder>()
             .eq(DealOrder::getUserId, UserContext.getUserId())
             .orderByDesc(DealOrder::getId));
+        orders.forEach(this::refreshExpiredStatus);
+        return orders;
     }
 
     @Transactional
@@ -196,13 +225,61 @@ public class DealService {
         if (!merchantService.getCurrentMerchantId().equals(order.getMerchantId())) {
             throw new BusinessException("只能核销自己店铺的团购券");
         }
+        refreshExpiredStatus(order);
+        if (STATUS_EXPIRED.equals(order.getStatus())) {
+            throw new BusinessException("该团购券已过期");
+        }
         if (!STATUS_UNUSED.equals(order.getStatus())) {
             throw new BusinessException("该团购券已核销或已失效");
         }
         order.setStatus(STATUS_USED);
         order.setUsedTime(LocalDateTime.now());
         dealOrderMapper.updateById(order);
+
+        DealRedeemLog log = new DealRedeemLog();
+        log.setDealOrderId(order.getId());
+        log.setMerchantId(order.getMerchantId());
+        log.setVoucherCode(order.getVoucherCode());
+        log.setOperatorId(UserContext.getUserId());
+        log.setRedeemedAt(order.getUsedTime());
+        dealRedeemLogMapper.insert(log);
+
         notificationService.send(order.getUserId(), "团购券已核销", "券码 " + order.getVoucherCode() + " 已成功核销。");
         return order;
+    }
+
+    @Transactional
+    public DealOrder refundDealOrder(Long dealOrderId, String userId) {
+        DealOrder order = requireUserDealOrder(dealOrderId, userId);
+        refreshExpiredStatus(order);
+        if (!STATUS_UNUSED.equals(order.getStatus())) {
+            throw new BusinessException("仅未使用的团购券可申请退款");
+        }
+        if (order.getExpireTime() != null && order.getExpireTime().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("团购券已过期，无法退款");
+        }
+        groupDealMapper.restoreStock(order.getDealId());
+        order.setStatus(STATUS_REFUNDED);
+        dealOrderMapper.updateById(order);
+        notificationService.send(userId, "团购券已退款", "券码 " + order.getVoucherCode() + " 已退款。");
+        return order;
+    }
+
+    public List<DealRedeemLogResponse> redeemLogs() {
+        Long merchantId = merchantService.getCurrentMerchantId();
+        List<DealRedeemLog> logs = dealRedeemLogMapper.selectList(new LambdaQueryWrapper<DealRedeemLog>()
+            .eq(DealRedeemLog::getMerchantId, merchantId)
+            .orderByDesc(DealRedeemLog::getId));
+        return logs.stream().map(DealRedeemLogResponse::from).toList();
+    }
+
+    private void refreshExpiredStatus(DealOrder order) {
+        if (!STATUS_UNUSED.equals(order.getStatus())) {
+            return;
+        }
+        if (order.getExpireTime() != null && order.getExpireTime().isBefore(LocalDateTime.now())) {
+            order.setStatus(STATUS_EXPIRED);
+            dealOrderMapper.updateById(order);
+        }
     }
 }

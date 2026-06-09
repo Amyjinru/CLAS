@@ -4,14 +4,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.dto.AddCartRequest;
 import com.clas.dto.CartItemResponse;
+import com.clas.dto.CartValidationResponse;
 import com.clas.dto.RemoveCartRequest;
 import com.clas.dto.UpdateCartRequest;
 import com.clas.entity.Cart;
 import com.clas.entity.Product;
 import com.clas.mapper.CartMapper;
 import com.clas.mapper.ProductMapper;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
@@ -94,6 +97,10 @@ public class CartService {
     }
 
     public List<CartItemResponse> list(String userId) {
+        return validate(userId).items();
+    }
+
+    public CartValidationResponse validate(String userId) {
         List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, userId)
             .orderByAsc(Cart::getId));
@@ -102,9 +109,25 @@ public class CartService {
             ? Map.of()
             : productMapper.selectBatchIds(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, product -> product));
-        return cartItems.stream()
+        List<CartItemResponse> items = cartItems.stream()
             .map(item -> toResponse(item, products.get(item.getProductId())))
             .toList();
+        int invalidCount = (int) items.stream().filter(item -> !item.valid()).count();
+        Set<Long> merchantIds = items.stream()
+            .map(CartItemResponse::merchantId)
+            .filter(id -> id != null)
+            .collect(Collectors.toCollection(HashSet::new));
+        return new CartValidationResponse(items, invalidCount, merchantIds.size() > 1);
+    }
+
+    public List<CartItemResponse> clearInvalid(String userId) {
+        CartValidationResponse validation = validate(userId);
+        for (CartItemResponse item : validation.items()) {
+            if (!item.valid()) {
+                cartMapper.deleteById(item.id());
+            }
+        }
+        return list(userId);
     }
 
     public void clear(String userId) {
@@ -122,6 +145,8 @@ public class CartService {
     }
 
     private CartItemResponse toResponse(Cart item, Product product) {
+        String invalidReason = resolveInvalidReason(item, product);
+        boolean valid = invalidReason == null;
         String name = product == null ? "商品已失效" : product.getName();
         Integer price = product == null ? 0 : product.getPrice();
         Long merchantId = product == null ? null : product.getMerchantId();
@@ -137,7 +162,25 @@ public class CartService {
             stock,
             image,
             item.getQuantity(),
-            price * item.getQuantity()
+            price * item.getQuantity(),
+            valid,
+            invalidReason
         );
+    }
+
+    private String resolveInvalidReason(Cart item, Product product) {
+        if (product == null) {
+            return "商品已失效";
+        }
+        if (!"ON_SALE".equals(product.getStatus())) {
+            return "商品已下架";
+        }
+        if (product.getStock() <= 0) {
+            return "商品已售罄";
+        }
+        if (item.getQuantity() > product.getStock()) {
+            return "库存不足";
+        }
+        return null;
     }
 }
