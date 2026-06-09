@@ -179,7 +179,7 @@ onMounted(load)
           v-model="filters.keyword"
           clearable
           placeholder="搜索商家名称、电话、品类或地址"
-          style="width: 340px"
+          class="search-input"
         />
         <el-select v-model="filters.status" placeholder="状态筛选" clearable style="width: 160px">
           <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -373,10 +373,11 @@ onMounted(load)
   margin-bottom: 14px;
 }
 
-.toolbar .el-input {
-  width: 340px !important;
+/* 搜索栏：强制 wrapper 填满容器，聚焦/非聚焦宽度一致 */
+.toolbar .search-input {
+  width: 340px;
 }
-.toolbar .el-input__wrapper {
+.toolbar .search-input .el-input__wrapper {
   width: 100% !important;
   box-sizing: border-box !important;
 }
