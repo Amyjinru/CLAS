@@ -101,32 +101,37 @@ fi
     Write-Host $cleanup
 
     Prompt-Message "Step 3/3: 同步代码并部署"
-    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @'
+    Write-Host "  代码拉取 → 构建 → 迁移 → 重启 → 健康检查（预计 3-5 分钟）" -ForegroundColor DarkGray
+    ssh -t -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @'
 set -e
 cd /opt/clas
-echo '>>> 拉取最新代码...'
+echo '>>> [1/3] 拉取最新代码...'
 git pull upstream dev
-echo '>>> 构建并部署...'
+echo ''
+echo '>>> [2/3] 构建并部署（前端 npm + vite，后端 mvn，数据库迁移）...'
 clas deploy 2>&1
-echo '>>> 健康检查...'
+echo ''
+echo '>>> [3/3] 最终验证...'
 sleep 2
 curl -s http://127.0.0.1:8080/api/health
 echo ''
-echo '>>> 完成!'
+echo '>>> 部署完成!'
 '@
 } else {
     Prompt-Message "Step 3/3: SSH 连接服务器（输入密码）"
     Write-Host "命令: ssh $SERVER_USER@$SERVER_IP" -ForegroundColor Gray
 
-    ssh ${SERVER_USER}@${SERVER_IP} -o StrictHostKeyChecking=no @'
+    ssh -t ${SERVER_USER}@${SERVER_IP} -o StrictHostKeyChecking=no @'
 set -e
 cd /opt/clas
-echo '>>> Connected'
+echo '>>> [1/3] Connected'
 git stash 2>/dev/null || true
 git pull upstream dev
-echo '>>> Building and deploying...'
+echo ''
+echo '>>> [2/3] Building and deploying...'
 clas deploy 2>&1
-echo '>>> Verifying...'
+echo ''
+echo '>>> [3/3] Verifying...'
 sleep 2
 curl -s http://127.0.0.1:8080/api/health
 echo ''
