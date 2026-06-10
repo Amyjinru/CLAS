@@ -35,7 +35,7 @@ function redirectByRole(user) {
 // 登录
 // ============================================================
 const phonePattern = /^1[3-9]\d{9}$/
-const loginForm = reactive({ phone: '13800000001', password: 'Abc123!' })
+const loginForm = reactive({ phone: '', password: '' })
 const loginLoading = ref(false)
 const showLoginPassword = ref(false)
 
@@ -184,7 +184,6 @@ function switchTab(tab) {
       <!-- ============================================ -->
       <template v-if="activeTab === 'login'">
         <h1>登录</h1>
-        <p class="hint">演示账号：13800000001 / 13800000002 / 13800000003，密码均为 Abc123!</p>
 
         <div class="form-group">
           <label>手机号 <span class="required">*</span></label>
