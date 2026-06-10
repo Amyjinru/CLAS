@@ -50,8 +50,8 @@
   --clas-warning-light: #fef3c7;
   --clas-danger: #dc2626;
   --clas-danger-light: #fee2e2;
-  --clas-danger-soft: #f87171;
-  --clas-danger-soft-hover: #fca5a5;
+  --clas-danger-soft: #dc2626;
+  --clas-danger-soft-hover: #b91c1c;
 
   /* ─── 应用到界面 ─── */
   --color-primary: #f97316;

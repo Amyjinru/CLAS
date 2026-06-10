@@ -225,209 +225,114 @@ onMounted(load)
 
 
 <style scoped>
-
 .notifications-page-wrap {
-
   display: grid;
-
   gap: 12px;
-
 }
-
-
 
 .back-compact {
-
   align-self: start;
-
   background: var(--bg-card);
-
   border: 1px solid var(--border-color);
-
   border-radius: var(--radius-sm);
-
   color: var(--text-secondary);
-
   cursor: pointer;
-
   font-size: 13px;
-
   font-weight: 500;
-
   justify-self: start;
-
   min-height: 32px;
-
   padding: 0 12px;
-
   width: auto;
-
 }
-
-
 
 .back-compact:hover {
-
   background: var(--color-primary-soft);
-
   border-color: var(--clas-amber-200);
-
   color: var(--color-primary);
-
   transform: none;
-
 }
-
-
 
 .notifications-page {
-
   margin-bottom: 0;
-
   width: 100%;
-
 }
-
-
 
 .page-head {
-
   align-items: flex-start;
-
   display: flex;
-
   justify-content: space-between;
-
   gap: 12px;
-
   margin-bottom: 18px;
-
 }
-
-
 
 .page-head h1 {
-
   margin: 0 0 6px;
-
 }
-
-
 
 .page-head p {
-
   color: var(--text-secondary);
-
   margin: 0;
-
 }
-
-
 
 .head-actions {
-
   display: flex;
-
   flex-wrap: wrap;
-
   gap: 4px;
-
   justify-content: flex-end;
-
 }
-
-
 
 .notifications-list {
-
   display: grid;
-
   gap: 0;
-
 }
-
-
 
 .notice-row {
-
   align-items: center;
-
   border-top: 1px solid var(--border-light);
-
   display: flex;
-
   justify-content: space-between;
-
   gap: 16px;
-
   padding: 16px 0;
-
 }
 
-
+.notice-row > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
 
 .notice-row p {
-
   color: var(--text-secondary);
-
   line-height: 1.6;
-
   margin: 6px 0 0;
-
   max-width: 920px;
-
 }
-
-
 
 .row-actions {
-
   align-items: center;
-
   display: flex;
-
-  flex-wrap: wrap;
-
-  gap: 4px;
-
+  flex-wrap: nowrap;
+  gap: 6px;
   justify-content: flex-end;
-
+  min-width: 148px;
+  flex-shrink: 0;
 }
-
-
 
 @media (min-width: 1024px) {
-
   .notifications-list {
-
     grid-template-columns: repeat(2, minmax(0, 1fr));
-
     gap: 0 24px;
-
   }
-
-
 
   .notice-row {
-
     align-items: flex-start;
-
     flex-direction: column;
-
     min-height: 120px;
-
   }
-
-
 
   .row-actions {
-
     justify-content: flex-start;
-
   }
-
 }
-
 </style>
 
 
