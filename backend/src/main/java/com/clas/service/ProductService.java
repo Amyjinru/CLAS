@@ -96,7 +96,7 @@ public class ProductService {
         product.setPrice(request.price());
         product.setStock(request.stock());
         product.setImage(request.imageUrl());
-        product.setStatus("OFF_SALE");
+        product.setStatus("ON_SALE");
         productMapper.insert(product);
         return product;
     }
