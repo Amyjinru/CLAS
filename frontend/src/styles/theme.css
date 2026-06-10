@@ -50,8 +50,8 @@
   --clas-warning-light: #fef3c7;
   --clas-danger: #dc2626;
   --clas-danger-light: #fee2e2;
-  --clas-danger-soft: #dc2626;
-  --clas-danger-soft-hover: #b91c1c;
+  --clas-danger-soft: #f87171;
+  --clas-danger-soft-hover: #fca5a5;
 
   /* ─── 应用到界面 ─── */
   --color-primary: #f97316;
@@ -184,12 +184,15 @@ body {
   background-color: var(--clas-danger-soft) !important;
   border-color: var(--clas-danger-soft) !important;
   color: #fff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  font-weight: 600 !important;
 }
 .el-button.btn-delete-soft:hover,
 .el-button.btn-delete-soft:focus {
   background-color: var(--clas-danger-soft-hover) !important;
   border-color: var(--clas-danger-soft-hover) !important;
   color: #fff !important;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.6);
 }
 .el-button--default {
   color: var(--text-secondary);

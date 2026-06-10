@@ -313,8 +313,17 @@ onMounted(load)
   flex-wrap: nowrap;
   gap: 6px;
   justify-content: flex-end;
-  min-width: 148px;
   flex-shrink: 0;
+}
+
+.row-actions > :first-child {
+  min-width: 80px;
+  justify-content: center;
+}
+
+.row-actions .btn-delete-soft {
+  min-width: 56px;
+  justify-content: center;
 }
 
 @media (min-width: 1024px) {
