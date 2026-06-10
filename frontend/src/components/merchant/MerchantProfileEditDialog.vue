@@ -171,7 +171,7 @@ async function save() {
         <img v-if="merchant?.logo" :src="merchant.logo" alt="店铺头像" />
         <div v-else class="logo-placeholder">{{ merchant?.merchantName?.slice(0, 1) || '店' }}</div>
         <input ref="fileInputRef" type="file" accept="image/jpeg,image/png" class="file-input" @change="onLogoSelected" />
-        <el-button type="primary" plain :loading="logoUploading" @click="openLogoPicker">上传店铺头像</el-button>
+        <el-button type="primary" :loading="logoUploading" @click="openLogoPicker">上传店铺头像</el-button>
       </div>
       <el-form label-width="96px">
         <el-form-item label="店铺名称">

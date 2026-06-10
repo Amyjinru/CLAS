@@ -378,7 +378,7 @@ onMounted(loadMerchant)
               accept="image/jpeg,image/png"
               @change="onLogoSelected"
             />
-            <el-button size="small" type="primary" plain :loading="logoUploading" @click="openLogoPicker">
+            <el-button size="small" type="primary" :loading="logoUploading" @click="openLogoPicker">
               上传店铺头像
             </el-button>
             <h4>{{ merchant.merchantName }}</h4>

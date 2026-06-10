@@ -291,7 +291,7 @@ onMounted(() => {
               accept="image/jpeg,image/png"
               @change="onLogoSelected"
             />
-            <el-button size="small" type="primary" plain :loading="logoUploading" @click="openLogoPicker">
+            <el-button size="small" type="primary" :loading="logoUploading" @click="openLogoPicker">
               上传店铺头像
             </el-button>
             <h4>{{ merchant.merchantName }}</h4>
@@ -374,7 +374,7 @@ onMounted(() => {
           <template #header>
           <div class="card-header">
             <h3>待接单管理 (营业中)</h3>
-            <el-button type="primary" plain @click="openReplyPanel">回复客户</el-button>
+            <el-button type="primary" @click="openReplyPanel">回复客户</el-button>
           </div>
           </template>
 
