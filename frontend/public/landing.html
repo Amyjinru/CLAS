@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="description" content="CLAS 校园本地生活服务平台 — 外卖、团购、到店预约，一站式校园生活服务" />
+<meta name="theme-color" content="#FFD100" />
+<title>CLAS — 校园生活，一站搞定</title>
+<style>
+  :root {
+    --yellow: #FFD100;
+    --yellow-dark: #E6BC00;
+    --yellow-light: #FFF8E1;
+    --yellow-soft: #FFF4CC;
+    --text: #1a1510;
+    --text-secondary: #5c4f2d;
+    --text-muted: #8c7a5e;
+    --bg: #faf7f2;
+    --white: #ffffff;
+    --border: #ebe3d5;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; font-size: 16px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 480px; margin: 0 auto; padding: 0 24px; }
+
+  /* ═══ SECTION 1: HERO ═══ */
+  .hero-section {
+    background: linear-gradient(180deg, #FFF8E1 0%, #FFECB3 40%, #FFF4CC 75%, var(--bg) 100%);
+    padding: 64px 0 48px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-section::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    right: -10%;
+    width: 240px; height: 240px;
+    background: radial-gradient(circle, rgba(255,209,0,0.15) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .hero-logo {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--yellow-dark);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: inline-block;
+    background: rgba(255,209,0,0.2);
+    padding: 6px 16px;
+    border-radius: 999px;
+  }
+  .hero-title {
+    font-size: clamp(28px, 8vw, 38px);
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .hero-title .highlight {
+    color: var(--yellow-dark);
+    position: relative;
+    display: inline-block;
+  }
+  .hero-title .highlight::after {
+    content: '';
+    position: absolute;
+    bottom: 2px; left: 0; right: 0;
+    height: 10px;
+    background: rgba(255,209,0,0.4);
+    border-radius: 4px;
+    z-index: -1;
+  }
+  .hero-sub {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    line-height: 1.5;
+  }
+  .hero-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 32px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    min-height: 52px;
+    letter-spacing: 0.03em;
+  }
+  .btn-primary {
+    background: var(--yellow);
+    color: var(--text);
+    box-shadow: 0 4px 16px rgba(255,209,0,0.35);
+    min-width: 220px;
+  }
+  .btn-primary:hover { background: var(--yellow-dark); transform: translateY(-2px); box-shadow: 0 6px 24px rgba(255,209,0,0.45); }
+  .btn-outline {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 2px solid var(--text-secondary);
+    min-width: 220px;
+  }
+  .btn-outline:hover { background: var(--text-secondary); color: #fff; border-color: var(--text-secondary); }
+
+  /* ═══ SECTION 2: FEATURES ═══ */
+  .features-section {
+    padding: 56px 0;
+    text-align: center;
+  }
+  .section-label {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--yellow-dark);
+    margin-bottom: 12px;
+  }
+  .section-title {
+    font-size: clamp(22px, 6vw, 28px);
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  .section-sub {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-bottom: 36px;
+  }
+  .features-grid {
+    display: grid;
+    gap: 16px;
+    text-align: left;
+  }
+  .feature-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: all 0.25s ease;
+  }
+  .feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+  }
+  .feature-icon {
+    width: 48px; height: 48px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 14px;
+  }
+  .feature-icon.delivery { background: #FFF4CC; }
+  .feature-icon.deals { background: #FCE4EC; }
+  .feature-icon.booking { background: #E0F2F1; }
+  .feature-icon.chat { background: #E8EAF6; }
+  .feature-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .feature-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+
+  /* ═══ SECTION 3: STATS ═══ */
+  .stats-section {
+    padding: 48px 0;
+    text-align: center;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .stat-item {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 28px 12px;
+  }
+  .stat-number {
+    font-size: clamp(28px, 7vw, 40px);
+    font-weight: 900;
+    color: var(--yellow-dark);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* ═══ SECTION 4: HOW IT WORKS ═══ */
+  .how-section {
+    padding: 56px 0;
+    text-align: center;
+  }
+  .steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    counter-reset: step;
+  }
+  .step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    text-align: left;
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 24px;
+    position: relative;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--yellow);
+    color: var(--text);
+    font-weight: 900;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step-item h3 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .step-item p { font-size: 14px; color: var(--text-secondary); }
+
+  /* ═══ SECTION 5: FINAL CTA ═══ */
+  .final-section {
+    padding: 64px 0 0;
+    text-align: center;
+    background: var(--white);
+  }
+  .final-title {
+    font-size: clamp(22px, 6vw, 28px);
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .final-sub {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+  }
+  .final-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 48px;
+  }
+  .btn-lg {
+    padding: 16px 40px;
+    font-size: 17px;
+    min-width: 240px;
+    border-radius: 999px;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    letter-spacing: 0.03em;
+  }
+  .btn-lg.primary {
+    background: var(--yellow);
+    color: var(--text);
+    box-shadow: 0 4px 16px rgba(255,209,0,0.35);
+  }
+  .btn-lg.primary:hover { background: var(--yellow-dark); transform: translateY(-2px); }
+
+  /* ═══ FOOTER ═══ */
+  .footer {
+    background: #f0ede7;
+    padding: 40px 24px 32px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 2;
+  }
+  .footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .footer-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .footer-links a:hover { color: var(--yellow-dark); }
+  .footer-divider {
+    width: 40px;
+    height: 2px;
+    background: var(--border);
+    margin: 16px auto;
+    border-radius: 1px;
+  }
+  .footer-copy { color: var(--text-muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ SECTION 1: HERO ═══ -->
+<section class="hero-section">
+  <div class="container">
+    <div class="hero-logo">🟡 CLAS</div>
+    <h1 class="hero-title">
+      校园生活，<br><span class="highlight">一站搞定</span>
+    </h1>
+    <p class="hero-sub">
+      外卖配送 · 团购优惠 · 到店预约<br>你的校园本地生活服务平台
+    </p>
+    <div class="hero-actions">
+      <a href="/login" class="btn btn-primary">
+        开始使用 →
+      </a>
+      <a href="/merchant-register" class="btn btn-outline">
+        商家入驻
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 2: FEATURES ═══ -->
+<section class="features-section">
+  <div class="container">
+    <div class="section-label">核心功能</div>
+    <h2 class="section-title">为什么选择 CLAS？</h2>
+    <p class="section-sub">覆盖校园生活的每一个场景</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon delivery">🛵</div>
+        <h3>外卖配送</h3>
+        <p>校园周边美食一键下单，快速配送到宿舍楼下，支持商家配送范围筛选</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon deals">🎫</div>
+        <h3>团购优惠</h3>
+        <p>超值团购套餐，双人餐、月卡、畅吃卡，比单点便宜 30% 以上</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon booking">📅</div>
+        <h3>到店预约</h3>
+        <p>提前预约餐厅、到店服务，免排队等候，合理安排你的校园生活</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon chat">💬</div>
+        <h3>实时客服</h3>
+        <p>在线咨询商家，随时沟通订单详情，你的问题我们快速响应</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 3: STATS ═══ -->
+<section class="stats-section">
+  <div class="container">
+    <div class="section-label">平台数据</div>
+    <h2 class="section-title">越来越多同学的选择</h2>
+    <p class="section-sub">持续增长的校园生活服务社区</p>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-number">11+</div>
+        <div class="stat-label">合作商家</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">23+</div>
+        <div class="stat-label">注册用户</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">43+</div>
+        <div class="stat-label">精选菜品</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 4: HOW IT WORKS ═══ -->
+<section class="how-section">
+  <div class="container">
+    <div class="section-label">快速上手</div>
+    <h2 class="section-title">三步开启校园美食之旅</h2>
+    <p class="section-sub">从注册到享用，不到 3 分钟</p>
+    <div class="steps-list">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div>
+          <h3>注册账号</h3>
+          <p>手机号快速注册，选择你的身份——普通用户或商家店主</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div>
+          <h3>选择商家下单</h3>
+          <p>浏览周边美食，选菜品加购物车，填写地址一键下单</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div>
+          <h3>享用美食</h3>
+          <p>等待配送或到店享用，完成订单后留下你的真实评价</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 5: FINAL CTA + FOOTER ═══ -->
+<section class="final-section">
+  <div class="container">
+    <h2 class="final-title">准备好开始了吗？</h2>
+    <p class="final-sub">加入 CLAS，享受便捷的校园生活服务</p>
+    <div class="final-actions">
+      <a href="/merchant-register" class="btn-lg primary">
+        商家入驻
+      </a>
+      <a href="/login" class="btn-lg primary">
+        开始使用
+      </a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-links">
+      <a href="#">制作团队</a>
+      <a href="#">联系我们</a>
+      <a href="#">用户协议</a>
+      <a href="#">隐私政策</a>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 CLAS 综合生活助手平台. All rights reserved.</p>
+  </footer>
+</section>
+
+</body>
+</html>
