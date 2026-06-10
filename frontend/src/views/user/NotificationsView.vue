@@ -311,19 +311,15 @@ onMounted(load)
   align-items: center;
   display: flex;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 8px;
   justify-content: flex-end;
   flex-shrink: 0;
-}
-
-.row-actions > :first-child {
-  min-width: 80px;
-  justify-content: center;
+  min-width: 144px;
 }
 
 .row-actions .btn-delete-soft {
   min-width: 56px;
-  justify-content: center;
+  flex-shrink: 0;
 }
 
 @media (min-width: 1024px) {
