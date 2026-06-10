@@ -420,7 +420,7 @@ input:focus,
 
 .resend-btn:hover:not(:disabled) {
   background: var(--color-primary, #f97316);
-  color: #fff;
+  color: var(--text-primary);
   border-color: var(--color-primary, #f97316);
 }
 
@@ -444,7 +444,7 @@ input:focus,
   letter-spacing: 0.04em;
   border-radius: var(--radius-md, 10px);
   background: var(--color-primary, #f97316);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   cursor: pointer;
   transition-property: background-color, transform, box-shadow;

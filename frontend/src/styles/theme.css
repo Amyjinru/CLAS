@@ -54,8 +54,8 @@
   --clas-danger-soft-hover: #fca5a5;
 
   /* ─── 应用到界面 ─── */
-  --color-primary: #cc580c;
-  --color-primary-hover: #b84e0a;
+  --color-primary: #f97316;
+  --color-primary-hover: #ea580c;
   --color-primary-light: var(--clas-amber-50);
   --color-primary-soft: var(--clas-amber-100);
 
@@ -66,7 +66,7 @@
   --bg-card: #ffffff;
   --bg-sidebar: #2d251c;
   --bg-sidebar-hover: #3d352b;
-  --bg-sidebar-active: rgba(204, 88, 12, 0.15);
+  --bg-sidebar-active: rgba(249, 115, 22, 0.15);
 
   --text-primary: #1a1510;
   --text-secondary: #6b5c49;
@@ -156,10 +156,12 @@ body {
 .el-button--primary {
   background-color: var(--color-primary) !important;
   border-color: var(--color-primary) !important;
+  color: var(--text-primary) !important;
 }
 .el-button--primary:hover {
   background-color: var(--color-primary-hover) !important;
   border-color: var(--color-primary-hover) !important;
+  color: var(--text-primary) !important;
   transform: translateY(-1px);
   box-shadow: var(--shadow-md) !important;
 }
@@ -252,6 +254,7 @@ body {
 .el-pagination .el-pager li.is-active {
   background-color: var(--color-primary) !important;
   border-radius: var(--radius-sm) !important;
+  color: var(--text-primary) !important;
 }
 .el-pagination .el-pager li:hover {
   color: var(--color-primary) !important;

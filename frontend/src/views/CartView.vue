@@ -430,7 +430,7 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
 .pay-btn {
   background: var(--color-primary);
   border-radius: var(--radius-sm);
-  color: #fff;
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
   padding: 8px 16px;
@@ -743,7 +743,7 @@ button.compact {
   letter-spacing: 0.04em;
   border-radius: var(--radius-sm);
   background: var(--color-primary);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   cursor: pointer;
   transition-property: background-color, transform, box-shadow;

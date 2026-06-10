@@ -9,7 +9,7 @@ button,
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--color-primary);
-  color: white;
+  color: var(--text-primary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -419,7 +419,7 @@ nav a.router-link-active {
   z-index: 10000;
   padding: 10px 20px;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 700;
   font-size: 14px;
   border-radius: var(--radius-sm);

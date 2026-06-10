@@ -419,7 +419,7 @@ function switchTab(tab) {
 
 .auth-tabs button.active {
   background: var(--color-primary, #f97316);
-  color: #fff;
+  color: var(--text-primary);
   box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
 }
 
@@ -614,7 +614,7 @@ input:focus {
 
 .resend-btn:hover:not(:disabled) {
   background: var(--color-primary, #f97316);
-  color: #fff;
+  color: var(--text-primary);
   border-color: var(--color-primary, #f97316);
 }
 
@@ -641,7 +641,7 @@ input:focus {
   letter-spacing: 0.04em;
   border-radius: var(--radius-md, 10px);
   background: var(--color-primary, #f97316);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   cursor: pointer;
   transition-property: background-color, transform, box-shadow;
