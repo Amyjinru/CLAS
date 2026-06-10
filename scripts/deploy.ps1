@@ -102,6 +102,7 @@ fi
 
     Prompt-Message "Step 3/3: 同步代码并部署"
     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @'
+set -e
 cd /opt/clas
 echo '>>> 拉取最新代码...'
 git pull upstream dev
@@ -118,6 +119,7 @@ echo '>>> 完成!'
     Write-Host "命令: ssh $SERVER_USER@$SERVER_IP" -ForegroundColor Gray
 
     ssh ${SERVER_USER}@${SERVER_IP} -o StrictHostKeyChecking=no @'
+set -e
 cd /opt/clas
 echo '>>> Connected'
 git stash 2>/dev/null || true

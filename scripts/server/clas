@@ -34,11 +34,7 @@ need_root() {
 
 build_app() {
   cd "$FRONTEND_DIR"
-  if [ -f package-lock.json ]; then
-    npm ci
-  else
-    npm install
-  fi
+  npm install
   npm run build
 
   cd "$BACKEND_DIR"
