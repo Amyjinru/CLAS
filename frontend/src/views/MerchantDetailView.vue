@@ -11,6 +11,7 @@ import { useCartActions } from '../composables/useCartActions'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
+import { formatFen, formatDistance } from '../utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,17 +66,17 @@ const deliveryStatus = computed(() => {
 
 function moneyText(amount, fallback = '未设置') {
   if (amount === null || amount === undefined) return fallback
-  return `¥${(amount / 100).toFixed(0)}`
+  return formatFen(amount, { symbol: true, decimals: 0 })
 }
 
 function priceText(amount) {
   if (amount === null || amount === undefined) return '价格待定'
-  return `¥${(amount / 100).toFixed(2)}`
+  return formatFen(amount, { symbol: true, decimals: 2 })
 }
 
 function distanceText(distance) {
   if (distance === null || distance === undefined) return '距离未知'
-  return distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`
+  return formatDistance(distance)
 }
 
 function fieldText(value, fallback = '暂无信息') {

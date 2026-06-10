@@ -8,6 +8,7 @@ import { useChatStore } from '../composables/useChatStore'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
+import { formatDistance } from '../utils/formatters'
 import { ElMessage } from 'element-plus'
 
 const merchants = ref([])
@@ -64,7 +65,7 @@ const activeFilters = computed(() => {
 
 function distanceText(distance) {
   if (distance === null || distance === undefined) return '距离未知'
-  return distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`
+  return formatDistance(distance)
 }
 
 function merchantOpenStatus(merchant) {

@@ -340,13 +340,13 @@ async function submitForm() {
 
 .card-header h2 {
   margin: 0;
-  color: #303133;
+  color: var(--text-primary);
   font-size: 24px;
 }
 
 .subtitle {
   margin: 8px 0 0 0;
-  color: #909399;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -370,30 +370,30 @@ async function submitForm() {
   padding: 0;
   list-style: none;
   font-size: 12px;
-  color: #909399;
+  color: var(--text-muted);
 }
 
 .password-checks li.ok {
-  color: #16a34a;
+  color: var(--clas-success);
 }
 
 .match-tip {
   width: 100%;
   margin: 6px 0 0;
   font-size: 12px;
-  color: #ef4444;
+  color: var(--clas-danger);
 }
 
 .match-tip.ok {
-  color: #16a34a;
+  color: var(--clas-success);
 }
 
 .section-title {
   font-size: 16px;
-  color: #303133;
+  color: var(--text-primary);
   margin-bottom: 20px;
   padding-left: 8px;
-  border-left: 4px solid #409eff;
+  border-left: 4px solid var(--color-primary);
 }
 
 .form-actions {
