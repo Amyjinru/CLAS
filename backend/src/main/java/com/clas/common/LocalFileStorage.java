@@ -27,14 +27,21 @@ public class LocalFileStorage {
         return directory;
     }
 
+    private static final java.util.Set<String> ALLOWED_EXTENSIONS = java.util.Set.of(
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"
+    );
+
     public String store(MultipartFile file, Path directory, String defaultExtension) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException("请选择要上传的文件");
         }
         String original = file.getOriginalFilename() == null ? "file" + defaultExtension : file.getOriginalFilename();
         String extension = original.contains(".")
-            ? original.substring(original.lastIndexOf('.'))
+            ? original.substring(original.lastIndexOf('.')).toLowerCase()
             : defaultExtension;
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new BusinessException("不支持的文件格式，仅允许: " + String.join(", ", ALLOWED_EXTENSIONS));
+        }
         String filename = UUID.randomUUID() + extension;
         Path target = directory.resolve(filename).toAbsolutePath().normalize();
         try (InputStream inputStream = file.getInputStream()) {

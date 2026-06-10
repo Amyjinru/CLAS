@@ -115,8 +115,8 @@ onMounted(loadStatus)
 <style scoped>
 select {
   width: 100%;
-  border: 1px solid #d8dde8;
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   min-height: 40px;
   padding: 8px 10px;
   font: inherit;

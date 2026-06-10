@@ -489,7 +489,7 @@ onMounted(async () => {
 .row-title { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
 .row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .notification-row.unread {
-  background: #fff7f0; margin-left: -12px; margin-right: -12px;
+  background: var(--color-primary-light); margin-left: -12px; margin-right: -12px;
   padding-left: 12px; padding-right: 12px;
 }
 .voucher-row strong { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
