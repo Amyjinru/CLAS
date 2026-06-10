@@ -444,8 +444,8 @@ onMounted(loadMerchant)
             <div v-for="category in categories" :key="category.id" class="category-item">
               <el-input v-model="category.name" maxlength="50" />
               <el-input-number v-model="category.sortOrder" :min="0" :step="1" />
-              <el-button type="primary" plain @click="handleUpdateCategory(category)">保存</el-button>
-              <el-button type="danger" plain @click="handleDeleteCategory(category)">删除</el-button>
+              <el-button type="primary" @click="handleUpdateCategory(category)">保存</el-button>
+              <el-button type="danger" @click="handleDeleteCategory(category)">删除</el-button>
             </div>
           </div>
           <el-empty v-else description="暂无商品分类" />
@@ -561,13 +561,12 @@ onMounted(loadMerchant)
 
             <el-table-column label="操作" width="160" fixed="right">
               <template #default="scope">
-                <el-button 
-                  type="primary" 
-                  size="small" 
-                  icon="Edit" 
+                <el-button
+                  type="primary"
+                  size="small"
+                  icon="Edit"
                   @click="openEditDialog(scope.row)"
                   :disabled="merchant.status === 'BLOCKED'"
-                  text
                 >
                   编辑
                 </el-button>
@@ -578,7 +577,7 @@ onMounted(loadMerchant)
                   @confirm="handleDelete(scope.row.id)"
                 >
                   <template #reference>
-                    <el-button type="danger" size="small" icon="Delete" text>删除</el-button>
+                    <el-button type="danger" size="small" icon="Delete">删除</el-button>
                   </template>
                 </el-popconfirm>
               </template>
@@ -672,7 +671,7 @@ onMounted(loadMerchant)
               :before-upload="beforeImageUpload"
               :http-request="handleImageUpload"
             >
-              <el-button :loading="uploadLoading" type="primary" plain>上传图片</el-button>
+              <el-button :loading="uploadLoading" type="primary">上传图片</el-button>
             </el-upload>
             <el-input v-model="form.imageUrl" placeholder="图片 URL 会在上传后自动填入，也可手动输入" />
           </div>
