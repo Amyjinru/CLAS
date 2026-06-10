@@ -342,7 +342,13 @@ onMounted(async () => {
 
   <section class="grid" v-loading="loading" v-if="loading || merchants.length">
     <article class="card" v-for="merchant in merchants" :key="merchant.id">
-      <div class="thumb">{{ merchant.category }}</div>
+      <div
+        class="thumb merchant-logo-thumb"
+        :class="{ 'has-logo': merchant.logo }"
+        :style="merchant.logo ? { backgroundImage: `url(${merchant.logo})` } : null"
+      >
+        {{ merchant.logo ? '' : merchant.category }}
+      </div>
       <h2>{{ merchant.merchantName }}</h2>
       <p>{{ merchant.address }}</p>
       <p>评分 {{ merchant.score }} · 人均 ¥{{ ((merchant.averagePrice || 0) / 100).toFixed(0) }} · {{ merchant.businessHours || '营业中' }}</p>
@@ -462,6 +468,15 @@ onMounted(async () => {
 
 .delivery-status {
   min-height: 28px;
+}
+
+.merchant-logo-thumb {
+  background-position: center;
+  background-size: cover;
+}
+
+.merchant-logo-thumb.has-logo {
+  color: transparent;
 }
 
 .empty-panel {

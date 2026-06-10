@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund, uploadMerchantLogo } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -18,6 +18,8 @@ const loginUser = ref(null)
 const voucherCode = ref('')
 const reviews = ref([])
 const replyDrafts = ref({})
+const logoInputRef = ref(null)
+const logoUploading = ref(false)
 
 // ===== version_314: 订单详情弹窗 & 商品名映射 =====
 const productNames = ref({})
@@ -166,6 +168,36 @@ async function handleReply(review) {
   await load()
 }
 
+function openLogoPicker() {
+  logoInputRef.value?.click()
+}
+
+function beforeLogoUpload(file) {
+  const allowed = ['image/jpeg', 'image/png']
+  if (!allowed.includes(file.type)) {
+    ElMessage.warning('仅支持 jpg/png 图片')
+    return false
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.warning('图片不能超过 5MB')
+    return false
+  }
+  return true
+}
+
+async function onLogoSelected(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file || !beforeLogoUpload(file)) return
+  logoUploading.value = true
+  try {
+    merchant.value = await uploadMerchantLogo(file)
+    ElMessage.success('店铺头像已更新')
+  } finally {
+    logoUploading.value = false
+  }
+}
+
 // ===== version_314: 通用订单操作方法 =====
 async function operate(action, order) {
   if (action === 'accept') await acceptOrder(order.order.id)
@@ -267,7 +299,20 @@ onMounted(() => {
           </template>
 
           <div class="merchant-badge">
-            <div class="store-icon">{{ merchant.merchantName.substring(0, 1) }}</div>
+            <button class="store-logo-button" type="button" :disabled="logoUploading" @click="openLogoPicker">
+              <img v-if="merchant.logo" :src="merchant.logo" alt="店铺头像" class="store-logo-img" />
+              <span v-else class="store-icon">{{ merchant.merchantName.substring(0, 1) }}</span>
+            </button>
+            <input
+              ref="logoInputRef"
+              class="logo-input"
+              type="file"
+              accept="image/jpeg,image/png"
+              @change="onLogoSelected"
+            />
+            <el-button size="small" type="primary" plain :loading="logoUploading" @click="openLogoPicker">
+              上传店铺头像
+            </el-button>
             <h4>{{ merchant.merchantName }}</h4>
             <el-tag :type="statusMap[merchant.status]?.type || 'info'" size="large" effect="dark">
               {{ statusMap[merchant.status]?.text || merchant.status }}
@@ -623,6 +668,37 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   margin-bottom: 12px;
+}
+
+.store-logo-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  height: 64px;
+  justify-content: center;
+  margin-bottom: 10px;
+  padding: 0;
+  width: 64px;
+}
+
+.store-logo-button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.store-logo-img {
+  border: 1px solid #dcdfe6;
+  border-radius: 50%;
+  height: 64px;
+  object-fit: cover;
+  width: 64px;
+}
+
+.logo-input {
+  display: none;
 }
 
 .merchant-badge h4 {

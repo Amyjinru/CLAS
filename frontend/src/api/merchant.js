@@ -10,6 +10,13 @@ export const getMyMerchantStats = () => api.get('/merchant/my/stats').then(unwra
 export const adminListMerchants = () => api.get('/merchant/admin/list').then(unwrap)
 export const adminAuditMerchant = (id, payload) => api.post(`/merchant/admin/audit/${id}`, payload).then(unwrap)
 export const adminGetMerchantLogs = (id) => api.get(`/merchant/admin/audit-logs/${id}`).then(unwrap)
+export const uploadMerchantLogo = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/merchant/my/logo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(unwrap)
+}
 
 export async function currentMerchantId() {
   const merchant = await getMyMerchant()

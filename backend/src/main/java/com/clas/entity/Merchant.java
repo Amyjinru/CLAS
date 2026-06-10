@@ -18,6 +18,7 @@ public class Merchant {
     
     private String userId;
     private String merchantName;
+    private String logo;
     private String phone;
     private String category;
     private String address;

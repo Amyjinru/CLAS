@@ -8,6 +8,7 @@ public record MerchantResponse(
     Long id,
     String userId,
     String merchantName,
+    String logo,
     String phone,
     String category,
     String address,

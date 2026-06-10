@@ -13,6 +13,7 @@ import com.clas.dto.OrderResponse;
 import com.clas.entity.MerchantAuditLog;
 import com.clas.entity.Orders;
 import com.clas.service.MerchantService;
+import com.clas.service.MerchantLogoUploadService;
 import com.clas.service.OrderService;
 import com.clas.service.StatisticsService;
 import jakarta.validation.Valid;
@@ -27,16 +28,24 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/merchant")
 public class MerchantController {
     private final MerchantService merchantService;
+    private final MerchantLogoUploadService merchantLogoUploadService;
     private final OrderService orderService;
     private final StatisticsService statisticsService;
 
-    public MerchantController(MerchantService merchantService, OrderService orderService, StatisticsService statisticsService) {
+    public MerchantController(
+        MerchantService merchantService,
+        MerchantLogoUploadService merchantLogoUploadService,
+        OrderService orderService,
+        StatisticsService statisticsService
+    ) {
         this.merchantService = merchantService;
+        this.merchantLogoUploadService = merchantLogoUploadService;
         this.orderService = orderService;
         this.statisticsService = statisticsService;
     }
@@ -96,6 +105,12 @@ public class MerchantController {
         }
         MerchantResponse response = merchantService.getMerchantByUserId(loggedInUserId);
         return Result.ok(response);
+    }
+
+    @PostMapping("/my/logo")
+    @RequireRole("MERCHANT")
+    public Result<MerchantResponse> uploadMyLogo(@RequestParam("file") MultipartFile file) {
+        return Result.ok(merchantLogoUploadService.uploadAndUpdate(file));
     }
 
     @GetMapping("/my/audit-status")

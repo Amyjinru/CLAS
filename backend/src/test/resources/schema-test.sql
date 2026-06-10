@@ -42,6 +42,7 @@ CREATE TABLE merchant (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,
     merchant_name VARCHAR(100) NOT NULL,
+    logo VARCHAR(512),
     phone VARCHAR(20) NOT NULL UNIQUE,
     category VARCHAR(50),
     address VARCHAR(255),

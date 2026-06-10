@@ -365,7 +365,15 @@ watch(
     <section class="panel merchant-hero" v-else-if="merchant">
       <div class="merchant-hero-main">
         <div class="merchant-title-row">
-          <div>
+          <div class="merchant-title-main">
+            <div
+              class="merchant-logo"
+              :class="{ 'has-logo': merchant.logo }"
+              :style="merchant.logo ? { backgroundImage: `url(${merchant.logo})` } : null"
+            >
+              {{ merchant.logo ? '' : fieldText(merchant.category, '店').slice(0, 1) }}
+            </div>
+            <div>
             <div class="merchant-tags">
               <el-tag effect="plain">{{ fieldText(merchant.category, '生活服务') }}</el-tag>
               <el-tag type="warning" effect="plain">评分 {{ merchant.score ?? '暂无' }}</el-tag>
@@ -373,6 +381,7 @@ watch(
             </div>
             <h1>{{ merchant.merchantName }}</h1>
             <p class="merchant-address">{{ fieldText(merchant.address, '暂无地址') }}</p>
+            </div>
           </div>
           <button
             class="favorite-button secondary"
@@ -591,6 +600,33 @@ watch(
   font-size: 30px;
   line-height: 1.2;
   margin: 12px 0 8px;
+}
+
+.merchant-title-main {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+}
+
+.merchant-logo {
+  align-items: center;
+  background: #2563eb;
+  background-position: center;
+  background-size: cover;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 28px;
+  font-weight: 700;
+  height: 72px;
+  justify-content: center;
+  width: 72px;
+}
+
+.merchant-logo.has-logo {
+  border: 1px solid #dcdfe6;
 }
 
 .merchant-tags {

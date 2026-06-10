@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +49,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -320,6 +322,27 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.data[0].distanceMeters").isNumber())
             .andExpect(jsonPath("$.data[0].estimatedMinutes").isNumber())
             .andExpect(jsonPath("$.data[0].deliveryAvailable").value(true));
+    }
+
+    @Test
+    void merchantLogoUploadUpdatesCurrentMerchant() throws Exception {
+        MockMultipartFile logo = new MockMultipartFile(
+            "file",
+            "logo.png",
+            "image/png",
+            new byte[] {
+                (byte) 0x89, 0x50, 0x4E, 0x47,
+                0x0D, 0x0A, 0x1A, 0x0A
+            }
+        );
+
+        mockMvc.perform(multipart("/api/merchant/my/logo")
+                .file(logo)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.logo").isString())
+            .andExpect(jsonPath("$.data.logo").value(org.hamcrest.Matchers.startsWith("/uploads/merchant-logo/1/")));
     }
 
     @Test

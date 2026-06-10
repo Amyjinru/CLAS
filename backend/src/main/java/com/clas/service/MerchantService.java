@@ -334,6 +334,7 @@ public class MerchantService {
             merchant.getId(),
             merchant.getUserId(),
             merchant.getMerchantName(),
+            merchant.getLogo(),
             merchant.getPhone(),
             merchant.getCategory(),
             merchant.getAddress(),
