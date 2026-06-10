@@ -186,12 +186,12 @@ onMounted(load)
 
 .list-item:hover,
 .list-item.active {
-  background: #fff7ed;
+  background: var(--color-primary-light);
 }
 
 .avatar {
   align-items: center;
-  background: linear-gradient(135deg, #f97316, #0f766e);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
   background-position: center;
   background-size: cover;
   border-radius: 50%;
@@ -205,11 +205,11 @@ onMounted(load)
 }
 
 .avatar.has-logo {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-color);
 }
 
 .user-avatar {
-  background: linear-gradient(135deg, #0f766e, #2563eb);
+  background: linear-gradient(135deg, var(--color-accent), var(--clas-teal-700));
   font-size: 13px;
 }
 
@@ -219,7 +219,7 @@ onMounted(load)
 }
 
 .list-item strong {
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -228,7 +228,7 @@ onMounted(load)
 .empty-record,
 .record-head span,
 .message-meta {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -245,7 +245,7 @@ onMounted(load)
 
 .record-head {
   align-items: center;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   gap: 10px;
   justify-content: space-between;
@@ -276,16 +276,16 @@ onMounted(load)
 }
 
 .message p {
-  background: #f1f5f9;
-  border-radius: 12px;
+  background: var(--clas-warm-100);
+  border-radius: var(--radius-md);
   line-height: 1.55;
   margin: 0;
   padding: 9px 12px;
 }
 
 .message.merchant p {
-  background: #f97316;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--text-primary);
 }
 
 @media (max-width: 1100px) {
