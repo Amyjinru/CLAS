@@ -88,7 +88,7 @@ public class PaymentService {
         paymentRepository.save(payment);
 
         try {
-            Thread.sleep(1200);
+            Thread.sleep(100); // 模拟支付延迟（生产环境应异步处理）
             if (PAY_METHOD_FAIL_MOCK.equals(payMethod)) {
                 return transactionTemplate.execute(status -> failPayment(payment, order));
             }

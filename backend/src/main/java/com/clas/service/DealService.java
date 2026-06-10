@@ -146,7 +146,7 @@ public class DealService {
         }
 
         try {
-            Thread.sleep(1200);
+            Thread.sleep(100); // 模拟支付延迟（生产环境应异步处理）
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new BusinessException("模拟支付被中断");
