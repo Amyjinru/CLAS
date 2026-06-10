@@ -144,10 +144,11 @@ async function load() {
   notifications.value = results[3].status === 'fulfilled' ? results[3].value : []
   penalties.value = results[4].status === 'fulfilled' ? results[4].value : []
   appeals.value = results[5].status === 'fulfilled' ? results[5].value : []
-  const failedCount = results.filter((item) => item.status === 'rejected').length
-  if (failedCount === results.length) {
+  const rejected = results.filter((item) => item.status === 'rejected')
+  const allAre401 = rejected.length > 0 && rejected.every((item) => item.reason?.response?.data?.code === 401 || item.reason?.response?.status === 401)
+  if (rejected.length === results.length && !allAre401) {
     loadError.value = '个人中心数据加载失败，请确认已登录后重试'
-  } else if (failedCount > 0) {
+  } else if (rejected.length > 0 && !allAre401) {
     ElMessage.warning('部分个人中心数据加载失败')
   }
   loading.value = false
