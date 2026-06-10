@@ -818,9 +818,9 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  color: #606266;
+  color: var(--text-secondary);
   font-size: 15px;
   font-weight: 500;
   transition-property: color, background-color;
@@ -828,12 +828,12 @@ onMounted(() => {
   transition-timing-function: ease;
 }
 .menu-item:hover {
-  color: #409eff;
-  background-color: #f0f7ff;
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
 }
 .menu-item.active {
-  color: #ffffff;
-  background-color: #409eff;
+  color: var(--text-primary);
+  background-color: var(--color-primary);
 }
 
 /* ===== version_314: 订单卡片 & 详情弹窗样式 ===== */
