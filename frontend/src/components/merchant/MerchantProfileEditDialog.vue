@@ -156,12 +156,20 @@ async function save() {
   if (!/^1[3-9]\d{9}$/.test(form.phone.trim())) return ElMessage.warning('请输入正确手机号')
   if (!/^\d{9,25}$/.test(form.bankAccount.trim())) return ElMessage.warning('请输入 9 到 25 位银行卡号')
   if (sensitiveChanged.value && !form.code.trim()) return ElMessage.warning('手机号或银行卡变更需要验证码')
+  const phoneChanged = props.merchant && form.phone !== props.merchant.phone
   saving.value = true
   try {
     const merchant = await updateMyMerchantProfile(payload())
     emit('saved', merchant)
     dialogVisible.value = false
-    ElMessage.success('店铺资料已更新')
+    if (phoneChanged) {
+      ElMessage.success({
+        message: `手机号已变更为 ${form.phone}，请使用新号码重新登录`,
+        duration: 8000
+      })
+    } else {
+      ElMessage.success('店铺资料已更新')
+    }
   } finally {
     saving.value = false
   }

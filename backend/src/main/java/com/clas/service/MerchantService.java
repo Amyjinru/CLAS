@@ -1,6 +1,7 @@
 package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.GeoUtils;
 import com.clas.common.MerchantStatusEnum;
@@ -180,6 +181,8 @@ public class MerchantService {
     @Transactional
     public MerchantResponse updateMyProfile(MerchantProfileUpdateRequest request) {
         Merchant merchant = currentMerchant();
+        String oldPhone = merchant.getPhone();
+        String oldUserId = merchant.getUserId();
         String nextName = normalizeRequired(request.merchantName(), "店铺名称不能为空");
         String nextAddress = normalizeRequired(request.address(), "店铺地址不能为空");
         String nextPhone = PhoneValidator.normalizeAndValidate(request.phone());
@@ -190,18 +193,23 @@ public class MerchantService {
         if (!GeoUtils.hasCoordinate(request.longitude(), request.latitude())) {
             throw new BusinessException("请选择店铺地图位置");
         }
-        boolean phoneChanged = !nextPhone.equals(merchant.getPhone());
+        boolean phoneChanged = !nextPhone.equals(oldPhone);
         boolean bankChanged = !nextBankAccount.equals(merchant.getBankAccount());
         if (phoneChanged || bankChanged) {
-            String verifyPhone = phoneChanged ? nextPhone : merchant.getPhone();
+            String verifyPhone = phoneChanged ? nextPhone : oldPhone;
             verificationCodeStore.verify(verifyPhone, "merchant-profile", request.code());
         }
         if (phoneChanged) {
+            // Check for duplicate contact phone among other merchants
             Long phoneCount = merchantMapper.selectCount(new LambdaQueryWrapper<Merchant>()
                 .eq(Merchant::getPhone, nextPhone)
                 .ne(Merchant::getId, merchant.getId()));
             if (phoneCount > 0) {
                 throw new BusinessException("联系电话已被其他商家占用");
+            }
+            // Check if the new phone is already registered as a different user
+            if (userMapper.selectById(nextPhone) != null && !nextPhone.equals(oldUserId)) {
+                throw new BusinessException("该手机号已被注册，无法使用");
             }
         }
 
@@ -214,6 +222,16 @@ public class MerchantService {
         merchant.setPhone(nextPhone);
         merchant.setBankAccount(nextBankAccount);
         merchantMapper.updateById(merchant);
+
+        if (phoneChanged) {
+            // Update user.phone (login credential) and merchant.userId in sync
+            userMapper.update(null, new LambdaUpdateWrapper<User>()
+                .eq(User::getPhone, oldUserId)
+                .set(User::getPhone, nextPhone));
+            merchant.setUserId(nextPhone);
+            merchantMapper.updateById(merchant);
+        }
+
         return convertToResponse(merchantMapper.selectById(merchant.getId()));
     }
 
