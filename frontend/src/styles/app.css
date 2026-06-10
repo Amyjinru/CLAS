@@ -14,7 +14,8 @@ button,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0 16px;
   font-weight: 600;
   font-family: var(--font-body);
@@ -54,7 +55,7 @@ textarea {
   width: 100%;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  min-height: 40px;
+  min-height: 44px;
   padding: 8px 12px;
   font: inherit;
   font-family: var(--font-body);
