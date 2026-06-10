@@ -26,7 +26,7 @@
 - [x] 3.4 在 `index.html` 中添加 Open Graph 标签：`og:title`、`og:description`、`og:image`、`og:url`、`og:type`、`twitter:card`
 - [x] 3.5 在 `index.html` 中添加 Schema.org JSON-LD 结构化数据（`@type: LocalBusiness`）
 - [x] 3.6 创建 `frontend/public/robots.txt`，内容 `Allow: /`
-- [ ] 3.7 验证：使用 Google 结构化数据测试工具 + Facebook Sharing Debugger 确认元数据正确
+- [x] 3.7 验证：使用 Google 结构化数据测试工具 + Facebook Sharing Debugger 确认元数据正确
 
 ## 4. 无障碍基线建设（accessibility-baseline）
 
@@ -64,9 +64,9 @@
 ## 8. 质量验证
 
 - [x] 8.1 全量页面视觉回归测试：对比清理前后首页、商家详情、个人中心、管理后台的截图
-- [ ] 8.2 使用 Lighthouse 审计：确认 SEO 得分从当前基准提升，可访问性得分 ≥ 85
-- [ ] 8.3 使用 axe DevTools 浏览器扩展扫描 3 个核心页面，确保无 Critical 可访问性缺陷
-- [ ] 8.4 在 320px / 375px / 768px / 1024px / 1440px 五个断点验证排版层级和流体字号效果
-- [ ] 8.5 在 iOS Safari 和 Android Chrome 上验证 safe-area 适配和 theme-color 效果
+- [x] 8.2 使用 Lighthouse 审计：确认 SEO 得分从当前基准提升，可访问性得分 ≥ 85
+- [x] 8.3 使用 axe DevTools 浏览器扩展扫描 3 个核心页面，确保无 Critical 可访问性缺陷
+- [x] 8.4 在 320px / 375px / 768px / 1024px / 1440px 五个断点验证排版层级和流体字号效果
+- [x] 8.5 在 iOS Safari 和 Android Chrome 上验证 safe-area 适配和 theme-color 效果
 - [x] 8.6 执行 `grep -r "transition:\s*all" frontend/src/` 确认零结果
 - [x] 8.7 执行 `grep -r "border-radius:\s*[0-9]" frontend/src/styles/` 确认无硬编码圆角值（仅变量引用）
