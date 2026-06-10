@@ -59,5 +59,5 @@
 - [x] 7.1 Run `mvn test` and fix any backend regressions.
 - [x] 7.2 Run `npm run build` and confirm production build succeeds.
 - [x] 7.3 Verify the build output no longer reports avoidable oversized chart initial chunks, or document remaining chunk-size rationale.
-- [ ] 7.4 Perform manual smoke checks for login/session expiry, cart checkout, payment, coupon use, admin dashboard, merchant products, and profile center.
+- [x] 7.4 Perform manual smoke checks for login/session expiry, cart checkout, payment, coupon use, admin dashboard, merchant products, and profile center.
 - [x] 7.5 Update docs or release notes for breaking authentication/config changes and legacy API deprecation.
