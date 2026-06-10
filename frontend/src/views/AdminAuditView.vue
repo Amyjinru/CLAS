@@ -389,7 +389,9 @@ onMounted(load)
   box-sizing: border-box !important;
   box-shadow: none !important;
 }
-.toolbar > .el-input :deep(.el-input__wrapper:hover),
+.toolbar > .el-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--border-color) inset !important;
+}
 .toolbar > .el-input :deep(.el-input__wrapper.is-focus) {
   box-shadow: none !important;
 }
