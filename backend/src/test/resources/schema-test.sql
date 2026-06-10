@@ -18,6 +18,7 @@ DROP TABLE IF EXISTS favorite;
 DROP TABLE IF EXISTS user_address;
 DROP TABLE IF EXISTS payment;
 DROP TABLE IF EXISTS review;
+DROP TABLE IF EXISTS chat_message;
 DROP TABLE IF EXISTS order_item;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS cart;
@@ -165,6 +166,16 @@ CREATE TABLE order_item (
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL,
     price INT NOT NULL
+);
+
+CREATE TABLE chat_message (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    merchant_id BIGINT NOT NULL,
+    user_id VARCHAR(11) NOT NULL,
+    sender_role VARCHAR(10) NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE review (

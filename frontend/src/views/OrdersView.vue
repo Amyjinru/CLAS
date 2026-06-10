@@ -2,9 +2,10 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
-import { cancelOrder, completeOrder, getReviewByOrder, listOrders, requestRefund } from '../api/clas'
+import { cancelOrder, completeOrder, getReviewByOrder, listOrders, requestRefund, getOrderMessages } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
+import ChatWindow from '../components/ChatWindow.vue'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
 import { orderStatusMap } from '../utils/status'
@@ -13,6 +14,8 @@ const orders = ref([])
 const message = ref('')
 const reviewedOrderIds = ref(new Set())
 const { confirmAction } = useConfirmAction()
+const chatOrder = ref(null)
+const chatHasHistory = ref(new Set())
 
 const refundStatusLabel = {
   PENDING: '待商家审核',
@@ -88,7 +91,35 @@ function distanceText(distance) {
   return formatDistance(distance)
 }
 
-onMounted(load)
+function openChat(order) {
+  chatOrder.value = order
+}
+
+function closeChat() {
+  chatOrder.value = null
+}
+
+async function checkChatHistory(order) {
+  try {
+    const messages = await getOrderMessages(order.order.id)
+    return messages && messages.length > 0
+  } catch {
+    return false
+  }
+}
+
+onMounted(async () => {
+  await load()
+  // Check chat history for completed orders
+  for (const order of orders.value) {
+    if (order.order.status === 'COMPLETED') {
+      const hasHistory = await checkChatHistory(order)
+      if (hasHistory) {
+        chatHasHistory.value = new Set([...chatHasHistory.value, order.order.id])
+      }
+    }
+  }
+})
 </script>
 
 <template>
@@ -153,6 +184,20 @@ onMounted(load)
           >
             申请退款
           </button>
+          <button
+            v-if="['PAID', 'ACCEPTED'].includes(order.order.status)"
+            class="secondary"
+            @click="openChat(order)"
+          >
+            联系商家
+          </button>
+          <button
+            v-if="order.order.status === 'COMPLETED' && chatHasHistory.has(order.order.id)"
+            class="secondary"
+            @click="openChat(order)"
+          >
+            查看聊天记录
+          </button>
           <RouterLink
             v-if="order.order.status === 'COMPLETED' && !hasReview(order.order.id)"
             class="button secondary"
@@ -166,6 +211,27 @@ onMounted(load)
     </section>
 
     <el-empty v-if="!orders.length && !message" description="暂无订单" />
+
+    <!-- Chat overlay -->
+    <div v-if="chatOrder" class="order-overlay" @click.self="closeChat">
+      <aside class="chat-panel">
+        <header class="chat-panel-head">
+          <h2>与商家沟通</h2>
+          <p class="chat-panel-subtitle">订单 #{{ chatOrder.order.id }}</p>
+          <button class="panel-close" type="button" @click="closeChat">×</button>
+        </header>
+        <div class="chat-panel-body">
+          <ChatWindow
+            :order-id="chatOrder.order.id"
+            :merchant-id="chatOrder.order.merchantId"
+            :merchant-name="chatOrder.merchantName || ''"
+            role="USER"
+            :order-status="chatOrder.order.status"
+            :order-number="chatOrder.order.id"
+          />
+        </div>
+      </aside>
+    </div>
   </div>
 </template>
 
@@ -228,5 +294,61 @@ onMounted(load)
   .orders-list {
     grid-template-columns: 1fr;
   }
+}
+
+/* Chat panel styles */
+.order-overlay {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.28);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 30;
+}
+
+.chat-panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  height: 520px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.chat-panel-head {
+  align-items: center;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px;
+}
+
+.chat-panel-head h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.chat-panel-subtitle {
+  color: #667085;
+  font-size: 13px;
+  margin: 0;
+  margin-left: auto;
+}
+
+.chat-panel-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+.chat-panel-body :deep(.chat-window) {
+  border: none;
+  border-radius: 0;
+  max-height: none;
 }
 </style>

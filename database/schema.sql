@@ -24,6 +24,7 @@ DROP TABLE IF EXISTS favorite;
 DROP TABLE IF EXISTS user_address;
 DROP TABLE IF EXISTS payment;
 DROP TABLE IF EXISTS review;
+DROP TABLE IF EXISTS chat_message;
 DROP TABLE IF EXISTS order_item;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS cart;
@@ -198,6 +199,18 @@ CREATE TABLE order_item (
     INDEX idx_order_item_product_order (product_id, order_id),
     CONSTRAINT fk_order_item_order FOREIGN KEY (order_id) REFERENCES orders(id),
     CONSTRAINT fk_order_item_product FOREIGN KEY (product_id) REFERENCES product(id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE chat_message (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    merchant_id BIGINT NOT NULL,
+    user_id VARCHAR(11) NOT NULL,
+    sender_role VARCHAR(10) NOT NULL COMMENT 'USER or MERCHANT',
+    content TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_chat_order (order_id),
+    INDEX idx_chat_merchant_user (merchant_id, user_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

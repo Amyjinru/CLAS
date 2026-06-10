@@ -7,6 +7,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
 import OrderDetailContent from '../components/OrderDetailContent.vue'
+import ChatWindow from '../components/ChatWindow.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
 
 const router = useRouter()
@@ -182,8 +183,18 @@ function openDetail(order) {
   selectedOrder.value = order
 }
 
+const chatOrder = ref(null)
+
 function closeDetail() {
   selectedOrder.value = null
+}
+
+function openChat(order) {
+  chatOrder.value = order
+}
+
+function closeChat() {
+  chatOrder.value = null
 }
 
 onMounted(() => {
@@ -461,6 +472,27 @@ onMounted(() => {
     </div>
     </div>
 
+    <!-- Chat overlay -->
+    <div v-if="chatOrder" class="order-overlay" @click.self="closeChat">
+      <aside class="chat-panel">
+        <header class="chat-panel-head">
+          <h2>与用户沟通</h2>
+          <p class="chat-panel-subtitle">订单 #{{ chatOrder.order.id }}</p>
+          <button class="panel-close" type="button" @click="closeChat">×</button>
+        </header>
+        <div class="chat-panel-body">
+          <ChatWindow
+            :order-id="chatOrder.order.id"
+            :merchant-id="chatOrder.order.merchantId"
+            :merchant-name="merchant?.merchantName || ''"
+            role="MERCHANT"
+            :order-status="chatOrder.order.status"
+            :order-number="chatOrder.order.id"
+          />
+        </div>
+      </aside>
+    </div>
+
     <!-- ===== version_314: 订单详情侧滑弹窗 ===== -->
     <div v-if="selectedOrder" class="order-overlay" @click.self="closeDetail">
       <aside class="order-panel">
@@ -474,6 +506,14 @@ onMounted(() => {
         </div>
 
         <footer class="order-panel-foot">
+          <button
+            v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
+            type="button"
+            class="secondary"
+            @click="openChat(selectedOrder)"
+          >
+            联系用户
+          </button>
           <button
             v-if="selectedOrder.order.status === 'PAID'"
             type="button"
@@ -779,5 +819,50 @@ onMounted(() => {
   .order-overlay {
     padding: 14px;
   }
+}
+
+/* Chat panel styles */
+.console-container .chat-panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  height: 520px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.chat-panel-head {
+  align-items: center;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px;
+}
+
+.chat-panel-head h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.chat-panel-subtitle {
+  color: #667085;
+  font-size: 13px;
+  margin: 0;
+  margin-left: auto;
+}
+
+.chat-panel-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+.chat-panel-body :deep(.chat-window) {
+  border: none;
+  border-radius: 0;
+  max-height: none;
 }
 </style>

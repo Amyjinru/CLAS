@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { currentRole, listAddresses, listAnnouncements, listMerchants, currentUser } from '../api/clas'
+import { currentRole, listAddresses, listAnnouncements, listMerchants, currentUser, listOrders } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
+import ChatWindow from '../components/ChatWindow.vue'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
@@ -19,6 +20,9 @@ const addresses = ref([])
 const selectedAddressId = ref('')
 const currentLocation = ref(getCurrentLocation())
 const locationDialogVisible = ref(false)
+const activeOrders = ref([])
+const chatOrder = ref(null)
+const ordersLoading = ref(false)
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
 const sortLabels = {
   distance: '距离最近',
@@ -194,10 +198,53 @@ function resetFilters() {
   load()
 }
 
+const orderStatusLabel = {
+  PENDING_PAYMENT: '待支付',
+  PAID: '已支付',
+  ACCEPTED: '商家已接单',
+  COMPLETED: '已完成',
+  CANCELED: '已取消',
+  REJECTED: '商家已拒单',
+  REFUNDED: '已退款',
+  REFUND_PENDING: '退款处理中'
+}
+
+const deliveryLabel = {
+  WAITING: '等待商家接单',
+  PREPARING: '商家备餐中',
+  DELIVERING: '配送中',
+  DELIVERED: '已送达'
+}
+
+function openChat(order) {
+  chatOrder.value = order
+}
+
+function closeChat() {
+  chatOrder.value = null
+}
+
+async function loadActiveOrders() {
+  if (currentRole() !== 'USER') return
+  ordersLoading.value = true
+  try {
+    const all = await listOrders()
+    activeOrders.value = all.filter((o) => o.order.status === 'PAID' || o.order.status === 'ACCEPTED')
+  } catch {
+    activeOrders.value = []
+  } finally {
+    ordersLoading.value = false
+  }
+}
+
+function hasActiveOrders() {
+  return activeOrders.value.length > 0
+}
+
 onMounted(async () => {
   await loadAddresses()
   await autoLocate()
-  await load()
+  await Promise.all([load(), loadActiveOrders()])
 })
 </script>
 
@@ -210,6 +257,31 @@ onMounted(async () => {
     <div class="hero-actions" v-if="currentRole() === 'USER'">
       <RouterLink class="button" to="/deals">团购到店</RouterLink>
       <RouterLink class="button secondary" to="/orders">我的订单</RouterLink>
+    </div>
+  </section>
+
+  <!-- 进行中的订单 -->
+  <section class="panel active-orders-panel" v-if="currentRole() === 'USER' && hasActiveOrders()" v-loading="ordersLoading">
+    <div class="section-head">
+      <h2>进行中的订单</h2>
+      <RouterLink to="/orders">查看全部订单</RouterLink>
+    </div>
+    <div class="active-order-list">
+      <article class="active-order-card" v-for="order in activeOrders" :key="order.order.id">
+        <div class="ao-info">
+          <span class="ao-id">订单 #{{ order.order.id }}</span>
+          <el-tag size="small" :type="order.order.status === 'PAID' ? 'warning' : 'success'">
+            {{ orderStatusLabel[order.order.status] || order.order.status }}
+          </el-tag>
+          <span class="ao-delivery">{{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }}</span>
+          <span class="ao-price">¥{{ (order.order.totalPrice / 100).toFixed(2) }}</span>
+          <span class="ao-items">{{ order.items.length }} 件商品</span>
+        </div>
+        <div class="ao-actions">
+          <button class="secondary" @click="openChat(order)">联系商家</button>
+          <RouterLink class="button secondary" :to="`/orders`">查看详情</RouterLink>
+        </div>
+      </article>
     </div>
   </section>
 
@@ -305,6 +377,27 @@ onMounted(async () => {
       @confirm="confirmLocation"
     />
   </el-dialog>
+
+  <!-- 聊天弹窗 -->
+  <div v-if="chatOrder" class="order-overlay" @click.self="closeChat">
+    <aside class="chat-panel">
+      <header class="chat-panel-head">
+        <h2>与商家沟通</h2>
+        <p class="chat-panel-subtitle">订单 #{{ chatOrder.order.id }}</p>
+        <button class="panel-close" type="button" @click="closeChat">×</button>
+      </header>
+      <div class="chat-panel-body">
+        <ChatWindow
+          :order-id="chatOrder.order.id"
+          :merchant-id="chatOrder.order.merchantId"
+          :merchant-name="''"
+          role="USER"
+          :order-status="chatOrder.order.status"
+          :order-number="chatOrder.order.id"
+        />
+      </div>
+    </aside>
+  </div>
 </template>
 
 <style scoped>
@@ -414,5 +507,126 @@ onMounted(async () => {
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.6;
+}
+
+/* 进行中的订单 */
+.active-orders-panel {
+  margin-bottom: 20px;
+}
+
+.active-order-list {
+  display: grid;
+  gap: 12px;
+}
+
+.active-order-card {
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px 18px;
+}
+
+.ao-info {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ao-id {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ao-delivery {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.ao-price {
+  color: var(--clas-danger, #f56c6c);
+  font-weight: 700;
+}
+
+.ao-items {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ao-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 聊天弹窗 */
+.order-overlay {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.28);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 30;
+}
+
+.chat-panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  height: 520px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.chat-panel-head {
+  align-items: center;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px;
+}
+
+.chat-panel-head h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.chat-panel-subtitle {
+  color: #667085;
+  font-size: 13px;
+  margin: 0 0 0 auto;
+}
+
+.panel-close {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 18px;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.chat-panel-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+.chat-panel-body :deep(.chat-window) {
+  border: none;
+  border-radius: 0;
+  max-height: none;
 }
 </style>
