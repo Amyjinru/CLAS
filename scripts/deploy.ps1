@@ -28,7 +28,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$PROJECT_ROOT = Split-Path -Parent $PSScriptRoot
 $SERVER_IP = "8.141.112.182"
 $SERVER_USER = "root"
 
@@ -49,12 +49,18 @@ Push-Location $PROJECT_ROOT
 try {
     if ($CommitMessage) {
         Prompt-Message "Step 1/3: 提交代码到 dev 分支"
-        git add -u
-        git add openspec/
-        git commit -m $CommitMessage
-        Check-Result "git commit"
-        git push upstream dev
-        Check-Result "git push to upstream/dev"
+        git add -A
+        $staged = git diff --cached --name-only
+        if ($staged) {
+            Write-Host "变更文件:"
+            $staged | ForEach-Object { Write-Host "  $_" }
+            git commit -m $CommitMessage
+            Check-Result "git commit"
+            git push upstream dev
+            Check-Result "git push to upstream/dev"
+        } else {
+            Write-Host "没有需要提交的变更，跳过提交" -ForegroundColor Yellow
+        }
     } else {
         $status = git status --porcelain
         if ($status) {
@@ -101,6 +107,11 @@ echo '>>> 拉取最新代码...'
 git pull upstream dev
 echo '>>> 构建并部署...'
 clas deploy 2>&1
+echo '>>> 健康检查...'
+sleep 2
+curl -s http://127.0.0.1:8080/api/health
+echo ''
+echo '>>> 完成!'
 "@
 } else {
     Prompt-Message "Step 3/3: SSH 连接服务器（输入密码）"
