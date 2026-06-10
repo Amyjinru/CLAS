@@ -4,22 +4,18 @@ import { useRouter } from 'vue-router'
 import {
   getMyMerchant,
   getMerchantProducts,
-  createProduct,
-  updateProduct,
   updateProductStatus,
   deleteProduct,
   listProductCategories,
-  createProductCategory,
-  updateProductCategory,
-  deleteProductCategory,
-  uploadProductImage,
   uploadMerchantLogo,
   currentUser
 } from '../api/clas'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
 import ProductStatusAction from '../components/product/ProductStatusAction.vue'
+import ProductCategoryManager from '../components/product/ProductCategoryManager.vue'
+import ProductFormDialog from '../components/product/ProductFormDialog.vue'
 import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
 import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
 import { merchantStatusMap, productStatusMap } from '../utils/status'
@@ -37,42 +33,14 @@ const total = ref(0)
 const searchKeyword = ref('')
 const categoryFilter = ref('')
 const categories = ref([])
-const categoryForm = ref({ name: '', sortOrder: 0 })
 
 // Dialog state
 const dialogVisible = ref(false)
-const dialogTitle = ref('新增商品')
-const formRef = ref(null)
 const isEdit = ref(false)
-const uploadLoading = ref(false)
+const selectedProduct = ref(null)
 const logoInputRef = ref(null)
 const logoUploading = ref(false)
 const profileDialogVisible = ref(false)
-
-const form = ref({
-  id: null,
-  name: '',
-  description: '',
-  price: 0,
-  stock: 0,
-  categoryId: null,
-  imageUrl: ''
-})
-
-const rules = {
-  name: [
-    { required: true, message: '商品名称不能为空', trigger: 'blur' },
-    { max: 50, message: '商品名称不能超过50个字符', trigger: 'blur' }
-  ],
-  price: [
-    { required: true, message: '商品价格不能为空', trigger: 'blur' },
-    { type: 'number', min: 0.01, message: '价格必须大于 0', trigger: 'blur' }
-  ],
-  stock: [
-    { required: true, message: '库存不能为空', trigger: 'blur' },
-    { type: 'integer', min: 0, message: '库存不能小于 0', trigger: 'blur' }
-  ]
-}
 
 async function loadMerchant() {
   loading.value = true
@@ -137,32 +105,13 @@ function handleSizeChange(size) {
 
 function openAddDialog() {
   isEdit.value = false
-  dialogTitle.value = '新增商品'
-  form.value = {
-    id: null,
-    name: '',
-    description: '',
-    price: 0,
-    stock: 0,
-    categoryId: null,
-    imageUrl: ''
-  }
+  selectedProduct.value = null
   dialogVisible.value = true
-  if (formRef.value) formRef.value.resetFields()
 }
 
 function openEditDialog(row) {
   isEdit.value = true
-  dialogTitle.value = '编辑商品'
-  form.value = {
-    id: row.id,
-    name: row.name,
-    description: row.description || '',
-    price: row.price / 100, // Convert cents to Yuan for display
-    stock: row.stock,
-    categoryId: row.categoryId || null,
-    imageUrl: row.imageUrl || ''
-  }
+  selectedProduct.value = row
   dialogVisible.value = true
 }
 
@@ -192,66 +141,15 @@ async function handleDelete(id) {
   }
 }
 
-async function handleCreateCategory() {
-  if (!categoryForm.value.name.trim()) {
-    ElMessage.warning('请填写分类名称')
-    return
-  }
-  await createProductCategory({
-    name: categoryForm.value.name.trim(),
-    sortOrder: categoryForm.value.sortOrder
-  })
-  ElMessage.success('分类已创建')
-  categoryForm.value = { name: '', sortOrder: 0 }
-  await loadCategories()
-}
-
-async function handleUpdateCategory(category) {
-  await updateProductCategory({
-    id: category.id,
-    name: category.name,
-    sortOrder: category.sortOrder
-  })
-  ElMessage.success('分类已保存')
-  await loadCategories()
-}
-
-async function handleDeleteCategory(category) {
-  await ElMessageBox.confirm(
-    `删除分类「${category.name}」后，分类下商品将变为未分类。确定删除吗？`,
-    '删除分类',
-    { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
-  )
-  await deleteProductCategory(category.id)
-  ElMessage.success('分类已删除')
-  if (categoryFilter.value === category.id) {
+function onCategoryReload({ deletedId } = {}) {
+  if (deletedId && categoryFilter.value === deletedId) {
     categoryFilter.value = ''
   }
-  await Promise.all([loadCategories(), loadProducts()])
+  Promise.all([loadCategories(), loadProducts()])
 }
 
-function beforeImageUpload(file) {
-  const allowed = ['image/jpeg', 'image/png']
-  if (!allowed.includes(file.type)) {
-    ElMessage.warning('仅支持 jpg/png 图片')
-    return false
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.warning('图片不能超过 5MB')
-    return false
-  }
-  return true
-}
-
-async function handleImageUpload({ file }) {
-  uploadLoading.value = true
-  try {
-    const data = await uploadProductImage(file)
-    form.value.imageUrl = data.url
-    ElMessage.success('图片上传成功')
-  } finally {
-    uploadLoading.value = false
-  }
+function onProductSaved() {
+  loadProducts()
 }
 
 function openLogoPicker() {
@@ -286,34 +184,6 @@ async function onLogoSelected(event) {
 
 function onMerchantProfileSaved(nextMerchant) {
   merchant.value = nextMerchant
-}
-
-function submitForm() {
-  if (!formRef.value) return
-  formRef.value.validate(async (valid) => {
-    if (!valid) return
-    
-    // Prepare payload (convert Yuan back to cents/fen for price)
-    const payload = {
-      ...form.value,
-      categoryId: form.value.categoryId || null,
-      price: Math.round(form.value.price * 100)
-    }
-
-    try {
-      if (isEdit.value) {
-        await updateProduct(payload)
-        ElMessage.success('商品修改成功')
-      } else {
-        await createProduct(payload)
-        ElMessage.success('商品添加成功，默认为下架状态')
-      }
-      dialogVisible.value = false
-      await loadProducts()
-    } catch (error) {
-      // handled
-    }
-  })
 }
 
 onMounted(loadMerchant)
@@ -427,29 +297,7 @@ onMounted(loadMerchant)
           class="status-alert"
         />
 
-        <el-card class="box-card work-card category-card">
-          <template #header>
-            <div class="card-header justify-between">
-              <h3>分类管理</h3>
-            </div>
-          </template>
-
-          <div class="category-create-row">
-            <el-input v-model="categoryForm.name" placeholder="分类名称，如 主食、饮品、小食" maxlength="50" />
-            <el-input-number v-model="categoryForm.sortOrder" :min="0" :step="1" />
-            <el-button type="primary" @click="handleCreateCategory">添加分类</el-button>
-          </div>
-
-          <div class="category-list" v-if="categories.length">
-            <div v-for="category in categories" :key="category.id" class="category-item">
-              <el-input v-model="category.name" maxlength="50" />
-              <el-input-number v-model="category.sortOrder" :min="0" :step="1" />
-              <el-button type="primary" @click="handleUpdateCategory(category)">保存</el-button>
-              <el-button type="danger" @click="handleDeleteCategory(category)">删除</el-button>
-            </div>
-          </div>
-          <el-empty v-else description="暂无商品分类" />
-        </el-card>
+        <ProductCategoryManager :categories="categories" @reload="onCategoryReload" />
 
         <el-card class="box-card work-card">
           <template #header>
@@ -606,95 +454,13 @@ onMounted(loadMerchant)
       @saved="onMerchantProfileSaved"
     />
 
-    <!-- Product Form Dialog -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="550px"
-      destroy-on-close
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="90px"
-        style="padding: 10px 20px 0 0;"
-      >
-        <el-form-item label="商品名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入商品名称" maxLength="50" />
-        </el-form-item>
-
-        <el-form-item label="商品价格" prop="price">
-          <el-input-number 
-            v-model="form.price" 
-            :precision="2" 
-            :step="0.5" 
-            :min="0" 
-            placeholder="单位：元" 
-            style="width: 180px;"
-          />
-          <span style="margin-left: 10px; color: #909399; font-size: 13px;">单位：元</span>
-        </el-form-item>
-
-        <el-form-item label="商品库存" prop="stock">
-          <el-input-number 
-            v-model="form.stock" 
-            :min="0" 
-            :step="1" 
-            placeholder="库存量" 
-            style="width: 180px;"
-          />
-        </el-form-item>
-
-        <el-form-item label="所属分类" prop="categoryId">
-          <el-select v-model="form.categoryId" placeholder="请选择分类" clearable style="width: 100%">
-            <el-option label="未分类" :value="null" />
-            <el-option
-              v-for="category in categories"
-              :key="category.id"
-              :label="category.name"
-              :value="category.id"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="商品图片" prop="imageUrl">
-          <div class="image-upload-box">
-            <el-image
-              v-if="form.imageUrl"
-              :src="form.imageUrl"
-              fit="cover"
-              class="product-preview-img"
-            />
-            <el-upload
-              :show-file-list="false"
-              :before-upload="beforeImageUpload"
-              :http-request="handleImageUpload"
-            >
-              <el-button :loading="uploadLoading" type="primary">上传图片</el-button>
-            </el-upload>
-            <el-input v-model="form.imageUrl" placeholder="图片 URL 会在上传后自动填入，也可手动输入" />
-          </div>
-        </el-form-item>
-
-        <el-form-item label="商品描述" prop="description">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入商品详细描述"
-            maxLength="200"
-            show-word-limit
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitForm">确定</el-button>
-        </div>
-      </template>
-    </el-dialog>
+    <ProductFormDialog
+      v-model:visible="dialogVisible"
+      :is-edit="isEdit"
+      :product="selectedProduct"
+      :categories="categories"
+      @saved="onProductSaved"
+    />
   </div>
 </template>
 
@@ -839,27 +605,7 @@ onMounted(loadMerchant)
   border-radius: 8px;
 }
 
-.work-card {
-  border-radius: 12px;
-}
-
-.category-card {
-  margin-bottom: 20px;
-}
-
-.category-create-row,
-.category-item {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) 140px auto auto;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.category-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 14px;
-}
+.work-card { border-radius: 12px; }
 
 .search-bar {
   display: flex;
@@ -873,19 +619,6 @@ onMounted(loadMerchant)
   height: 50px;
   border-radius: 6px;
   border: 1px solid #e4e7ed;
-}
-
-.image-upload-box {
-  display: grid;
-  gap: 10px;
-  width: 100%;
-}
-
-.product-preview-img {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  height: 120px;
-  width: 120px;
 }
 
 .image-slot {

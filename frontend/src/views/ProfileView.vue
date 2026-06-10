@@ -2,8 +2,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
-  createAddress,
-  deleteAddress,
   deleteNotification,
   deleteAllNotifications,
   getProfile,
@@ -16,18 +14,16 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   removeFavorite,
-  setDefaultAddress,
   sessionUser,
   setSessionUser,
-  submitAppeal,
-  updateAddress,
   updateProfile,
   uploadAvatar
 } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import LocationSelector from '../components/LocationSelector.vue'
 import ProfileHero from '../components/profile/ProfileHero.vue'
 import ProfileSummary from '../components/profile/ProfileSummary.vue'
+import ProfileAddressSection from '../components/profile/ProfileAddressSection.vue'
+import ProfilePenaltySection from '../components/profile/ProfilePenaltySection.vue'
 
 const addresses = ref([])
 const dealOrders = ref([])
@@ -37,39 +33,14 @@ const penalties = ref([])
 const appeals = ref([])
 const loading = ref(false)
 const loadError = ref('')
-const savingAddress = ref(false)
-const addressActionId = ref('')
 const favoriteActionId = ref(null)
 const notificationActionId = ref(null)
 const markingAllRead = ref(false)
 const deletingAllNotifications = ref(false)
-const editingAddressId = ref(null)
-const locationKey = ref(0)
-const addressFormRef = ref(null)
 const activeProfileTab = ref('transactions')
 const profileForm = reactive({ nickname: '', avatar: '' })
-const appealForm = reactive({ penaltyId: null, content: '' })
 const avatarUploading = ref(false)
 const nicknameSaving = ref(false)
-
-const form = reactive({
-  contactName: '',
-  phone: '',
-  address: '',
-  longitude: null,
-  latitude: null,
-  isDefault: false
-})
-
-const locationData = reactive({
-  province: '',
-  city: '',
-  district: '',
-  street: '',
-  address: '',
-  longitude: null,
-  latitude: null
-})
 
 const currentUser = computed(() => sessionUser.value || {})
 const unreadCount = computed(() => notifications.value.filter(item => !item.readFlag).length)
@@ -84,99 +55,14 @@ const transactionShortcuts = computed(() => [
   { label: '购物车', value: '继续结算已选商品', to: '/cart', type: 'success' },
   { label: '生活预约', value: '查看预约记录', to: '/bookings', type: 'warning' }
 ])
-const penaltyTypeLabel = {
-  MUTE: '禁言',
-  BAN: '封禁',
-  SERVICE_STOP: '停止服务'
-}
-const appealStatusLabel = {
-  PENDING: '待处理',
-  APPROVED: '已通过',
-  REJECTED: '已驳回'
-}
-const appealablePenalties = computed(() => penalties.value.filter((item) => item.active))
 const displayName = computed(() => profileForm.nickname || currentUser.value?.username || currentUser.value?.phone || '未命名用户')
-const addressRules = {
-  contactName: [{ required: true, message: '请填写联系人', trigger: 'blur' }],
-  phone: [{ required: true, message: '请填写联系电话', trigger: 'blur' }],
-  address: [{ required: true, message: '请选择或定位收货地址', trigger: 'change' }]
-}
 
 function getErrorMessage(error, fallback = '操作失败，请稍后重试') {
   return error?.response?.data?.message || error?.message || fallback
 }
 
-function hasCoordinate(longitude, latitude) {
-  return longitude !== null && longitude !== undefined && longitude !== ''
-    && latitude !== null && latitude !== undefined && latitude !== ''
-}
-
-function resetLocationData() {
-  Object.assign(locationData, {
-    province: '',
-    city: '',
-    district: '',
-    street: '',
-    address: '',
-    longitude: null,
-    latitude: null
-  })
-  locationKey.value += 1
-}
-
-function resetForm() {
-  Object.assign(form, {
-    contactName: '',
-    phone: '',
-    address: '',
-    longitude: null,
-    latitude: null,
-    isDefault: false
-  })
-  editingAddressId.value = null
-  resetLocationData()
-}
-
-function onLocationConfirm(loc) {
-  syncLocationDraft(loc)
-  ElMessage.success('收货位置已确认')
-}
-
-function syncLocationDraft(loc) {
-  Object.assign(form, {
-    address: loc.address,
-    longitude: loc.longitude,
-    latitude: loc.latitude
-  })
-  addressFormRef.value?.clearValidate?.('address')
-}
-
 function openSummaryCard(item) {
   activeProfileTab.value = item.targetTab
-}
-
-function validateAddressForm() {
-  const contactName = form.contactName.trim()
-  const phone = form.phone.trim()
-  const address = form.address.trim()
-  if (!contactName) {
-    ElMessage.warning('请填写联系人')
-    return false
-  }
-  if (!phone) {
-    ElMessage.warning('请填写联系电话')
-    return false
-  }
-  if (!address || !hasCoordinate(form.longitude, form.latitude)) {
-    ElMessage.warning('请选择或定位收货地址')
-    return false
-  }
-  Object.assign(form, {
-    contactName,
-    phone,
-    address
-  })
-  return true
 }
 
 const silentConfig = { silent: true }
@@ -241,13 +127,6 @@ function avatarText() {
   return (displayName.value || '?').slice(0, 1).toUpperCase()
 }
 
-function avatarStyle() {
-  if (profileForm.avatar) {
-    return { backgroundImage: `url(${profileForm.avatar})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-  }
-  return {}
-}
-
 async function load() {
   loading.value = true
   loadError.value = ''
@@ -272,89 +151,6 @@ async function load() {
     ElMessage.warning('部分个人中心数据加载失败')
   }
   loading.value = false
-}
-
-async function submitAddress() {
-  if (!validateAddressForm()) {
-    return
-  }
-  savingAddress.value = true
-  try {
-    if (editingAddressId.value) {
-      await updateAddress(editingAddressId.value, form)
-      ElMessage.success('地址已更新')
-    } else {
-      await createAddress(form)
-      ElMessage.success('地址已保存')
-    }
-    resetForm()
-    await load()
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, '地址保存失败'))
-  } finally {
-    savingAddress.value = false
-  }
-}
-
-function editAddress(item) {
-  editingAddressId.value = item.id
-  Object.assign(form, {
-    contactName: item.contactName,
-    phone: item.phone,
-    address: item.address,
-    longitude: item.longitude,
-    latitude: item.latitude,
-    isDefault: Boolean(item.isDefault)
-  })
-  Object.assign(locationData, {
-    province: '',
-    city: '',
-    district: '',
-    street: item.address || '',
-    address: item.address || '',
-    longitude: item.longitude,
-    latitude: item.latitude
-  })
-  locationKey.value += 1
-}
-
-async function markDefault(id) {
-  addressActionId.value = `default-${id}`
-  try {
-    await setDefaultAddress(id)
-    ElMessage.success('默认地址已更新')
-    await load()
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, '设置默认地址失败'))
-  } finally {
-    addressActionId.value = ''
-  }
-}
-
-async function removeAddress(id) {
-  try {
-    await ElMessageBox.confirm('删除后需要重新添加该收货地址，确定删除吗？', '删除地址', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-  } catch {
-    return
-  }
-
-  addressActionId.value = `delete-${id}`
-  try {
-    await deleteAddress(id)
-    if (editingAddressId.value === id) {
-      resetForm()
-    }
-    ElMessage.success('地址已删除')
-    await load()
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, '删除地址失败'))
-  } finally {
-    addressActionId.value = ''
-  }
 }
 
 async function removeFavoriteMerchant(id) {
@@ -433,30 +229,6 @@ async function clearAllNotifications() {
   } finally {
     deletingAllNotifications.value = false
   }
-}
-
-async function sendAppeal() {
-  if (!appealForm.content.trim()) {
-    ElMessage.warning('请填写申诉内容')
-    return
-  }
-  try {
-    await submitAppeal({
-      penaltyId: appealForm.penaltyId || undefined,
-      content: appealForm.content.trim()
-    })
-    appealForm.content = ''
-    appealForm.penaltyId = null
-    ElMessage.success('申诉已提交')
-    await load()
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, '申诉提交失败'))
-  }
-}
-
-function formatDateTime(value) {
-  if (!value) return ''
-  return String(value).replace('T', ' ').slice(0, 16)
 }
 
 function formatMoney(cents) {
@@ -588,133 +360,11 @@ onMounted(async () => {
       </el-tab-pane>
 
       <el-tab-pane label="账号与申诉" name="account">
-        <div class="section-head">
-          <div>
-            <h2>处罚记录</h2>
-            <p>查看平台对账号的限制状态</p>
-          </div>
-        </div>
-        <el-empty v-if="!penalties.length" description="暂无处罚记录" />
-        <article v-for="item in penalties" v-else :key="item.id" class="list-row">
-          <div>
-            <strong>{{ penaltyTypeLabel[item.penaltyType] || item.penaltyType }}</strong>
-            <p>{{ item.reason }}</p>
-            <p class="muted">
-              {{ item.active ? '生效中' : '已失效' }}
-              <span v-if="item.endTime"> · 至 {{ formatDateTime(item.endTime) }}</span>
-            </p>
-          </div>
-          <el-tag :type="item.active ? 'danger' : 'info'">{{ item.active ? '生效中' : '已结束' }}</el-tag>
-        </article>
-
-        <div class="section-head" style="margin-top: 20px">
-          <div>
-            <h2>处罚申诉</h2>
-            <p>如对禁言、封禁等处理有异议，可提交申诉</p>
-          </div>
-        </div>
-        <div v-if="appealablePenalties.length" class="appeal-penalty-select">
-          <span>关联处罚（可选）</span>
-          <el-select v-model="appealForm.penaltyId" clearable placeholder="选择要申诉的处罚">
-            <el-option
-              v-for="item in appealablePenalties"
-              :key="item.id"
-              :label="`#${item.id} ${penaltyTypeLabel[item.penaltyType] || item.penaltyType}：${item.reason}`"
-              :value="item.id"
-            />
-          </el-select>
-        </div>
-        <el-input v-model="appealForm.content" type="textarea" rows="3" placeholder="请描述申诉理由" />
-        <el-button type="primary" style="margin-top: 10px" @click="sendAppeal">提交申诉</el-button>
-        <article v-for="item in appeals" :key="item.id" class="list-row">
-          <div>
-            <strong>{{ appealStatusLabel[item.status] || item.status }}</strong>
-            <p>{{ item.content }}</p>
-            <p v-if="item.adminReply" class="muted">管理员回复：{{ item.adminReply }}</p>
-          </div>
-        </article>
+        <ProfilePenaltySection :penalties="penalties" :appeals="appeals" @reload="load" />
       </el-tab-pane>
 
       <el-tab-pane label="地址与资料" name="addresses" lazy>
-        <div class="section-head">
-          <div>
-            <h2>收货地址</h2>
-            <p>{{ editingAddressId ? '正在编辑已保存地址' : '新增常用收货地址' }}</p>
-          </div>
-          <el-tag type="success">{{ addresses.length }} 个地址</el-tag>
-        </div>
-
-        <el-form
-          ref="addressFormRef"
-          class="address-form"
-          :model="form"
-          :rules="addressRules"
-          label-position="top"
-        >
-          <div class="form-row">
-            <el-form-item label="联系人" prop="contactName" required>
-              <el-input v-model="form.contactName" placeholder="收货人姓名" />
-            </el-form-item>
-            <el-form-item label="联系电话" prop="phone" required>
-              <el-input v-model="form.phone" placeholder="收货人手机号" />
-            </el-form-item>
-          </div>
-          <el-form-item label="收货位置" prop="address" required>
-            <LocationSelector
-              :key="locationKey"
-              v-model="locationData"
-              @update:modelValue="syncLocationDraft"
-              @confirm="onLocationConfirm"
-            />
-          </el-form-item>
-          <div class="form-actions">
-            <el-checkbox v-model="form.isDefault">设为默认地址</el-checkbox>
-            <div>
-              <el-button @click="resetForm">
-                {{ editingAddressId ? '取消编辑' : '重置' }}
-              </el-button>
-              <el-button type="primary" :loading="savingAddress" @click="submitAddress">
-                {{ editingAddressId ? '保存修改' : '保存地址' }}
-              </el-button>
-            </div>
-          </div>
-        </el-form>
-
-        <el-empty v-if="!addresses.length" description="暂无收货地址">
-          <el-button type="primary" plain @click="resetForm">添加地址</el-button>
-        </el-empty>
-
-        <article v-for="item in addresses" v-else :key="item.id" class="list-row address-row">
-          <div>
-            <div class="row-title">
-              <strong>{{ item.contactName }}</strong>
-              <el-tag v-if="item.isDefault" type="success" size="small">默认</el-tag>
-            </div>
-            <p>{{ item.phone }} · {{ item.address }}</p>
-            <p v-if="hasCoordinate(item.longitude, item.latitude)" class="coord-line">
-              {{ Number(item.longitude).toFixed(6) }}, {{ Number(item.latitude).toFixed(6) }}
-            </p>
-          </div>
-          <div class="row-actions">
-            <el-button text type="primary" @click="editAddress(item)">编辑</el-button>
-            <el-button
-              v-if="!item.isDefault"
-              text
-              :loading="addressActionId === `default-${item.id}`"
-              @click="markDefault(item.id)"
-            >
-              设默认
-            </el-button>
-            <el-button
-              text
-              type="danger"
-              :loading="addressActionId === `delete-${item.id}`"
-              @click="removeAddress(item.id)"
-            >
-              删除
-            </el-button>
-          </div>
-        </article>
+        <ProfileAddressSection :addresses="addresses" @reload="load" />
       </el-tab-pane>
 
       <el-tab-pane label="消息与服务" name="messages">
@@ -828,115 +478,23 @@ onMounted(async () => {
   justify-content: space-between;
   margin-bottom: 16px;
 }
-.section-head h2 {
-  margin: 0;
-}
-.section-head p {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin: 6px 0 0;
-}
-.address-form {
-  border-bottom: 1px solid var(--border-light);
-  margin-bottom: 6px;
-  padding-bottom: 16px;
-}
-.form-row {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.form-actions {
-  align-items: center;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-}
-.list-row {
-  align-items: center;
-  border-top: 1px dashed var(--border-light);
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 14px;
-}
-.notification-fold p {
-  color: var(--text-secondary);
-  margin: 0;
-}
-.address-form { margin-bottom: 18px; }
+.section-head h2 { margin: 0; }
+.section-head p { color: var(--text-secondary); font-size: 13px; margin: 6px 0 0; }
 .list-row {
   align-items: center; border-top: 1px solid var(--border-light);
   display: flex; justify-content: space-between; padding: 14px 0;
 }
-.row-title {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.row-actions {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
-.address-preview {
-  background: #f0f9eb;
-  border: 1px solid #d1edc4;
-  border-radius: 8px;
-  color: #529b2e;
-  display: grid;
-  font-size: 13px;
-  gap: 4px;
-  line-height: 1.4;
-  margin-top: 10px;
-  padding: 10px 12px;
-  width: 100%;
-}
-.address-preview small {
-  color: #67c23a;
-}
+.notification-fold p { color: var(--text-secondary); margin: 0; }
+.row-title { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+.row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .notification-row.unread {
-  background: #fff7f0;
-  margin-left: -12px;
-  margin-right: -12px;
-  padding-left: 12px;
-  padding-right: 12px;
+  background: #fff7f0; margin-left: -12px; margin-right: -12px;
+  padding-left: 12px; padding-right: 12px;
 }
-.voucher-row strong {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
+.voucher-row strong { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 @media (max-width: 900px) {
-  .shortcut-grid {
-    grid-template-columns: 1fr;
-  }
-  .form-row,
-  .form-actions {
-    grid-template-columns: 1fr;
-  }
-  .form-actions {
-    align-items: stretch;
-    display: grid;
-  }
-  .list-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .row-actions {
-    justify-content: flex-start;
-  }
+  .shortcut-grid { grid-template-columns: 1fr; }
+  .list-row { align-items: flex-start; flex-direction: column; }
+  .row-actions { justify-content: flex-start; }
 }
-.appeal-penalty-select {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.appeal-penalty-select .el-select { min-width: 280px; }
-.address-preview { margin-top: 8px; font-size: 13px; color: #67c23a; }
-@media (max-width: 900px) { .profile-grid { grid-template-columns: 1fr; } }
 </style>

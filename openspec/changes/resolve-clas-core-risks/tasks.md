@@ -48,8 +48,8 @@
 - [x] 6.1 Add shared frontend formatters for fen-to-yuan money, date/time, and common status label/type maps.
 - [x] 6.2 Add reusable `MoneyText` and `StatusTag` components and migrate high-traffic pages to use them.
 - [x] 6.3 Add composables for table query/pagination and confirmation actions, then migrate admin list pages incrementally.
-- [ ] 6.4 Split `ProfileView.vue` into focused profile, address, penalty/appeal, and account-action sections.
-- [ ] 6.5 Split `MerchantProductsView.vue` into category management, product table, product form, image upload, and status action components.
+- [x] 6.4 Split `ProfileView.vue` into focused profile, address, penalty/appeal, and account-action sections.
+- [x] 6.5 Split `MerchantProductsView.vue` into category management, product table, product form, image upload, and status action components.
 - [ ] 6.6 Extract reusable cart/order action UI from `CartView.vue` and `MerchantDetailView.vue` without changing user-visible flows.
 - [x] 6.7 Configure Vite manual chunks for Vue, Element Plus, ECharts/charts, and app code.
 - [x] 6.8 Change chart imports/routes so ECharts code loads only for dashboard or analytics views.
