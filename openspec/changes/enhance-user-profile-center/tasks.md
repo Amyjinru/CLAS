@@ -40,11 +40,11 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Test profile loading with addresses, favorites, vouchers, and notifications.
-- [ ] 6.2 Test empty states for addresses, favorites, vouchers, and notifications where possible.
-- [ ] 6.3 Test address save, set-default, and delete flows.
-- [ ] 6.4 Test notification single mark-read flow.
-- [ ] 6.5 If optional endpoints are implemented, test address edit and mark-all-read flows.
+- [x] 6.1 Test profile loading with addresses, favorites, vouchers, and notifications.
+- [x] 6.2 Test empty states for addresses, favorites, vouchers, and notifications where possible.
+- [x] 6.3 Test address save, set-default, and delete flows.
+- [x] 6.4 Test notification single mark-read flow.
+- [x] 6.5 If optional endpoints are implemented, test address edit and mark-all-read flows.
 - [x] 6.6 Run frontend build after implementation.
 - [x] 6.7 If backend endpoints are implemented, run backend tests.
 

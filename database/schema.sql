@@ -1,6 +1,20 @@
 CREATE DATABASE IF NOT EXISTS clas DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE clas;
 
+-- ============================================================
+-- DROP (按外键依赖反序)
+-- ============================================================
+DROP TABLE IF EXISTS deal_redeem_log;
+DROP TABLE IF EXISTS user_coupon;
+DROP TABLE IF EXISTS coupon;
+DROP TABLE IF EXISTS appeal;
+DROP TABLE IF EXISTS user_penalty;
+DROP TABLE IF EXISTS deleted_review_backup;
+DROP TABLE IF EXISTS review_delete_request;
+DROP TABLE IF EXISTS review_user_hidden;
+DROP TABLE IF EXISTS review_vote;
+DROP TABLE IF EXISTS review_reply;
+DROP TABLE IF EXISTS review_image;
 DROP TABLE IF EXISTS announcement;
 DROP TABLE IF EXISTS service_booking;
 DROP TABLE IF EXISTS deal_order;
@@ -19,12 +33,18 @@ DROP TABLE IF EXISTS merchant_audit_log;
 DROP TABLE IF EXISTS merchant;
 DROP TABLE IF EXISTS `user`;
 
+-- ============================================================
+-- 核心业务表
+-- ============================================================
+
 CREATE TABLE `user` (
     phone VARCHAR(20) PRIMARY KEY,
     username VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL,
-    enabled TINYINT(1) NOT NULL DEFAULT 1
+    enabled TINYINT(1) NOT NULL DEFAULT 1,
+    avatar VARCHAR(512),
+    nickname VARCHAR(50)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE merchant (
@@ -48,7 +68,9 @@ CREATE TABLE merchant (
     settlement_cycle INT,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
-    UNIQUE KEY uk_merchant_user_id (user_id)
+    UNIQUE KEY uk_merchant_user_id (user_id),
+    INDEX idx_merchant_status (status),
+    INDEX idx_merchant_category (category)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE merchant_audit_log (
@@ -58,7 +80,8 @@ CREATE TABLE merchant_audit_log (
     old_status VARCHAR(20),
     new_status VARCHAR(20) NOT NULL,
     remarks VARCHAR(255),
-    created_at DATETIME NOT NULL
+    created_at DATETIME NOT NULL,
+    INDEX idx_audit_log_merchant (merchant_id, created_at DESC)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE product_category (
@@ -68,7 +91,8 @@ CREATE TABLE product_category (
     sort_order INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
-    UNIQUE KEY uk_product_category_merchant_name (merchant_id, name)
+    UNIQUE KEY uk_product_category_merchant_name (merchant_id, name),
+    INDEX idx_product_category_merchant (merchant_id, sort_order, id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE product (
@@ -82,14 +106,17 @@ CREATE TABLE product (
     image VARCHAR(255),
     status VARCHAR(20) NOT NULL DEFAULT 'ON_SALE',
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    updated_at DATETIME NOT NULL,
+    INDEX idx_product_merchant (merchant_id, status),
+    INDEX idx_product_category_id (category_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE cart (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,
     product_id BIGINT NOT NULL,
-    quantity INT NOT NULL
+    quantity INT NOT NULL,
+    INDEX idx_cart_user (user_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE user_address (
@@ -102,7 +129,8 @@ CREATE TABLE user_address (
     latitude DECIMAL(10,6),
     is_default TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    updated_at DATETIME NOT NULL,
+    INDEX idx_address_user (user_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE favorite (
@@ -110,7 +138,8 @@ CREATE TABLE favorite (
     user_id VARCHAR(20) NOT NULL,
     merchant_id BIGINT NOT NULL,
     created_at DATETIME NOT NULL,
-    UNIQUE KEY uk_favorite_user_merchant (user_id, merchant_id)
+    UNIQUE KEY uk_favorite_user_merchant (user_id, merchant_id),
+    INDEX idx_favorite_user (user_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE notification (
@@ -119,14 +148,23 @@ CREATE TABLE notification (
     title VARCHAR(100) NOT NULL,
     content VARCHAR(255) NOT NULL,
     read_flag TINYINT(1) NOT NULL DEFAULT 0,
-    created_at DATETIME NOT NULL
+    created_at DATETIME NOT NULL,
+    INDEX idx_notification_user_read (user_id, read_flag, created_at DESC)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 交易表
+-- ============================================================
 
 CREATE TABLE orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,
     merchant_id BIGINT NOT NULL,
     total_price INT NOT NULL,
+    subtotal INT NOT NULL DEFAULT 0,
+    delivery_fee INT NOT NULL DEFAULT 0,
+    coupon_discount INT NOT NULL DEFAULT 0,
+    user_coupon_id BIGINT,
     status VARCHAR(20) NOT NULL,
     delivery_address VARCHAR(255),
     delivery_longitude DECIMAL(10,6),
@@ -137,7 +175,15 @@ CREATE TABLE orders (
     estimated_minutes INT NOT NULL DEFAULT 30,
     refund_reason VARCHAR(255),
     refund_status VARCHAR(20) NOT NULL DEFAULT 'NONE',
-    create_time DATETIME NOT NULL
+    refund_requested_at DATETIME,
+    refund_resolved_at DATETIME,
+    remark VARCHAR(255),
+    reject_reason VARCHAR(255),
+    refund_reject_reason VARCHAR(255),
+    create_time DATETIME NOT NULL,
+    INDEX idx_orders_user (user_id, create_time DESC),
+    INDEX idx_orders_merchant_status (merchant_id, status, create_time DESC),
+    INDEX idx_orders_status (status)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE order_item (
@@ -145,8 +191,13 @@ CREATE TABLE order_item (
     order_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL,
-    price INT NOT NULL
+    price INT NOT NULL,
+    INDEX idx_order_item_order (order_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 评价体系
+-- ============================================================
 
 CREATE TABLE review (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -156,8 +207,84 @@ CREATE TABLE review (
     content TEXT,
     merchant_reply TEXT,
     report_reason VARCHAR(255),
-    report_status VARCHAR(20) NOT NULL DEFAULT 'NONE'
+    report_status VARCHAR(20) NOT NULL DEFAULT 'NONE',
+    created_at DATETIME,
+    INDEX idx_review_user (user_id),
+    INDEX idx_review_order (order_id),
+    INDEX idx_review_report_status (report_status)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE review_image (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    review_id BIGINT NOT NULL,
+    image_url VARCHAR(512) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    INDEX idx_review_image_review (review_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE review_reply (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    review_id BIGINT NOT NULL,
+    parent_reply_id BIGINT,
+    user_id VARCHAR(20) NOT NULL,
+    reply_type VARCHAR(20) NOT NULL DEFAULT 'USER',
+    content TEXT NOT NULL,
+    deleted TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    INDEX idx_review_reply_review (review_id, created_at)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE review_vote (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    target_type VARCHAR(20) NOT NULL,
+    target_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    vote_type VARCHAR(10) NOT NULL,
+    created_at DATETIME NOT NULL,
+    UNIQUE KEY uk_review_vote (target_type, target_id, user_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE review_user_hidden (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    review_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    created_at DATETIME NOT NULL,
+    UNIQUE KEY uk_review_hidden (review_id, user_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE deleted_review_backup (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    review_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    order_id BIGINT NOT NULL,
+    score INT NOT NULL,
+    content TEXT,
+    images_json TEXT,
+    deleted_by VARCHAR(20) NOT NULL,
+    delete_type VARCHAR(20) NOT NULL,
+    deleted_at DATETIME NOT NULL
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE review_delete_request (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    review_id BIGINT NOT NULL,
+    reply_id BIGINT,
+    merchant_id BIGINT NOT NULL,
+    request_type VARCHAR(20) NOT NULL DEFAULT 'MERCHANT',
+    reporter_user_id VARCHAR(20),
+    reason VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    admin_id VARCHAR(20),
+    admin_remarks VARCHAR(255),
+    created_at DATETIME NOT NULL,
+    processed_at DATETIME,
+    INDEX idx_review_delete_req_status (status)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 支付
+-- ============================================================
 
 CREATE TABLE payment (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -166,16 +293,29 @@ CREATE TABLE payment (
     amount INT NOT NULL,
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
-    create_time DATETIME NOT NULL
+    create_time DATETIME NOT NULL,
+    INDEX idx_payment_order (order_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 公告（含置顶和有效期）
+-- ============================================================
 
 CREATE TABLE announcement (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     title VARCHAR(100) NOT NULL,
     content TEXT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
-    create_time DATETIME NOT NULL
+    pinned TINYINT(1) NOT NULL DEFAULT 0,
+    start_at DATETIME,
+    end_at DATETIME,
+    create_time DATETIME NOT NULL,
+    INDEX idx_announcement_published (status, pinned DESC, create_time DESC)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 服务预约
+-- ============================================================
 
 CREATE TABLE service_booking (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -187,8 +327,14 @@ CREATE TABLE service_booking (
     note VARCHAR(255),
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    updated_at DATETIME NOT NULL,
+    INDEX idx_booking_user (user_id),
+    INDEX idx_booking_merchant (merchant_id, status)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 团购
+-- ============================================================
 
 CREATE TABLE group_deal (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -201,7 +347,8 @@ CREATE TABLE group_deal (
     valid_days INT NOT NULL DEFAULT 30,
     status VARCHAR(20) NOT NULL DEFAULT 'ON_SALE',
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    updated_at DATETIME NOT NULL,
+    INDEX idx_group_deal_merchant (merchant_id, status)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE deal_order (
@@ -212,9 +359,92 @@ CREATE TABLE deal_order (
     voucher_code VARCHAR(40) NOT NULL UNIQUE,
     status VARCHAR(20) NOT NULL DEFAULT 'UNUSED',
     pay_amount INT NOT NULL,
+    paid_time DATETIME,
+    expire_time DATETIME,
     create_time DATETIME NOT NULL,
-    used_time DATETIME
+    used_time DATETIME,
+    INDEX idx_deal_order_user (user_id, status),
+    INDEX idx_deal_order_merchant (merchant_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE deal_redeem_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    deal_order_id BIGINT NOT NULL,
+    merchant_id BIGINT NOT NULL,
+    voucher_code VARCHAR(40) NOT NULL,
+    operator_id VARCHAR(20) NOT NULL,
+    redeemed_at DATETIME NOT NULL,
+    INDEX idx_redeem_log_order (deal_order_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 优惠券
+-- ============================================================
+
+CREATE TABLE coupon (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(100) NOT NULL,
+    description VARCHAR(255),
+    coupon_type VARCHAR(20) NOT NULL DEFAULT 'FIXED',
+    discount_amount INT NOT NULL DEFAULT 0,
+    discount_percent INT,
+    min_order_amount INT NOT NULL DEFAULT 0,
+    merchant_id BIGINT,
+    total_limit INT NOT NULL DEFAULT 0,
+    claimed_count INT NOT NULL DEFAULT 0,
+    valid_from DATETIME NOT NULL,
+    valid_to DATETIME NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at DATETIME NOT NULL,
+    INDEX idx_coupon_status (status)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_coupon (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    coupon_id BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'UNUSED',
+    order_id BIGINT,
+    claimed_at DATETIME NOT NULL,
+    used_at DATETIME,
+    UNIQUE KEY uk_user_coupon (user_id, coupon_id),
+    INDEX idx_user_coupon_user_status (user_id, status)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 违规与申诉
+-- ============================================================
+
+CREATE TABLE user_penalty (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    penalty_type VARCHAR(30) NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    start_time DATETIME NOT NULL,
+    end_time DATETIME,
+    admin_id VARCHAR(20) NOT NULL,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL,
+    INDEX idx_penalty_user (user_id, active)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE appeal (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    penalty_id BIGINT,
+    content TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    admin_reply TEXT,
+    admin_id VARCHAR(20),
+    created_at DATETIME NOT NULL,
+    processed_at DATETIME,
+    INDEX idx_appeal_user (user_id),
+    INDEX idx_appeal_status (status)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 种子数据（BCrypt 密码哈希 → 明文: Abc123!）
+-- ============================================================
 
 INSERT INTO `user` (phone, username, password, role, enabled) VALUES
     ('13800000001', 'user', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'USER', 1),
@@ -241,8 +471,8 @@ INSERT INTO product (id, merchant_id, category_id, name, description, price, sto
 INSERT INTO user_address (id, user_id, contact_name, phone, address, longitude, latitude, is_default, created_at, updated_at) VALUES
     (1, '13800000001', '张同学', '13800000001', '软件学院 A 座 302', 116.398000, 39.910000, 1, NOW(), NOW());
 
-INSERT INTO announcement (id, title, content, status, create_time) VALUES
-    (1, '平台公告', '欢迎使用 CLAS 生活助手平台演示版。', 'PUBLISHED', NOW());
+INSERT INTO announcement (id, title, content, status, pinned, start_at, end_at, create_time) VALUES
+    (1, '平台公告', '欢迎使用 CLAS 生活助手平台演示版。', 'PUBLISHED', 0, NOW(), NULL, NOW());
 
 INSERT INTO service_booking (id, user_id, merchant_id, service_name, appointment_time, contact_phone, note, status, created_at, updated_at) VALUES
     (1, '13800000001', 1, '门店轻食咨询', DATE_ADD(NOW(), INTERVAL 1 DAY), '13800000001', '希望安排下午到店', 'CONFIRMED', NOW(), NOW());
@@ -250,3 +480,7 @@ INSERT INTO service_booking (id, user_id, merchant_id, service_name, appointment
 INSERT INTO group_deal (id, merchant_id, title, description, original_price, deal_price, stock, valid_days, status, created_at, updated_at) VALUES
     (1, 1, '双人轻食套餐', '任选两份主食加酸奶杯，到店核销更划算', 6400, 4990, 50, 30, 'ON_SALE', NOW(), NOW()),
     (2, 2, '咖啡下午茶券', '拿铁或冷萃任选一杯，工作日下午可用', 2200, 1590, 80, 15, 'ON_SALE', NOW(), NOW());
+
+INSERT INTO coupon (id, title, description, coupon_type, discount_amount, min_order_amount, merchant_id, total_limit, claimed_count, valid_from, valid_to, status, created_at) VALUES
+    (1, '新用户满减券', '外卖订单满 ¥20 减 ¥3', 'FIXED', 300, 2000, NULL, 1000, 0, NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY), 'ACTIVE', NOW()),
+    (2, '轻食铺专享券', '校园轻食铺满 ¥15 减 ¥2', 'FIXED', 200, 1500, 1, 500, 0, NOW(), DATE_ADD(NOW(), INTERVAL 60 DAY), 'ACTIVE', NOW());

@@ -20,19 +20,29 @@ public class AnnouncementService {
         return announcementRepository.findPublishedList();
     }
 
+    public List<Announcement> listAdmin() {
+        return announcementRepository.findAdminList();
+    }
+
     public Announcement create(AnnouncementRequest request) {
         Announcement announcement = new Announcement();
-        announcement.setTitle(request.title());
-        announcement.setContent(request.content());
+        announcement.setTitle(request.getTitle());
+        announcement.setContent(request.getContent());
         announcement.setStatus("PUBLISHED");
+        announcement.setPinned(request.getPinned() != null ? request.getPinned() : false);
+        announcement.setStartAt(request.getStartAt() != null ? request.getStartAt() : LocalDateTime.now());
+        announcement.setEndAt(request.getEndAt());
         announcement.setCreateTime(LocalDateTime.now());
         return announcementRepository.save(announcement);
     }
 
     public Announcement update(Long id, AnnouncementRequest request) {
         Announcement announcement = requireAnnouncement(id);
-        announcement.setTitle(request.title());
-        announcement.setContent(request.content());
+        announcement.setTitle(request.getTitle());
+        announcement.setContent(request.getContent());
+        announcement.setPinned(request.getPinned() != null ? request.getPinned() : announcement.getPinned());
+        announcement.setStartAt(request.getStartAt() != null ? request.getStartAt() : announcement.getStartAt());
+        announcement.setEndAt(request.getEndAt());
         return announcementRepository.save(announcement);
     }
 

@@ -259,6 +259,9 @@ CREATE TABLE announcement (
     title VARCHAR(100) NOT NULL,
     content CLOB NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
+    pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    start_at TIMESTAMP,
+    end_at TIMESTAMP,
     create_time TIMESTAMP NOT NULL
 );
 

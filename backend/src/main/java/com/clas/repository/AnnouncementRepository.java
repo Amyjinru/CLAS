@@ -14,5 +14,7 @@ public interface AnnouncementRepository {
 
     List<Announcement> findPublishedList();
 
+    List<Announcement> findAdminList();
+
     void deleteById(Long id);
 }

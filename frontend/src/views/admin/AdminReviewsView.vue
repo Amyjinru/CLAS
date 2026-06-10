@@ -128,6 +128,13 @@ function resetReviewFilters() {
   searchReviews()
 }
 
+function exportCSV() {
+  const params = new URLSearchParams()
+  if (reviewFilters.reportStatus) params.set('reportStatus', reviewFilters.reportStatus)
+  if (reviewFilters.keyword.trim()) params.set('keyword', reviewFilters.keyword.trim())
+  window.open('/api/admin/export/reviews?' + params.toString(), '_blank')
+}
+
 async function refreshAll() {
   await Promise.all([loadDeleteRequests(), loadReviews()])
 }
@@ -235,6 +242,7 @@ onMounted(refreshAll)
         </el-select>
         <el-button type="primary" @click="searchReviews">查询</el-button>
         <el-button @click="resetReviewFilters">重置</el-button>
+        <el-button @click="exportCSV">导出 CSV</el-button>
       </div>
 
       <el-table :data="reviews" stripe v-loading="loading" size="small" empty-text="暂无匹配评价">

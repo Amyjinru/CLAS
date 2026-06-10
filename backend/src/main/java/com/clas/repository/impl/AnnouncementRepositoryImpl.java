@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.entity.Announcement;
 import com.clas.mapper.AnnouncementMapper;
 import com.clas.repository.AnnouncementRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
@@ -18,7 +19,6 @@ public class AnnouncementRepositoryImpl implements AnnouncementRepository {
 
     @Override
     public Announcement save(Announcement announcement) {
-        // id 为空表示新公告；已有 id 时走更新，方便 Service 复用同一个保存入口。
         if (announcement.getId() == null) {
             announcementMapper.insert(announcement);
         } else {
@@ -34,9 +34,20 @@ public class AnnouncementRepositoryImpl implements AnnouncementRepository {
 
     @Override
     public List<Announcement> findPublishedList() {
-        // 只给用户端展示已发布公告，最新发布的排在前面。
+        LocalDateTime now = LocalDateTime.now();
         return announcementMapper.selectList(new LambdaQueryWrapper<Announcement>()
             .eq(Announcement::getStatus, "PUBLISHED")
+            .and(w -> w.isNull(Announcement::getStartAt).or().le(Announcement::getStartAt, now))
+            .and(w -> w.isNull(Announcement::getEndAt).or().ge(Announcement::getEndAt, now))
+            .orderByDesc(Announcement::getPinned)
+            .orderByDesc(Announcement::getCreateTime)
+            .orderByDesc(Announcement::getId));
+    }
+
+    @Override
+    public List<Announcement> findAdminList() {
+        return announcementMapper.selectList(new LambdaQueryWrapper<Announcement>()
+            .orderByDesc(Announcement::getPinned)
             .orderByDesc(Announcement::getCreateTime)
             .orderByDesc(Announcement::getId));
     }

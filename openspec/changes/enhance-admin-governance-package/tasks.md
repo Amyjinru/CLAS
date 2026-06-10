@@ -42,7 +42,7 @@
 - [x] 4.8 Add matching optional filters to `GET /api/admin/reviews` where needed.
 - [x] 4.9 Improve review processing copy, remarks display, and post-action refresh.
 - [x] 4.10 Improve `AdminAnnouncementsView.vue` list/form layout, loading state, empty state, and edit/reset flow.
-- [ ] 4.11 Announcement pinned/effective-window support (数据库 + 后端 + 前端)
+- [x] 4.11 Announcement pinned/effective-window support (数据库 + 后端 + 前端)
 
       **4.11.1 Database migration**: Add columns to `announcement` table via idempotent migration:
       - `pinned TINYINT(1) NOT NULL DEFAULT 0`
@@ -80,7 +80,7 @@
       - Show "已过期" tag when endAt is before now.
       - Ensure form resets pinned/date fields on edit and after submit.
       - Empty state and loading state remain functional.
-- [ ] 4.12 Optional: add CSV export for users, orders, or reviews using current filters.
+- [x] 4.12 Optional: add CSV export for users, orders, or reviews using current filters.
 
       **4.12.1 Backend export endpoints** (`AdminController.java`):
       - Add `GET /api/admin/export/users` with same filter params as `/api/admin/users`.
@@ -104,7 +104,7 @@
 
 - [x] 6.1 Run frontend build after UI changes.
 - [x] 6.2 Run backend tests or backend package after API changes.
-- [ ] 6.3 Manually verify `/admin/audit` filters, details, audit dialog, and logs.
-- [ ] 6.4 Manually verify `/admin/dashboard` date filter, chart states, and refresh.
-- [ ] 6.5 Manually verify `/admin/users`, `/admin/orders`, `/admin/reviews`, and `/admin/announcements` governance flows.
-- [ ] 6.6 If deployed, run `clas deploy` and verify `/api/health`.
+- [x] 6.3 Manually verify `/admin/audit` filters, details, audit dialog, and logs.
+- [x] 6.4 Manually verify `/admin/dashboard` date filter, chart states, and refresh.
+- [x] 6.5 Manually verify `/admin/users`, `/admin/orders`, `/admin/reviews`, and `/admin/announcements` governance flows.
+- [x] 6.6 If deployed, run `clas deploy` and verify `/api/health`.

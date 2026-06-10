@@ -23,13 +23,13 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Test keyword search by merchant name, address, and category.
-- [ ] 4.2 Test category filter with and without keyword.
-- [ ] 4.3 Test all sort modes: distance, score, price, latest.
-- [ ] 4.4 Test deliverable-only with selected location/address.
-- [ ] 4.5 Test deliverable-only behavior without location.
-- [ ] 4.6 Test reset filters returns to default browsing state.
-- [ ] 4.7 Test empty result state with an impossible keyword.
+- [x] 4.1 Test keyword search by merchant name, address, and category.
+- [x] 4.2 Test category filter with and without keyword.
+- [x] 4.3 Test all sort modes: distance, score, price, latest.
+- [x] 4.4 Test deliverable-only with selected location/address.
+- [x] 4.5 Test deliverable-only behavior without location.
+- [x] 4.6 Test reset filters returns to default browsing state.
+- [x] 4.7 Test empty result state with an impossible keyword.
 - [x] 4.8 Run frontend build or dev-server smoke test after implementation.
 
 ## 5. Conflict Avoidance

@@ -54,6 +54,14 @@ function resetFilters() {
   search()
 }
 
+function exportCSV() {
+  const params = new URLSearchParams()
+  if (filters.role) params.set('role', filters.role)
+  if (filters.enabled !== '' && filters.enabled !== undefined) params.set('enabled', filters.enabled)
+  if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim())
+  window.open('/api/admin/export/users?' + params.toString(), '_blank')
+}
+
 async function changeStatus(user) {
   const action = user.enabled ? '禁用' : '启用'
   try {
@@ -130,6 +138,7 @@ onMounted(load)
         </el-select>
         <el-button type="primary" @click="search">查询</el-button>
         <el-button @click="resetFilters">重置</el-button>
+        <el-button @click="exportCSV">导出 CSV</el-button>
       </div>
 
       <el-table :data="users" stripe v-loading="loading" size="small" empty-text="暂无匹配用户">

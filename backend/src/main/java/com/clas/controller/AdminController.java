@@ -16,11 +16,14 @@ import com.clas.service.AppealService;
 import com.clas.service.PenaltyService;
 import com.clas.service.ReviewService;
 import com.clas.service.StatisticsService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -312,5 +315,127 @@ public class AdminController {
             body.get("adminReply"),
             com.clas.config.UserContext.getUserId()
         ));
+    }
+
+    // ==================== CSV 导出 ====================
+
+    @GetMapping("/export/users")
+    public void exportUsers(
+        @RequestParam(required = false) String role,
+        @RequestParam(required = false) Boolean enabled,
+        @RequestParam(required = false) String keyword,
+        HttpServletResponse response
+    ) throws IOException {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        if (role != null && !role.isBlank()) wrapper.eq(User::getRole, role);
+        if (enabled != null) wrapper.eq(User::getEnabled, enabled);
+        if (keyword != null && !keyword.isBlank()) {
+            String nk = keyword.trim();
+            wrapper.and(w -> w.like(User::getPhone, nk).or().like(User::getUsername, nk).or().like(User::getNickname, nk));
+        }
+        wrapper.orderByAsc(User::getPhone);
+        List<User> users = userMapper.selectList(wrapper);
+
+        setCsvHeaders(response, "users.csv");
+        PrintWriter w = response.getWriter();
+        w.println("﻿手机号,用户名,角色,状态,昵称");
+        for (User u : users) {
+            w.println(String.join(",",
+                csvEscape(u.getPhone()),
+                csvEscape(u.getUsername()),
+                csvEscape(u.getRole()),
+                Boolean.TRUE.equals(u.getEnabled()) ? "启用" : "禁用",
+                csvEscape(u.getNickname() != null ? u.getNickname() : "")
+            ));
+        }
+        w.flush();
+    }
+
+    @GetMapping("/export/orders")
+    public void exportOrders(
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+        @RequestParam(required = false) String keyword,
+        HttpServletResponse response
+    ) throws IOException {
+        LambdaQueryWrapper<Orders> wrapper = new LambdaQueryWrapper<>();
+        if (status != null && !status.isBlank()) wrapper.eq(Orders::getStatus, status);
+        if (startDate != null) wrapper.ge(Orders::getCreateTime, startDate.atStartOfDay());
+        if (endDate != null) wrapper.le(Orders::getCreateTime, endDate.atTime(LocalTime.MAX));
+        if (keyword != null && !keyword.isBlank()) {
+            String nk = keyword.trim();
+            wrapper.and(w -> {
+                w.like(Orders::getUserId, nk).or().like(Orders::getDeliveryAddress, nk);
+                try { w.or().eq(Orders::getId, Long.valueOf(nk)).or().eq(Orders::getMerchantId, Long.valueOf(nk)); }
+                catch (NumberFormatException ignored) {}
+            });
+        }
+        wrapper.orderByDesc(Orders::getCreateTime);
+        List<Orders> orders = ordersMapper.selectList(wrapper);
+
+        setCsvHeaders(response, "orders.csv");
+        PrintWriter w = response.getWriter();
+        w.println("﻿订单ID,用户手机,商家ID,金额(分),状态,配送状态,退款状态,创建时间,收货地址");
+        for (Orders o : orders) {
+            w.println(String.join(",",
+                String.valueOf(o.getId()),
+                csvEscape(o.getUserId()),
+                String.valueOf(o.getMerchantId()),
+                String.valueOf(o.getTotalPrice()),
+                csvEscape(o.getStatus()),
+                csvEscape(o.getDeliveryStatus()),
+                csvEscape(o.getRefundStatus()),
+                csvEscape(o.getCreateTime() != null ? o.getCreateTime().toString() : ""),
+                csvEscape(o.getDeliveryAddress() != null ? o.getDeliveryAddress() : "")
+            ));
+        }
+        w.flush();
+    }
+
+    @GetMapping("/export/reviews")
+    public void exportReviews(
+        @RequestParam(required = false) String reportStatus,
+        @RequestParam(required = false) String keyword,
+        HttpServletResponse response
+    ) throws IOException {
+        LambdaQueryWrapper<Review> wrapper = new LambdaQueryWrapper<>();
+        if (reportStatus != null && !reportStatus.isBlank()) wrapper.eq(Review::getReportStatus, reportStatus);
+        if (keyword != null && !keyword.isBlank()) {
+            String nk = keyword.trim();
+            wrapper.and(w -> w.like(Review::getUserId, nk).or().like(Review::getContent, nk).or().like(Review::getReportReason, nk));
+        }
+        wrapper.orderByDesc(Review::getId);
+        List<Review> reviews = reviewMapper.selectList(wrapper);
+
+        setCsvHeaders(response, "reviews.csv");
+        PrintWriter w = response.getWriter();
+        w.println("﻿评价ID,订单ID,用户手机,评分,内容,举报原因,举报状态,创建时间");
+        for (Review r : reviews) {
+            w.println(String.join(",",
+                String.valueOf(r.getId()),
+                String.valueOf(r.getOrderId()),
+                csvEscape(r.getUserId()),
+                String.valueOf(r.getScore()),
+                csvEscape(r.getContent() != null ? r.getContent() : ""),
+                csvEscape(r.getReportReason() != null ? r.getReportReason() : ""),
+                csvEscape(r.getReportStatus()),
+                csvEscape(r.getCreatedAt() != null ? r.getCreatedAt().toString() : "")
+            ));
+        }
+        w.flush();
+    }
+
+    private void setCsvHeaders(HttpServletResponse response, String filename) {
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    }
+
+    private String csvEscape(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }

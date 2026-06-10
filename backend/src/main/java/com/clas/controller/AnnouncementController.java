@@ -31,6 +31,12 @@ public class AnnouncementController {
     }
 
     @RequireRole("ADMIN")
+    @GetMapping("/admin/list")
+    public Result<List<Announcement>> adminList() {
+        return Result.ok(announcementService.listAdmin());
+    }
+
+    @RequireRole("ADMIN")
     @PostMapping("/create")
     public Result<Announcement> create(@Valid @RequestBody AnnouncementRequest request) {
         return Result.ok(announcementService.create(request));

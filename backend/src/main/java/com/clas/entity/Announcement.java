@@ -14,5 +14,8 @@ public class Announcement {
     private String title;
     private String content;
     private String status;
+    private Boolean pinned;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
     private LocalDateTime createTime;
 }

@@ -68,6 +68,15 @@ function resetFilters() {
   search()
 }
 
+function exportCSV() {
+  const params = new URLSearchParams()
+  if (filters.status) params.set('status', filters.status)
+  if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim())
+  if (filters.dateRange && filters.dateRange[0]) params.set('startDate', filters.dateRange[0])
+  if (filters.dateRange && filters.dateRange[1]) params.set('endDate', filters.dateRange[1])
+  window.open('/api/admin/export/orders?' + params.toString(), '_blank')
+}
+
 function onPageChange(value) {
   page.value = value
   load()
@@ -112,6 +121,7 @@ onMounted(load)
         />
         <el-button type="primary" @click="search">查询</el-button>
         <el-button @click="resetFilters">重置</el-button>
+        <el-button @click="exportCSV">导出 CSV</el-button>
       </div>
 
       <el-table :data="orders" stripe v-loading="loading" size="small" empty-text="暂无匹配订单">

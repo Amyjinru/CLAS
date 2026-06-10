@@ -37,12 +37,12 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Test normal merchant detail loading with products.
-- [ ] 6.2 Test sold-out product button state.
-- [ ] 6.3 Test favorite and unfavorite flow.
-- [ ] 6.4 Test page behavior with no current location.
-- [ ] 6.5 Test manual location selection still updates delivery estimate.
-- [ ] 6.6 Test empty product state if possible using a merchant with no available products or mocked data.
+- [x] 6.1 Test normal merchant detail loading with products.
+- [x] 6.2 Test sold-out product button state.
+- [x] 6.3 Test favorite and unfavorite flow.
+- [x] 6.4 Test page behavior with no current location.
+- [x] 6.5 Test manual location selection still updates delivery estimate.
+- [x] 6.6 Test empty product state if possible using a merchant with no available products or mocked data.
 - [x] 6.7 Run frontend build after implementation.
 
 ## 7. Conflict Avoidance

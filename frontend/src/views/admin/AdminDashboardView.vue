@@ -26,8 +26,11 @@ const merchantRanking = ref({ bySales: [], byRating: [] })
 const topProducts = ref({ products: [] })
 const loading = ref(false)
 const fullscreen = ref(false)
+const clock = ref('')
 let salesChart = null
 let orderChart = null
+let refreshTimer = null
+let clockTimer = null
 
 const rangeParams = computed(() => ({
   startDate: dateRange.value?.[0],
@@ -145,9 +148,52 @@ function initOrderStatusChart() {
 
 function toggleFullscreen() {
   fullscreen.value = !fullscreen.value
+  if (fullscreen.value) {
+    startAutoRefresh()
+    startClock()
+  } else {
+    stopAutoRefresh()
+    stopClock()
+  }
   nextTick(() => {
     salesChart?.resize()
     orderChart?.resize()
+  })
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh()
+  refreshTimer = setInterval(() => load(), 30000)
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+function startClock() {
+  updateClock()
+  clockTimer = setInterval(updateClock, 1000)
+}
+
+function stopClock() {
+  if (clockTimer) {
+    clearInterval(clockTimer)
+    clockTimer = null
+  }
+}
+
+function updateClock() {
+  const now = new Date()
+  clock.value = now.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
   })
 }
 
@@ -171,6 +217,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  stopAutoRefresh()
+  stopClock()
   salesChart?.dispose()
   orderChart?.dispose()
 })
@@ -184,6 +232,8 @@ onUnmounted(() => {
         <p>按时间区间观察平台订单、销售、商家和商品表现。</p>
       </div>
       <div class="head-actions">
+        <span v-if="fullscreen" class="live-clock">{{ clock }}</span>
+        <span v-if="fullscreen" class="auto-tag">每 30 秒自动刷新</span>
         <el-date-picker
           v-model="dateRange"
           type="daterange"
@@ -301,10 +351,29 @@ onUnmounted(() => {
 }
 
 .head-actions {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.live-clock {
+  background: #1e293b;
+  border-radius: 6px;
+  color: #0d9488;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 14px;
+}
+
+.auto-tag {
+  background: #ecfdf5;
+  border-radius: 4px;
+  color: #047857;
+  font-size: 12px;
+  padding: 4px 10px;
 }
 
 .stat-grid,
