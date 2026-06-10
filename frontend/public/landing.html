@@ -298,15 +298,15 @@
     <p class="section-sub reveal">持续增长的校园生活服务社区</p>
     <div class="stats-grid">
       <div class="stat-item reveal" style="transition-delay:0s">
-        <div class="stat-num counter" data-target="11">0</div>
+        <div class="stat-num counter" data-target="0" id="stat-merchants">0</div>
         <div class="stat-lbl">合作商家</div>
       </div>
       <div class="stat-item reveal" style="transition-delay:.15s">
-        <div class="stat-num counter" data-target="23">0</div>
+        <div class="stat-num counter" data-target="0" id="stat-users">0</div>
         <div class="stat-lbl">注册用户</div>
       </div>
       <div class="stat-item reveal" style="transition-delay:.3s">
-        <div class="stat-num counter" data-target="43">0</div>
+        <div class="stat-num counter" data-target="0" id="stat-products">0</div>
         <div class="stat-lbl">精选菜品</div>
       </div>
     </div>
@@ -407,16 +407,38 @@
   }
 
   // ─── Trigger reveal animations on active page ───
+  var statsLoaded = false;
   function triggerReveal(idx) {
     var page = pages[idx];
     page.querySelectorAll('.reveal').forEach(function(el) {
       setTimeout(function() { el.classList.add('vis'); }, 80);
     });
+
+    // 首次进入统计页时从 API 拉取真实数据
+    if (idx === 2 && !statsLoaded) {
+      statsLoaded = true;
+      fetch('/api/public/stats').then(function(r) { return r.json(); }).then(function(d) {
+        if (d && d.code === 200 && d.data) {
+          var m = document.getElementById('stat-merchants');
+          var u = document.getElementById('stat-users');
+          var p = document.getElementById('stat-products');
+          if (m) m.setAttribute('data-target', d.data.merchants || 0);
+          if (u) u.setAttribute('data-target', d.data.users || 0);
+          if (p) p.setAttribute('data-target', d.data.products || 0);
+        }
+        startCounters(page);
+      }).catch(function() { startCounters(page); });
+    } else {
+      startCounters(page);
+    }
+  }
+
+  function startCounters(page) {
     page.querySelectorAll('.counter').forEach(function(el) {
       if (el.dataset.done) return;
       el.dataset.done = '1';
-      var target = parseInt(el.getAttribute('data-target'), 10);
-      var c = 0, dur = 1800, steps = 60, st = dur/steps, inc = target/steps;
+      var target = parseInt(el.getAttribute('data-target'), 10) || 0;
+      var c = 0, dur = 1800, steps = 60, st = dur/steps, inc = target/steps || 1;
       function tick() {
         c += inc;
         if (c >= target) { el.textContent = target + '+'; el.style.animation = 'countPop 0.5s var(--spring) both'; return; }
