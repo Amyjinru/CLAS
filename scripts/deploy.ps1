@@ -87,21 +87,21 @@ if ($keyTest -eq "KEY_OK") {
 # ---- Step 3: 部署 ----
 # 先检查并清理可能残留的旧进程
 if ($useKey) {
-    $cleanup = ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @"
+    $cleanup = ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @'
 # 检查是否有多个 Java 进程（可能是旧 nohup 进程残留）
-old_count=\$(ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | wc -l)
-if [ "\$old_count" -gt 0 ]; then
-    echo ">>> 发现 \$old_count 个非 systemd 管理的 Java 进程，正在清理..."
-    ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | awk '{print \$2}' | xargs -r kill -9 2>/dev/null
+old_count=$(ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | wc -l)
+if [ "$old_count" -gt 0 ]; then
+    echo ">>> 发现 $old_count 个非 systemd 管理的 Java 进程，正在清理..."
+    ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | awk '{print $2}' | xargs -r kill -9 2>/dev/null
     sleep 2
     systemctl restart clas-backend
     echo '>>> 已重启服务'
 fi
-"@
+'@
     Write-Host $cleanup
 
     Prompt-Message "Step 3/3: 同步代码并部署"
-    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @"
+    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_IP} @'
 cd /opt/clas
 echo '>>> 拉取最新代码...'
 git pull upstream dev
@@ -112,12 +112,12 @@ sleep 2
 curl -s http://127.0.0.1:8080/api/health
 echo ''
 echo '>>> 完成!'
-"@
+'@
 } else {
     Prompt-Message "Step 3/3: SSH 连接服务器（输入密码）"
     Write-Host "命令: ssh $SERVER_USER@$SERVER_IP" -ForegroundColor Gray
 
-    ssh ${SERVER_USER}@${SERVER_IP} -o StrictHostKeyChecking=no @"
+    ssh ${SERVER_USER}@${SERVER_IP} -o StrictHostKeyChecking=no @'
 cd /opt/clas
 echo '>>> Connected'
 git stash 2>/dev/null || true
@@ -129,7 +129,7 @@ sleep 2
 curl -s http://127.0.0.1:8080/api/health
 echo ''
 echo '>>> Done!'
-"@
+'@
 }
 
 if ($LASTEXITCODE -eq 0) {
