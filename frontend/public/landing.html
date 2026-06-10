@@ -24,11 +24,10 @@
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html {
-    scroll-snap-type: y mandatory;
-    scroll-behavior: smooth;
     font-size: 16px;
-    overflow-x: hidden;
+    overflow: hidden;
   }
+  body { overflow: hidden; touch-action: pan-y; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
     color: var(--text);
@@ -39,8 +38,6 @@
 
   /* ═══ Page Container ═══ */
   .page {
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
     min-height: var(--page-h);
     display: flex;
     align-items: center;
@@ -363,57 +360,114 @@
   'use strict';
   var pages = document.querySelectorAll('.page');
   var dots = document.querySelectorAll('.nav-dot');
-  var currentPage = 0;
+  var total = pages.length;
+  var current = 0;
+  var animating = false;
+  var startY = 0;
+  var startTime = 0;
+  var body = document.body;
 
-  // ─── Scroll Reveal ───
-  var observer = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('vis');
-        observer.unobserve(entry.target);
+  // ─── Easing: easeOutQuint + slight overshoot ───
+  function ease(t) { return t < 0.8 ? 1 - Math.pow(1 - t/0.8, 3) : 1 - Math.pow(1 - (t-0.8)/0.2, 1.5); }
+
+  // ─── Smooth scroll to page ───
+  function goTo(idx) {
+    if (idx < 0 || idx >= total || animating) return;
+    animating = true;
+    current = idx;
+    var targetY = idx * window.innerHeight;
+    var startY = window.scrollY;
+    var distance = targetY - startY;
+    var duration = 700;
+    var start = performance.now();
+
+    function step(now) {
+      var elapsed = now - start;
+      var progress = Math.min(elapsed / duration, 1);
+      window.scrollTo(0, startY + distance * ease(progress));
+      // Parallax blobs
+      var blobs = document.querySelectorAll('.hero-blob');
+      blobs.forEach(function(b, i) {
+        b.style.transform = 'translateY(' + (window.scrollY * (0.03 + i * 0.02)) + 'px)';
+      });
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        window.scrollTo(0, targetY);
+        animating = false;
+        updateDots();
+        triggerReveal(idx);
       }
-    });
-  }, { threshold: 0.2 });
-  document.querySelectorAll('.reveal').forEach(function(el) { observer.observe(el); });
+    }
+    requestAnimationFrame(step);
+  }
 
-  // ─── Counter ───
-  var cObs = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (!entry.isIntersecting) return;
-      var el = entry.target;
+  // ─── Update dots ───
+  function updateDots() {
+    dots.forEach(function(d, i) { d.classList.toggle('active', i === current); });
+  }
+
+  // ─── Trigger reveal animations on active page ───
+  function triggerReveal(idx) {
+    var page = pages[idx];
+    page.querySelectorAll('.reveal').forEach(function(el) {
+      setTimeout(function() { el.classList.add('vis'); }, 80);
+    });
+    page.querySelectorAll('.counter').forEach(function(el) {
+      if (el.dataset.done) return;
+      el.dataset.done = '1';
       var target = parseInt(el.getAttribute('data-target'), 10);
-      var current = 0, duration = 1800, steps = 60, stepTime = duration / steps, increment = target / steps;
+      var c = 0, dur = 1800, steps = 60, st = dur/steps, inc = target/steps;
       function tick() {
-        current += increment;
-        if (current >= target) { el.textContent = target + '+'; return; }
-        el.textContent = Math.floor(current) + '+';
-        requestAnimationFrame(function() { setTimeout(tick, stepTime); });
+        c += inc;
+        if (c >= target) { el.textContent = target + '+'; el.style.animation = 'countPop 0.5s var(--spring) both'; return; }
+        el.textContent = Math.floor(c) + '+';
+        requestAnimationFrame(function() { setTimeout(tick, st); });
       }
       tick();
-      cObs.unobserve(el);
     });
-  }, { threshold: 0.5 });
-  document.querySelectorAll('.counter').forEach(function(el) { cObs.observe(el); });
+  }
 
-  // ─── Active Page Detection ───
-  var pageObserver = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-        var idx = Array.from(pages).indexOf(entry.target);
-        if (idx >= 0) {
-          currentPage = idx;
-          dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
-        }
-      }
-    });
-  }, { threshold: 0.5 });
-  pages.forEach(function(p) { pageObserver.observe(p); });
+  // ─── Wheel ───
+  var wheelTimer;
+  window.addEventListener('wheel', function(e) {
+    if (animating) return;
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(function() {
+      if (e.deltaY > 15) goTo(current + 1);
+      else if (e.deltaY < -15) goTo(current - 1);
+    }, 30);
+  }, { passive: true });
+
+  // ─── Touch ───
+  window.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+  }, { passive: true });
+
+  window.addEventListener('touchend', function(e) {
+    if (animating) return;
+    var dy = startY - e.changedTouches[0].clientY;
+    var dt = Date.now() - startTime;
+    var velocity = Math.abs(dy / dt);
+    // Fast swipe or enough distance
+    if (velocity > 0.5 || Math.abs(dy) > 50) {
+      if (dy > 20) goTo(current + 1);
+      else if (dy < -20) goTo(current - 1);
+    }
+  }, { passive: true });
+
+  // ─── Keyboard ───
+  window.addEventListener('keydown', function(e) {
+    if (animating) return;
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
+  });
 
   // ─── Dot Click ───
   dots.forEach(function(dot) {
     dot.addEventListener('click', function() {
-      var idx = parseInt(dot.getAttribute('data-page'), 10);
-      pages[idx].scrollIntoView({ behavior: 'smooth' });
+      goTo(parseInt(dot.getAttribute('data-page'), 10));
     });
   });
 
@@ -429,19 +483,9 @@
     });
   });
 
-  // ─── Parallax Blobs ───
-  var blobs = document.querySelectorAll('.hero-blob');
-  var ticking = false;
-  window.addEventListener('scroll', function() {
-    if (!ticking) {
-      requestAnimationFrame(function() {
-        var sy = window.scrollY;
-        blobs.forEach(function(b, i) { b.style.transform = 'translateY(' + (sy * (0.03 + i * 0.02)) + 'px)'; });
-        ticking = false;
-      });
-      ticking = true;
-    }
-  });
+  // ─── Init: reveal page 0 immediately ───
+  triggerReveal(0);
+  updateDots();
 })();
 </script>
 </body>
