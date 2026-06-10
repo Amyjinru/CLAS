@@ -873,10 +873,10 @@ onMounted(() => {
 }
 
 .order-panel {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
   display: flex;
   flex-direction: column;
   max-height: min(80vh, 640px);

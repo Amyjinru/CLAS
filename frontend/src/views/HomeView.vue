@@ -628,10 +628,10 @@ onMounted(async () => {
 }
 
 .chat-panel {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
   display: flex;
   flex-direction: column;
   height: 520px;
@@ -641,7 +641,7 @@ onMounted(async () => {
 
 .chat-panel-head {
   align-items: center;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -654,16 +654,16 @@ onMounted(async () => {
 }
 
 .chat-panel-subtitle {
-  color: #667085;
+  color: var(--text-muted);
   font-size: 13px;
   margin: 0 0 0 auto;
 }
 
 .panel-close {
-  background: #f3f4f6;
+  background: var(--clas-warm-100);
   border: none;
-  border-radius: 6px;
-  color: #6b7280;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 18px;
   min-height: 32px;

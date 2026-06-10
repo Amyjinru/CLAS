@@ -385,8 +385,8 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
 }
 
 .pending-card {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary-soft);
   border-radius: var(--radius-md);
   margin-bottom: 10px;
   padding: 16px 18px;
@@ -406,17 +406,17 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
 }
 
 .pending-tag {
-  background: #fef3c7;
-  border-radius: 999px;
-  color: #b45309;
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-full);
+  color: var(--clas-amber-700);
   font-size: 12px;
   font-weight: 700;
   padding: 4px 10px;
   white-space: nowrap;
 }
 .pending-tag.deal {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
 }
 
 .pending-actions {
@@ -615,8 +615,8 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
 }
 
 .cart-item.invalid {
-  background: #fff7ed;
-  border-color: #fdba74;
+  background: var(--color-primary-light);
+  border-color: var(--clas-amber-300);
 }
 
 .invalid-tip {
