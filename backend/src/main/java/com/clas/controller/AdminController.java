@@ -19,7 +19,6 @@ import com.clas.service.StatisticsService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -232,9 +231,19 @@ public class AdminController {
         Page<Review> result = reviewMapper.selectPage(new Page<>(page, size), wrapper);
 
         // 补充关联信息
+        // 批量预加载关联数据，消除 N+1
+        java.util.Set<Long> orderIds = result.getRecords().stream().map(Review::getOrderId).collect(java.util.stream.Collectors.toSet());
+        java.util.Set<String> userIds = result.getRecords().stream().map(Review::getUserId).collect(java.util.stream.Collectors.toSet());
+        java.util.Map<Long, Orders> orderMap = ordersMapper.selectList(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Orders>().in(Orders::getId, orderIds))
+            .stream().collect(java.util.stream.Collectors.toMap(Orders::getId, o -> o));
+        java.util.Map<String, User> userMap = userMapper.selectList(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<User>().in(User::getPhone, userIds))
+            .stream().collect(java.util.stream.Collectors.toMap(User::getPhone, u -> u));
+
         List<Map<String, Object>> enrichedRecords = result.getRecords().stream().map(r -> {
-            Orders order = ordersMapper.selectById(r.getOrderId());
-            User user = userMapper.selectById(r.getUserId());
+            Orders order = orderMap.get(r.getOrderId());
+            User user = userMap.get(r.getUserId());
             Map<String, Object> map = new java.util.HashMap<>();
             map.put("id", r.getId());
             map.put("orderId", r.getOrderId());
@@ -258,7 +267,6 @@ public class AdminController {
     }
 
     @DeleteMapping("/reviews/{id}")
-    @Transactional
     public Result<Void> deleteReview(@PathVariable Long id) {
         reviewService.adminDeleteReview(id);
         return Result.ok();
