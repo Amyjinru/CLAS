@@ -38,7 +38,7 @@ build_app() {
   npm run build
 
   cd "$BACKEND_DIR"
-  mvn clean package -DskipTests
+  mvn clean package -Dmaven.test.skip=true
   test -f "$JAR_PATH"
 }
 
