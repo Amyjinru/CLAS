@@ -384,8 +384,9 @@ onMounted(load)
   width: 340px;
   display: flex;
 }
-.toolbar > .el-input :deep(.el-input__wrapper) {
-  flex: 1;
+.toolbar > .el-input :deep(.el-input__wrapper),
+.toolbar > .el-input :deep(.el-input__inner) {
+  width: 100% !important;
   box-sizing: border-box !important;
 }
 .toolbar > .el-input :deep(.el-input__wrapper:hover) {
