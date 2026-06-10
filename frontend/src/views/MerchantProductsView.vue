@@ -479,11 +479,11 @@ onMounted(loadMerchant)
 
 .welcome-content h2 {
   margin: 20px 0 10px 0;
-  color: #303133;
+  color: var(--text-primary);
 }
 
 .welcome-content p {
-  color: #606266;
+  color: var(--text-secondary);
   max-width: 480px;
   margin: 0 auto 30px auto;
 }
@@ -518,7 +518,7 @@ onMounted(loadMerchant)
 .card-header h3 {
   margin: 0;
   font-size: 16px;
-  color: #303133;
+  color: var(--text-primary);
 }
 
 .merchant-badge {
@@ -563,7 +563,7 @@ onMounted(loadMerchant)
 }
 
 .store-logo-img {
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--border-color);
   border-radius: 50%;
   height: 64px;
   object-fit: cover;
@@ -668,7 +668,7 @@ onMounted(loadMerchant)
   padding: 12px 16px;
   border-radius: 8px;
   cursor: pointer;
-  color: #606266;
+  color: var(--text-secondary);
   font-size: 15px;
   font-weight: 500;
   transition-property: color, background-color;
@@ -677,12 +677,12 @@ onMounted(loadMerchant)
 }
 
 .menu-item:hover {
-  color: #409eff;
-  background-color: #f0f7ff;
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
 }
 
 .menu-item.active {
-  color: #ffffff;
-  background-color: #409eff;
+  color: var(--text-primary);
+  background-color: var(--color-primary);
 }
 </style>
