@@ -6,7 +6,7 @@
 浏览商家 -> 浏览商品 -> 加入购物车 -> 提交订单 -> 模拟支付 -> 商家接单 -> 确认完成 -> 评价
 ```
 
-当前版本已接入 Redis 验证码、模拟支付、公告管理、数据统计与管理员后台；鉴权仍采用轻量级 `Authorization: <phone>` 演示方案，尚未接入 JWT / Spring Security。收藏功能已实现（收藏店铺、取消收藏、收藏列表）。
+当前版本已接入 Redis 验证码、模拟支付、公告管理（含置顶/有效期）、数据统计与管理员后台、CSV 数据导出、Dashboard 大屏模式；鉴权已升级为 JWT Bearer Token + BCrypt 密码哈希，HTTP 状态码规范化（401/403/400），CORS 白名单配置化。收藏功能已实现（收藏店铺、取消收藏、收藏列表）。优惠券模块、评价治理（举报/删评/申诉/违规处罚）已上线。
 
 > 第二阶段已实现商家入驻、5态状态机、管理员审核、RBAC 权限控制，详见下方「功能改进」章节。
 
@@ -14,7 +14,7 @@
 
 - 后端：Spring Boot 3、MyBatis Plus、MySQL、Redis、Lombok
 - 前端：Vue3、Vite、axios
-- 数据库：16 张业务表，见 `database/schema.sql`；旧本地库请先执行 `database/migration-20260608.sql` 补齐字段。
+- 数据库：28 张业务表，见 `database/schema.sql`；旧本地库请先执行 `database/migration-20260608.sql` 补齐字段。
 
 ## 项目结构
 
@@ -49,7 +49,7 @@ PowerShell 不能使用 `<` 重定向时，可以改用：
 Get-Content -Raw database\migration-20260608.sql | mysql --host=127.0.0.1 --port=3306 --user=root --password=你的密码
 ```
 
-`schema.sql` 会重建 `clas` 数据库和 16 张业务表；`migration-20260608.sql` 只补字段/表并保留已有数据。
+`schema.sql` 会重建 `clas` 数据库和 28 张业务表（含优惠券/评价治理/违规处理/团购核销等）；`migration-20260608.sql` 只补字段/表并保留已有数据。
 
 ## 启动后端
 
@@ -80,7 +80,7 @@ npm run dev
 | 商家 | `13800000002` | `merchant` | `Abc123!` |
 | 管理员 | `13800000003` | `admin` | `Abc123!` |
 
-当前版本采用轻量级演示鉴权：前端把当前登录用户保存在 `localStorage`，请求时携带手机号作为 `Authorization` Header，后端按手机号加载用户并做角色校验。
+当前版本采用 JWT 鉴权：前端登录后存储 Token 到 `localStorage`，请求时携带 `Authorization: Bearer <token>` Header，后端解析 JWT 获取用户身份并做角色校验。密码使用 BCrypt 哈希存储，旧明文密码登录时自动升级。
 
 ## 用户模块与接口约定
 
@@ -123,13 +123,17 @@ npm run dev
 }
 ```
 
-### 简易鉴权与角色
+### JWT 鉴权与角色
 
-- 当前阶段不接入 JWT / Spring Security，`Authorization: <phone>` 仅适合课程演示。
-- 前端登录后将用户信息写入 `localStorage` 的 `clas_user`。
-- 后端通过请求头 `Authorization: <phone>` 获取当前用户，购物车、订单、支付、评价等私有操作以服务端当前用户为准，不信任请求体中的 `userId`。
+- 已接入 JWT（HMAC-SHA256 签名，24 小时过期），`Authorization: Bearer <token>` 标准格式。
+- 前端登录后将 Token 和用户信息写入 `localStorage` 的 `clas_token` / `clas_user`。
+- 后端 `AuthInterceptor` 解析 JWT 获取当前用户，购物车、订单、支付、评价等私有操作以服务端当前用户为准。
 - 角色统一使用字符串：`USER`、`MERCHANT`、`ADMIN`。
 - 需要权限的接口使用 `@RequireRole` 注解控制。
+- HTTP 状态码规范化：401（未认证）、403（无权限）、400（业务错误）。
+- 密码使用 BCrypt 哈希存储，旧明文密码（非 `$2b$` 前缀）登录时自动升级为 BCrypt 哈希。
+- CORS 通过 `app.cors.allowed-origins` 配置白名单，不再使用 `*` 全放通。
+- 敏感配置（数据库密码、JWT 密钥）强制通过环境变量注入，无默认明文值。
 
 ### 金额单位
 
@@ -354,15 +358,18 @@ PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业�
 | `views/admin/AdminOrdersView.vue` | 订单管理页面 |
 | `views/admin/AdminReviewsView.vue` | 评价管理页面 |
 | `styles/theme.css` | CSS 主题变量体系 |
-# 2026-06-08 开发进度快照
+# 2026-06-10 开发进度快照
 
-当前 `dev` 分支已经从外卖下单 MVP 扩展为“生活助手平台”综合演示版本，围绕作业第二个开发建议补齐了用户、商家、管理员三端能力：
+当前 `dev` 分支已从外卖下单 MVP 扩展为”生活助手平台”综合演示版本，围绕软件工程课程设计补齐了用户、商家、管理员三端能力，并完成了安全加固和数据库统一：
 
+- **安全加固**：JWT Bearer Token 鉴权 + BCrypt 密码哈希 + HTTP 状态码规范化（401/403/400）+ CORS 白名单 + 敏感配置环境变量注入。
+- **管理后台增强**：公告置顶/有效期管理、CSV 数据导出（用户/订单/评价）、Dashboard 大屏模式（实时时钟 + 30 秒自动刷新）。
+- **数据库统一**：`schema.sql` 统一为 28 张业务表，补齐所有迁移字段和索引，H2 测试 schema 同步。新增表包括优惠券（coupon/user_coupon）、评价治理（review_image/review_reply/review_vote/review_delete_request/review_user_hidden/deleted_review_backup）、违规处罚（user_penalty/appeal）、团购核销日志（deal_redeem_log）。
+- **测试验证**：后端 18 项测试全部通过（`mvn test`），前端构建成功（`npm run build`）。
 - 用户端：商家搜索/筛选、商品下单、地址管理、团购券购买、收藏店铺、消息通知、订单退款申请、生活服务预约、评价与举报。
 - 商家端：接单/配送/完成、团购券创建与核销、评价回复、退款审核、预约确认/完成/取消、公告查看。
-- 管理端：商家审核、仪表盘统计、用户/订单/评价/公告管理、评价举报处理。
-- 数据库：当前 schema 已扩展到 16 张业务表，新增/调整内容见 `database/schema.sql`，协作同学拉取后需要重新执行脚本或同步迁移表结构。
-- 鉴权说明：仍采用课程演示级 `Authorization: <phone>` + `@RequireRole` 方案，尚未接入生产级 JWT / Spring Security。
+- 管理端：商家审核、仪表盘统计（ECharts + 大屏模式）、用户/订单/评价/公告管理、CSV 导出、评价举报处理、违规处罚/申诉。
+- 鉴权说明：已接入 JWT + BCrypt，生产级 Token 认证替代旧 `Authorization: <phone>` 方案。
 
 新增页面入口：
 
