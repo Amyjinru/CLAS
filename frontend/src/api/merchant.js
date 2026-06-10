@@ -20,6 +20,5 @@ export async function currentMerchantId() {
 }
 
 export async function listMerchantOrders() {
-  const merchantId = await currentMerchantId()
-  return api.get(`/order/merchant/${merchantId}`).then(unwrap)
+  return api.get('/order/merchant/me').then(unwrap)
 }

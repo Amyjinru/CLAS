@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CouponService {
     public static final String STATUS_UNUSED = "UNUSED";
+    public static final String STATUS_RESERVED = "RESERVED";
     public static final String STATUS_USED = "USED";
     public static final String STATUS_EXPIRED = "EXPIRED";
     private static final String COUPON_ACTIVE = "ACTIVE";
@@ -70,9 +71,14 @@ public class CouponService {
         if (existing != null) {
             throw new BusinessException("您已领取过该优惠券");
         }
-        if (coupon.getTotalLimit() != null && coupon.getTotalLimit() > 0
+        boolean limitedAndFull = coupon.getTotalLimit() != null && coupon.getTotalLimit() > 0
             && coupon.getClaimedCount() != null
-            && coupon.getClaimedCount() >= coupon.getTotalLimit()) {
+            && coupon.getClaimedCount() >= coupon.getTotalLimit();
+        if (limitedAndFull) {
+            throw new BusinessException("优惠券已被领完");
+        }
+        int incremented = couponMapper.incrementClaimedIfAvailable(couponId);
+        if (incremented == 0) {
             throw new BusinessException("优惠券已被领完");
         }
 
@@ -84,7 +90,6 @@ public class CouponService {
         userCouponMapper.insert(userCoupon);
 
         coupon.setClaimedCount((coupon.getClaimedCount() == null ? 0 : coupon.getClaimedCount()) + 1);
-        couponMapper.updateById(coupon);
         return UserCouponResponse.from(userCoupon, coupon);
     }
 
@@ -138,9 +143,11 @@ public class CouponService {
         if (userCouponId == null) {
             return;
         }
-        UserCoupon userCoupon = requireUnusedUserCoupon(userCouponId, userId);
-        userCoupon.setOrderId(orderId);
-        userCouponMapper.updateById(userCoupon);
+        requireUnusedUserCoupon(userCouponId, userId);
+        int rows = userCouponMapper.reserveForOrder(userCouponId, userId, orderId);
+        if (rows == 0) {
+            throw new BusinessException("优惠券不可用");
+        }
     }
 
     @Transactional
@@ -148,14 +155,14 @@ public class CouponService {
         if (userCouponId == null) {
             return;
         }
-        UserCoupon userCoupon = userCouponMapper.selectById(userCouponId);
-        if (userCoupon == null || !STATUS_UNUSED.equals(userCoupon.getStatus())) {
-            return;
+        int rows = userCouponMapper.markUsedForOrder(userCouponId, orderId, LocalDateTime.now());
+        if (rows == 0) {
+            UserCoupon userCoupon = userCouponMapper.selectById(userCouponId);
+            if (userCoupon != null && STATUS_USED.equals(userCoupon.getStatus()) && Objects.equals(userCoupon.getOrderId(), orderId)) {
+                return;
+            }
+            throw new BusinessException("优惠券不可用");
         }
-        userCoupon.setStatus(STATUS_USED);
-        userCoupon.setOrderId(orderId);
-        userCoupon.setUsedAt(LocalDateTime.now());
-        userCouponMapper.updateById(userCoupon);
     }
 
     @Transactional
@@ -163,13 +170,7 @@ public class CouponService {
         if (userCouponId == null) {
             return;
         }
-        UserCoupon userCoupon = userCouponMapper.selectById(userCouponId);
-        if (userCoupon == null || STATUS_USED.equals(userCoupon.getStatus())) {
-            return;
-        }
-        userCoupon.setOrderId(null);
-        userCoupon.setStatus(STATUS_UNUSED);
-        userCouponMapper.updateById(userCoupon);
+        userCouponMapper.releaseReservation(userCouponId);
     }
 
     private List<UserCouponResponse> toResponses(List<UserCoupon> userCoupons) {

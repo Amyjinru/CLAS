@@ -1,4 +1,7 @@
 <script setup>
+import MoneyText from './MoneyText.vue'
+import { formatCompactDateTime } from '../utils/formatters'
+
 const props = defineProps({
   order: {
     type: Object,
@@ -25,10 +28,6 @@ function itemName(productId) {
   return props.productNames[productId] || `商品 ${productId}`
 }
 
-function formatTime(value) {
-  if (!value) return ''
-  return String(value).replace('T', ' ')
-}
 </script>
 
 <template>
@@ -37,7 +36,7 @@ function formatTime(value) {
       <p class="meta">
         订单号 {{ order.order.id }} · {{ statusLabel[order.order.status] || order.order.status }}
       </p>
-      <p v-if="order.order.createTime" class="meta">下单时间 {{ formatTime(order.order.createTime) }}</p>
+      <p v-if="order.order.createTime" class="meta">下单时间 {{ formatCompactDateTime(order.order.createTime) }}</p>
     </template>
 
     <ul class="item-list">
@@ -47,15 +46,15 @@ function formatTime(value) {
           <span class="item-qty">× {{ item.quantity }}</span>
         </div>
         <div class="item-price">
-          <span>单价 ¥{{ (item.price / 100).toFixed(2) }}</span>
+          <span>单价 <MoneyText :amount="item.price" /></span>
           <span v-if="!compact" class="item-subtotal">
-            小计 ¥{{ ((item.price * item.quantity) / 100).toFixed(2) }}
+            小计 <MoneyText :amount="item.price * item.quantity" />
           </span>
         </div>
       </li>
     </ul>
 
-    <p class="total">合计 ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p>
+    <p class="total">合计 <MoneyText :amount="order.order.totalPrice" /></p>
   </div>
 </template>
 

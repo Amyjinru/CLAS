@@ -52,9 +52,6 @@ api.interceptors.request.use(
     const user = JSON.parse(localStorage.getItem('clas_user') || 'null')
     if (user && user.token) {
       config.headers['Authorization'] = 'Bearer ' + user.token
-    } else if (user && user.phone) {
-      // 向后兼容：过渡期仍支持 phone 直传
-      config.headers['Authorization'] = user.phone
     }
 
     return config

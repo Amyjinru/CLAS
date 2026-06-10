@@ -33,29 +33,19 @@ public class AuthInterceptor implements HandlerInterceptor {
             String authValue = authHeader.trim();
 
             if (authValue.startsWith("Bearer ")) {
-                // JWT Bearer token 模式
                 String token = authValue.substring(7).trim();
-                if (jwtUtil.isTokenValid(token)) {
-                    String phone = jwtUtil.getPhoneFromToken(token);
-                    String role = jwtUtil.getRoleFromToken(token);
-                    // 检查账号是否仍处于启用状态
-                    User user = userMapper.selectById(phone);
-                    if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
-                        throw new BusinessException(401, "账号已被禁用或不存在");
-                    }
-                    UserContext.setUser(phone, role);
-                } else {
+                if (!jwtUtil.isTokenValid(token)) {
                     throw new BusinessException(401, "登录已过期，请重新登录");
                 }
-            } else {
-                // 向后兼容：直接传 phone 模式（过渡期）
-                User user = userMapper.selectById(authValue);
-                if (user != null) {
-                    if (Boolean.FALSE.equals(user.getEnabled())) {
-                        throw new BusinessException(401, "账号已被禁用");
-                    }
-                    UserContext.setUser(user);
+                String phone = jwtUtil.getPhoneFromToken(token);
+                String role = jwtUtil.getRoleFromToken(token);
+                User user = userMapper.selectById(phone);
+                if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
+                    throw new BusinessException(401, "账号已被禁用或不存在");
                 }
+                UserContext.setUser(phone, role);
+            } else {
+                throw new BusinessException(401, "未登录，请先登录");
             }
         }
 

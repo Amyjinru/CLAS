@@ -343,6 +343,23 @@ CREATE TABLE user_coupon (
     UNIQUE(user_id, coupon_id)
 );
 
+CREATE INDEX idx_user_coupon_order_status ON user_coupon (order_id, status);
+CREATE INDEX idx_orders_create_status ON orders (create_time, status);
+CREATE INDEX idx_orders_merchant_create_status ON orders (merchant_id, create_time, status);
+CREATE INDEX idx_order_item_order ON order_item (order_id);
+CREATE INDEX idx_order_item_product_order ON order_item (product_id, order_id);
+CREATE INDEX idx_review_order_id ON review (order_id, id);
+CREATE INDEX idx_review_image_review_sort ON review_image (review_id, sort_order);
+CREATE INDEX idx_review_reply_review_deleted_id ON review_reply (review_id, deleted, id);
+CREATE INDEX idx_review_vote_target ON review_vote (target_type, target_id);
+CREATE INDEX idx_review_hidden_user ON review_user_hidden (user_id, review_id);
+
+ALTER TABLE order_item ADD CONSTRAINT fk_order_item_order FOREIGN KEY (order_id) REFERENCES orders(id);
+ALTER TABLE order_item ADD CONSTRAINT fk_order_item_product FOREIGN KEY (product_id) REFERENCES product(id);
+ALTER TABLE payment ADD CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES orders(id);
+ALTER TABLE review ADD CONSTRAINT fk_review_order FOREIGN KEY (order_id) REFERENCES orders(id);
+ALTER TABLE user_coupon ADD CONSTRAINT fk_user_coupon_coupon FOREIGN KEY (coupon_id) REFERENCES coupon(id);
+
 CREATE TABLE user_penalty (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,

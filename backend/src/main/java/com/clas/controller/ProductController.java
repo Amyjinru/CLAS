@@ -43,8 +43,19 @@ public class ProductController {
     }
 
     @GetMapping("/api/merchant/products/list")
+    @Deprecated
     @RequireRole("MERCHANT")
     public Result<ProductListResponse> getMerchantProducts(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId) {
+        return getMyProducts(page, size, keyword, categoryId);
+    }
+
+    @GetMapping("/api/merchant/me/products")
+    @RequireRole("MERCHANT")
+    public Result<ProductListResponse> getMyProducts(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
@@ -64,16 +75,30 @@ public class ProductController {
     }
 
     @PostMapping("/api/merchant/products/create")
+    @Deprecated
     @RequireRole("MERCHANT")
     public Result<ProductResponse> createProduct(@Valid @RequestBody ProductCreateRequest request) {
+        return createMyProduct(request);
+    }
+
+    @PostMapping("/api/merchant/me/products")
+    @RequireRole("MERCHANT")
+    public Result<ProductResponse> createMyProduct(@Valid @RequestBody ProductCreateRequest request) {
         Long merchantId = merchantService.getCurrentMerchantId();
         Product product = productService.createProduct(request, merchantId);
         return Result.ok(productService.toResponse(product));
     }
 
     @PutMapping("/api/merchant/products/update")
+    @Deprecated
     @RequireRole("MERCHANT")
     public Result<ProductResponse> updateProduct(@Valid @RequestBody ProductUpdateRequest request) {
+        return updateMyProduct(request);
+    }
+
+    @PutMapping("/api/merchant/me/products")
+    @RequireRole("MERCHANT")
+    public Result<ProductResponse> updateMyProduct(@Valid @RequestBody ProductUpdateRequest request) {
         Long merchantId = merchantService.getCurrentMerchantId();
         Product product = productService.updateProduct(request, merchantId);
         return Result.ok(productService.toResponse(product));
@@ -106,19 +131,32 @@ public class ProductController {
     public record StatusUpdateRequest(Long productId, String status) {}
 
     @PatchMapping("/api/merchant/products/status")
+    @Deprecated
     @RequireRole("MERCHANT")
     public Result<Void> updateStatus(@Valid @RequestBody StatusUpdateRequest request) {
+        return updateMyProductStatus(request);
+    }
+
+    @PatchMapping("/api/merchant/me/products/status")
+    @RequireRole("MERCHANT")
+    public Result<Void> updateMyProductStatus(@Valid @RequestBody StatusUpdateRequest request) {
         Long merchantId = merchantService.getCurrentMerchantId();
         productService.updateStatus(request.productId(), request.status(), merchantId);
         return Result.ok();
     }
 
     @DeleteMapping("/api/merchant/products/{productId}")
+    @Deprecated
     @RequireRole("MERCHANT")
     public Result<Void> deleteProduct(@PathVariable Long productId) {
+        return deleteMyProduct(productId);
+    }
+
+    @DeleteMapping("/api/merchant/me/products/{productId}")
+    @RequireRole("MERCHANT")
+    public Result<Void> deleteMyProduct(@PathVariable Long productId) {
         Long merchantId = merchantService.getCurrentMerchantId();
         productService.deleteProduct(productId, merchantId);
         return Result.ok();
     }
 }
-

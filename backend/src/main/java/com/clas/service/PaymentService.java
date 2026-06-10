@@ -10,6 +10,7 @@ import com.clas.repository.PaymentRepository;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class PaymentService {
@@ -17,22 +18,25 @@ public class PaymentService {
     private static final String STATUS_SUCCESS = "SUCCESS";
     private static final String STATUS_FAILED = "FAILED";
     private static final String PAY_METHOD_FAIL_MOCK = "FAIL_MOCK";
+    private static final String ORDER_STATUS_PAYING = "PAYING";
 
     private final PaymentRepository paymentRepository;
     private final OrderService orderService;
     private final OrdersMapper ordersMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public PaymentService(
         PaymentRepository paymentRepository,
         OrderService orderService,
-        OrdersMapper ordersMapper
+        OrdersMapper ordersMapper,
+        TransactionTemplate transactionTemplate
     ) {
         this.paymentRepository = paymentRepository;
         this.orderService = orderService;
         this.ordersMapper = ordersMapper;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
     public PaymentResponse mockPay(PaymentRequest request) {
         Orders order = orderService.requireUserOrder(request.orderId(), request.userId());
         if (!OrderService.STATUS_PENDING_PAYMENT.equals(order.getStatus())) {
@@ -58,7 +62,7 @@ public class PaymentService {
                 .filter(payment -> STATUS_FAILED.equals(payment.getStatus())
                     && normalizePayMethod(request.payMethod()).equals(payment.getPayMethod()))
                 .map(payment -> PaymentResponse.from(payment, order.getStatus())))
-            .orElseGet(() -> processPendingPayment(order, request));
+            .orElseGet(() -> beginAndConfirmPayment(order, request));
     }
 
     public PaymentResponse getPaymentStatus(Long orderId) {
@@ -71,7 +75,7 @@ public class PaymentService {
         return paymentStatusForOrder(orderId, order);
     }
 
-    private PaymentResponse processPendingPayment(Orders order, PaymentRequest request) {
+    private PaymentResponse beginAndConfirmPayment(Orders order, PaymentRequest request) {
         String payMethod = normalizePayMethod(request.payMethod());
 
         Payment payment = new Payment();
@@ -86,25 +90,57 @@ public class PaymentService {
         try {
             Thread.sleep(1200);
             if (PAY_METHOD_FAIL_MOCK.equals(payMethod)) {
-                payment.setStatus(STATUS_FAILED);
-                paymentRepository.save(payment);
-                return PaymentResponse.from(payment, order.getStatus());
+                return transactionTemplate.execute(status -> failPayment(payment, order));
             }
-
-            payment.setStatus(STATUS_SUCCESS);
-            paymentRepository.save(payment);
-
-            orderService.deductStockForPayment(order.getId());
-            orderService.markCouponUsed(order.getId());
-            order.setStatus(OrderService.STATUS_PAID);
-            ordersMapper.updateById(order);
-            return PaymentResponse.from(payment, order.getStatus());
+            PaymentOutcome outcome = transactionTemplate.execute(status -> confirmPayment(payment, order));
+            if (outcome.error() != null) {
+                throw outcome.error();
+            }
+            return outcome.response();
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            payment.setStatus(STATUS_FAILED);
-            paymentRepository.save(payment);
+            transactionTemplate.executeWithoutResult(status -> failPayment(payment, order));
             throw new BusinessException("模拟支付被中断");
         }
+    }
+
+    private PaymentOutcome confirmPayment(Payment payment, Orders order) {
+        int locked = ordersMapper.updateStatusIfCurrent(
+            order.getId(),
+            OrderService.STATUS_PENDING_PAYMENT,
+            ORDER_STATUS_PAYING
+        );
+        if (locked == 0) {
+            Orders latest = orderService.requireOrder(order.getId());
+            PaymentResponse response = paymentRepository.findSuccessfulByOrderId(order.getId())
+                .map(existing -> PaymentResponse.from(existing, latest.getStatus()))
+                .orElseGet(() -> PaymentResponse.from(payment, latest.getStatus()));
+            return new PaymentOutcome(response, null);
+        }
+
+        try {
+            orderService.deductStockForPayment(order.getId());
+            orderService.markCouponUsed(order.getId());
+            payment.setStatus(STATUS_SUCCESS);
+            paymentRepository.save(payment);
+            ordersMapper.updateStatusIfCurrent(order.getId(), ORDER_STATUS_PAYING, OrderService.STATUS_PAID);
+            order.setStatus(OrderService.STATUS_PAID);
+            return new PaymentOutcome(PaymentResponse.from(payment, order.getStatus()), null);
+        } catch (RuntimeException exception) {
+            payment.setStatus(STATUS_FAILED);
+            paymentRepository.save(payment);
+            ordersMapper.updateStatusIfCurrent(order.getId(), ORDER_STATUS_PAYING, OrderService.STATUS_PENDING_PAYMENT);
+            BusinessException error = exception instanceof BusinessException businessException
+                ? businessException
+                : new BusinessException("支付失败，请稍后重试");
+            return new PaymentOutcome(PaymentResponse.from(payment, OrderService.STATUS_PENDING_PAYMENT), error);
+        }
+    }
+
+    private PaymentResponse failPayment(Payment payment, Orders order) {
+        payment.setStatus(STATUS_FAILED);
+        paymentRepository.save(payment);
+        return PaymentResponse.from(payment, order.getStatus());
     }
 
     private PaymentResponse paymentStatusForOrder(Long orderId, Orders order) {
@@ -146,5 +182,8 @@ public class PaymentService {
             return STATUS_SUCCESS;
         }
         return STATUS_FAILED;
+    }
+
+    private record PaymentOutcome(PaymentResponse response, BusinessException error) {
     }
 }

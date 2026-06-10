@@ -160,9 +160,12 @@ public class ReviewService {
         List<Review> reviews = reviewMapper.selectList(new LambdaQueryWrapper<Review>()
             .in(Review::getOrderId, orderIds)
             .orderByDesc(Review::getId));
-        return reviews.stream()
+        List<Review> visibleReviews = reviews.stream()
             .filter(review -> !hiddenIds.contains(review.getId()))
-            .map(review -> toDetail(review, viewerId))
+            .toList();
+        BatchReviewContext context = buildReviewContext(visibleReviews, viewerId);
+        return visibleReviews.stream()
+            .map(review -> toDetail(review, viewerId, context))
             .toList();
     }
 
@@ -170,7 +173,52 @@ public class ReviewService {
         List<Review> reviews = reviewMapper.selectList(new LambdaQueryWrapper<Review>()
             .eq(Review::getUserId, userId)
             .orderByDesc(Review::getId));
-        return reviews.stream().map(review -> toDetail(review, userId)).toList();
+        BatchReviewContext context = buildReviewContext(reviews, userId);
+        return reviews.stream()
+            .map(review -> toDetail(review, userId, context))
+            .toList();
+    }
+
+    private BatchReviewContext buildReviewContext(List<Review> reviews, String viewerId) {
+        if (reviews.isEmpty()) {
+            return BatchReviewContext.empty();
+        }
+        List<Long> reviewIds = reviews.stream().map(Review::getId).toList();
+        List<ReviewReply> replies = reviewReplyMapper.selectList(new LambdaQueryWrapper<ReviewReply>()
+            .in(ReviewReply::getReviewId, reviewIds)
+            .eq(ReviewReply::getDeleted, false)
+            .orderByAsc(ReviewReply::getId));
+        Set<String> userIds = new HashSet<>();
+        reviews.forEach(review -> userIds.add(review.getUserId()));
+        replies.forEach(reply -> userIds.add(reply.getUserId()));
+        Map<String, User> users = userIds.isEmpty()
+            ? Map.of()
+            : userMapper.selectBatchIds(userIds).stream().collect(Collectors.toMap(User::getPhone, user -> user));
+
+        Map<Long, List<String>> imagesByReview = reviewImageMapper.selectList(new LambdaQueryWrapper<ReviewImage>()
+                .in(ReviewImage::getReviewId, reviewIds)
+                .orderByAsc(ReviewImage::getSortOrder))
+            .stream()
+            .collect(Collectors.groupingBy(
+                ReviewImage::getReviewId,
+                Collectors.mapping(ReviewImage::getImageUrl, Collectors.toList())
+            ));
+        Map<Long, List<ReviewReply>> repliesByReview = replies.stream()
+            .collect(Collectors.groupingBy(ReviewReply::getReviewId));
+
+        List<Long> replyIds = replies.stream().map(ReviewReply::getId).toList();
+        List<ReviewVote> votes = new ArrayList<>();
+        votes.addAll(reviewVoteMapper.selectList(new LambdaQueryWrapper<ReviewVote>()
+            .in(ReviewVote::getTargetType, List.of("REVIEW", "MERCHANT_REPLY"))
+            .in(ReviewVote::getTargetId, reviewIds)));
+        if (!replyIds.isEmpty()) {
+            votes.addAll(reviewVoteMapper.selectList(new LambdaQueryWrapper<ReviewVote>()
+                .eq(ReviewVote::getTargetType, "REPLY")
+                .in(ReviewVote::getTargetId, replyIds)));
+        }
+        Map<String, List<ReviewVote>> votesByTarget = votes.stream()
+            .collect(Collectors.groupingBy(vote -> vote.getTargetType() + ":" + vote.getTargetId()));
+        return new BatchReviewContext(users, imagesByReview, repliesByReview, votesByTarget);
     }
 
     public MerchantRatingResponse getMerchantRating(Long merchantId) {
@@ -429,15 +477,18 @@ public class ReviewService {
     }
 
     private ReviewDetailResponse toDetail(Review review, String viewerId) {
-        User user = userMapper.selectById(review.getUserId());
-        VoteSummary reviewVotes = summarizeVotes("REVIEW", review.getId(), viewerId);
-        VoteSummary merchantReplyVotes = summarizeVotes("MERCHANT_REPLY", review.getId(), viewerId);
-        List<ReviewReply> replies = reviewReplyMapper.selectList(new LambdaQueryWrapper<ReviewReply>()
-            .eq(ReviewReply::getReviewId, review.getId())
-            .eq(ReviewReply::getDeleted, false)
-            .orderByAsc(ReviewReply::getId));
+        return toDetail(review, viewerId, buildReviewContext(List.of(review), viewerId));
+    }
+
+    private ReviewDetailResponse toDetail(Review review, String viewerId, BatchReviewContext context) {
+        User user = context.users().get(review.getUserId());
+        VoteSummary reviewVotes = summarizeVotes(context.votesByTarget()
+            .getOrDefault(voteKey("REVIEW", review.getId()), List.of()), viewerId);
+        VoteSummary merchantReplyVotes = summarizeVotes(context.votesByTarget()
+            .getOrDefault(voteKey("MERCHANT_REPLY", review.getId()), List.of()), viewerId);
+        List<ReviewReply> replies = context.repliesByReview().getOrDefault(review.getId(), List.of());
         List<ReviewReplyResponse> replyResponses = replies.stream()
-            .map(reply -> toReplyResponse(reply, viewerId))
+            .map(reply -> toReplyResponse(reply, viewerId, context))
             .toList();
         return new ReviewDetailResponse(
             review.getId(),
@@ -447,7 +498,7 @@ public class ReviewService {
             userProfileService.avatarOf(user),
             review.getScore(),
             review.getContent(),
-            loadImages(review.getId()),
+            context.imagesByReview().getOrDefault(review.getId(), List.of()),
             review.getMerchantReply(),
             reviewVotes.likes(),
             reviewVotes.dislikes(),
@@ -462,8 +513,13 @@ public class ReviewService {
     }
 
     private ReviewReplyResponse toReplyResponse(ReviewReply reply, String viewerId) {
-        User user = userMapper.selectById(reply.getUserId());
-        VoteSummary votes = summarizeVotes("REPLY", reply.getId(), viewerId);
+        return toReplyResponse(reply, viewerId, buildReviewContext(List.of(requireReview(reply.getReviewId())), viewerId));
+    }
+
+    private ReviewReplyResponse toReplyResponse(ReviewReply reply, String viewerId, BatchReviewContext context) {
+        User user = context.users().get(reply.getUserId());
+        VoteSummary votes = summarizeVotes(context.votesByTarget()
+            .getOrDefault(voteKey("REPLY", reply.getId()), List.of()), viewerId);
         return new ReviewReplyResponse(
             reply.getId(),
             reply.getReviewId(),
@@ -485,6 +541,10 @@ public class ReviewService {
         List<ReviewVote> votes = reviewVoteMapper.selectList(new LambdaQueryWrapper<ReviewVote>()
             .eq(ReviewVote::getTargetType, targetType)
             .eq(ReviewVote::getTargetId, targetId));
+        return summarizeVotes(votes, viewerId);
+    }
+
+    private VoteSummary summarizeVotes(List<ReviewVote> votes, String viewerId) {
         long likes = votes.stream().filter(v -> "LIKE".equals(v.getVoteType())).count();
         long dislikes = votes.stream().filter(v -> "DISLIKE".equals(v.getVoteType())).count();
         String myVote = viewerId == null ? null : votes.stream()
@@ -493,6 +553,10 @@ public class ReviewService {
             .findFirst()
             .orElse(null);
         return new VoteSummary(likes, dislikes, myVote);
+    }
+
+    private String voteKey(String targetType, Long targetId) {
+        return targetType + ":" + targetId;
     }
 
     private void validateVoteTarget(Long targetId, String targetType) {
@@ -675,5 +739,16 @@ public class ReviewService {
     }
 
     private record VoteSummary(long likes, long dislikes, String myVote) {
+    }
+
+    private record BatchReviewContext(
+        Map<String, User> users,
+        Map<Long, List<String>> imagesByReview,
+        Map<Long, List<ReviewReply>> repliesByReview,
+        Map<String, List<ReviewVote>> votesByTarget
+    ) {
+        private static BatchReviewContext empty() {
+            return new BatchReviewContext(Map.of(), Map.of(), Map.of(), Map.of());
+        }
     }
 }

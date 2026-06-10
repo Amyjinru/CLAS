@@ -1,7 +1,7 @@
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import * as echarts from 'echarts'
 import { getMyMerchantStats } from '../api/clas'
+import { formatFen } from '../utils/formatters'
 
 const loading = ref(true)
 const stats = ref({
@@ -11,10 +11,7 @@ const stats = ref({
   topProducts: []
 })
 let salesChart = null
-
-function formatFen(value) {
-  return ((value || 0) / 100).toFixed(2)
-}
+let echartsModule = null
 
 async function loadStats() {
   loading.value = true
@@ -23,13 +20,21 @@ async function loadStats() {
   } finally {
     loading.value = false
     await nextTick()
-    renderChart()
+    await renderChart()
   }
 }
 
-function renderChart() {
+async function ensureEcharts() {
+  if (!echartsModule) {
+    echartsModule = (await import('../utils/echarts')).default
+  }
+  return echartsModule
+}
+
+async function renderChart() {
   const dom = document.getElementById('merchantSalesChart')
   if (!dom) return
+  const echarts = await ensureEcharts()
   salesChart?.dispose()
   salesChart = echarts.init(dom)
   const data = stats.value.dailySales || []
