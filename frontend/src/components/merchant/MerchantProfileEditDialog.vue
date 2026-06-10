@@ -180,7 +180,7 @@ async function save() {
   <el-dialog v-model="dialogVisible" title="信息修改" width="720px" destroy-on-close>
     <div class="profile-dialog">
       <div class="logo-row">
-        <img v-if="merchant?.logo" :src="merchant.logo" alt="店铺头像" />
+        <img v-if="merchant?.logo" :src="merchant.logo" alt="店铺头像" loading="lazy" />
         <div v-else class="logo-placeholder">{{ merchant?.merchantName?.slice(0, 1) || '店' }}</div>
         <input ref="fileInputRef" type="file" accept="image/jpeg,image/png" class="file-input" @change="onLogoSelected" />
         <el-button type="primary" :loading="logoUploading" @click="openLogoPicker">上传店铺头像</el-button>

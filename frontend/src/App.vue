@@ -55,6 +55,7 @@ async function handleLogout() {
 
 <template>
   <div class="shell">
+    <a href="#main-content" class="skip-link">跳到主要内容</a>
     <header class="topbar">
       <div class="header-left">
         <RouterLink class="brand" :to="brandLink">CLAS 生活助手</RouterLink>
@@ -110,7 +111,7 @@ async function handleLogout() {
         </template>
       </nav>
     </header>
-    <main class="main-content">
+    <main id="main-content" class="main-content">
       <RouterView :key="route.fullPath" />
     </main>
     <ChatSidebar v-if="sessionUser" />
@@ -190,7 +191,9 @@ nav a {
   font-weight: 500;
   padding: 7px 16px;
   border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  transition-property: color, background-color;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   letter-spacing: 0.02em;
 }
 

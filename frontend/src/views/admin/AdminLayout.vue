@@ -101,7 +101,9 @@ function navigateTo(path) {
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.03em;
-  transition: all var(--transition-fast);
+  transition-property: background-color, color, border-color;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   color: var(--text-sidebar);
 }
 .sidebar-menu .el-menu-item:hover {

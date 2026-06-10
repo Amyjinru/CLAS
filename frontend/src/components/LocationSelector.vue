@@ -525,7 +525,9 @@ onMounted(async () => {
   padding: 10px;
   text-align: center;
   width: 100%;
-  transition: all 0.2s;
+  transition-property: background-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .wheel button.active {

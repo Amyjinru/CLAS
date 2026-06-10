@@ -459,7 +459,9 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 18px 22px;
-  transition: all var(--transition-fast);
+  transition-property: box-shadow, transform;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 .cart-item:hover {
   border-color: var(--clas-amber-200);
@@ -548,7 +550,9 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
   color: var(--clas-error, #ef4444);
   border: 1px solid var(--clas-error-light, #fecaca);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition-property: background-color, color, border-color, box-shadow;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 .delete-btn:hover:not(:disabled) {
   background: var(--clas-error-light, #fef2f2);
@@ -742,7 +746,9 @@ button.compact {
   color: #fff;
   border: none;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition-property: background-color, transform, box-shadow;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   width: 100%;
 }

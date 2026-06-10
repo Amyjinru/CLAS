@@ -412,7 +412,9 @@ function switchTab(tab) {
   background: transparent;
   color: var(--text-secondary, #6b7280);
   cursor: pointer;
-  transition: all var(--transition-fast, 0.2s);
+  transition-property: color, background-color;
+  transition-duration: var(--transition-fast, 0.2s);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .auth-tabs button.active {
@@ -602,7 +604,9 @@ input:focus {
   color: var(--color-primary, #f97316);
   cursor: pointer;
   white-space: nowrap;
-  transition: all var(--transition-fast, 0.2s);
+  transition-property: color, background-color;
+  transition-duration: var(--transition-fast, 0.2s);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -640,7 +644,9 @@ input:focus {
   color: #fff;
   border: none;
   cursor: pointer;
-  transition: all var(--transition-fast, 0.2s);
+  transition-property: background-color, transform, box-shadow;
+  transition-duration: var(--transition-fast, 0.2s);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -823,7 +823,9 @@ onMounted(() => {
   color: #606266;
   font-size: 15px;
   font-weight: 500;
-  transition: all 0.3s ease;
+  transition-property: color, background-color;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
 }
 .menu-item:hover {
   color: #409eff;

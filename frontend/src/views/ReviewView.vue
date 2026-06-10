@@ -113,7 +113,7 @@ onMounted(load)
         </el-upload>
         <div class="preview-list">
           <div v-for="url in imageUrls" :key="url" class="preview-item">
-            <img :src="url" alt="预览" />
+            <img :src="url" alt="预览" loading="lazy" />
             <button type="button" class="remove" @click="removeImage(url)">×</button>
           </div>
         </div>

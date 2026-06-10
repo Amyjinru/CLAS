@@ -160,7 +160,7 @@ onMounted(load)
       </div>
       <p class="content">{{ review.content || '（无文字评价）' }}</p>
       <div v-if="review.images?.length" class="images">
-        <img v-for="(img, idx) in review.images" :key="idx" :src="img" alt="评价图片" />
+        <img v-for="(img, idx) in review.images" :key="idx" :src="img" alt="评价图片" loading="lazy" />
       </div>
       <div class="actions">
         <el-button text @click="vote('REVIEW', review.id, 'LIKE')">赞 {{ review.likeCount || 0 }}</el-button>

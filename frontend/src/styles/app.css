@@ -19,7 +19,9 @@ button,
   padding: 0 16px;
   font-weight: 600;
   font-family: var(--font-body);
-  transition: all var(--transition-fast);
+  transition-property: background-color, transform, box-shadow;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   letter-spacing: 0.02em;
 }
 button:hover,
@@ -196,7 +198,9 @@ nav a {
   font-weight: 500;
   padding: 6px 14px;
   border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  transition-property: color, background-color;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
 }
 nav a:hover,
@@ -267,7 +271,9 @@ nav a.router-link-active {
   border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow-sm);
-  transition: all var(--transition-base);
+  transition-property: box-shadow, transform;
+  transition-duration: var(--transition-base);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card:hover,
 .row:hover {
@@ -297,7 +303,9 @@ nav a.router-link-active {
 }
 .row h2,
 .card h2 {
-  font-size: 18px;
+  font-size: var(--text-h3);
+  font-weight: 600;
+  line-height: var(--leading-h3);
   margin: 0 0 6px;
   color: var(--text-primary);
 }
@@ -306,6 +314,7 @@ nav a.router-link-active {
 .panel p {
   color: var(--text-secondary);
   margin: 0 0 8px;
+  max-width: 65ch;
 }
 .row-actions {
   align-items: center;
@@ -328,8 +337,9 @@ nav a.router-link-active {
 
 /* ─── 页面标题装饰 ─── */
 .page-title {
-  font-size: 26px;
-  font-weight: 700;
+  font-size: clamp(22px, 5vw, var(--text-h2));
+  font-weight: 800;
+  line-height: var(--leading-h2);
   color: var(--text-primary);
   margin: 0 0 24px 0;
   letter-spacing: 0.04em;
@@ -401,6 +411,112 @@ nav a.router-link-active {
 .stagger-3 { animation-delay: 0.15s; }
 .stagger-4 { animation-delay: 0.2s; }
 
+/* ─── 无障碍 — Skip Link ─── */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 10000;
+  padding: 10px 20px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: top 0.1s ease-out;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* ─── 无障碍 — 聚焦环 ─── */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ─── 动效可访问性 — 尊重用户偏好 ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── 微交互 ─── */
+
+/* 开关切换 */
+.el-switch .el-switch__core {
+  transition: transform 150ms ease-out;
+}
+.el-switch.is-checked .el-switch__core {
+  transform: translateX(6px);
+}
+
+/* 复选框勾选弹跳 */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  animation: scaleIn 0.2s ease-out both;
+}
+
+/* 通知徽标弹性出现 */
+.el-badge__content {
+  animation: scaleIn 0.25s ease-out both;
+}
+
+/* 表单验证抖动 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-3px); }
+  30%, 70% { transform: translateX(3px); }
+}
+.el-form-item.is-error .el-input__wrapper {
+  animation: shake 0.4s ease-out;
+  border-color: var(--clas-danger);
+  box-shadow: 0 0 0 1px var(--clas-danger) inset;
+}
+
+/* 表单验证成功脉冲 */
+@keyframes successPulse {
+  0% { box-shadow: 0 0 0 0 rgba(101, 163, 13, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(101, 163, 13, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(101, 163, 13, 0); }
+}
+.el-form-item.is-success .el-input__wrapper {
+  animation: successPulse 0.6s ease-out;
+}
+
+/* ─── 移动端安全区域 ─── */
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* 底部固定元素避让 iPhone 指示条 */
+.checkout,
+.tabs {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+/* 小屏 (iPhone SE/6/7/8) 适配 */
+@media (max-width: 375px) {
+  main {
+    padding: 10px;
+  }
+  .hero {
+    padding: 24px 16px;
+  }
+  .card,
+  .row {
+    padding: 14px;
+  }
+  .page-title {
+    padding-left: 10px;
+  }
+}
+
 /* ─── 响应式 ─── */
 @media (max-width: 768px) {
   .topbar,
@@ -419,8 +535,5 @@ nav a.router-link-active {
   }
   .stat-value {
     font-size: 28px;
-  }
-  .page-title {
-    font-size: 22px;
   }
 }

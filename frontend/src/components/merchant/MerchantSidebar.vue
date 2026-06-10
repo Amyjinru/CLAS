@@ -66,7 +66,9 @@ const items = [
   gap: 12px;
   padding: 12px 16px;
   text-align: left;
-  transition: all 0.3s ease;
+  transition-property: background-color, color, border-color;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
   width: 100%;
 }
 
