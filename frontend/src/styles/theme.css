@@ -6,17 +6,17 @@
 
 /* ─── 根变量：浅色主题 ─── */
 :root {
-  /* 主色系：暖琥珀 — 食物、烟火气、热情 */
-  --clas-amber-50: #fff7ed;
-  --clas-amber-100: #ffedd5;
-  --clas-amber-200: #fed7aa;
-  --clas-amber-300: #fdba74;
-  --clas-amber-400: #fb923c;
-  --clas-amber-500: #f97316;
-  --clas-amber-600: #ea580c;
-  --clas-amber-700: #c2410c;
-  --clas-amber-800: #9a3412;
-  --clas-amber-900: #7c2d12;
+  /* 主色系：美团黄 — 活力、醒目、年轻 */
+  --clas-amber-50: #FFFDE7;
+  --clas-amber-100: #FFF9C4;
+  --clas-amber-200: #FFF176;
+  --clas-amber-300: #FFE566;
+  --clas-amber-400: #FFD740;
+  --clas-amber-500: #FFD100;
+  --clas-amber-600: #E6BC00;
+  --clas-amber-700: #B8970E;
+  --clas-amber-800: #8D7200;
+  --clas-amber-900: #6B5600;
 
   /* 强调色：深青 — 清新、信任、生机 */
   --clas-teal-50: #f0fdfa;
@@ -54,10 +54,10 @@
   --clas-danger-soft-hover: #fca5a5;
 
   /* ─── 应用到界面 ─── */
-  --color-primary: #fb8c00;
-  --color-primary-hover: #f57c00;
-  --color-primary-light: var(--clas-amber-50);
-  --color-primary-soft: var(--clas-amber-100);
+  --color-primary: #FFD100;
+  --color-primary-hover: #E6BC00;
+  --color-primary-light: #FFF8E1;
+  --color-primary-soft: #FFECB3;
 
   --color-accent: var(--clas-teal-600);
   --color-accent-light: var(--clas-teal-50);
@@ -66,7 +66,7 @@
   --bg-card: #ffffff;
   --bg-sidebar: #2d251c;
   --bg-sidebar-hover: #3d352b;
-  --bg-sidebar-active: rgba(251, 140, 0, 0.15);
+  --bg-sidebar-active: rgba(255, 209, 0, 0.15);
 
   --text-primary: #1a1510;
   --text-secondary: #6b5c49;

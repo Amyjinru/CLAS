@@ -37,11 +37,11 @@ button:active,
 button.secondary,
 .button.secondary {
   background: var(--color-primary-soft);
-  color: var(--clas-amber-700);
+  color: #B8970E;
 }
 button.secondary:hover,
 .button.secondary:hover {
-  background: var(--clas-amber-200);
+  background: #FFE566;
 }
 button:disabled {
   background: var(--clas-warm-100);
@@ -226,7 +226,7 @@ nav a.router-link-active {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  background: linear-gradient(135deg, #faf7f2 0%, #ffedd5 50%, #fcfaf5 100%);
+  background: linear-gradient(135deg, #faf7f2 0%, #FFF4CC 50%, #fcfaf5 100%);
   border: none;
   position: relative;
   overflow: hidden;
@@ -282,9 +282,9 @@ nav a.router-link-active {
 }
 .thumb {
   align-items: center;
-  background: var(--clas-amber-50);
+  background: var(--color-primary-light);
   border-radius: var(--radius-md);
-  color: var(--clas-amber-700);
+  color: #B8970E;
   display: flex;
   font-weight: 900;
   height: 92px;
@@ -353,7 +353,7 @@ nav a.router-link-active {
   top: 4px;
   bottom: 4px;
   width: 4px;
-  background: linear-gradient(180deg, var(--color-primary), var(--clas-amber-300));
+  background: linear-gradient(180deg, var(--color-primary), #FFE566);
   border-radius: var(--radius-full);
 }
 
