@@ -26,6 +26,8 @@ import {
 } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import LocationSelector from '../components/LocationSelector.vue'
+import ProfileHero from '../components/profile/ProfileHero.vue'
+import ProfileSummary from '../components/profile/ProfileSummary.vue'
 
 const addresses = ref([])
 const dealOrders = ref([])
@@ -47,7 +49,6 @@ const addressFormRef = ref(null)
 const activeProfileTab = ref('transactions')
 const profileForm = reactive({ nickname: '', avatar: '' })
 const appealForm = reactive({ penaltyId: null, content: '' })
-const avatarInputRef = ref(null)
 const avatarUploading = ref(false)
 const nicknameSaving = ref(false)
 
@@ -209,10 +210,6 @@ async function saveProfile() {
   } finally {
     nicknameSaving.value = false
   }
-}
-
-function openAvatarPicker() {
-  avatarInputRef.value?.click()
 }
 
 async function onAvatarSelected(event) {
@@ -491,55 +488,23 @@ onMounted(async () => {
 
 <template>
   <div class="user-page profile-page">
-  <section class="hero profile-hero">
-    <div class="profile-head">
-      <button
-        type="button"
-        class="avatar-btn"
-        :class="{ uploading: avatarUploading }"
-        :disabled="avatarUploading"
-        @click="openAvatarPicker"
-      >
-        <div class="avatar" :style="avatarStyle()">{{ profileForm.avatar ? '' : avatarText() }}</div>
-        <span class="avatar-tip">{{ avatarUploading ? '上传中...' : '点击更换头像' }}</span>
-      </button>
-      <input
-        ref="avatarInputRef"
-        type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp"
-        class="avatar-input"
-        @change="onAvatarSelected"
-      />
-      <div class="profile-meta">
-        <h1>个人中心</h1>
-        <p>{{ displayName }} · {{ currentUser.phone || '未绑定手机号' }}</p>
-        <div class="nickname-row">
-          <el-input
-            v-model="profileForm.nickname"
-            maxlength="50"
-            show-word-limit
-            placeholder="设置昵称"
-            @keyup.enter="saveProfile"
-          />
-          <el-button type="primary" :loading="nicknameSaving" @click="saveProfile">保存昵称</el-button>
-        </div>
-      </div>
-    </div>
-  </section>
+  <ProfileHero
+    v-model:nickname="profileForm.nickname"
+    :display-name="displayName"
+    :phone="currentUser.phone"
+    :avatar="profileForm.avatar"
+    :avatar-text="avatarText()"
+    :avatar-uploading="avatarUploading"
+    :nickname-saving="nicknameSaving"
+    @avatar-selected="onAvatarSelected"
+    @save-profile="saveProfile"
+  />
 
-  <section class="profile-summary">
-    <button
-      v-for="item in summaryCards"
-      :key="item.label"
-      type="button"
-      class="summary-item"
-      :class="{ active: activeProfileTab === item.targetTab }"
-      @click="openSummaryCard(item)"
-    >
-      <strong>{{ item.value }}</strong>
-      <span>{{ item.label }}</span>
-    </button>
-  </section>
+  <ProfileSummary
+    :cards="summaryCards"
+    :active-tab="activeProfileTab"
+    @select="openSummaryCard"
+  />
 
   <section v-if="loading" class="panel state-panel">
     <el-skeleton :rows="8" animated />
@@ -816,67 +781,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.profile-hero { display: grid; gap: 16px; }
-.profile-head { align-items: center; display: flex; gap: 20px; flex-wrap: wrap; }
-.avatar-btn {
-  align-items: center; background: transparent; border: 0; cursor: pointer;
-  display: flex; flex-direction: column; gap: 8px; padding: 0;
-}
-.avatar-btn.uploading { cursor: wait; opacity: 0.75; }
-.avatar-input { display: none; }
-.avatar {
-  align-items: center; background: #dbeafe; border: 2px solid #bfdbfe; border-radius: 50%;
-  color: #1d4ed8; display: flex; height: 88px; justify-content: center;
-  width: 88px; font-size: 28px; font-weight: 700; transition: border-color 0.2s, box-shadow 0.2s;
-}
-.avatar-btn:hover .avatar { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12); }
-.avatar-tip { color: var(--text-secondary); font-size: 12px; }
-.profile-meta { display: grid; gap: 10px; min-width: 240px; }
-.profile-meta h1 { margin: 0; }
-.profile-meta p { color: var(--text-secondary); margin: 0; }
-.nickname-row { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; max-width: 420px; }
-.nickname-row .el-input { flex: 1; min-width: 180px; }
-.profile-summary {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 18px;
-}
-.summary-item {
-  background: #fff;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  color: var(--text-primary);
-  cursor: pointer;
-  display: block;
-  padding: 16px;
-  text-align: left;
-  width: 100%;
-}
-.summary-item:hover,
-.summary-item:focus-visible {
-  background: #fff;
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-sm);
-  outline: none;
-  transform: none;
-}
-.summary-item.active {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary);
-}
-.summary-item strong {
-  color: var(--text-primary);
-  display: block;
-  font-size: 24px;
-  line-height: 1.1;
-}
-.summary-item span {
-  color: var(--text-secondary);
-  display: block;
-  font-size: 13px;
-  margin-top: 8px;
-}
 .profile-workspace {
   overflow: hidden;
 }
@@ -1006,8 +910,7 @@ onMounted(async () => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 @media (max-width: 900px) {
-  .shortcut-grid,
-  .profile-summary {
+  .shortcut-grid {
     grid-template-columns: 1fr;
   }
   .form-row,

@@ -1,6 +1,7 @@
 package com.clas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,13 +9,45 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.clas.common.BusinessException;
+import com.clas.entity.Coupon;
+import com.clas.entity.Product;
+import com.clas.entity.Review;
+import com.clas.entity.ReviewImage;
+import com.clas.entity.ReviewReply;
+import com.clas.entity.ReviewVote;
+import com.clas.entity.UserCoupon;
+import com.clas.mapper.CouponMapper;
+import com.clas.mapper.ProductMapper;
+import com.clas.mapper.ReviewImageMapper;
+import com.clas.mapper.ReviewMapper;
+import com.clas.mapper.ReviewReplyMapper;
+import com.clas.mapper.ReviewVoteMapper;
+import com.clas.mapper.UserCouponMapper;
+import com.clas.service.CouponService;
+import java.util.Properties;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.ibatis.cache.CacheKey;
+import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Plugin;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.ResultHandler;
+import org.apache.ibatis.session.RowBounds;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -34,6 +67,33 @@ class ModuleIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private UserCouponMapper userCouponMapper;
+
+    @Autowired
+    private CouponMapper couponMapper;
+
+    @Autowired
+    private CouponService couponService;
+
+    @Autowired
+    private ProductMapper productMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ReviewMapper reviewMapper;
+
+    @Autowired
+    private ReviewImageMapper reviewImageMapper;
+
+    @Autowired
+    private ReviewReplyMapper reviewReplyMapper;
+
+    @Autowired
+    private ReviewVoteMapper reviewVoteMapper;
 
     @Test
     void userRegisterWorksAndHidesPassword() throws Exception {
@@ -224,6 +284,9 @@ class ModuleIntegrationTest {
     @Test
     void adminMerchantListRequiresAdminRole() throws Exception {
         // 管理员接口必须同时拦截未登录用户和非 ADMIN 角色用户。
+        String userToken = loginToken(USER_PHONE);
+        String adminToken = loginToken(ADMIN_PHONE);
+
         mockMvc.perform(get("/api/merchant/admin/list"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value(401))
@@ -231,12 +294,17 @@ class ModuleIntegrationTest {
 
         mockMvc.perform(get("/api/merchant/admin/list")
                 .header("Authorization", USER_PHONE))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(401));
+
+        mockMvc.perform(get("/api/merchant/admin/list")
+                .header("Authorization", "Bearer " + userToken))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value(403))
             .andExpect(jsonPath("$.message").value("权限不足，无法访问"));
 
         mockMvc.perform(get("/api/merchant/admin/list")
-                .header("Authorization", ADMIN_PHONE))
+                .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
     }
@@ -244,7 +312,7 @@ class ModuleIntegrationTest {
     @Test
     void merchantListCalculatesDistanceFromAddress() throws Exception {
         mockMvc.perform(get("/api/merchant/list")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .param("addressId", "1")
                 .param("sort", "distance"))
             .andExpect(status().isOk())
@@ -278,7 +346,7 @@ class ModuleIntegrationTest {
     @Test
     void cartUpdateAndDeleteItemWork() throws Exception {
         mockMvc.perform(post("/api/cart/add")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -289,7 +357,7 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.code").value(200));
 
         mockMvc.perform(post("/api/cart/update")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -301,9 +369,70 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.data[0].subtotal").value(5180));
 
         mockMvc.perform(delete("/api/cart/item/" + USER_PHONE + "/1")
-                .header("Authorization", USER_PHONE))
+                .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void canonicalCurrentUserRoutesIgnoreClientSuppliedIds() throws Exception {
+        String otherUserId = "13900009999";
+
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", otherUserId,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].userId").value(USER_PHONE));
+
+        mockMvc.perform(get("/api/cart/me")
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].userId").value(USER_PHONE));
+
+        mockMvc.perform(get("/api/cart/list/" + otherUserId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].userId").value(USER_PHONE));
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", otherUserId,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.userId").value(USER_PHONE))
+            .andReturn();
+
+        mockMvc.perform(get("/api/order/me")
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        mockMvc.perform(get("/api/order/list/" + otherUserId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+        mockMvc.perform(post("/api/order/cancel/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/order/merchant/999")
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/order/merchant/me")
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk());
     }
 
     @Test
@@ -315,7 +444,7 @@ class ModuleIntegrationTest {
             .path("data").get(0).path("stock").asInt();
 
         mockMvc.perform(post("/api/cart/add")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -325,7 +454,7 @@ class ModuleIntegrationTest {
             .andExpect(status().isOk());
 
         MvcResult orderResult = mockMvc.perform(post("/api/order/create")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -343,7 +472,7 @@ class ModuleIntegrationTest {
             .path("data").path("order").path("id").asLong();
 
         mockMvc.perform(post("/api/order/cancel/" + orderId)
-                .header("Authorization", USER_PHONE))
+                .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("CANCELED"));
 
@@ -358,7 +487,7 @@ class ModuleIntegrationTest {
     @Test
     void paymentReviewFlowWorks() throws Exception {
         mockMvc.perform(post("/api/cart/add")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -369,7 +498,7 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.code").value(200));
 
         MvcResult orderResult = mockMvc.perform(post("/api/order/create")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
@@ -386,13 +515,13 @@ class ModuleIntegrationTest {
             .path("data").path("order").path("id").asLong();
 
         mockMvc.perform(get("/api/payment/status/" + orderId)
-                .header("Authorization", USER_PHONE))
+                .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"))
             .andExpect(jsonPath("$.data.orderStatus").value("PENDING_PAYMENT"));
 
         mockMvc.perform(post("/api/payment/mock")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "orderId", orderId,
@@ -406,16 +535,30 @@ class ModuleIntegrationTest {
         mockMvc.perform(get("/api/product/list/1"))
             .andExpect(jsonPath("$.data[0].stock").value(29));
 
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", orderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"));
+
+        mockMvc.perform(get("/api/product/list/1"))
+            .andExpect(jsonPath("$.data[0].stock").value(29));
+
         mockMvc.perform(post("/api/order/accept/" + orderId)
-                .header("Authorization", MERCHANT_PHONE))
+                .header("Authorization", auth(MERCHANT_PHONE)))
             .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
 
         mockMvc.perform(post("/api/order/complete/" + orderId)
-                .header("Authorization", USER_PHONE))
+                .header("Authorization", auth(USER_PHONE)))
             .andExpect(jsonPath("$.data.status").value("COMPLETED"));
 
         mockMvc.perform(post("/api/review/add")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "orderId", orderId,
@@ -431,7 +574,7 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.data.averageScore").value(5.0));
 
         mockMvc.perform(post("/api/review/add")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "orderId", orderId,
@@ -443,9 +586,234 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void couponIsReservedReleasedAndUsedAcrossOrderLifecycle() throws Exception {
+        MvcResult claimResult = mockMvc.perform(post("/api/coupon/claim/1")
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("UNUSED"))
+            .andReturn();
+        Long userCouponId = objectMapper.readTree(claimResult.getResponse().getContentAsString())
+            .path("data").path("id").asLong();
+
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult canceledOrderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "merchantId", 1,
+                    "userCouponId", userCouponId
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+        Long canceledOrderId = objectMapper.readTree(canceledOrderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        UserCoupon reserved = userCouponMapper.selectById(userCouponId);
+        assertEquals("RESERVED", reserved.getStatus());
+        assertEquals(canceledOrderId, reserved.getOrderId());
+
+        mockMvc.perform(post("/api/order/cancel/" + canceledOrderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("CANCELED"));
+
+        UserCoupon released = userCouponMapper.selectById(userCouponId);
+        assertEquals("UNUSED", released.getStatus());
+        assertEquals(null, released.getOrderId());
+
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult paidOrderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "merchantId", 1,
+                    "userCouponId", userCouponId
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+        Long paidOrderId = objectMapper.readTree(paidOrderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", paidOrderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
+
+        UserCoupon used = userCouponMapper.selectById(userCouponId);
+        assertEquals("USED", used.getStatus());
+        assertEquals(paidOrderId, used.getOrderId());
+    }
+
+    @Test
+    void limitedCouponCannotBeOverClaimed() {
+        Coupon coupon = new Coupon();
+        coupon.setTitle("Single claim coupon");
+        coupon.setDescription("Limit regression");
+        coupon.setCouponType("FIXED");
+        coupon.setDiscountAmount(100);
+        coupon.setDiscountPercent(null);
+        coupon.setMinOrderAmount(0);
+        coupon.setMerchantId(null);
+        coupon.setTotalLimit(1);
+        coupon.setClaimedCount(0);
+        coupon.setValidFrom(LocalDateTime.now().minusDays(1));
+        coupon.setValidTo(LocalDateTime.now().plusDays(1));
+        coupon.setStatus("ACTIVE");
+        coupon.setCreatedAt(LocalDateTime.now());
+        couponMapper.insert(coupon);
+
+        couponService.claim(USER_PHONE, coupon.getId());
+
+        assertThrows(BusinessException.class, () -> couponService.claim("13900000999", coupon.getId()));
+        assertEquals(1, couponMapper.selectById(coupon.getId()).getClaimedCount());
+    }
+
+    @Test
+    void paymentFailsWithoutMarkingOrderPaidWhenStockRunsOutAfterOrderCreation() throws Exception {
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+        Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        Product product = productMapper.selectById(1L);
+        int originalStock = product.getStock();
+        product.setStock(0);
+        productMapper.updateById(product);
+        try {
+            mockMvc.perform(post("/api/payment/mock")
+                    .header("Authorization", auth(USER_PHONE))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of(
+                        "orderId", orderId,
+                        "userId", USER_PHONE,
+                        "payMethod", "MOCK"
+                    ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("库存不足：Chicken Energy Bowl"));
+
+            mockMvc.perform(get("/api/payment/status/" + orderId)
+                    .header("Authorization", auth(USER_PHONE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.paymentStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.orderStatus").value("PENDING_PAYMENT"));
+        } finally {
+            product.setStock(originalStock);
+            productMapper.updateById(product);
+        }
+    }
+
+    @Test
+    void orderAndReviewListsUseBatchedDetailQueries() throws Exception {
+        Long firstOrderId = createPendingOrderForUser();
+        Long secondOrderId = createPendingOrderForUser();
+        insertReviewFixture(firstOrderId, "批量评价 1", 1);
+        insertReviewFixture(secondOrderId, "批量评价 2", 2);
+
+        String userAuth = auth(USER_PHONE);
+
+        MybatisQueryCounter.reset();
+        mockMvc.perform(get("/api/order/list/" + USER_PHONE)
+                .header("Authorization", userAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+        org.junit.jupiter.api.Assertions.assertTrue(
+            MybatisQueryCounter.count() <= 4,
+            "订单列表应批量加载明细，当前查询次数: " + MybatisQueryCounter.count()
+        );
+
+        MybatisQueryCounter.reset();
+        mockMvc.perform(get("/api/review/mine")
+                .header("Authorization", userAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+        org.junit.jupiter.api.Assertions.assertTrue(
+            MybatisQueryCounter.count() <= 8,
+            "评价列表应批量加载用户、图片、回复和投票，当前查询次数: " + MybatisQueryCounter.count()
+        );
+    }
+
+    @Test
+    void databaseRejectsCoreOrphanRows() {
+        long validOrderId = 99001L;
+        jdbcTemplate.update("""
+            INSERT INTO orders (
+                id, user_id, merchant_id, total_price, subtotal, delivery_fee, coupon_discount,
+                status, delivery_status, estimated_minutes, create_time
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            validOrderId, USER_PHONE, 1L, 100, 100, 0, 0,
+            "PENDING_PAYMENT", "WAITING", 30, LocalDateTime.now()
+        );
+
+        assertThrows(Exception.class, () -> jdbcTemplate.update(
+            "INSERT INTO order_item (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)",
+            -9001L, 1L, 1, 100
+        ));
+        assertThrows(Exception.class, () -> jdbcTemplate.update(
+            "INSERT INTO order_item (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)",
+            validOrderId, -9001L, 1, 100
+        ));
+        assertThrows(Exception.class, () -> jdbcTemplate.update(
+            "INSERT INTO payment (order_id, user_id, amount, pay_method, status, create_time) VALUES (?, ?, ?, ?, ?, ?)",
+            -9001L, USER_PHONE, 100, "MOCK", "PENDING", LocalDateTime.now()
+        ));
+        assertThrows(Exception.class, () -> jdbcTemplate.update(
+            "INSERT INTO review (order_id, user_id, score, content, report_status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            -9001L, USER_PHONE, 5, "orphan", "NONE", LocalDateTime.now()
+        ));
+        assertThrows(Exception.class, () -> jdbcTemplate.update(
+            "INSERT INTO user_coupon (user_id, coupon_id, status, claimed_at) VALUES (?, ?, ?, ?)",
+            USER_PHONE, -9001L, "UNUSED", LocalDateTime.now()
+        ));
+    }
+
+    @Test
     void createAnnouncementWorks() throws Exception {
         mockMvc.perform(post("/api/announcement/create")
-                .header("Authorization", ADMIN_PHONE)
+                .header("Authorization", auth(ADMIN_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "title", "新公告",
@@ -458,12 +826,12 @@ class ModuleIntegrationTest {
     @Test
     void bookingFlowRequiresOwnerAndMerchantRoles() throws Exception {
         mockMvc.perform(get("/api/bookings/merchant")
-                .header("Authorization", USER_PHONE))
+                .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value(403));
 
         MvcResult bookingResult = mockMvc.perform(post("/api/bookings")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "merchantId", 1,
@@ -482,22 +850,150 @@ class ModuleIntegrationTest {
             .path("data").path("id").asLong();
 
         mockMvc.perform(post("/api/bookings/" + bookingId + "/status")
-                .header("Authorization", USER_PHONE)
+                .header("Authorization", auth(USER_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("status", "CONFIRMED"))))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value(403));
 
         mockMvc.perform(post("/api/bookings/" + bookingId + "/status")
-                .header("Authorization", MERCHANT_PHONE)
+                .header("Authorization", auth(MERCHANT_PHONE))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("status", "CONFIRMED"))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
 
         mockMvc.perform(post("/api/bookings/" + bookingId + "/cancel")
-                .header("Authorization", USER_PHONE))
+                .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("CANCELED"));
+    }
+
+    private Long createPendingOrderForUser() throws Exception {
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+        return objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+    }
+
+    private void insertReviewFixture(Long orderId, String content, int sortOrder) {
+        Review review = new Review();
+        review.setOrderId(orderId);
+        review.setUserId(USER_PHONE);
+        review.setScore(5);
+        review.setContent(content);
+        review.setReportStatus("NONE");
+        review.setCreatedAt(LocalDateTime.now());
+        reviewMapper.insert(review);
+
+        ReviewImage image = new ReviewImage();
+        image.setReviewId(review.getId());
+        image.setImageUrl("https://example.test/review-" + review.getId() + ".jpg");
+        image.setSortOrder(sortOrder);
+        image.setCreatedAt(LocalDateTime.now());
+        reviewImageMapper.insert(image);
+
+        ReviewReply reply = new ReviewReply();
+        reply.setReviewId(review.getId());
+        reply.setUserId(MERCHANT_PHONE);
+        reply.setReplyType("MERCHANT");
+        reply.setContent("谢谢反馈 " + review.getId());
+        reply.setDeleted(false);
+        reply.setCreatedAt(LocalDateTime.now());
+        reviewReplyMapper.insert(reply);
+
+        ReviewVote reviewVote = new ReviewVote();
+        reviewVote.setTargetType("REVIEW");
+        reviewVote.setTargetId(review.getId());
+        reviewVote.setUserId(ADMIN_PHONE);
+        reviewVote.setVoteType("LIKE");
+        reviewVote.setCreatedAt(LocalDateTime.now());
+        reviewVoteMapper.insert(reviewVote);
+
+        ReviewVote replyVote = new ReviewVote();
+        replyVote.setTargetType("REPLY");
+        replyVote.setTargetId(reply.getId());
+        replyVote.setUserId(USER_PHONE);
+        replyVote.setVoteType("LIKE");
+        replyVote.setCreatedAt(LocalDateTime.now());
+        reviewVoteMapper.insert(replyVote);
+    }
+
+    private String loginToken(String phone) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", phone,
+                    "password", STRONG_PASSWORD
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.token").isString())
+            .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+            .path("data").path("token").asText();
+    }
+
+    private String auth(String phone) throws Exception {
+        return "Bearer " + loginToken(phone);
+    }
+
+    @TestConfiguration
+    static class MybatisQueryCounterConfig {
+        @Bean
+        MybatisQueryCounter mybatisQueryCounter() {
+            return new MybatisQueryCounter();
+        }
+    }
+
+    @Intercepts({
+        @Signature(type = Executor.class, method = "query", args = {
+            MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class
+        }),
+        @Signature(type = Executor.class, method = "query", args = {
+            MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class, CacheKey.class, BoundSql.class
+        })
+    })
+    static class MybatisQueryCounter implements Interceptor {
+        private static final AtomicInteger QUERIES = new AtomicInteger();
+
+        static void reset() {
+            QUERIES.set(0);
+        }
+
+        static int count() {
+            return QUERIES.get();
+        }
+
+        @Override
+        public Object intercept(Invocation invocation) throws Throwable {
+            QUERIES.incrementAndGet();
+            return invocation.proceed();
+        }
+
+        @Override
+        public Object plugin(Object target) {
+            return Plugin.wrap(target, this);
+        }
+
+        @Override
+        public void setProperties(Properties properties) {
+        }
     }
 }

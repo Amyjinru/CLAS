@@ -1,18 +1,12 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted } from 'vue'
 import { listAdminOrders } from '../../api/admin'
 import { ElMessage } from 'element-plus'
-
-const orders = ref([])
-const total = ref(0)
-const page = ref(1)
-const size = ref(10)
-const loading = ref(false)
-const filters = reactive({
-  status: '',
-  keyword: '',
-  dateRange: []
-})
+import MoneyText from '../../components/MoneyText.vue'
+import StatusTag from '../../components/StatusTag.vue'
+import { useTableQuery } from '../../composables/useTableQuery'
+import { formatDateTime } from '../../utils/formatters'
+import { orderStatusMap } from '../../utils/status'
 
 const statusOptions = [
   { label: '全部状态', value: '' },
@@ -24,48 +18,45 @@ const statusOptions = [
   { label: '已退款', value: 'REFUNDED' }
 ]
 
-const statusTagTypes = {
-  PENDING_PAYMENT: 'warning',
-  PAID: 'primary',
-  ACCEPTED: 'info',
-  COMPLETED: 'success',
-  REFUND_REQUESTED: 'warning',
-  REFUNDED: 'danger'
-}
-
-const statusLabels = Object.fromEntries(statusOptions.filter((item) => item.value).map((item) => [item.value, item.label]))
+const {
+  rows: orders,
+  total,
+  page,
+  size,
+  loading,
+  filters,
+  load: loadOrders,
+  search,
+  reset,
+  onPageChange
+} = useTableQuery(listAdminOrders, {
+  filters: {
+    status: '',
+    keyword: '',
+    dateRange: []
+  },
+  params: ({ page, size, filters }) => ({
+    page,
+    size,
+    status: filters.status || undefined,
+    keyword: filters.keyword.trim() || undefined,
+    startDate: filters.dateRange?.[0],
+    endDate: filters.dateRange?.[1]
+  }),
+  rows: (data) => data.records,
+  total: (data) => data.total
+})
 
 async function load() {
-  loading.value = true
   try {
-    const params = {
-      page: page.value,
-      size: size.value,
-      status: filters.status || undefined,
-      keyword: filters.keyword.trim() || undefined,
-      startDate: filters.dateRange?.[0],
-      endDate: filters.dateRange?.[1]
-    }
-    const data = await listAdminOrders(params)
-    orders.value = data.records
-    total.value = data.total
+    await loadOrders()
   } catch {
     ElMessage.error('加载订单列表失败')
-  } finally {
-    loading.value = false
   }
 }
 
-function search() {
-  page.value = 1
-  load()
-}
-
 function resetFilters() {
-  filters.status = ''
-  filters.keyword = ''
-  filters.dateRange = []
-  search()
+  reset({ status: '', keyword: '', dateRange: [] }).catch(() => ElMessage.error('加载订单列表失败'))
 }
 
 function exportCSV() {
@@ -77,20 +68,15 @@ function exportCSV() {
   window.open('/api/admin/export/orders?' + params.toString(), '_blank')
 }
 
-function onPageChange(value) {
-  page.value = value
-  load()
+function handleSearch() {
+  search().catch(() => ElMessage.error('加载订单列表失败'))
 }
 
-function formatFen(value) {
-  return value ? (value / 100).toFixed(2) : '0.00'
+function handlePageChange(value) {
+  onPageChange(value).catch(() => ElMessage.error('加载订单列表失败'))
 }
 
-function formatTime(value) {
-  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-'
-}
-
-onMounted(load)
+onMounted(() => load().catch(() => ElMessage.error('加载订单列表失败')))
 </script>
 
 <template>
@@ -105,8 +91,8 @@ onMounted(load)
 
     <el-card shadow="never">
       <div class="toolbar">
-        <el-input v-model="filters.keyword" clearable placeholder="搜索订单号、用户、商家或地址" style="max-width: 300px" @keyup.enter="search" />
-        <el-select v-model="filters.status" placeholder="订单状态" clearable style="width: 150px" @change="search">
+        <el-input v-model="filters.keyword" clearable placeholder="搜索订单号、用户、商家或地址" style="max-width: 300px" @keyup.enter="handleSearch" />
+        <el-select v-model="filters.status" placeholder="订单状态" clearable style="width: 150px" @change="handleSearch">
           <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <el-date-picker
@@ -117,9 +103,9 @@ onMounted(load)
           start-placeholder="开始日期"
           end-placeholder="结束日期"
           style="width: 260px"
-          @change="search"
+          @change="handleSearch"
         />
-        <el-button type="primary" @click="search">查询</el-button>
+        <el-button type="primary" @click="handleSearch">查询</el-button>
         <el-button @click="resetFilters">重置</el-button>
         <el-button @click="exportCSV">导出 CSV</el-button>
       </div>
@@ -129,14 +115,10 @@ onMounted(load)
         <el-table-column prop="userId" label="用户" min-width="120" show-overflow-tooltip />
         <el-table-column prop="merchantId" label="商家ID" width="90" />
         <el-table-column label="金额" width="110">
-          <template #default="{ row }">¥{{ formatFen(row.totalPrice) }}</template>
+          <template #default="{ row }"><MoneyText :amount="row.totalPrice" /></template>
         </el-table-column>
         <el-table-column label="状态" width="110">
-          <template #default="{ row }">
-            <el-tag :type="statusTagTypes[row.status] || 'info'" size="small">
-              {{ statusLabels[row.status] || row.status }}
-            </el-tag>
-          </template>
+          <template #default="{ row }"><StatusTag :status="row.status" :map="orderStatusMap" /></template>
         </el-table-column>
         <el-table-column prop="deliveryAddress" label="配送地址" min-width="190" show-overflow-tooltip />
         <el-table-column prop="rejectReason" label="拒单原因" min-width="140" show-overflow-tooltip>
@@ -146,7 +128,7 @@ onMounted(load)
           <template #default="{ row }">{{ row.refundStatus || '-' }}</template>
         </el-table-column>
         <el-table-column label="下单时间" width="170">
-          <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
+          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
         </el-table-column>
       </el-table>
 
@@ -155,7 +137,7 @@ onMounted(load)
         :page-size="size"
         :total="total"
         layout="total, prev, pager, next"
-        @current-change="onPageChange"
+        @current-change="handlePageChange"
         class="pager"
       />
     </el-card>

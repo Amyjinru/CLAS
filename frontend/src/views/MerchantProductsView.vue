@@ -16,6 +16,10 @@ import {
   currentUser
 } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import MoneyText from '../components/MoneyText.vue'
+import StatusTag from '../components/StatusTag.vue'
+import ProductStatusAction from '../components/product/ProductStatusAction.vue'
+import { merchantStatusMap, productStatusMap } from '../utils/status'
 
 const router = useRouter()
 const merchant = ref(null)
@@ -62,14 +66,6 @@ const rules = {
     { required: true, message: '库存不能为空', trigger: 'blur' },
     { type: 'integer', min: 0, message: '库存不能小于 0', trigger: 'blur' }
   ]
-}
-
-const statusMap = {
-  PENDING: { text: '待审核', type: 'warning' },
-  APPROVED: { text: '已审核', type: 'info' },
-  OPEN: { text: '营业中', type: 'success' },
-  CLOSED: { text: '停业中', type: 'danger' },
-  BLOCKED: { text: '已禁用', type: 'danger' }
 }
 
 async function loadMerchant() {
@@ -332,9 +328,7 @@ onMounted(loadMerchant)
           <div class="merchant-badge">
             <div class="store-icon">{{ merchant.merchantName.substring(0, 1) }}</div>
             <h4>{{ merchant.merchantName }}</h4>
-            <el-tag :type="statusMap[merchant.status]?.type || 'info'" size="large" effect="dark">
-              {{ statusMap[merchant.status]?.text || merchant.status }}
-            </el-tag>
+            <StatusTag :status="merchant.status" :map="merchantStatusMap" size="large" effect="dark" />
           </div>
 
           <el-divider />
@@ -483,7 +477,7 @@ onMounted(loadMerchant)
 
             <el-table-column label="价格" width="110">
               <template #default="scope">
-                <span class="price-text">¥{{ (scope.row.price / 100).toFixed(2) }}</span>
+                <span class="price-text"><MoneyText :amount="scope.row.price" /></span>
               </template>
             </el-table-column>
 
@@ -497,20 +491,16 @@ onMounted(loadMerchant)
 
             <el-table-column label="状态" width="100">
               <template #default="scope">
-                <el-tag :type="scope.row.status === 'ON_SALE' ? 'success' : 'info'">
-                  {{ scope.row.status === 'ON_SALE' ? '上架中' : '下架中' }}
-                </el-tag>
+                <StatusTag :status="scope.row.status" :map="productStatusMap" />
               </template>
             </el-table-column>
 
             <el-table-column label="上/下架" width="90">
               <template #default="scope">
-                <el-switch
-                  :model-value="scope.row.status === 'ON_SALE'"
-                  @change="handleStatusToggle(scope.row)"
+                <ProductStatusAction
+                  :active="scope.row.status === 'ON_SALE'"
                   :disabled="merchant.status === 'PENDING' || merchant.status === 'BLOCKED'"
-                  active-color="#13ce66"
-                  inactive-color="#ff4949"
+                  @toggle="handleStatusToggle(scope.row)"
                 />
               </template>
             </el-table-column>

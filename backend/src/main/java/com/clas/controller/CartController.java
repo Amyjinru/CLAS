@@ -45,27 +45,57 @@ public class CartController {
     }
 
     @GetMapping("/list/{userId}")
+    @Deprecated
     public Result<List<CartItemResponse>> list(@PathVariable String userId) {
+        return listMine();
+    }
+
+    @GetMapping("/me")
+    public Result<List<CartItemResponse>> listMine() {
         return Result.ok(cartService.list(currentUserId()));
     }
 
     @DeleteMapping("/item/{userId}/{productId}")
+    @Deprecated
     public Result<List<CartItemResponse>> deleteItem(@PathVariable String userId, @PathVariable Long productId) {
+        return deleteMyItem(productId);
+    }
+
+    @DeleteMapping("/me/items/{productId}")
+    public Result<List<CartItemResponse>> deleteMyItem(@PathVariable Long productId) {
         return Result.ok(cartService.deleteItem(currentUserId(), productId));
     }
 
     @GetMapping("/validate/{userId}")
+    @Deprecated
     public Result<CartValidationResponse> validate(@PathVariable String userId) {
+        return validateMine();
+    }
+
+    @GetMapping("/me/validation")
+    public Result<CartValidationResponse> validateMine() {
         return Result.ok(cartService.validate(currentUserId()));
     }
 
     @DeleteMapping("/invalid/{userId}")
+    @Deprecated
     public Result<List<CartItemResponse>> clearInvalid(@PathVariable String userId) {
+        return clearMyInvalid();
+    }
+
+    @DeleteMapping("/me/invalid")
+    public Result<List<CartItemResponse>> clearMyInvalid() {
         return Result.ok(cartService.clearInvalid(currentUserId()));
     }
 
     @DeleteMapping("/clear/{userId}")
+    @Deprecated
     public Result<Void> clear(@PathVariable String userId) {
+        return clearMine();
+    }
+
+    @DeleteMapping("/me")
+    public Result<Void> clearMine() {
         cartService.clear(currentUserId());
         return Result.ok();
     }

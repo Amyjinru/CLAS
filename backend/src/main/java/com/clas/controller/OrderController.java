@@ -62,14 +62,28 @@ public class OrderController {
     }
 
     @GetMapping("/list/{userId}")
+    @Deprecated
     @RequireRole("USER")
     public Result<List<OrderResponse>> list(@PathVariable String userId) {
+        return listMine();
+    }
+
+    @GetMapping("/me")
+    @RequireRole("USER")
+    public Result<List<OrderResponse>> listMine() {
         return Result.ok(orderService.listForUser(currentUserId()));
     }
 
     @GetMapping("/merchant/{merchantId}")
+    @Deprecated
     @RequireRole("MERCHANT")
     public Result<List<OrderResponse>> merchantOrders(@PathVariable Long merchantId) {
+        return myMerchantOrders();
+    }
+
+    @GetMapping("/merchant/me")
+    @RequireRole("MERCHANT")
+    public Result<List<OrderResponse>> myMerchantOrders() {
         return Result.ok(orderService.listForMerchant(merchantService.getCurrentMerchantId()));
     }
 

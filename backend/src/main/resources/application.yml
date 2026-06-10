@@ -39,7 +39,7 @@ content-moderation:
   forbidden-words: ${FORBIDDEN_WORDS:}
 
 jwt:
-  secret: ${JWT_SECRET:clas-dev-secret-key-2026-must-be-32bytes!}
+  secret: ${JWT_SECRET:}
 
 app:
   cors:

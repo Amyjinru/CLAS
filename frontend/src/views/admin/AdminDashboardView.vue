@@ -1,8 +1,8 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import * as echarts from 'echarts'
 import { getDashboard, getMerchantRanking, getOrderStats, getSalesOverview, getTopProducts } from '../../api/admin'
 import { ElMessage } from 'element-plus'
+import { formatFen } from '../../utils/formatters'
 
 const today = new Date()
 const start = new Date()
@@ -31,6 +31,7 @@ let salesChart = null
 let orderChart = null
 let refreshTimer = null
 let clockTimer = null
+let echartsModule = null
 
 const rangeParams = computed(() => ({
   startDate: dateRange.value?.[0],
@@ -71,7 +72,7 @@ async function load() {
     merchantRanking.value = merchants
     topProducts.value = products
     await nextTick()
-    initCharts()
+    await initCharts()
   } catch (error) {
     ElMessage.error('加载仪表盘数据失败')
   } finally {
@@ -79,12 +80,20 @@ async function load() {
   }
 }
 
-function initCharts() {
-  initSalesChart()
-  initOrderStatusChart()
+async function ensureEcharts() {
+  if (!echartsModule) {
+    echartsModule = (await import('../../utils/echarts')).default
+  }
+  return echartsModule
 }
 
-function initSalesChart() {
+async function initCharts() {
+  const echarts = await ensureEcharts()
+  initSalesChart(echarts)
+  initOrderStatusChart(echarts)
+}
+
+function initSalesChart(echarts) {
   const dom = document.getElementById('salesChart')
   if (!dom || !hasSalesData.value) return
   salesChart?.dispose()
@@ -119,7 +128,7 @@ function initSalesChart() {
   })
 }
 
-function initOrderStatusChart() {
+function initOrderStatusChart(echarts) {
   const dom = document.getElementById('orderStatusChart')
   if (!dom || !hasOrderStatusData.value) return
   orderChart?.dispose()
@@ -200,10 +209,6 @@ function updateClock() {
 function handleResize() {
   salesChart?.resize()
   orderChart?.resize()
-}
-
-function formatFen(value) {
-  return value ? (value / 100).toFixed(2) : '0.00'
 }
 
 function toDateInput(date) {

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.dto.*;
 import com.clas.entity.*;
 import com.clas.mapper.*;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -27,6 +28,7 @@ public class StatisticsService {
     private final PaymentMapper paymentMapper;
     private final ProductMapper productMapper;
     private final ReviewMapper reviewMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public StatisticsService(
         UserMapper userMapper,
@@ -35,7 +37,8 @@ public class StatisticsService {
         OrderItemMapper orderItemMapper,
         PaymentMapper paymentMapper,
         ProductMapper productMapper,
-        ReviewMapper reviewMapper
+        ReviewMapper reviewMapper,
+        JdbcTemplate jdbcTemplate
     ) {
         this.userMapper = userMapper;
         this.merchantMapper = merchantMapper;
@@ -44,6 +47,7 @@ public class StatisticsService {
         this.paymentMapper = paymentMapper;
         this.productMapper = productMapper;
         this.reviewMapper = reviewMapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     /**
@@ -58,14 +62,11 @@ public class StatisticsService {
         Long totalMerchants = merchantMapper.selectCount(null);
         Long totalOrders = ordersMapper.selectCount(null);
 
-        // 总销售额：所有已支付/已接单/已完成订单的金额总和
-        Long totalSales = 0L;
-        List<Orders> allOrders = ordersMapper.selectList(null);
-        for (Orders o : allOrders) {
-            if (!"PENDING_PAYMENT".equals(o.getStatus())) {
-                totalSales += o.getTotalPrice() != null ? o.getTotalPrice() : 0;
-            }
-        }
+        Long totalSales = queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE status <> 'PENDING_PAYMENT'
+            """);
 
         // 今日数据
         DateRange range = resolveRange(startDate, endDate);
@@ -78,17 +79,13 @@ public class StatisticsService {
                 .le(Orders::getCreateTime, todayEnd)
         );
 
-        Long todaySales = 0L;
-        List<Orders> todayOrderList = ordersMapper.selectList(
-            new LambdaQueryWrapper<Orders>()
-                .ge(Orders::getCreateTime, todayStart)
-                .le(Orders::getCreateTime, todayEnd)
-        );
-        for (Orders o : todayOrderList) {
-            if (!"PENDING_PAYMENT".equals(o.getStatus())) {
-                todaySales += o.getTotalPrice() != null ? o.getTotalPrice() : 0;
-            }
-        }
+        Long todaySales = queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE status <> 'PENDING_PAYMENT'
+              AND create_time >= ?
+              AND create_time <= ?
+            """, todayStart, todayEnd);
 
         Long pendingPayment = ordersMapper.selectCount(
             new LambdaQueryWrapper<Orders>().eq(Orders::getStatus, "PENDING_PAYMENT"));
@@ -113,18 +110,18 @@ public class StatisticsService {
     public OrderStatsDTO getOrderStats(LocalDate startDate, LocalDate endDate) {
         // 各状态数量
         DateRange range = resolveRange(startDate, endDate);
-        List<Orders> allOrders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
-            .ge(Orders::getCreateTime, range.startDate().atStartOfDay())
-            .le(Orders::getCreateTime, range.endDate().atTime(LocalTime.MAX)));
-        Map<String, Long> statusMap = allOrders.stream()
-            .collect(Collectors.groupingBy(
-                o -> o.getStatus() != null ? o.getStatus() : "UNKNOWN",
-                Collectors.counting()
-            ));
-
-        List<OrderStatsDTO.StatusCount> statusCounts = statusMap.entrySet().stream()
-            .map(e -> new OrderStatsDTO.StatusCount(e.getKey(), e.getValue()))
-            .toList();
+        LocalDateTime rangeStart = range.startDate().atStartOfDay();
+        LocalDateTime rangeEnd = range.endDate().atTime(LocalTime.MAX);
+        List<OrderStatsDTO.StatusCount> statusCounts = jdbcTemplate.query("""
+            SELECT COALESCE(status, 'UNKNOWN') AS status, COUNT(*) AS count
+            FROM orders
+            WHERE create_time >= ? AND create_time <= ?
+            GROUP BY status
+            """,
+            (rs, rowNum) -> new OrderStatsDTO.StatusCount(rs.getString("status"), rs.getLong("count")),
+            rangeStart,
+            rangeEnd
+        );
 
         // 近7天每日订单数
         List<OrderStatsDTO.DailyCount> dailyOrders = new ArrayList<>();
@@ -132,14 +129,16 @@ public class StatisticsService {
             LocalDateTime dayStart = date.atStartOfDay();
             LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
 
-            List<Orders> dayOrders = allOrders.stream()
-                .filter(o -> o.getCreateTime() != null)
-                .filter(o -> !o.getCreateTime().isBefore(dayStart) && !o.getCreateTime().isAfter(dayEnd))
-                .toList();
-            long count = dayOrders.size();
-            long amount = dayOrders.stream()
-                .mapToLong(o -> o.getTotalPrice() != null ? o.getTotalPrice() : 0)
-                .sum();
+            long count = queryLong("""
+                SELECT COUNT(*)
+                FROM orders
+                WHERE create_time >= ? AND create_time <= ?
+                """, dayStart, dayEnd);
+            long amount = queryLong("""
+                SELECT COALESCE(SUM(total_price), 0)
+                FROM orders
+                WHERE create_time >= ? AND create_time <= ?
+                """, dayStart, dayEnd);
 
             dailyOrders.add(new OrderStatsDTO.DailyCount(date.toString(), count, amount));
         }
@@ -164,16 +163,18 @@ public class StatisticsService {
             LocalDateTime dayStart = date.atStartOfDay();
             LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
 
-            List<Orders> dayOrders = ordersMapper.selectList(
-                new LambdaQueryWrapper<Orders>()
-                    .ge(Orders::getCreateTime, dayStart)
-                    .le(Orders::getCreateTime, dayEnd)
-            );
-            long amount = dayOrders.stream()
-                .filter(o -> !"PENDING_PAYMENT".equals(o.getStatus()))
-                .mapToLong(o -> o.getTotalPrice() != null ? o.getTotalPrice() : 0)
-                .sum();
-            long orderCount = dayOrders.size();
+            long amount = queryLong("""
+                SELECT COALESCE(SUM(total_price), 0)
+                FROM orders
+                WHERE status <> 'PENDING_PAYMENT'
+                  AND create_time >= ?
+                  AND create_time <= ?
+                """, dayStart, dayEnd);
+            long orderCount = queryLong("""
+                SELECT COUNT(*)
+                FROM orders
+                WHERE create_time >= ? AND create_time <= ?
+                """, dayStart, dayEnd);
 
             dailySales.add(new SalesOverviewDTO.DailySale(date.toString(), amount, orderCount));
             weeklySales += amount;
@@ -184,11 +185,11 @@ public class StatisticsService {
         }
 
         // 总销售额
-        List<Orders> allOrders = ordersMapper.selectList(null);
-        totalSales = allOrders.stream()
-            .filter(o -> !"PENDING_PAYMENT".equals(o.getStatus()))
-            .mapToLong(o -> o.getTotalPrice() != null ? o.getTotalPrice() : 0)
-            .sum();
+        totalSales = queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE status <> 'PENDING_PAYMENT'
+            """);
 
         return new SalesOverviewDTO(dailySales, totalSales, monthlySales, weeklySales);
     }
@@ -196,41 +197,44 @@ public class StatisticsService {
     public SalesOverviewDTO getSalesOverview(LocalDate startDate, LocalDate endDate) {
         DateRange range = resolveRange(startDate, endDate);
         List<SalesOverviewDTO.DailySale> dailySales = new ArrayList<>();
-        List<Orders> allOrders = ordersMapper.selectList(null);
-
         for (LocalDate date : daysInRange(range)) {
             LocalDateTime dayStart = date.atStartOfDay();
             LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
-            List<Orders> dayOrders = allOrders.stream()
-                .filter(order -> order.getCreateTime() != null)
-                .filter(order -> !order.getCreateTime().isBefore(dayStart) && !order.getCreateTime().isAfter(dayEnd))
-                .toList();
-            long amount = dayOrders.stream()
-                .filter(order -> !"PENDING_PAYMENT".equals(order.getStatus()))
-                .mapToLong(order -> order.getTotalPrice() != null ? order.getTotalPrice() : 0)
-                .sum();
-            dailySales.add(new SalesOverviewDTO.DailySale(date.toString(), amount, (long) dayOrders.size()));
+            long amount = queryLong("""
+                SELECT COALESCE(SUM(total_price), 0)
+                FROM orders
+                WHERE status <> 'PENDING_PAYMENT'
+                  AND create_time >= ?
+                  AND create_time <= ?
+                """, dayStart, dayEnd);
+            long orderCount = queryLong("""
+                SELECT COUNT(*)
+                FROM orders
+                WHERE create_time >= ? AND create_time <= ?
+                """, dayStart, dayEnd);
+            dailySales.add(new SalesOverviewDTO.DailySale(date.toString(), amount, orderCount));
         }
 
-        long totalSales = allOrders.stream()
-            .filter(order -> !"PENDING_PAYMENT".equals(order.getStatus()))
-            .mapToLong(order -> order.getTotalPrice() != null ? order.getTotalPrice() : 0)
-            .sum();
+        long totalSales = queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE status <> 'PENDING_PAYMENT'
+            """);
         LocalDate today = LocalDate.now();
         LocalDate weekStart = today.minusDays(6);
         LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
-        long weeklySales = allOrders.stream()
-            .filter(order -> order.getCreateTime() != null)
-            .filter(order -> !order.getCreateTime().toLocalDate().isBefore(weekStart))
-            .filter(order -> !"PENDING_PAYMENT".equals(order.getStatus()))
-            .mapToLong(order -> order.getTotalPrice() != null ? order.getTotalPrice() : 0)
-            .sum();
-        long monthlySales = allOrders.stream()
-            .filter(order -> order.getCreateTime() != null)
-            .filter(order -> !order.getCreateTime().isBefore(monthStart))
-            .filter(order -> !"PENDING_PAYMENT".equals(order.getStatus()))
-            .mapToLong(order -> order.getTotalPrice() != null ? order.getTotalPrice() : 0)
-            .sum();
+        long weeklySales = queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE status <> 'PENDING_PAYMENT'
+              AND create_time >= ?
+            """, weekStart.atStartOfDay());
+        long monthlySales = queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE status <> 'PENDING_PAYMENT'
+              AND create_time >= ?
+            """, monthStart);
 
         return new SalesOverviewDTO(dailySales, totalSales, monthlySales, weeklySales);
     }
@@ -239,42 +243,39 @@ public class StatisticsService {
      * 商家排行（按销售额 + 按评分）
      */
     public MerchantRankingDTO getMerchantRanking() {
-        List<Merchant> merchants = merchantMapper.selectList(null);
-        List<Orders> allOrders = ordersMapper.selectList(null);
-
-        // 按销售额排行
-        Map<Long, Long> merchantSales = new HashMap<>();
-        Map<Long, Long> merchantOrderCount = new HashMap<>();
-        for (Orders o : allOrders) {
-            Long mid = o.getMerchantId();
-            merchantSales.merge(mid, o.getTotalPrice() != null ? o.getTotalPrice() : 0L, Long::sum);
-            merchantOrderCount.merge(mid, 1L, Long::sum);
-        }
-
-        List<MerchantRankingDTO.MerchantRank> bySales = merchants.stream()
-            .map(m -> new MerchantRankingDTO.MerchantRank(
-                m.getId(), m.getMerchantName(), m.getCategory(), m.getScore(),
-                merchantSales.getOrDefault(m.getId(), 0L),
-                merchantOrderCount.getOrDefault(m.getId(), 0L)
-            ))
-            .sorted((a, b) -> Long.compare(b.totalSales(), a.totalSales()))
-            .limit(10)
-            .toList();
-
-        // 按评分排行
-        List<MerchantRankingDTO.MerchantRank> byRating = merchants.stream()
-            .map(m -> new MerchantRankingDTO.MerchantRank(
-                m.getId(), m.getMerchantName(), m.getCategory(), m.getScore(),
-                merchantSales.getOrDefault(m.getId(), 0L),
-                merchantOrderCount.getOrDefault(m.getId(), 0L)
-            ))
-            .sorted((a, b) -> {
-                BigDecimal sa = a.score() != null ? a.score() : BigDecimal.ZERO;
-                BigDecimal sb = b.score() != null ? b.score() : BigDecimal.ZERO;
-                return sb.compareTo(sa);
-            })
-            .limit(10)
-            .toList();
+        String rankingSql = """
+            SELECT m.id AS merchant_id,
+                   m.merchant_name,
+                   m.category,
+                   m.score,
+                   COALESCE(SUM(CASE WHEN o.status <> 'PENDING_PAYMENT' THEN o.total_price ELSE 0 END), 0) AS total_sales,
+                   COUNT(o.id) AS order_count
+            FROM merchant m
+            LEFT JOIN orders o ON o.merchant_id = m.id
+            GROUP BY m.id, m.merchant_name, m.category, m.score
+            """;
+        List<MerchantRankingDTO.MerchantRank> bySales = jdbcTemplate.query(
+            rankingSql + " ORDER BY total_sales DESC LIMIT 10",
+            (rs, rowNum) -> new MerchantRankingDTO.MerchantRank(
+                rs.getLong("merchant_id"),
+                rs.getString("merchant_name"),
+                rs.getString("category"),
+                rs.getBigDecimal("score"),
+                rs.getLong("total_sales"),
+                rs.getLong("order_count")
+            )
+        );
+        List<MerchantRankingDTO.MerchantRank> byRating = jdbcTemplate.query(
+            rankingSql + " ORDER BY score DESC LIMIT 10",
+            (rs, rowNum) -> new MerchantRankingDTO.MerchantRank(
+                rs.getLong("merchant_id"),
+                rs.getString("merchant_name"),
+                rs.getString("category"),
+                rs.getBigDecimal("score"),
+                rs.getLong("total_sales"),
+                rs.getLong("order_count")
+            )
+        );
 
         return new MerchantRankingDTO(bySales, byRating);
     }
@@ -283,42 +284,27 @@ public class StatisticsService {
      * 热销商品排行
      */
     public TopProductDTO getTopProducts() {
-        List<OrderItem> allItems = orderItemMapper.selectList(null);
-        List<Product> allProducts = productMapper.selectList(null);
-        List<Merchant> allMerchants = merchantMapper.selectList(null);
-
-        Map<Long, String> productNameMap = allProducts.stream()
-            .collect(Collectors.toMap(com.clas.entity.Product::getId, com.clas.entity.Product::getName));
-        Map<Long, String> merchantNameMap = allMerchants.stream()
-            .collect(Collectors.toMap(Merchant::getId, Merchant::getMerchantName));
-
-        // 按商品聚合销量和销售额
-        Map<Long, Long> productSold = new HashMap<>();
-        Map<Long, Long> productAmount = new HashMap<>();
-        for (OrderItem item : allItems) {
-            productSold.merge(item.getProductId(), (long) item.getQuantity(), Long::sum);
-            productAmount.merge(item.getProductId(),
-                (long) item.getPrice() * item.getQuantity(), Long::sum);
-        }
-
-        List<TopProductDTO.ProductRank> ranks = productSold.entrySet().stream()
-            .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
-            .limit(10)
-            .map(e -> new TopProductDTO.ProductRank(
-                e.getKey(),
-                productNameMap.getOrDefault(e.getKey(), "未知商品"),
-                merchantNameMap.getOrDefault(
-                    allProducts.stream()
-                        .filter(p -> p.getId().equals(e.getKey()))
-                        .findFirst()
-                        .map(com.clas.entity.Product::getMerchantId)
-                        .orElse(0L),
-                    "未知商家"
-                ),
-                e.getValue(),
-                productAmount.getOrDefault(e.getKey(), 0L)
-            ))
-            .toList();
+        List<TopProductDTO.ProductRank> ranks = jdbcTemplate.query("""
+            SELECT p.id AS product_id,
+                   p.name AS product_name,
+                   m.merchant_name,
+                   COALESCE(SUM(oi.quantity), 0) AS sold_count,
+                   COALESCE(SUM(oi.price * oi.quantity), 0) AS total_amount
+            FROM order_item oi
+            JOIN product p ON p.id = oi.product_id
+            LEFT JOIN merchant m ON m.id = p.merchant_id
+            GROUP BY p.id, p.name, m.merchant_name
+            ORDER BY sold_count DESC
+            LIMIT 10
+            """,
+            (rs, rowNum) -> new TopProductDTO.ProductRank(
+                rs.getLong("product_id"),
+                rs.getString("product_name"),
+                rs.getString("merchant_name"),
+                rs.getLong("sold_count"),
+                rs.getLong("total_amount")
+            )
+        );
 
         return new TopProductDTO(ranks);
     }
@@ -328,65 +314,69 @@ public class StatisticsService {
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime todayEnd = today.atTime(LocalTime.MAX);
 
-        List<Orders> paidOrders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
-            .eq(Orders::getMerchantId, merchantId)
-            .ne(Orders::getStatus, "PENDING_PAYMENT"));
-
-        long todayOrders = paidOrders.stream()
-            .filter(order -> order.getCreateTime() != null)
-            .filter(order -> !order.getCreateTime().isBefore(todayStart) && !order.getCreateTime().isAfter(todayEnd))
-            .count();
-        long todaySales = paidOrders.stream()
-            .filter(order -> order.getCreateTime() != null)
-            .filter(order -> !order.getCreateTime().isBefore(todayStart) && !order.getCreateTime().isAfter(todayEnd))
-            .mapToLong(order -> order.getTotalPrice() == null ? 0 : order.getTotalPrice())
-            .sum();
+        long todayOrders = queryLong("""
+            SELECT COUNT(*)
+            FROM orders
+            WHERE merchant_id = ?
+              AND status <> 'PENDING_PAYMENT'
+              AND create_time >= ?
+              AND create_time <= ?
+            """, merchantId, todayStart, todayEnd);
+        long todaySales = queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE merchant_id = ?
+              AND status <> 'PENDING_PAYMENT'
+              AND create_time >= ?
+              AND create_time <= ?
+            """, merchantId, todayStart, todayEnd);
 
         List<MerchantStatsDTO.DailySale> dailySales = new ArrayList<>();
         for (int i = 6; i >= 0; i--) {
             LocalDate date = today.minusDays(i);
             LocalDateTime dayStart = date.atStartOfDay();
             LocalDateTime dayEnd = date.atTime(LocalTime.MAX);
-            List<Orders> dayOrders = paidOrders.stream()
-                .filter(order -> order.getCreateTime() != null)
-                .filter(order -> !order.getCreateTime().isBefore(dayStart) && !order.getCreateTime().isAfter(dayEnd))
-                .toList();
-            long amount = dayOrders.stream()
-                .mapToLong(order -> order.getTotalPrice() == null ? 0 : order.getTotalPrice())
-                .sum();
-            dailySales.add(new MerchantStatsDTO.DailySale(date.toString(), (long) dayOrders.size(), amount));
+            long orderCount = queryLong("""
+                SELECT COUNT(*)
+                FROM orders
+                WHERE merchant_id = ?
+                  AND status <> 'PENDING_PAYMENT'
+                  AND create_time >= ?
+                  AND create_time <= ?
+                """, merchantId, dayStart, dayEnd);
+            long amount = queryLong("""
+                SELECT COALESCE(SUM(total_price), 0)
+                FROM orders
+                WHERE merchant_id = ?
+                  AND status <> 'PENDING_PAYMENT'
+                  AND create_time >= ?
+                  AND create_time <= ?
+                """, merchantId, dayStart, dayEnd);
+            dailySales.add(new MerchantStatsDTO.DailySale(date.toString(), orderCount, amount));
         }
 
-        Set<Long> paidOrderIds = paidOrders.stream()
-            .map(Orders::getId)
-            .collect(Collectors.toSet());
-        List<Product> merchantProducts = productMapper.selectList(new LambdaQueryWrapper<Product>()
-            .eq(Product::getMerchantId, merchantId));
-        Map<Long, String> productNames = merchantProducts.stream()
-            .collect(Collectors.toMap(Product::getId, Product::getName));
-        Set<Long> merchantProductIds = productNames.keySet();
-
-        Map<Long, Long> soldCounts = new HashMap<>();
-        Map<Long, Long> amounts = new HashMap<>();
-        List<OrderItem> allItems = orderItemMapper.selectList(null);
-        for (OrderItem item : allItems) {
-            if (!paidOrderIds.contains(item.getOrderId()) || !merchantProductIds.contains(item.getProductId())) {
-                continue;
-            }
-            soldCounts.merge(item.getProductId(), (long) item.getQuantity(), Long::sum);
-            amounts.merge(item.getProductId(), (long) item.getPrice() * item.getQuantity(), Long::sum);
-        }
-
-        List<MerchantStatsDTO.ProductRank> topProducts = soldCounts.entrySet().stream()
-            .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
-            .limit(10)
-            .map(entry -> new MerchantStatsDTO.ProductRank(
-                entry.getKey(),
-                productNames.getOrDefault(entry.getKey(), "未知商品"),
-                entry.getValue(),
-                amounts.getOrDefault(entry.getKey(), 0L)
-            ))
-            .toList();
+        List<MerchantStatsDTO.ProductRank> topProducts = jdbcTemplate.query("""
+            SELECT p.id AS product_id,
+                   p.name AS product_name,
+                   COALESCE(SUM(oi.quantity), 0) AS sold_count,
+                   COALESCE(SUM(oi.price * oi.quantity), 0) AS total_amount
+            FROM product p
+            JOIN order_item oi ON oi.product_id = p.id
+            JOIN orders o ON o.id = oi.order_id
+            WHERE p.merchant_id = ?
+              AND o.status <> 'PENDING_PAYMENT'
+            GROUP BY p.id, p.name
+            ORDER BY sold_count DESC
+            LIMIT 10
+            """,
+            (rs, rowNum) -> new MerchantStatsDTO.ProductRank(
+                rs.getLong("product_id"),
+                rs.getString("product_name"),
+                rs.getLong("sold_count"),
+                rs.getLong("total_amount")
+            ),
+            merchantId
+        );
 
         return new MerchantStatsDTO(todayOrders, todaySales, dailySales, topProducts);
     }
@@ -416,5 +406,10 @@ public class StatisticsService {
     }
 
     private record DateRange(LocalDate startDate, LocalDate endDate) {
+    }
+
+    private long queryLong(String sql, Object... args) {
+        Long value = jdbcTemplate.queryForObject(sql, Long.class, args);
+        return value == null ? 0L : value;
     }
 }

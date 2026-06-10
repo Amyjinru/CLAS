@@ -3,21 +3,17 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
 import { cancelOrder, completeOrder, getReviewByOrder, listOrders, requestRefund } from '../api/clas'
+import MoneyText from '../components/MoneyText.vue'
+import StatusTag from '../components/StatusTag.vue'
+import { useConfirmAction } from '../composables/useConfirmAction'
+import { formatCompactDateTime, formatDistance } from '../utils/formatters'
+import { orderStatusMap } from '../utils/status'
 
 const orders = ref([])
 const message = ref('')
 const reviewedOrderIds = ref(new Set())
+const { confirmAction } = useConfirmAction()
 
-const statusLabel = {
-  PENDING_PAYMENT: '待支付',
-  PAID: '已支付',
-  ACCEPTED: '商家已接单',
-  COMPLETED: '已完成',
-  CANCELED: '已取消',
-  REJECTED: '商家已拒单',
-  REFUNDED: '已退款',
-  REFUND_PENDING: '退款处理中'
-}
 const refundStatusLabel = {
   PENDING: '待商家审核',
   APPROVED: '已通过',
@@ -37,11 +33,6 @@ const deliveryLabel = {
   PREPARING: '商家备餐中',
   DELIVERING: '配送中',
   DELIVERED: '已送达'
-}
-
-function formatDateTime(value) {
-  if (!value) return ''
-  return String(value).replace('T', ' ').slice(0, 16)
 }
 
 async function load() {
@@ -66,13 +57,17 @@ async function load() {
 }
 
 async function complete(order) {
-  await completeOrder(order.order.id)
-  await load()
+  await confirmAction('确认该订单已经完成？', async () => {
+    await completeOrder(order.order.id)
+    await load()
+  }, { type: 'success' })
 }
 
 async function cancel(order) {
-  await cancelOrder(order.order.id)
-  await load()
+  await confirmAction('确认取消该订单？', async () => {
+    await cancelOrder(order.order.id)
+    await load()
+  })
 }
 
 async function refund(order) {
@@ -90,7 +85,7 @@ function hasReview(orderId) {
 
 function distanceText(distance) {
   if (!distance) return ''
-  return distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`
+  return formatDistance(distance)
 }
 
 onMounted(load)
@@ -109,12 +104,12 @@ onMounted(load)
       <article class="row order-card" v-for="order in orders" :key="order.order.id">
         <div class="order-body">
           <h2>订单 {{ order.order.id }}</h2>
-          <p>{{ statusLabel[order.order.status] || order.order.status }} · {{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }} · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p>
+          <p><StatusTag :status="order.order.status" :map="orderStatusMap" /> · {{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }} · <MoneyText :amount="order.order.totalPrice" /></p>
           <p v-if="order.order.subtotal != null">
-            商品 ¥{{ (order.order.subtotal / 100).toFixed(2) }}
-            · 配送费 ¥{{ ((order.order.deliveryFee || 0) / 100).toFixed(2) }}
+            商品 <MoneyText :amount="order.order.subtotal" />
+            · 配送费 <MoneyText :amount="order.order.deliveryFee || 0" />
             <span v-if="order.order.couponDiscount > 0">
-              · 优惠 -¥{{ (order.order.couponDiscount / 100).toFixed(2) }}
+              · 优惠 <MoneyText :amount="order.order.couponDiscount" negative />
             </span>
           </p>
           <p v-if="order.order.remark" class="order-note">备注：{{ order.order.remark }}</p>
@@ -122,8 +117,8 @@ onMounted(load)
           <p v-if="order.order.refundReason" class="order-note">退款申请：{{ order.order.refundReason }}</p>
           <p v-if="order.order.refundStatus && order.order.refundStatus !== 'NONE'" class="order-note">
             退款进度：{{ refundStatusLabel[order.order.refundStatus] || order.order.refundStatus }}
-            <span v-if="order.order.refundRequestedAt"> · 申请于 {{ formatDateTime(order.order.refundRequestedAt) }}</span>
-            <span v-if="order.order.refundResolvedAt"> · 处理于 {{ formatDateTime(order.order.refundResolvedAt) }}</span>
+            <span v-if="order.order.refundRequestedAt"> · 申请于 {{ formatCompactDateTime(order.order.refundRequestedAt).slice(0, 16) }}</span>
+            <span v-if="order.order.refundResolvedAt"> · 处理于 {{ formatCompactDateTime(order.order.refundResolvedAt).slice(0, 16) }}</span>
           </p>
           <p v-if="order.order.refundRejectReason" class="order-note warn">
             退款拒绝理由：{{ order.order.refundRejectReason }}

@@ -183,7 +183,9 @@ CREATE TABLE orders (
     create_time DATETIME NOT NULL,
     INDEX idx_orders_user (user_id, create_time DESC),
     INDEX idx_orders_merchant_status (merchant_id, status, create_time DESC),
-    INDEX idx_orders_status (status)
+    INDEX idx_orders_status (status),
+    INDEX idx_orders_create_status (create_time, status),
+    INDEX idx_orders_merchant_create_status (merchant_id, create_time, status)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE order_item (
@@ -192,7 +194,10 @@ CREATE TABLE order_item (
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL,
     price INT NOT NULL,
-    INDEX idx_order_item_order (order_id)
+    INDEX idx_order_item_order (order_id),
+    INDEX idx_order_item_product_order (product_id, order_id),
+    CONSTRAINT fk_order_item_order FOREIGN KEY (order_id) REFERENCES orders(id),
+    CONSTRAINT fk_order_item_product FOREIGN KEY (product_id) REFERENCES product(id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -211,7 +216,9 @@ CREATE TABLE review (
     created_at DATETIME,
     INDEX idx_review_user (user_id),
     INDEX idx_review_order (order_id),
-    INDEX idx_review_report_status (report_status)
+    INDEX idx_review_order_id (order_id, id),
+    INDEX idx_review_report_status (report_status),
+    CONSTRAINT fk_review_order FOREIGN KEY (order_id) REFERENCES orders(id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE review_image (
@@ -220,7 +227,8 @@ CREATE TABLE review_image (
     image_url VARCHAR(512) NOT NULL,
     sort_order INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
-    INDEX idx_review_image_review (review_id)
+    INDEX idx_review_image_review (review_id),
+    INDEX idx_review_image_review_sort (review_id, sort_order)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE review_reply (
@@ -232,7 +240,8 @@ CREATE TABLE review_reply (
     content TEXT NOT NULL,
     deleted TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
-    INDEX idx_review_reply_review (review_id, created_at)
+    INDEX idx_review_reply_review (review_id, created_at),
+    INDEX idx_review_reply_review_deleted_id (review_id, deleted, id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE review_vote (
@@ -242,7 +251,8 @@ CREATE TABLE review_vote (
     user_id VARCHAR(20) NOT NULL,
     vote_type VARCHAR(10) NOT NULL,
     created_at DATETIME NOT NULL,
-    UNIQUE KEY uk_review_vote (target_type, target_id, user_id)
+    UNIQUE KEY uk_review_vote (target_type, target_id, user_id),
+    INDEX idx_review_vote_target (target_type, target_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE review_user_hidden (
@@ -250,7 +260,8 @@ CREATE TABLE review_user_hidden (
     review_id BIGINT NOT NULL,
     user_id VARCHAR(20) NOT NULL,
     created_at DATETIME NOT NULL,
-    UNIQUE KEY uk_review_hidden (review_id, user_id)
+    UNIQUE KEY uk_review_hidden (review_id, user_id),
+    INDEX idx_review_hidden_user (user_id, review_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE deleted_review_backup (
@@ -294,7 +305,8 @@ CREATE TABLE payment (
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
     create_time DATETIME NOT NULL,
-    INDEX idx_payment_order (order_id)
+    INDEX idx_payment_order (order_id),
+    CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES orders(id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -408,7 +420,9 @@ CREATE TABLE user_coupon (
     claimed_at DATETIME NOT NULL,
     used_at DATETIME,
     UNIQUE KEY uk_user_coupon (user_id, coupon_id),
-    INDEX idx_user_coupon_user_status (user_id, status)
+    INDEX idx_user_coupon_user_status (user_id, status),
+    INDEX idx_user_coupon_order_status (order_id, status),
+    CONSTRAINT fk_user_coupon_coupon FOREIGN KEY (coupon_id) REFERENCES coupon(id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

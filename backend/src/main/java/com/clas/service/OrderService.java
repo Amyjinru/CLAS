@@ -419,9 +419,16 @@ public class OrderService {
     }
 
     private List<OrderResponse> withItems(List<Orders> orders) {
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        List<Long> orderIds = orders.stream().map(Orders::getId).toList();
+        Map<Long, List<OrderItem>> itemsByOrderId = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().in(OrderItem::getOrderId, orderIds))
+            .stream()
+            .collect(Collectors.groupingBy(OrderItem::getOrderId));
         return orders.stream()
-            .map(order -> new OrderResponse(order, orderItemMapper.selectList(
-                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId()))))
+            .map(order -> new OrderResponse(order, itemsByOrderId.getOrDefault(order.getId(), List.of())))
             .toList();
     }
 
@@ -448,7 +455,6 @@ public class OrderService {
         }
     }
 
-    @Transactional
     public void deductStockForPayment(Long orderId) {
         List<OrderItem> orderItems = orderItemMapper.selectList(
             new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
