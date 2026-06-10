@@ -204,7 +204,7 @@ CREATE TABLE order_item (
 
 CREATE TABLE chat_message (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    order_id BIGINT NOT NULL,
+    order_id BIGINT,
     merchant_id BIGINT NOT NULL,
     user_id VARCHAR(11) NOT NULL,
     sender_role VARCHAR(10) NOT NULL COMMENT 'USER or MERCHANT',

@@ -11,6 +11,7 @@ import ChatWindow from '../components/ChatWindow.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
 import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
 import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
+import { useChatStore } from '../composables/useChatStore'
 
 const router = useRouter()
 const merchant = ref(null)
@@ -23,6 +24,7 @@ const replyDrafts = ref({})
 const logoInputRef = ref(null)
 const logoUploading = ref(false)
 const profileDialogVisible = ref(false)
+const chatStore = useChatStore()
 
 // ===== version_314: 订单详情弹窗 & 商品名映射 =====
 const productNames = ref({})
@@ -232,6 +234,10 @@ function closeChat() {
   chatOrder.value = null
 }
 
+async function openReplyPanel() {
+  await chatStore.openReplyPanel()
+}
+
 function onMerchantProfileSaved(nextMerchant) {
   merchant.value = nextMerchant
 }
@@ -368,6 +374,7 @@ onMounted(() => {
           <template #header>
           <div class="card-header">
             <h3>待接单管理 (营业中)</h3>
+            <el-button type="primary" plain @click="openReplyPanel">回复客户</el-button>
           </div>
           </template>
 

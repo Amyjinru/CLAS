@@ -31,6 +31,7 @@ const AdminUsersView = () => import('../views/admin/AdminUsersView.vue')
 const AdminOrdersView = () => import('../views/admin/AdminOrdersView.vue')
 const AdminReviewsView = () => import('../views/admin/AdminReviewsView.vue')
 const AdminAppealsView = () => import('../views/admin/AdminAppealsView.vue')
+const AdminMessagesView = () => import('../views/admin/AdminMessagesView.vue')
 
 function defaultPath() {
   const role = currentRole()
@@ -76,7 +77,8 @@ const routes = [
       { path: 'audit', component: AdminAuditView },
       { path: 'reviews', component: AdminReviewsView },
       { path: 'appeals', component: AdminAppealsView },
-      { path: 'announcements', component: AdminAnnouncementsView }
+      { path: 'announcements', component: AdminAnnouncementsView },
+      { path: 'messages', component: AdminMessagesView }
     ]
   },
 

@@ -7,6 +7,7 @@ public record ChatMessageResponse(
     Long id,
     Long orderId,
     Long merchantId,
+    String userId,
     String senderRole,
     String content,
     LocalDateTime createdAt
@@ -16,6 +17,7 @@ public record ChatMessageResponse(
             message.getId(),
             message.getOrderId(),
             message.getMerchantId(),
+            message.getUserId(),
             message.getSenderRole(),
             message.getContent(),
             message.getCreatedAt()

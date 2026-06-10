@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import BackButton from '../components/BackButton.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -6,6 +6,7 @@ import { addCart, addFavorite, createOrder, getCart, getDeliveryEstimate, getMer
 import LocationSelector from '../components/LocationSelector.vue'
 import MerchantRouteMap from '../components/MerchantRouteMap.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
+import { useChatStore } from '../composables/useChatStore'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
@@ -28,6 +29,7 @@ const favoriteMerchantIds = ref(new Set())
 const currentLocation = ref(getCurrentLocation())
 const deliveryEstimate = ref(null)
 const locationDialogVisible = ref(false)
+const chatStore = useChatStore()
 
 const merchantCartItems = computed(() =>
   cartItems.value.filter((item) => item.merchantId === merchantId.value)
@@ -390,6 +392,9 @@ watch(
             @click="toggleFavorite"
           >
             {{ favoriteLoading ? '处理中...' : (isFavorite ? '已收藏' : '收藏商家') }}
+          </button>
+          <button class="button consult-button" type="button" @click="chatStore.openMerchantChat(merchantId)">
+            咨询客服
           </button>
         </div>
 

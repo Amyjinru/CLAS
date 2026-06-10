@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { sessionUser } from '../../api/clas'
@@ -13,7 +13,8 @@ const menuItems = [
   { path: '/admin/audit',      label: '商家审核', icon: 'Checked' },
   { path: '/admin/reviews',    label: '评价管理', icon: 'Star' },
   { path: '/admin/appeals',    label: '申诉管理', icon: 'ChatLineSquare' },
-  { path: '/admin/announcements', label: '公告管理', icon: 'Notification' }
+  { path: '/admin/announcements', label: '公告管理', icon: 'Notification' },
+  { path: '/admin/messages', label: '信息管理', icon: 'ChatDotRound' }
 ]
 
 const activeMenu = computed(() => route.path)

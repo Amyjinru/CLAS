@@ -1,9 +1,10 @@
-<script setup>
+﻿<script setup>
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { currentRole, listAddresses, listAnnouncements, listMerchants, currentUser, listOrders } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import { useChatStore } from '../composables/useChatStore'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
@@ -23,6 +24,7 @@ const locationDialogVisible = ref(false)
 const activeOrders = ref([])
 const chatOrder = ref(null)
 const ordersLoading = ref(false)
+const chatStore = useChatStore()
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
 const sortLabels = {
   distance: '距离最近',
@@ -363,7 +365,10 @@ onMounted(async () => {
         <el-tag v-else-if="merchant.deliveryAvailable === false" type="danger" effect="plain">超出配送范围</el-tag>
         <el-tag v-else effect="plain">选择位置查看配送</el-tag>
       </p>
-      <RouterLink class="button secondary" :to="`/merchant/${merchant.id}`">进入店铺</RouterLink>
+      <div class="card-actions">
+        <RouterLink class="button secondary" :to="`/merchant/${merchant.id}`">进入店铺</RouterLink>
+        <button class="button" type="button" @click="chatStore.openMerchantChat(merchant.id)">咨询客服</button>
+      </div>
     </article>
   </section>
 
@@ -468,6 +473,13 @@ onMounted(async () => {
 
 .delivery-status {
   min-height: 28px;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
 }
 
 .merchant-logo-thumb {

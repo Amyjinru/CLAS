@@ -1,8 +1,9 @@
-<script setup>
+﻿<script setup>
 import { onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { logout, sessionUser } from './api/clas'
 import { ElMessage } from 'element-plus'
+import ChatSidebar from './components/ChatSidebar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -112,6 +113,7 @@ async function handleLogout() {
     <main class="main-content">
       <RouterView :key="route.fullPath" />
     </main>
+    <ChatSidebar v-if="sessionUser" />
   </div>
 </template>
 

@@ -1,9 +1,10 @@
 package com.clas.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 public record ChatMessageRequest(
-    @NotNull Long orderId,
+    Long orderId,
+    Long merchantId,
+    String userId,
     @NotBlank String content
 ) {}
