@@ -4,10 +4,11 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [vue()],
   build: {
-    target: 'es2020',
+    target: 'es2022',
     cssMinify: true,
     assetsInlineLimit: 4096,
     chunkSizeWarningLimit: 600,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {

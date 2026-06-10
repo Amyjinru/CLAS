@@ -52,7 +52,7 @@ migrate_db() {
   fi
 
   local mysql_user="${MYSQL_USER:-root}"
-  local mysql_password="${MYSQL_PASSWORD:-123456}"
+  local mysql_password="${MYSQL_PASSWORD:-}"
   local mysql_host="${MYSQL_HOST:-127.0.0.1}"
   local mysql_port="${MYSQL_PORT:-3306}"
 
