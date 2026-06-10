@@ -54,8 +54,8 @@
   --clas-danger-soft-hover: #fca5a5;
 
   /* ─── 应用到界面 ─── */
-  --color-primary: #f97316;
-  --color-primary-hover: #ea580c;
+  --color-primary: #fb8c00;
+  --color-primary-hover: #f57c00;
   --color-primary-light: var(--clas-amber-50);
   --color-primary-soft: var(--clas-amber-100);
 
@@ -66,7 +66,7 @@
   --bg-card: #ffffff;
   --bg-sidebar: #2d251c;
   --bg-sidebar-hover: #3d352b;
-  --bg-sidebar-active: rgba(249, 115, 22, 0.15);
+  --bg-sidebar-active: rgba(251, 140, 0, 0.15);
 
   --text-primary: #1a1510;
   --text-secondary: #6b5c49;
