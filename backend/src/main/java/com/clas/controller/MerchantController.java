@@ -6,6 +6,7 @@ import com.clas.config.RequireRole;
 import com.clas.config.UserContext;
 import com.clas.dto.MerchantAuditRequest;
 import com.clas.dto.DeliveryEstimateResponse;
+import com.clas.dto.MerchantProfileUpdateRequest;
 import com.clas.dto.MerchantRegisterRequest;
 import com.clas.dto.MerchantResponse;
 import com.clas.dto.MerchantStatsDTO;
@@ -24,6 +25,7 @@ import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -111,6 +113,19 @@ public class MerchantController {
     @RequireRole("MERCHANT")
     public Result<MerchantResponse> uploadMyLogo(@RequestParam("file") MultipartFile file) {
         return Result.ok(merchantLogoUploadService.uploadAndUpdate(file));
+    }
+
+    @PostMapping("/my/profile/send-code")
+    @RequireRole("MERCHANT")
+    public Result<String> sendProfileUpdateCode(@Valid @RequestBody MerchantProfileUpdateRequest request) {
+        merchantService.sendProfileUpdateCode(request);
+        return Result.ok("验证码已发送");
+    }
+
+    @PutMapping("/my/profile")
+    @RequireRole("MERCHANT")
+    public Result<MerchantResponse> updateMyProfile(@Valid @RequestBody MerchantProfileUpdateRequest request) {
+        return Result.ok(merchantService.updateMyProfile(request));
     }
 
     @GetMapping("/my/audit-status")

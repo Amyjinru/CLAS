@@ -1,9 +1,13 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { createDeal, listMerchantDeals } from '../api/clas'
+import { createDeal, getMyMerchant, listMerchantDeals } from '../api/clas'
 import { ElMessage } from 'element-plus'
+import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
+import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
 
 const deals = ref([])
+const merchant = ref(null)
+const profileDialogVisible = ref(false)
 const form = reactive({
   title: '',
   description: '',
@@ -19,7 +23,9 @@ function yuan(value) {
 }
 
 async function load() {
-  deals.value = await listMerchantDeals()
+  const [merchantInfo, dealList] = await Promise.all([getMyMerchant(), listMerchantDeals()])
+  merchant.value = merchantInfo
+  deals.value = dealList
 }
 
 async function submit() {
@@ -34,9 +40,18 @@ async function submit() {
 }
 
 onMounted(load)
+
+function onMerchantProfileSaved(nextMerchant) {
+  merchant.value = nextMerchant
+}
 </script>
 
 <template>
+  <div class="merchant-page">
+    <aside class="sidebar-panel">
+      <MerchantSidebar active="deals" @edit-profile="profileDialogVisible = true" />
+    </aside>
+    <main class="merchant-main">
   <section class="hero">
     <div>
       <h1>团购管理</h1>
@@ -69,9 +84,34 @@ onMounted(load)
       </article>
     </div>
   </section>
+    </main>
+    <MerchantProfileEditDialog
+      v-model:visible="profileDialogVisible"
+      :merchant="merchant"
+      @saved="onMerchantProfileSaved"
+    />
+  </div>
 </template>
 
 <style scoped>
+.merchant-page {
+  display: flex;
+  gap: 24px;
+  margin: 30px auto;
+  max-width: 1200px;
+  padding: 0 20px 48px;
+}
+
+.sidebar-panel {
+  flex: 1;
+  min-width: 260px;
+}
+
+.merchant-main {
+  flex: 3;
+  min-width: 0;
+}
+
 .deal-layout {
   display: grid;
   gap: 18px;
@@ -97,6 +137,10 @@ onMounted(load)
   font-weight: 800;
 }
 @media (max-width: 900px) {
+  .merchant-page {
+    flex-direction: column;
+  }
+
   .deal-layout {
     grid-template-columns: 1fr;
   }

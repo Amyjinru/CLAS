@@ -9,6 +9,7 @@ import com.clas.common.PhoneValidator;
 import com.clas.common.VerificationCodeStore;
 import com.clas.dto.MerchantAuditRequest;
 import com.clas.dto.DeliveryEstimateResponse;
+import com.clas.dto.MerchantProfileUpdateRequest;
 import com.clas.dto.MerchantRegisterRequest;
 import com.clas.dto.MerchantResponse;
 import com.clas.entity.Merchant;
@@ -165,6 +166,52 @@ public class MerchantService {
         Merchant merchant = merchantMapper.selectOne(new LambdaQueryWrapper<Merchant>()
             .eq(Merchant::getUserId, userId));
         return merchant != null ? convertToResponse(merchant) : null;
+    }
+
+    public void sendProfileUpdateCode(MerchantProfileUpdateRequest request) {
+        Merchant merchant = currentMerchant();
+        String nextPhone = PhoneValidator.normalizeAndValidate(request.phone());
+        String targetPhone = nextPhone.equals(merchant.getPhone()) ? merchant.getPhone() : nextPhone;
+        verificationCodeStore.generateAndStore(targetPhone, "merchant-profile");
+    }
+
+    @Transactional
+    public MerchantResponse updateMyProfile(MerchantProfileUpdateRequest request) {
+        Merchant merchant = currentMerchant();
+        String nextName = normalizeRequired(request.merchantName(), "店铺名称不能为空");
+        String nextAddress = normalizeRequired(request.address(), "店铺地址不能为空");
+        String nextPhone = PhoneValidator.normalizeAndValidate(request.phone());
+        String nextBankAccount = normalizeRequired(request.bankAccount(), "银行账号不能为空");
+        if (!nextBankAccount.matches("^\\d{9,25}$")) {
+            throw new BusinessException("银行账号必须是 9 到 25 位数字");
+        }
+        if (!GeoUtils.hasCoordinate(request.longitude(), request.latitude())) {
+            throw new BusinessException("请选择店铺地图位置");
+        }
+        boolean phoneChanged = !nextPhone.equals(merchant.getPhone());
+        boolean bankChanged = !nextBankAccount.equals(merchant.getBankAccount());
+        if (phoneChanged || bankChanged) {
+            String verifyPhone = phoneChanged ? nextPhone : merchant.getPhone();
+            verificationCodeStore.verify(verifyPhone, "merchant-profile", request.code());
+        }
+        if (phoneChanged) {
+            Long phoneCount = merchantMapper.selectCount(new LambdaQueryWrapper<Merchant>()
+                .eq(Merchant::getPhone, nextPhone)
+                .ne(Merchant::getId, merchant.getId()));
+            if (phoneCount > 0) {
+                throw new BusinessException("联系电话已被其他商家占用");
+            }
+        }
+
+        merchant.setMerchantName(nextName);
+        merchant.setAddress(nextAddress);
+        merchant.setLongitude(request.longitude());
+        merchant.setLatitude(request.latitude());
+        merchant.setDeliveryRadiusM(normalizeDeliveryRadius(request.deliveryRadiusM()));
+        merchant.setPhone(nextPhone);
+        merchant.setBankAccount(nextBankAccount);
+        merchantMapper.updateById(merchant);
+        return convertToResponse(merchantMapper.selectById(merchant.getId()));
     }
 
     @Transactional
@@ -425,6 +472,26 @@ public class MerchantService {
         Integer estimatedMinutes,
         Boolean deliveryAvailable
     ) {
+    }
+
+    private Merchant currentMerchant() {
+        String userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new BusinessException("未登录，请先登录");
+        }
+        Merchant merchant = merchantMapper.selectOne(new LambdaQueryWrapper<Merchant>()
+            .eq(Merchant::getUserId, userId));
+        if (merchant == null) {
+            throw new BusinessException("当前用户未入驻为商家");
+        }
+        return merchant;
+    }
+
+    private String normalizeRequired(String value, String message) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new BusinessException(message);
+        }
+        return value.trim();
     }
 
     public Long getCurrentMerchantId() {

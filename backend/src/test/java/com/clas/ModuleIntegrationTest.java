@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -343,6 +344,38 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.logo").isString())
             .andExpect(jsonPath("$.data.logo").value(org.hamcrest.Matchers.startsWith("/uploads/merchant-logo/1/")));
+    }
+
+    @Test
+    void merchantProfileUpdateRequiresCodeForSensitiveFields() throws Exception {
+        Map<String, Object> payload = Map.of(
+            "merchantName", "Campus Light Meals Updated",
+            "address", "Software Park West Gate No.2",
+            "longitude", 116.398000,
+            "latitude", 39.910000,
+            "deliveryRadiusM", 3500,
+            "phone", "13900009999",
+            "bankAccount", "6222000000000000099",
+            "code", TEST_CODE
+        );
+
+        mockMvc.perform(post("/api/merchant/my/profile/send-code")
+                .header("Authorization", auth(MERCHANT_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(put("/api/merchant/my/profile")
+                .header("Authorization", auth(MERCHANT_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.merchantName").value("Campus Light Meals Updated"))
+            .andExpect(jsonPath("$.data.phone").value("13900009999"))
+            .andExpect(jsonPath("$.data.bankAccount").value("6222000000000000099"))
+            .andExpect(jsonPath("$.data.address").value("Software Park West Gate No.2"));
     }
 
     @Test

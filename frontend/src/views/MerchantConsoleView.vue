@@ -9,6 +9,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import OrderDetailContent from '../components/OrderDetailContent.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
+import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
+import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
 
 const router = useRouter()
 const merchant = ref(null)
@@ -20,6 +22,7 @@ const reviews = ref([])
 const replyDrafts = ref({})
 const logoInputRef = ref(null)
 const logoUploading = ref(false)
+const profileDialogVisible = ref(false)
 
 // ===== version_314: 订单详情弹窗 & 商品名映射 =====
 const productNames = ref({})
@@ -229,6 +232,10 @@ function closeChat() {
   chatOrder.value = null
 }
 
+function onMerchantProfileSaved(nextMerchant) {
+  merchant.value = nextMerchant
+}
+
 onMounted(() => {
   if (currentRole() !== 'MERCHANT') {
     router.push('/login')
@@ -257,39 +264,7 @@ onMounted(() => {
     <div v-else-if="merchant" class="console-layout">
       <!-- Left Info Panel -->
       <div class="sidebar-panel">
-        <!-- Navigation Menu -->
-        <el-card class="box-card nav-card" style="margin-bottom: 20px;">
-          <div class="menu-list">
-            <div
-              class="menu-item active"
-              @click="router.push('/merchant-console')"
-            >
-              <el-icon><List /></el-icon>
-              <span>接单管理</span>
-            </div>
-            <div
-              class="menu-item"
-              @click="router.push('/merchant/analytics')"
-            >
-              <el-icon><TrendCharts /></el-icon>
-              <span>经营分析</span>
-            </div>
-            <div
-              class="menu-item"
-              @click="router.push('/merchant/products')"
-            >
-              <el-icon><Goods /></el-icon>
-              <span>商品管理</span>
-            </div>
-            <div
-              class="menu-item"
-              @click="router.push('/merchant/deals')"
-            >
-              <el-icon><Ticket /></el-icon>
-              <span>团购管理</span>
-            </div>
-          </div>
-        </el-card>
+        <MerchantSidebar active="orders" @edit-profile="profileDialogVisible = true" />
 
         <el-card class="box-card info-card">
           <template #header>
@@ -516,6 +491,12 @@ onMounted(() => {
       </div>
     </div>
     </div>
+
+    <MerchantProfileEditDialog
+      v-model:visible="profileDialogVisible"
+      :merchant="merchant"
+      @saved="onMerchantProfileSaved"
+    />
 
     <!-- Chat overlay -->
     <div v-if="chatOrder" class="order-overlay" @click.self="closeChat">

@@ -20,6 +20,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
 import ProductStatusAction from '../components/product/ProductStatusAction.vue'
+import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
+import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
 import { merchantStatusMap, productStatusMap } from '../utils/status'
 
 const router = useRouter()
@@ -45,6 +47,7 @@ const isEdit = ref(false)
 const uploadLoading = ref(false)
 const logoInputRef = ref(null)
 const logoUploading = ref(false)
+const profileDialogVisible = ref(false)
 
 const form = ref({
   id: null,
@@ -281,6 +284,10 @@ async function onLogoSelected(event) {
   }
 }
 
+function onMerchantProfileSaved(nextMerchant) {
+  merchant.value = nextMerchant
+}
+
 function submitForm() {
   if (!formRef.value) return
   formRef.value.validate(async (valid) => {
@@ -331,8 +338,9 @@ onMounted(loadMerchant)
     <div v-else-if="merchant" class="console-layout">
       <!-- Left Info Panel -->
       <div class="sidebar-panel">
+        <MerchantSidebar active="products" @edit-profile="profileDialogVisible = true" />
         <!-- Navigation Menu -->
-        <el-card class="box-card nav-card" style="margin-bottom: 20px;">
+        <el-card v-if="false" class="box-card nav-card" style="margin-bottom: 20px;">
           <div class="menu-list">
             <div 
               class="menu-item"
@@ -592,6 +600,12 @@ onMounted(loadMerchant)
         </el-card>
       </div>
     </div>
+
+    <MerchantProfileEditDialog
+      v-model:visible="profileDialogVisible"
+      :merchant="merchant"
+      @saved="onMerchantProfileSaved"
+    />
 
     <!-- Product Form Dialog -->
     <el-dialog

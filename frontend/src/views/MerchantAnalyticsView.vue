@@ -1,9 +1,13 @@
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { getMyMerchantStats } from '../api/clas'
+import { getMyMerchant, getMyMerchantStats } from '../api/clas'
 import { formatFen } from '../utils/formatters'
+import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
+import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
 
 const loading = ref(true)
+const merchant = ref(null)
+const profileDialogVisible = ref(false)
 const stats = ref({
   todayOrders: 0,
   todaySales: 0,
@@ -16,7 +20,9 @@ let echartsModule = null
 async function loadStats() {
   loading.value = true
   try {
-    stats.value = await getMyMerchantStats()
+    const [merchantInfo, statsInfo] = await Promise.all([getMyMerchant(), getMyMerchantStats()])
+    merchant.value = merchantInfo
+    stats.value = statsInfo
   } finally {
     loading.value = false
     await nextTick()
@@ -66,10 +72,18 @@ async function renderChart() {
 
 onMounted(loadStats)
 onUnmounted(() => salesChart?.dispose())
+
+function onMerchantProfileSaved(nextMerchant) {
+  merchant.value = nextMerchant
+}
 </script>
 
 <template>
-  <div class="analytics-page" v-loading="loading">
+  <div class="merchant-page" v-loading="loading">
+    <aside class="sidebar-panel">
+      <MerchantSidebar active="analytics" @edit-profile="profileDialogVisible = true" />
+    </aside>
+    <main class="analytics-page">
     <div class="page-head">
       <h1>经营分析</h1>
     </div>
@@ -101,14 +115,32 @@ onUnmounted(() => salesChart?.dispose())
         </el-table-column>
       </el-table>
     </el-card>
+    </main>
+    <MerchantProfileEditDialog
+      v-model:visible="profileDialogVisible"
+      :merchant="merchant"
+      @saved="onMerchantProfileSaved"
+    />
   </div>
 </template>
 
 <style scoped>
-.analytics-page {
+.merchant-page {
+  display: flex;
+  gap: 24px;
   max-width: 1120px;
   margin: 30px auto;
   padding: 0 20px 48px;
+}
+
+.sidebar-panel {
+  flex: 1;
+  min-width: 260px;
+}
+
+.analytics-page {
+  flex: 3;
+  min-width: 0;
 }
 
 .page-head h1 {
@@ -146,6 +178,10 @@ onUnmounted(() => salesChart?.dispose())
 }
 
 @media (max-width: 640px) {
+  .merchant-page {
+    flex-direction: column;
+  }
+
   .stats-grid {
     grid-template-columns: 1fr;
   }
