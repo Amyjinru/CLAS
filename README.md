@@ -135,6 +135,48 @@ npm run dev
 
 所有金额字段统一使用 `INT`，单位为“分”；前端展示时再除以 `100` 转成“元”。
 
+### AI 内容安全审核（2026-06-10）
+
+本次重点补充了头像与文本内容的提交前安全审核，保持现有 Spring Boot + Vue 框架、数据库结构和接口路径不变，只在后端 Service 层复用原有上传/提交入口进行拦截。
+
+**审核入口**
+
+| 类型 | 现有接口 | 审核内容 |
+| --- | --- | --- |
+| 头像上传 | `POST /api/user/profile/avatar` | 图片内容与图片中可见文字 |
+| 头像 URL 更新 | `PUT /api/user/profile` | `avatar` URL 指向的图片 |
+| 昵称更新 | `PUT /api/user/profile` | `nickname` 文本 |
+| 提交评价 | `POST /api/review/add` | 评价正文 |
+| 商家回复 | `POST /api/review/{reviewId}/reply` | 商家回复正文 |
+| 评论回复 | `POST /api/review/{reviewId}/comments` | 评论正文 |
+
+**实现方式**
+
+- 新增 `ContentModerationService` 统一封装本地违禁词过滤与阿里云百炼 DashScope 调用。
+- 本地违禁词过滤始终启用，默认包含：`色情`、`涉黄`、`赌博`、`毒品`、`违禁`、`诈骗`。
+- 配置 `DASHSCOPE_API_KEY` 后启用 AI 审核；未配置时不调用外部 AI，只执行本地违禁词过滤，不阻塞原有业务流程。
+- AI 审核不新增人工复核流程：判定不通过时直接返回业务错误，判定通过时继续原有保存逻辑。
+- 现有评价举报、商家删评申请、管理员处理等治理功能保持原样。
+
+**配置**
+
+生产或本地环境可通过环境变量配置：
+
+```bash
+DASHSCOPE_API_KEY=你的百炼API_KEY
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_TEXT_MODEL=qwen3.6-flash
+DASHSCOPE_IMAGE_MODEL=qwen3.5-flash
+FORBIDDEN_WORDS=额外词1,额外词2
+```
+
+本地开发也可以复制 `backend/src/main/resources/application-local.yml.example` 为 `application-local.yml` 后填写；该文件已被 `.gitignore` 忽略，避免 API Key 提交到仓库。
+
+**验证**
+
+- `mvn test` 已同步当前接口契约，18 项后端测试全部通过。
+- 测试断言已更新为当前响应结构：注册/登录成功返回 `data.user`；业务异常返回真实 HTTP 状态码，例如 `400`、`401`、`403`。
+
 ---
 
 ## 功能改进：商家列表/详情、商家入驻/状态

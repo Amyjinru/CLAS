@@ -17,10 +17,16 @@ public class UserAvatarUploadService {
 
     private final UserMapper userMapper;
     private final LocalFileStorage localFileStorage;
+    private final ContentModerationService contentModerationService;
 
-    public UserAvatarUploadService(UserMapper userMapper, LocalFileStorage localFileStorage) {
+    public UserAvatarUploadService(
+        UserMapper userMapper,
+        LocalFileStorage localFileStorage,
+        ContentModerationService contentModerationService
+    ) {
         this.userMapper = userMapper;
         this.localFileStorage = localFileStorage;
+        this.contentModerationService = contentModerationService;
     }
 
     public User uploadAndUpdate(String userId, MultipartFile file) {
@@ -41,6 +47,7 @@ public class UserAvatarUploadService {
         if (contentType != null && !contentType.startsWith("image/")) {
             throw new BusinessException("请上传图片文件");
         }
+        contentModerationService.assertAvatarAllowed(file);
 
         User user = userMapper.selectById(userId);
         if (user == null) {

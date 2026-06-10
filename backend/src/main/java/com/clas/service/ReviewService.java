@@ -62,6 +62,7 @@ public class ReviewService {
     private final NotificationService notificationService;
     private final PenaltyService penaltyService;
     private final UserProfileService userProfileService;
+    private final ContentModerationService contentModerationService;
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
 
@@ -80,6 +81,7 @@ public class ReviewService {
         NotificationService notificationService,
         PenaltyService penaltyService,
         UserProfileService userProfileService,
+        ContentModerationService contentModerationService,
         UserMapper userMapper,
         ObjectMapper objectMapper
     ) {
@@ -97,6 +99,7 @@ public class ReviewService {
         this.notificationService = notificationService;
         this.penaltyService = penaltyService;
         this.userProfileService = userProfileService;
+        this.contentModerationService = contentModerationService;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
     }
@@ -120,6 +123,7 @@ public class ReviewService {
         if (images.size() > MAX_IMAGES) {
             throw new BusinessException("评价图片最多上传 " + MAX_IMAGES + " 张");
         }
+        contentModerationService.assertTextAllowed(request.content(), "评价内容");
         Review review = new Review();
         review.setOrderId(request.orderId());
         review.setUserId(request.userId());
@@ -185,6 +189,7 @@ public class ReviewService {
         if (!merchantService.getCurrentMerchantId().equals(order.getMerchantId())) {
             throw new BusinessException("只能回复自己店铺的评价");
         }
+        contentModerationService.assertTextAllowed(reply, "商家回复");
         review.setMerchantReply(reply);
         reviewMapper.updateById(review);
         notificationService.send(review.getUserId(), "商家回复了评价", "您的订单 " + review.getOrderId() + " 评价收到商家回复。");
@@ -200,6 +205,7 @@ public class ReviewService {
                 throw new BusinessException("回复目标不存在");
             }
         }
+        contentModerationService.assertTextAllowed(request.content(), "评论内容");
         ReviewReply reply = new ReviewReply();
         reply.setReviewId(reviewId);
         reply.setParentReplyId(request.parentReplyId());

@@ -29,6 +29,15 @@ mybatis-plus:
 amap:
   web-service-key: ${AMAP_WEB_SERVICE_KEY:}
 
+dashscope:
+  api-key: ${DASHSCOPE_API_KEY:}
+  base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+  text-model: ${DASHSCOPE_TEXT_MODEL:qwen3.6-flash}
+  image-model: ${DASHSCOPE_IMAGE_MODEL:qwen3.5-flash}
+
+content-moderation:
+  forbidden-words: ${FORBIDDEN_WORDS:}
+
 jwt:
   secret: ${JWT_SECRET:clas-dev-secret-key-2026-must-be-32bytes!}
 

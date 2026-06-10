@@ -55,9 +55,9 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
-            .andExpect(jsonPath("$.data.username").value("new_user"))
-            .andExpect(jsonPath("$.data.role").value("USER"))
-            .andExpect(jsonPath("$.data.password").doesNotExist());
+            .andExpect(jsonPath("$.data.user.username").value("new_user"))
+            .andExpect(jsonPath("$.data.user.role").value("USER"))
+            .andExpect(jsonPath("$.data.user.password").doesNotExist());
     }
 
     @Test
@@ -80,8 +80,8 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
-            .andExpect(jsonPath("$.data.phone").value("13900000011"))
-            .andExpect(jsonPath("$.data.username").value("user"));
+            .andExpect(jsonPath("$.data.user.phone").value("13900000011"))
+            .andExpect(jsonPath("$.data.user.username").value("user"));
     }
 
     @Test
@@ -90,7 +90,7 @@ class ModuleIntegrationTest {
         mockMvc.perform(post("/api/user/register/send-code")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("phone", USER_PHONE))))
-            .andExpect(status().isOk())
+            .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(400))
             .andExpect(jsonPath("$.message").value("该手机号已被注册"));
     }
@@ -114,7 +114,7 @@ class ModuleIntegrationTest {
                     "code", TEST_CODE,
                     "role", "ROOT"
                 ))))
-            .andExpect(status().isOk())
+            .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(400))
             .andExpect(jsonPath("$.message").value("角色只能是 USER、MERCHANT 或 ADMIN"));
     }
@@ -136,7 +136,7 @@ class ModuleIntegrationTest {
                     "phone", "13900000013",
                     "code", TEST_CODE
                 ))))
-            .andExpect(status().isOk())
+            .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(400))
             .andExpect(jsonPath("$.message").value("密码至少6位，必须包含大小写英文字母、数字和特殊符号，且不能包含空白字符"));
     }
@@ -158,7 +158,7 @@ class ModuleIntegrationTest {
                     "phone", "13900000016",
                     "code", TEST_CODE
                 ))))
-            .andExpect(status().isOk())
+            .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(400))
             .andExpect(jsonPath("$.message").value("两次输入的密码不一致"));
     }
@@ -216,7 +216,7 @@ class ModuleIntegrationTest {
                     "phone", USER_PHONE,
                     "password", "wrong-password"
                 ))))
-            .andExpect(status().isOk())
+            .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(400))
             .andExpect(jsonPath("$.message").value("手机号或密码错误"));
     }
@@ -225,14 +225,14 @@ class ModuleIntegrationTest {
     void adminMerchantListRequiresAdminRole() throws Exception {
         // 管理员接口必须同时拦截未登录用户和非 ADMIN 角色用户。
         mockMvc.perform(get("/api/merchant/admin/list"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value(401))
             .andExpect(jsonPath("$.message").value("未登录，请先登录"));
 
         mockMvc.perform(get("/api/merchant/admin/list")
                 .header("Authorization", USER_PHONE))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(403))
             .andExpect(jsonPath("$.message").value("权限不足，无法访问"));
 
         mockMvc.perform(get("/api/merchant/admin/list")
@@ -459,8 +459,8 @@ class ModuleIntegrationTest {
     void bookingFlowRequiresOwnerAndMerchantRoles() throws Exception {
         mockMvc.perform(get("/api/bookings/merchant")
                 .header("Authorization", USER_PHONE))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(403));
 
         MvcResult bookingResult = mockMvc.perform(post("/api/bookings")
                 .header("Authorization", USER_PHONE)
@@ -485,8 +485,8 @@ class ModuleIntegrationTest {
                 .header("Authorization", USER_PHONE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("status", "CONFIRMED"))))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(400));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(403));
 
         mockMvc.perform(post("/api/bookings/" + bookingId + "/status")
                 .header("Authorization", MERCHANT_PHONE)

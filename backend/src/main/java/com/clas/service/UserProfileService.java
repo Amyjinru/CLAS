@@ -9,9 +9,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class UserProfileService {
     private final UserMapper userMapper;
+    private final ContentModerationService contentModerationService;
 
-    public UserProfileService(UserMapper userMapper) {
+    public UserProfileService(UserMapper userMapper, ContentModerationService contentModerationService) {
         this.userMapper = userMapper;
+        this.contentModerationService = contentModerationService;
     }
 
     public User getProfile(String userId) {
@@ -36,9 +38,11 @@ public class UserProfileService {
             if (nickname.length() > 50) {
                 throw new BusinessException("昵称不能超过 50 个字符");
             }
+            contentModerationService.assertTextAllowed(nickname, "昵称");
             user.setNickname(nickname);
         }
         if (request.avatar() != null) {
+            contentModerationService.assertAvatarUrlAllowed(request.avatar());
             user.setAvatar(request.avatar());
         }
         userMapper.updateById(user);
