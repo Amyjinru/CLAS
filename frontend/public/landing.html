@@ -362,30 +362,28 @@
   var dots = document.querySelectorAll('.nav-dot');
   var total = pages.length;
   var current = 0;
-  var animating = false;
-  var startY = 0;
-  var startTime = 0;
-  var body = document.body;
+  var locked = false;  // 动画 + 冷却期锁，防止重复触发
+  var touchStartY = 0;
+  var touchStartTime = 0;
 
-  // ─── Easing: easeOutQuint + slight overshoot ───
-  function ease(t) { return t < 0.8 ? 1 - Math.pow(1 - t/0.8, 3) : 1 - Math.pow(1 - (t-0.8)/0.2, 1.5); }
+  // ─── Easing: easeOutCubic ───
+  function ease(t) { return 1 - Math.pow(1 - t, 3); }
 
   // ─── Smooth scroll to page ───
   function goTo(idx) {
-    if (idx < 0 || idx >= total || animating) return;
-    animating = true;
+    if (idx < 0 || idx >= total || locked) return;
+    locked = true;
     current = idx;
     var targetY = idx * window.innerHeight;
     var startY = window.scrollY;
     var distance = targetY - startY;
-    var duration = 700;
+    var duration = Math.min(800, Math.abs(distance) * 1.2 + 300);
     var start = performance.now();
 
     function step(now) {
       var elapsed = now - start;
       var progress = Math.min(elapsed / duration, 1);
       window.scrollTo(0, startY + distance * ease(progress));
-      // Parallax blobs
       var blobs = document.querySelectorAll('.hero-blob');
       blobs.forEach(function(b, i) {
         b.style.transform = 'translateY(' + (window.scrollY * (0.03 + i * 0.02)) + 'px)';
@@ -394,9 +392,10 @@
         requestAnimationFrame(step);
       } else {
         window.scrollTo(0, targetY);
-        animating = false;
         updateDots();
         triggerReveal(idx);
+        // 动画结束后 350ms 冷却，防止触控板惯性余震
+        setTimeout(function() { locked = false; }, 350);
       }
     }
     requestAnimationFrame(step);
@@ -429,29 +428,28 @@
   }
 
   // ─── Wheel ───
-  var wheelTimer;
+  var wheelTimer = 0;
   window.addEventListener('wheel', function(e) {
-    if (animating) return;
+    if (locked) return;
     clearTimeout(wheelTimer);
     wheelTimer = setTimeout(function() {
       if (e.deltaY > 15) goTo(current + 1);
       else if (e.deltaY < -15) goTo(current - 1);
-    }, 30);
+    }, 50);
   }, { passive: true });
 
   // ─── Touch ───
   window.addEventListener('touchstart', function(e) {
-    startY = e.touches[0].clientY;
-    startTime = Date.now();
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
   }, { passive: true });
 
   window.addEventListener('touchend', function(e) {
-    if (animating) return;
-    var dy = startY - e.changedTouches[0].clientY;
-    var dt = Date.now() - startTime;
+    if (locked) return;
+    var dy = touchStartY - e.changedTouches[0].clientY;
+    var dt = Date.now() - touchStartTime;
     var velocity = Math.abs(dy / dt);
-    // Fast swipe or enough distance
-    if (velocity > 0.5 || Math.abs(dy) > 50) {
+    if (velocity > 0.4 || Math.abs(dy) > 50) {
       if (dy > 20) goTo(current + 1);
       else if (dy < -20) goTo(current - 1);
     }
@@ -459,7 +457,7 @@
 
   // ─── Keyboard ───
   window.addEventListener('keydown', function(e) {
-    if (animating) return;
+    if (locked) return;
     if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }
     if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
   });
