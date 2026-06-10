@@ -34,6 +34,12 @@ const AdminAppealsView = () => import('../views/admin/AdminAppealsView.vue')
 const AdminMessagesView = () => import('../views/admin/AdminMessagesView.vue')
 
 function defaultPath() {
+  const user = currentUser()
+  if (!user) {
+    // 未登录 → 跳转到落地页（纯 HTML，零 JS 开销）
+    window.location.replace('/landing.html')
+    return '/login' // 兜底：如果 replace 失败则到登录页
+  }
   const role = currentRole()
   if (role === 'MERCHANT') return '/merchant-console'
   if (role === 'ADMIN') return '/admin/dashboard'
