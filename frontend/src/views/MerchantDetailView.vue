@@ -2,11 +2,12 @@
 import BackButton from '../components/BackButton.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { addCart, addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listGroupedProducts, listProducts, removeCart, removeFavorite } from '../api/clas'
+import { addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listGroupedProducts, listProducts, removeFavorite } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
 import MerchantRouteMap from '../components/MerchantRouteMap.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
 import { useChatStore } from '../composables/useChatStore'
+import { useCartActions } from '../composables/useCartActions'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
@@ -20,7 +21,6 @@ const productGroups = ref({})
 const activeProductCategory = ref('')
 const cartItems = ref([])
 const cartOpen = ref(false)
-const message = ref('')
 const loading = ref(false)
 const loadError = ref('')
 const submitting = ref(false)
@@ -30,6 +30,8 @@ const currentLocation = ref(getCurrentLocation())
 const deliveryEstimate = ref(null)
 const locationDialogVisible = ref(false)
 const chatStore = useChatStore()
+const { cartMessage, increaseItem, decreaseItem, removeAll } = useCartActions()
+const message = cartMessage
 
 const merchantCartItems = computed(() =>
   cartItems.value.filter((item) => item.merchantId === merchantId.value)
@@ -245,13 +247,8 @@ async function add(product) {
     message.value = `商家已休息，${businessStatus.value.nextOpenText}`
     return
   }
-  try {
-    await addCart({ productId: product.id, quantity: 1 })
-    message.value = `${product.name} 已加入购物车`
-    await load()
-  } catch (error) {
-    message.value = error.response?.data?.message || '请先登录'
-  }
+  const ok = await increaseItem(product.id, product.name)
+  if (ok) await load()
 }
 
 async function increaseCartItem(item) {
@@ -259,30 +256,18 @@ async function increaseCartItem(item) {
     message.value = `商家已休息，${businessStatus.value.nextOpenText}`
     return
   }
-  try {
-    await addCart({ productId: item.productId, quantity: 1 })
-    await load()
-  } catch (error) {
-    message.value = error.response?.data?.message || '操作失败'
-  }
+  const ok = await increaseItem(item.productId)
+  if (ok) await load()
 }
 
 async function decreaseCartItem(item) {
-  try {
-    await removeCart({ productId: item.productId, quantity: 1 })
-    await load()
-  } catch (error) {
-    message.value = error.response?.data?.message || '操作失败'
-  }
+  const ok = await decreaseItem(item.productId)
+  if (ok) await load()
 }
 
 async function removeCartItem(item) {
-  try {
-    await removeCart({ productId: item.productId, quantity: item.quantity })
-    await load()
-  } catch (error) {
-    message.value = error.response?.data?.message || '操作失败'
-  }
+  const ok = await removeAll(item.productId, item.quantity)
+  if (ok) await load()
 }
 
 async function submitOrder() {

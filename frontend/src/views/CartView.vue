@@ -6,22 +6,21 @@ import {
   claimCoupon,
   clearInvalidCart,
   createOrder,
-  deleteCartItem,
   getCart,
   listAddresses,
   listClaimableCoupons,
   listMyDealOrders,
   listOrders,
-  previewOrder,
-  updateCart
+  previewOrder
 } from '../api/clas'
+import { useCartActions } from '../composables/useCartActions'
 
 const router = useRouter()
+const { cartMessage, actionProductId, updateQuantity, removeItem } = useCartActions()
 const items = ref([])
 const pendingFoodOrders = ref([])
 const pendingDealOrders = ref([])
-const message = ref('')
-const updatingProductId = ref(null)
+const message = cartMessage
 const addresses = ref([])
 const selectedAddressId = ref('')
 const orderRemark = ref('')
@@ -132,35 +131,20 @@ async function removeInvalidItems() {
 }
 
 async function changeQuantity(item, quantity) {
-  const nextQuantity = Number(quantity)
-  if (!Number.isInteger(nextQuantity) || nextQuantity < 1) {
-    message.value = '数量至少为 1'
-    await load()
-    return
-  }
-  updatingProductId.value = item.productId
-  try {
-    items.value = await updateCart({ productId: item.productId, quantity: nextQuantity })
-    message.value = '购物车数量已更新'
+  const result = await updateQuantity(item.productId, quantity)
+  if (result) {
+    items.value = result
     await loadPreview()
-  } catch (error) {
-    message.value = error.response?.data?.message || '更新数量失败'
+  } else {
     await load()
-  } finally {
-    updatingProductId.value = null
   }
 }
 
 async function deleteItem(item) {
-  updatingProductId.value = item.productId
-  try {
-    items.value = await deleteCartItem(item.productId)
-    message.value = '商品已从购物车删除'
+  const result = await removeItem(item.productId)
+  if (result) {
+    items.value = result
     await loadPreview()
-  } catch (error) {
-    message.value = error.response?.data?.message || '删除商品失败'
-  } finally {
-    updatingProductId.value = null
   }
 }
 
@@ -246,13 +230,13 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
                   min="1"
                   :max="item.stock"
                   :value="item.quantity"
-                  :disabled="updatingProductId === item.productId"
+                  :disabled="actionProductId === item.productId"
                   @change="changeQuantity(item, $event.target.value)"
                 />
               </label>
               <button
                 class="delete-btn"
-                :disabled="updatingProductId === item.productId"
+                :disabled="actionProductId === item.productId"
                 @click="deleteItem(item)"
               >
                 删除
