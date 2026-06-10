@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { sendMerchantProfileCode, updateMyMerchantProfile, uploadMerchantLogo } from '../../api/clas'
@@ -25,6 +25,7 @@ const form = reactive({
   longitude: null,
   latitude: null,
   deliveryRadiusM: 3000,
+  businessHours: '09:00-21:00',
   code: ''
 })
 const locationData = reactive({
@@ -67,6 +68,7 @@ function resetForm() {
   form.longitude = merchant.longitude ?? null
   form.latitude = merchant.latitude ?? null
   form.deliveryRadiusM = merchant.deliveryRadiusM || 3000
+  form.businessHours = merchant.businessHours || '09:00-21:00'
   form.code = ''
   Object.assign(locationData, {
     province: '',
@@ -123,6 +125,7 @@ function payload() {
     longitude: form.longitude,
     latitude: form.latitude,
     deliveryRadiusM: form.deliveryRadiusM,
+    businessHours: form.businessHours.trim(),
     code: form.code.trim()
   }
 }
@@ -149,6 +152,7 @@ async function sendCode() {
 async function save() {
   if (!form.merchantName.trim()) return ElMessage.warning('请输入店铺名称')
   if (!form.address.trim() || !form.longitude || !form.latitude) return ElMessage.warning('请确认店铺地图地址')
+  if (!/^\d{2}:\d{2}-\d{2}:\d{2}$/.test(form.businessHours.trim())) return ElMessage.warning('营业时间格式应为 HH:mm-HH:mm')
   if (!/^1[3-9]\d{9}$/.test(form.phone.trim())) return ElMessage.warning('请输入正确手机号')
   if (!/^\d{9,25}$/.test(form.bankAccount.trim())) return ElMessage.warning('请输入 9 到 25 位银行卡号')
   if (sensitiveChanged.value && !form.code.trim()) return ElMessage.warning('手机号或银行卡变更需要验证码')
@@ -183,6 +187,9 @@ async function save() {
             @update:modelValue="syncLocationDraft"
             @confirm="onLocationConfirm"
           />
+        </el-form-item>
+        <el-form-item label="营业时间">
+          <el-input v-model="form.businessHours" placeholder="09:00-21:00" maxlength="11" />
         </el-form-item>
         <el-form-item label="联系电话">
           <el-input v-model="form.phone" maxlength="11" />

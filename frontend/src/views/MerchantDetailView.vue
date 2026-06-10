@@ -80,7 +80,7 @@ function fieldText(value, fallback = '暂无信息') {
   return value || fallback
 }
 
-const businessStatus = computed(() => resolveBusinessStatus(merchant.value?.businessHours))
+const businessStatus = computed(() => resolveBusinessStatus(merchant.value))
 
 function parseTimeToMinutes(value) {
   const match = /^(\d{2}):(\d{2})$/.exec((value || '').trim())
@@ -91,7 +91,14 @@ function parseTimeToMinutes(value) {
   return hours * 60 + minutes
 }
 
-function resolveBusinessStatus(hoursText) {
+function resolveBusinessStatus(merchantInfo) {
+  if (!merchantInfo || merchantInfo.status !== 'OPEN') {
+    return { open: false, label: '未营业', type: 'info', nextOpenText: '暂不营业' }
+  }
+  if (merchantInfo.manualClosed) {
+    return { open: false, label: '已打烊', type: 'info', nextOpenText: '已打烊' }
+  }
+  const hoursText = merchantInfo.businessHours
   const fallback = { open: true, label: '营业中', type: 'success', nextOpenText: '' }
   if (!hoursText || !hoursText.includes('-')) return fallback
   const [startText, endText] = hoursText.split('-').map((item) => item.trim())
@@ -106,7 +113,7 @@ function resolveBusinessStatus(hoursText) {
     : now >= start || now < end
   return {
     open,
-    label: open ? '营业中' : '已休息',
+    label: open ? '营业中' : '已打烊',
     type: open ? 'success' : 'info',
     nextOpenText: open ? '' : `${startText} 开始营业`
   }

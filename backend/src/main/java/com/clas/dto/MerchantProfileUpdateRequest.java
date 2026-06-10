@@ -14,6 +14,7 @@ public record MerchantProfileUpdateRequest(
     BigDecimal longitude,
     BigDecimal latitude,
     Integer deliveryRadiusM,
+    String businessHours,
 
     @NotBlank(message = "联系电话不能为空")
     String phone,

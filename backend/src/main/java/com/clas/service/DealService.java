@@ -1,4 +1,4 @@
-package com.clas.service;
+﻿package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
@@ -295,6 +295,9 @@ public class DealService {
         Merchant merchant = merchantMapper.selectById(merchantId);
         if (merchant == null) {
             throw new BusinessException("商家不存在");
+        }
+        if (Boolean.TRUE.equals(merchant.getManualClosed())) {
+            throw new BusinessException("商家已打烊");
         }
         String businessHours = trimToNull(merchant.getBusinessHours());
         if (businessHours == null) {

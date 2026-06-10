@@ -1,0 +1,3 @@
+USE clas;
+
+ALTER TABLE merchant ADD COLUMN manual_closed TINYINT(1) NOT NULL DEFAULT 0;

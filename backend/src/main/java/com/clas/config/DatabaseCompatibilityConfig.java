@@ -15,13 +15,16 @@ public class DatabaseCompatibilityConfig {
     private static final Logger log = LoggerFactory.getLogger(DatabaseCompatibilityConfig.class);
 
     @Bean
-    ApplicationRunner ensureMerchantLogoColumn(DataSource dataSource, JdbcTemplate jdbcTemplate) {
+    ApplicationRunner ensureMerchantCompatibilityColumns(DataSource dataSource, JdbcTemplate jdbcTemplate) {
         return args -> {
-            if (hasColumn(dataSource, "merchant", "logo")) {
-                return;
+            if (!hasColumn(dataSource, "merchant", "logo")) {
+                log.info("Adding missing merchant.logo column for store logo uploads");
+                jdbcTemplate.execute("ALTER TABLE merchant ADD COLUMN logo VARCHAR(512)");
             }
-            log.info("Adding missing merchant.logo column for store logo uploads");
-            jdbcTemplate.execute("ALTER TABLE merchant ADD COLUMN logo VARCHAR(512)");
+            if (!hasColumn(dataSource, "merchant", "manual_closed")) {
+                log.info("Adding missing merchant.manual_closed column for manual closing");
+                jdbcTemplate.execute("ALTER TABLE merchant ADD COLUMN manual_closed BOOLEAN NOT NULL DEFAULT FALSE");
+            }
         };
     }
 

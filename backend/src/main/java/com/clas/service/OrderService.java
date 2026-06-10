@@ -557,6 +557,9 @@ public class OrderService {
     }
 
     private void assertMerchantOpenNow(Merchant merchant) {
+        if (Boolean.TRUE.equals(merchant.getManualClosed())) {
+            throw new BusinessException("商家已打烊");
+        }
         String businessHours = trimToNull(merchant.getBusinessHours());
         if (businessHours == null) {
             return;

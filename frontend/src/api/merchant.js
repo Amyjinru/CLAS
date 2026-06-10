@@ -9,6 +9,7 @@ export const getMyMerchantAuditStatus = () => api.get('/merchant/my/audit-status
 export const getMyMerchantStats = () => api.get('/merchant/my/stats').then(unwrap)
 export const sendMerchantProfileCode = (payload) => api.post('/merchant/my/profile/send-code', payload).then(unwrap)
 export const updateMyMerchantProfile = (payload) => api.put('/merchant/my/profile', payload).then(unwrap)
+export const toggleMerchantManualClosed = () => api.post('/merchant/my/manual-closed/toggle').then(unwrap)
 export const adminListMerchants = () => api.get('/merchant/admin/list').then(unwrap)
 export const adminAuditMerchant = (id, payload) => api.post(`/merchant/admin/audit/${id}`, payload).then(unwrap)
 export const adminGetMerchantLogs = (id) => api.get(`/merchant/admin/audit-logs/${id}`).then(unwrap)

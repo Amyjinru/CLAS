@@ -1,8 +1,8 @@
 ﻿<script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund, uploadMerchantLogo } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund, uploadMerchantLogo, toggleMerchantManualClosed } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -25,6 +25,7 @@ const logoInputRef = ref(null)
 const logoUploading = ref(false)
 const profileDialogVisible = ref(false)
 const chatStore = useChatStore()
+const displayStatus = computed(() => resolveDisplayStatus(merchant.value))
 
 // ===== version_314: 订单详情弹窗 & 商品名映射 =====
 const productNames = ref({})
@@ -49,6 +50,41 @@ const orderStatusLabel = {
   REJECTED: '商家已拒单',
   REFUNDED: '已退款',
   REFUND_PENDING: '退款处理中'
+}
+
+function resolveDisplayStatus(merchantInfo) {
+  if (!merchantInfo) return { text: '-', type: 'info', open: false }
+  if (merchantInfo.status !== 'OPEN') {
+    const mapped = statusMap[merchantInfo.status] || { text: merchantInfo.status, type: 'info' }
+    return { ...mapped, open: false }
+  }
+  if (merchantInfo.manualClosed) {
+    return { text: '已打烊', type: 'info', open: false }
+  }
+  if (!isWithinBusinessHours(merchantInfo.businessHours)) {
+    return { text: '已打烊', type: 'info', open: false }
+  }
+  return { text: '营业中', type: 'success', open: true }
+}
+
+function isWithinBusinessHours(hoursText) {
+  if (!hoursText || !hoursText.includes('-')) return true
+  const [startText, endText] = hoursText.split('-').map((item) => item.trim())
+  const start = parseBusinessMinutes(startText)
+  const end = parseBusinessMinutes(endText)
+  if (start === null || end === null || start === end) return true
+  const nowDate = new Date()
+  const now = nowDate.getHours() * 60 + nowDate.getMinutes()
+  return start < end ? now >= start && now < end : now >= start || now < end
+}
+
+function parseBusinessMinutes(value) {
+  const match = /^(\d{2}):(\d{2})$/.exec((value || '').trim())
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return null
+  return hours * 60 + minutes
 }
 
 async function load() {
@@ -242,6 +278,11 @@ function onMerchantProfileSaved(nextMerchant) {
   merchant.value = nextMerchant
 }
 
+async function toggleManualClosed() {
+  merchant.value = await toggleMerchantManualClosed()
+  ElMessage.success(merchant.value.manualClosed ? '已手动打烊' : '已恢复默认营业状态')
+}
+
 onMounted(() => {
   if (currentRole() !== 'MERCHANT') {
     router.push('/login')
@@ -295,9 +336,17 @@ onMounted(() => {
               上传店铺头像
             </el-button>
             <h4>{{ merchant.merchantName }}</h4>
-            <el-tag :type="statusMap[merchant.status]?.type || 'info'" size="large" effect="dark">
-              {{ statusMap[merchant.status]?.text || merchant.status }}
+            <el-tag :type="displayStatus.type" size="large" effect="dark">
+              {{ displayStatus.text }}
             </el-tag>
+            <el-button
+              v-if="merchant.status === 'OPEN'"
+              size="small"
+              :type="merchant.manualClosed ? 'success' : 'warning'"
+              @click="toggleManualClosed"
+            >
+              {{ merchant.manualClosed ? '恢复默认状态' : '手动打烊' }}
+            </el-button>
           </div>
 
           <el-divider />

@@ -128,6 +128,12 @@ public class MerchantController {
         return Result.ok(merchantService.updateMyProfile(request));
     }
 
+    @PostMapping("/my/manual-closed/toggle")
+    @RequireRole("MERCHANT")
+    public Result<MerchantResponse> toggleManualClosed() {
+        return Result.ok(merchantService.toggleManualClosed());
+    }
+
     @GetMapping("/my/audit-status")
     @RequireRole("MERCHANT")
     public Result<Map<String, Object>> getMyAuditStatus() {

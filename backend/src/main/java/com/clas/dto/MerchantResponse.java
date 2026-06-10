@@ -21,6 +21,7 @@ public record MerchantResponse(
     Integer averagePrice,
     BigDecimal score,
     MerchantStatusEnum status,
+    Boolean manualClosed,
     String bankAccount,
     String adminRemarks,
     Integer settlementCycle,

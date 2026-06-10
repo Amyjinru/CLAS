@@ -67,6 +67,30 @@ function distanceText(distance) {
   return distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`
 }
 
+function merchantOpenStatus(merchant) {
+  if (!merchant || merchant.status !== 'OPEN') return { open: false, label: '未营业', type: 'info' }
+  if (merchant.manualClosed) return { open: false, label: '已打烊', type: 'info' }
+  const hoursText = merchant.businessHours
+  if (!hoursText || !hoursText.includes('-')) return { open: true, label: '营业中', type: 'success' }
+  const [startText, endText] = hoursText.split('-').map((item) => item.trim())
+  const start = parseBusinessMinutes(startText)
+  const end = parseBusinessMinutes(endText)
+  if (start === null || end === null || start === end) return { open: true, label: '营业中', type: 'success' }
+  const nowDate = new Date()
+  const now = nowDate.getHours() * 60 + nowDate.getMinutes()
+  const open = start < end ? now >= start && now < end : now >= start || now < end
+  return { open, label: open ? '营业中' : '已打烊', type: open ? 'success' : 'info' }
+}
+
+function parseBusinessMinutes(value) {
+  const match = /^(\d{2}):(\d{2})$/.exec((value || '').trim())
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
 async function load() {
   if (onlyDeliverable.value && !hasSearchLocation.value) {
     onlyDeliverable.value = false
@@ -361,6 +385,7 @@ onMounted(async () => {
         <span v-if="merchant.deliveryRadiusM"> · {{ distanceText(merchant.deliveryRadiusM) }} 内配送</span>
       </p>
       <p class="delivery-status">
+        <el-tag :type="merchantOpenStatus(merchant).type" effect="plain">{{ merchantOpenStatus(merchant).label }}</el-tag>
         <el-tag v-if="merchant.deliveryAvailable === true" type="success" effect="plain">可配送</el-tag>
         <el-tag v-else-if="merchant.deliveryAvailable === false" type="danger" effect="plain">超出配送范围</el-tag>
         <el-tag v-else effect="plain">选择位置查看配送</el-tag>

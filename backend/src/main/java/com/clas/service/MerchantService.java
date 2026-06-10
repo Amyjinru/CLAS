@@ -25,6 +25,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -208,6 +210,7 @@ public class MerchantService {
         merchant.setLongitude(request.longitude());
         merchant.setLatitude(request.latitude());
         merchant.setDeliveryRadiusM(normalizeDeliveryRadius(request.deliveryRadiusM()));
+        merchant.setBusinessHours(normalizeBusinessHours(request.businessHours(), merchant.getBusinessHours()));
         merchant.setPhone(nextPhone);
         merchant.setBankAccount(nextBankAccount);
         merchantMapper.updateById(merchant);
@@ -298,6 +301,7 @@ public class MerchantService {
         merchant.setAveragePrice(0);
         merchant.setScore(BigDecimal.valueOf(0.00));
         merchant.setStatus(MerchantStatusEnum.PENDING); // Default pending
+        merchant.setManualClosed(false);
         merchant.setBankAccount(request.bankAccount());
         merchant.setSettlementCycle(request.settlementCycle());
         
@@ -394,6 +398,7 @@ public class MerchantService {
             merchant.getAveragePrice(),
             merchant.getScore(),
             merchant.getStatus(),
+            Boolean.TRUE.equals(merchant.getManualClosed()),
             merchant.getBankAccount(),
             merchant.getAdminRemarks(),
             merchant.getSettlementCycle(),
@@ -461,6 +466,35 @@ public class MerchantService {
             throw new BusinessException("配送范围需在500到10000米之间");
         }
         return radius;
+    }
+
+    @Transactional
+    public MerchantResponse toggleManualClosed() {
+        Merchant merchant = currentMerchant();
+        if (merchant.getStatus() != MerchantStatusEnum.OPEN) {
+            throw new BusinessException("只有营业中的商家可以手动打烊");
+        }
+        merchant.setManualClosed(!Boolean.TRUE.equals(merchant.getManualClosed()));
+        merchantMapper.updateById(merchant);
+        return convertToResponse(merchantMapper.selectById(merchant.getId()));
+    }
+
+    private String normalizeBusinessHours(String value, String currentValue) {
+        String hours = value == null ? "" : value.trim();
+        if (hours.isEmpty()) {
+            return currentValue == null || currentValue.isBlank() ? "09:00-21:00" : currentValue.trim();
+        }
+        String[] parts = hours.split("-");
+        if (parts.length != 2) {
+            throw new BusinessException("营业时间格式应为 HH:mm-HH:mm");
+        }
+        try {
+            LocalTime.parse(parts[0].trim());
+            LocalTime.parse(parts[1].trim());
+        } catch (DateTimeParseException exception) {
+            throw new BusinessException("营业时间格式应为 HH:mm-HH:mm");
+        }
+        return parts[0].trim() + "-" + parts[1].trim();
     }
 
     private record Coordinate(BigDecimal latitude, BigDecimal longitude) {

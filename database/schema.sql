@@ -65,6 +65,7 @@ CREATE TABLE merchant (
     average_price INT NOT NULL DEFAULT 0,
     score DECIMAL(3,2) DEFAULT 0.00,
     status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+    manual_closed TINYINT(1) NOT NULL DEFAULT 0,
     bank_account VARCHAR(50),
     admin_remarks VARCHAR(255),
     settlement_cycle INT,

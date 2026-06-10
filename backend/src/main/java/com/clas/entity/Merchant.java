@@ -31,6 +31,7 @@ public class Merchant {
     private Integer averagePrice;
     private BigDecimal score;
     private MerchantStatusEnum status;
+    private Boolean manualClosed;
     private String bankAccount;
     private String adminRemarks;
     private Integer settlementCycle;
