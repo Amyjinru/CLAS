@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { currentRole, listAddresses, listAnnouncements, listMerchants, currentUser, listOrders } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
@@ -10,6 +10,10 @@ import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
 import { formatDistance } from '../utils/formatters'
 import { ElMessage } from 'element-plus'
+
+defineOptions({
+  name: 'HomeView'
+})
 
 const merchants = ref([])
 const announcements = ref([])
@@ -86,7 +90,7 @@ const activeFilters = computed(() => {
   if (sort.value) {
     filters.push({ key: 'sort', label: `排序：${sortLabels[sort.value] || sort.value}` })
   }
-  if (currentLocation.value?.address) {
+  if (shouldQueryByLocation() && currentLocation.value?.address) {
     filters.push({ key: 'location', label: `位置：${currentLocation.value.address}` })
   }
   if (onlyDeliverable.value) {
@@ -134,10 +138,10 @@ async function load() {
     category: category.value || undefined,
     sort: sort.value || DEFAULT_SORT
   }
-  if (currentLocation.value?.longitude && currentLocation.value?.latitude) {
+  if (shouldQueryByLocation() && currentLocation.value?.longitude && currentLocation.value?.latitude) {
     params.lng = currentLocation.value.longitude
     params.lat = currentLocation.value.latitude
-  } else if (selectedAddressId.value) {
+  } else if (shouldQueryByLocation() && selectedAddressId.value) {
     params.addressId = selectedAddressId.value
   }
   if (onlyDeliverable.value && hasSearchLocation.value) {
@@ -156,6 +160,10 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function shouldQueryByLocation() {
+  return sort.value === 'distance' || onlyDeliverable.value
 }
 
 async function loadAddresses() {
@@ -188,7 +196,7 @@ async function autoLocate() {
     const AMap = await loadAmap()
     const geolocation = new AMap.Geolocation({
       enableHighAccuracy: true,
-      timeout: 8000,
+      timeout: 3000,
       showButton: false
     })
     await new Promise((resolve) => {
@@ -349,10 +357,26 @@ function hasActiveOrders() {
   return activeOrders.value.length > 0
 }
 
-onMounted(async () => {
-  await loadAddresses()
-  await autoLocate()
-  await Promise.all([load(), loadActiveOrders()])
+watch(
+  () => [
+    currentLocation.value?.longitude,
+    currentLocation.value?.latitude
+  ],
+  ([longitude, latitude], [oldLongitude, oldLatitude]) => {
+    if (!longitude || !latitude || (longitude === oldLongitude && latitude === oldLatitude)) {
+      return
+    }
+    if (shouldQueryByLocation()) {
+      load()
+    }
+  }
+)
+
+onMounted(() => {
+  loadAddresses()
+  autoLocate()
+  load()
+  loadActiveOrders()
 })
 </script>
 

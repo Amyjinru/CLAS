@@ -106,7 +106,14 @@ async function handleLogout() {
       </nav>
     </header>
     <main id="main-content" class="main-content">
-      <RouterView :key="route.fullPath" />
+      <RouterView v-slot="{ Component, route: viewRoute }">
+        <KeepAlive include="HomeView">
+          <component
+            :is="Component"
+            :key="viewRoute.path === '/home' ? 'HomeView' : viewRoute.fullPath"
+          />
+        </KeepAlive>
+      </RouterView>
     </main>
     <ChatSidebar v-if="sessionUser" />
   </div>

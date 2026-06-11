@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createAddress } from '../api/clas'
-import { hasAmapKey, loadAmap } from '../utils/amap'
+import { ensureAmapPlugins, hasAmapKey, loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 
 const props = defineProps({
@@ -127,12 +127,15 @@ function markManualDraft() {
   current.source = 'manual'
 }
 
-async function ensureAmap() {
+async function ensureAmap(plugins = []) {
   if (!hasAmapKey()) {
     throw new Error('AMAP_KEY_MISSING')
   }
   if (!AMapRef) {
     AMapRef = await loadAmap()
+  }
+  if (plugins.length) {
+    AMapRef = await ensureAmapPlugins(plugins)
   }
   return AMapRef
 }
@@ -158,7 +161,7 @@ function queryDistrict(keyword, level) {
 
 async function loadProvinces() {
   try {
-    await ensureAmap()
+    await ensureAmap(['AMap.DistrictSearch'])
     loadingDistrict.value = true
     provinces.value = sortAdministrativeAreas(await queryDistrict('中国', 'country'))
   } catch {
@@ -214,7 +217,7 @@ async function locateCurrent() {
     locating.value = true
     const geolocation = new AMapRef.Geolocation({
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 3000,
       showButton: false
     })
     geolocation.getCurrentPosition(async (status, result) => {

@@ -205,7 +205,7 @@ async function autoLocate() {
     const AMap = await loadAmap()
     const geolocation = new AMap.Geolocation({
       enableHighAccuracy: true,
-      timeout: 8000,
+      timeout: 3000,
       showButton: false
     })
     geolocation.getCurrentPosition(async (status, result) => {
