@@ -144,7 +144,7 @@ function handleNotificationClick(item) {
             </div>
             <div class="row-actions">
               <el-button v-if="!item.readFlag" text type="primary" :loading="actionId === item.id" @click.stop="emit('read', item.id)">标记已读</el-button>
-              <el-button text type="danger" @click.stop="emit('remove', item.id)">删除</el-button>
+              <el-button type="danger" plain @click.stop="emit('remove', item.id)">删除</el-button>
             </div>
           </article>
         </div>

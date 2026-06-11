@@ -736,14 +736,22 @@ onMounted(async () => {
 
 .search-row {
   align-items: center;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.search-row :deep(.el-input) {
+  margin: 0;
+  width: 100%;
+}
+
+.search-row :deep(.el-button) {
+  margin: 0;
 }
 
 .search-input {
-  flex: 1;
-  min-width: 220px;
+  min-width: 0;
 }
 
 .filter-count {
@@ -859,11 +867,15 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .search-row {
-    align-items: stretch;
+    grid-template-columns: 1fr 1fr;
   }
 
-  .search-row .el-button {
-    flex: 1;
+  .search-input {
+    grid-column: 1 / -1;
+  }
+
+  .search-row :deep(.el-button) {
+    width: 100%;
   }
 }
 
