@@ -63,7 +63,8 @@
   --color-accent-light: var(--clas-teal-50);
 
   --bg-page: #faf7f2;
-  --bg-card: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.62);
+  --bg-card-solid: #ffffff;
   --bg-sidebar: #2d251c;
   --bg-sidebar-hover: #3d352b;
   --bg-sidebar-active: rgba(255, 209, 0, 0.15);
@@ -121,7 +122,8 @@
 
 :root[data-theme='dark'] {
   --bg-page: #1f1c18;
-  --bg-card: #2b2721;
+  --bg-card: rgba(43, 39, 33, 0.65);
+  --bg-card-solid: #2b2721;
   --bg-sidebar: #17130f;
   --bg-sidebar-hover: #342f27;
   --bg-sidebar-active: rgba(255, 209, 0, 0.18);
@@ -241,15 +243,35 @@ body {
 /* 卡片 */
 .el-card {
   border-radius: var(--radius-lg) !important;
-  border: 1px solid var(--border-light) !important;
+  border: 6px solid transparent !important;
+  border-image-source: url('../assets/lace-border.svg') !important;
+  border-image-slice: 12 !important;
+  border-image-width: 6px !important;
+  border-image-repeat: round !important;
+  border-image-outset: 2px !important;
   box-shadow: var(--shadow-sm) !important;
   transition-property: box-shadow, transform;
   transition-duration: var(--transition-base);
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
+  overflow: visible;
+  background: var(--bg-card) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  background-clip: padding-box;
 }
 .el-card:hover {
   box-shadow: var(--shadow-md) !important;
+}
+/* 暗色模式 — el-card 蕾丝 */
+:root[data-theme='dark'] .el-card {
+  border-image-source: url('../assets/lace-border.svg') !important;
+}
+/* el-card 内部保留圆角（通过 overflow:hidden 在 body 上） */
+.el-card__body {
+  border-radius: inherit;
+  background: var(--bg-card);
+  position: relative;
+  z-index: 1;
 }
 .el-card__header {
   padding: 18px 24px !important;
@@ -302,6 +324,9 @@ body {
 .el-dialog {
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-xl) !important;
+  background: var(--bg-card) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 .el-dialog__header {
   padding: 20px 24px 0 !important;

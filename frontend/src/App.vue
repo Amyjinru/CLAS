@@ -5,6 +5,7 @@ import { logout, sessionUser } from './api/clas'
 import { ElMessage } from 'element-plus'
 import ChatSidebar from './components/ChatSidebar.vue'
 import { preferenceState } from './utils/preferences'
+import patternBg from './assets/pattern-bg.svg'
 
 const router = useRouter()
 const route = useRoute()
@@ -58,7 +59,8 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :style="{ backgroundImage: `url(${patternBg})` }">
+    <div class="shell-pattern-overlay" aria-hidden="true"></div>
     <a href="#main-content" class="skip-link">跳到主要内容</a>
     <header class="topbar">
       <div class="header-left">
@@ -108,6 +110,18 @@ async function handleLogout() {
     <main id="main-content" class="main-content">
       <RouterView :key="route.fullPath" />
     </main>
+    <footer
+      class="app-footer"
+      aria-label="页脚装饰"
+    >
+      <div class="footer-overlay">
+        <div class="footer-content">
+          <span class="footer-brand">CLAS</span>
+          <span class="footer-tagline">生活助手 · 温暖每一餐</span>
+          <span class="footer-copy">&copy; {{ new Date().getFullYear() }} CLAS Team</span>
+        </div>
+      </div>
+    </footer>
     <ChatSidebar v-if="sessionUser" />
   </div>
 </template>
@@ -118,8 +132,47 @@ async function handleLogout() {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-page);
+  position: relative;
+  background-repeat: repeat;
+  background-size: 360px 240px;
+  background-color: #FFFBF5;
   font-family: var(--font-body);
+}
+
+/* 整页柔光遮罩 — 让图案融入背景，不干扰内容阅读 */
+.shell-pattern-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg,
+      rgba(255, 251, 245, 0.45) 0%,
+      rgba(255, 248, 240, 0.60) 30%,
+      rgba(255, 245, 235, 0.70) 60%,
+      rgba(255, 242, 230, 0.78) 100%
+    );
+}
+
+/* 暗色模式 — 整页遮罩 */
+:root[data-theme='dark'] .shell-pattern-overlay {
+  background:
+    linear-gradient(135deg,
+      rgba(30, 27, 24, 0.60) 0%,
+      rgba(30, 27, 24, 0.75) 30%,
+      rgba(30, 27, 24, 0.85) 60%,
+      rgba(30, 27, 24, 0.92) 100%
+    );
+}
+
+/* 所有交互元素置于遮罩之上 */
+.topbar,
+.main-content,
+.app-footer,
+.chat-sidebar,
+.skip-link {
+  position: relative;
+  z-index: 1;
 }
 
 .topbar {
