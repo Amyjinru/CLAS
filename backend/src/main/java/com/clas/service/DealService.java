@@ -149,7 +149,8 @@ public class DealService {
                 method,
                 "FAILED",
                 order.getStatus(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                null
             );
         }
 
@@ -188,7 +189,8 @@ public class DealService {
             method,
             "SUCCESS",
             order.getStatus(),
-            paidTime
+            paidTime,
+            null
         );
     }
 
@@ -205,7 +207,8 @@ public class DealService {
             null,
             paymentStatus,
             order.getStatus(),
-            order.getPaidTime() == null ? order.getCreateTime() : order.getPaidTime()
+            order.getPaidTime() == null ? order.getCreateTime() : order.getPaidTime(),
+            null
         );
     }
 

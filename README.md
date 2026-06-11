@@ -147,6 +147,10 @@ npm run dev
 
 所有金额字段统一使用 `INT`，单位为“分”；前端展示时再除以 `100` 转成“元”。
 
+### 支付幂等
+
+`POST /api/payment/mock` 和兼容入口 `POST /api/order/pay/{orderId}` 支持可选请求头 `Idempotency-Key`。同一用户对同一订单重复提交相同幂等键时，会复用同一条支付流水并在响应 `data.idempotencyKey` 中回传；同一幂等键不能用于该用户的其他订单。
+
 ### AI 内容安全审核（2026-06-10）
 
 本次重点补充了头像与文本内容的提交前安全审核，保持现有 Spring Boot + Vue 框架、数据库结构和接口路径不变，只在后端 Service 层复用原有上传/提交入口进行拦截。

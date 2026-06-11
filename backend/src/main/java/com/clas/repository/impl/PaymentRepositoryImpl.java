@@ -46,4 +46,16 @@ public class PaymentRepositoryImpl implements PaymentRepository {
             .last("LIMIT 1"));
         return Optional.ofNullable(payment);
     }
+
+    @Override
+    public Optional<Payment> findByUserIdAndIdempotencyKey(String userId, String idempotencyKey) {
+        if (userId == null || idempotencyKey == null || idempotencyKey.isBlank()) {
+            return Optional.empty();
+        }
+        Payment payment = paymentMapper.selectOne(new LambdaQueryWrapper<Payment>()
+            .eq(Payment::getUserId, userId)
+            .eq(Payment::getIdempotencyKey, idempotencyKey)
+            .last("LIMIT 1"));
+        return Optional.ofNullable(payment);
+    }
 }

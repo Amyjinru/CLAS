@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,8 +26,19 @@ public class PaymentController {
     }
 
     @PostMapping("/mock")
-    public Result<PaymentResponse> mockPay(@Valid @RequestBody PaymentRequest request) {
-        return Result.ok(paymentService.mockPay(new PaymentRequest(request.orderId(), UserContext.getUserId(), request.payMethod())));
+    public Result<PaymentResponse> mockPay(
+        @Valid @RequestBody PaymentRequest request,
+        @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
+    ) {
+        String resolvedKey = idempotencyKey == null || idempotencyKey.isBlank()
+            ? request.idempotencyKey()
+            : idempotencyKey;
+        return Result.ok(paymentService.mockPay(new PaymentRequest(
+            request.orderId(),
+            UserContext.getUserId(),
+            request.payMethod(),
+            resolvedKey
+        )));
     }
 
     @GetMapping("/status/{orderId}")

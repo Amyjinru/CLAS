@@ -930,6 +930,81 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void paymentIdempotencyKeyReusesSamePayment() throws Exception {
+        Long orderId = createPendingOrderForUser();
+        String key = "payment-key-" + orderId;
+
+        MvcResult firstPay = mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", orderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key))
+            .andReturn();
+
+        Long firstPaymentId = objectMapper.readTree(firstPay.getResponse().getContentAsString())
+            .path("data").path("paymentId").asLong();
+
+        MvcResult secondPay = mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", orderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key))
+            .andReturn();
+
+        Long secondPaymentId = objectMapper.readTree(secondPay.getResponse().getContentAsString())
+            .path("data").path("paymentId").asLong();
+        assertEquals(firstPaymentId, secondPaymentId);
+    }
+
+    @Test
+    void paymentIdempotencyKeyCannotBeReusedForAnotherOrder() throws Exception {
+        Long firstOrderId = createPendingOrderForUser();
+        String key = "reused-payment-key";
+
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", firstOrderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key));
+
+        Long secondOrderId = createPendingOrderForUser();
+
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", secondOrderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("幂等键已用于其他订单"));
+    }
+
+    @Test
     void reviewCommentCreatesReplyNotificationAndLegacyNotificationsRemainValid() throws Exception {
         Long orderId = createCompletedOrder();
 

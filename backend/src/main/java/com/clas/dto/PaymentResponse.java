@@ -10,7 +10,8 @@ public record PaymentResponse(
     String payMethod,
     String paymentStatus,
     String orderStatus,
-    LocalDateTime createTime
+    LocalDateTime createTime,
+    String idempotencyKey
 ) {
     public static PaymentResponse from(Payment payment, String orderStatus) {
         return new PaymentResponse(
@@ -20,7 +21,8 @@ public record PaymentResponse(
             payment.getPayMethod(),
             payment.getStatus(),
             orderStatus,
-            payment.getCreateTime()
+            payment.getCreateTime(),
+            payment.getIdempotencyKey()
         );
     }
 }
