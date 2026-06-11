@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -95,9 +96,11 @@ public class OrderController {
 
     @PostMapping("/pay/{orderId}")
     @RequireRole("USER")
-    public Result<PaymentResponse> pay(@PathVariable Long orderId) {
-        Orders order = orderService.requireOrder(orderId);
-        PaymentRequest request = new PaymentRequest(orderId, currentUserId(), "MOCK");
+    public Result<PaymentResponse> pay(
+        @PathVariable Long orderId,
+        @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
+    ) {
+        PaymentRequest request = new PaymentRequest(orderId, currentUserId(), "MOCK", idempotencyKey);
         return Result.ok(paymentService.mockPay(request));
     }
 

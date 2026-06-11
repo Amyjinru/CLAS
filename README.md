@@ -111,9 +111,13 @@ npm run dev
 {
   "code": 200,
   "message": "success",
-  "data": {}
+  "data": {},
+  "timestamp": 1781179200000,
+  "requestId": "trace-test-123"
 }
 ```
+
+后端会读取请求头 `X-Request-Id` 并在响应头与响应体中回传；未传入时自动生成，用于联调、日志定位和云端冒烟测试关联。
 
 业务错误统一返回 `code=400`，例如：
 
@@ -121,7 +125,9 @@ npm run dev
 {
   "code": 400,
   "message": "手机号或密码错误",
-  "data": null
+  "data": null,
+  "timestamp": 1781179200000,
+  "requestId": "trace-test-123"
 }
 ```
 
@@ -140,6 +146,10 @@ npm run dev
 ### 金额单位
 
 所有金额字段统一使用 `INT`，单位为“分”；前端展示时再除以 `100` 转成“元”。
+
+### 支付幂等
+
+`POST /api/payment/mock` 和兼容入口 `POST /api/order/pay/{orderId}` 支持可选请求头 `Idempotency-Key`。同一用户对同一订单重复提交相同幂等键时，会复用同一条支付流水并在响应 `data.idempotencyKey` 中回传；同一幂等键不能用于该用户的其他订单。
 
 ### AI 内容安全审核（2026-06-10）
 

@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,6 +30,7 @@ import com.clas.mapper.ReviewReplyMapper;
 import com.clas.mapper.ReviewVoteMapper;
 import com.clas.mapper.UserCouponMapper;
 import com.clas.service.CouponService;
+import java.util.Base64;
 import java.util.Properties;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -102,6 +104,29 @@ class ModuleIntegrationTest {
 
     @Autowired
     private NotificationMapper notificationMapper;
+
+    @Test
+    void apiResponsesIncludeTimestampAndRequestId() throws Exception {
+        mockMvc.perform(get("/api/health")
+                .header("X-Request-Id", "trace-test-123"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("X-Request-Id", "trace-test-123"))
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.timestamp").isNumber())
+            .andExpect(jsonPath("$.requestId").value("trace-test-123"));
+    }
+
+    @Test
+    void apiErrorsIncludeRequestId() throws Exception {
+        mockMvc.perform(get("/api/deals/999999")
+                .header("X-Request-Id", "missing-deal-trace"))
+            .andExpect(status().isBadRequest())
+            .andExpect(header().string("X-Request-Id", "missing-deal-trace"))
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("团购券不存在"))
+            .andExpect(jsonPath("$.timestamp").isNumber())
+            .andExpect(jsonPath("$.requestId").value("missing-deal-trace"));
+    }
 
     @Test
     void userRegisterWorksAndHidesPassword() throws Exception {
@@ -595,10 +620,9 @@ class ModuleIntegrationTest {
             "file",
             "logo.png",
             "image/png",
-            new byte[] {
-                (byte) 0x89, 0x50, 0x4E, 0x47,
-                0x0D, 0x0A, 0x1A, 0x0A
-            }
+            Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+            )
         );
 
         mockMvc.perform(multipart("/api/merchant/my/logo")
@@ -903,6 +927,81 @@ class ModuleIntegrationTest {
                     "content", "重复评价"
                 ))))
             .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void paymentIdempotencyKeyReusesSamePayment() throws Exception {
+        Long orderId = createPendingOrderForUser();
+        String key = "payment-key-" + orderId;
+
+        MvcResult firstPay = mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", orderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key))
+            .andReturn();
+
+        Long firstPaymentId = objectMapper.readTree(firstPay.getResponse().getContentAsString())
+            .path("data").path("paymentId").asLong();
+
+        MvcResult secondPay = mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", orderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key))
+            .andReturn();
+
+        Long secondPaymentId = objectMapper.readTree(secondPay.getResponse().getContentAsString())
+            .path("data").path("paymentId").asLong();
+        assertEquals(firstPaymentId, secondPaymentId);
+    }
+
+    @Test
+    void paymentIdempotencyKeyCannotBeReusedForAnotherOrder() throws Exception {
+        Long firstOrderId = createPendingOrderForUser();
+        String key = "reused-payment-key";
+
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", firstOrderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key));
+
+        Long secondOrderId = createPendingOrderForUser();
+
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", secondOrderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("幂等键已用于其他订单"));
     }
 
     @Test

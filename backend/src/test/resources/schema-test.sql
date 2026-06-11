@@ -285,7 +285,9 @@ CREATE TABLE payment (
     amount INT NOT NULL,
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
-    create_time TIMESTAMP NOT NULL
+    create_time TIMESTAMP NOT NULL,
+    idempotency_key VARCHAR(128),
+    UNIQUE(user_id, idempotency_key)
 );
 
 CREATE TABLE announcement (

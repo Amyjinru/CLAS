@@ -39,6 +39,17 @@ public class PaymentService {
 
     public PaymentResponse mockPay(PaymentRequest request) {
         Orders order = orderService.requireUserOrder(request.orderId(), request.userId());
+        String idempotencyKey = normalizeIdempotencyKey(request.idempotencyKey());
+        if (idempotencyKey != null) {
+            var existingPayment = paymentRepository.findByUserIdAndIdempotencyKey(request.userId(), idempotencyKey);
+            if (existingPayment.isPresent()) {
+                Payment payment = existingPayment.get();
+                if (!order.getId().equals(payment.getOrderId())) {
+                    throw new BusinessException("幂等键已用于其他订单");
+                }
+                return PaymentResponse.from(payment, order.getStatus());
+            }
+        }
         if (!OrderService.STATUS_PENDING_PAYMENT.equals(order.getStatus())) {
             if (OrderService.STATUS_PAID.equals(order.getStatus())
                 || OrderService.STATUS_ACCEPTED.equals(order.getStatus())
@@ -77,6 +88,7 @@ public class PaymentService {
 
     private PaymentResponse beginAndConfirmPayment(Orders order, PaymentRequest request) {
         String payMethod = normalizePayMethod(request.payMethod());
+        String idempotencyKey = normalizeIdempotencyKey(request.idempotencyKey());
 
         Payment payment = new Payment();
         payment.setOrderId(order.getId());
@@ -85,6 +97,7 @@ public class PaymentService {
         payment.setPayMethod(payMethod);
         payment.setStatus(STATUS_PENDING);
         payment.setCreateTime(LocalDateTime.now());
+        payment.setIdempotencyKey(idempotencyKey);
         paymentRepository.save(payment);
 
         try {
@@ -153,6 +166,7 @@ public class PaymentService {
                 null,
                 mapOrderStatusToPaymentStatus(order.getStatus()),
                 order.getStatus(),
+                null,
                 null
             ));
     }
@@ -170,6 +184,17 @@ public class PaymentService {
 
     private String normalizePayMethod(String payMethod) {
         return payMethod == null || payMethod.isBlank() ? "MOCK" : payMethod.trim();
+    }
+
+    private String normalizeIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return null;
+        }
+        String normalized = idempotencyKey.trim();
+        if (normalized.length() > 128) {
+            throw new BusinessException("幂等键长度不能超过128个字符");
+        }
+        return normalized;
     }
 
     private String mapOrderStatusToPaymentStatus(String orderStatus) {
