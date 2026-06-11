@@ -1,0 +1,1 @@
+import{C as e,N as t,T as n,_ as r}from"./element-r533nVL1.js";import{t as i}from"./BackButton-6DvW_La_.js";import{t as a}from"./AnnouncementList-DHM9-AKE.js";var o={__name:`MerchantAnnouncementsView`,setup(o){return(o,s)=>(t(),e(r,null,[n(i,{to:`/merchant-console`,label:`返回商家工作台`}),n(a,{title:`平台公告`,description:`商家端可查看平台发布的运营通知与规则说明。`})],64))}};export{o as default};

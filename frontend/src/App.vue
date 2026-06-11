@@ -6,6 +6,7 @@ import { ElMessage } from 'element-plus'
 import ChatSidebar from './components/ChatSidebar.vue'
 import { preferenceState } from './utils/preferences'
 import patternBg from './assets/pattern-bg.svg'
+import foodLines from './assets/food-lines.svg'
 
 const router = useRouter()
 const route = useRoute()
@@ -61,6 +62,12 @@ async function handleLogout() {
 <template>
   <div class="shell" :style="{ backgroundImage: `url(${patternBg})` }">
     <div class="shell-pattern-overlay" aria-hidden="true"></div>
+    <img
+      class="food-lines-layer"
+      :src="foodLines"
+      alt=""
+      aria-hidden="true"
+    />
     <header class="topbar">
       <div class="header-left">
         <RouterLink class="brand" :to="brandLink">CLAS 生活助手</RouterLink>
@@ -203,6 +210,24 @@ async function handleLogout() {
   opacity: 0.18;
   animation: rippleFlow1 8s ease-in-out infinite;
   filter: blur(3px);
+}
+
+/* ═══════════ 食物剪影动画层 ═══════════ */
+.food-lines-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.85;
+}
+
+/* 暗色模式 — 降低食物线条亮度 */
+:root[data-theme='dark'] .food-lines-layer {
+  opacity: 0.45;
+  filter: brightness(0.8);
 }
 
 /* 暗色模式 — 整页遮罩 */
