@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLAS 数据填充 — 使用正确的 API 路径"""
+"""CLAS 数据填充 — 仅用于开发/测试环境，严禁在生产环境执行"""
 import urllib.request, json, sys, time
 
 BASE = "http://127.0.0.1:8080/api"

@@ -135,9 +135,9 @@ onMounted(loadAuditStatus)
 
 .status-hero {
   align-items: center;
-  background: #ffffff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   display: flex;
   gap: 24px;
   justify-content: space-between;
@@ -146,19 +146,19 @@ onMounted(loadAuditStatus)
 }
 
 .eyebrow {
-  color: #909399;
+  color: var(--text-muted);
   font-size: 13px;
   margin: 0 0 8px;
 }
 
 .status-hero h1 {
-  color: #303133;
+  color: var(--text-primary);
   font-size: 28px;
   margin: 0;
 }
 
 .summary {
-  color: #606266;
+  color: var(--text-secondary);
   line-height: 1.7;
   margin: 10px 0 0;
 }
@@ -168,9 +168,9 @@ onMounted(loadAuditStatus)
 }
 
 .timeline-section {
-  background: #ffffff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   padding: 24px;
 }
 
@@ -183,33 +183,33 @@ onMounted(loadAuditStatus)
 }
 
 .section-head h2 {
-  color: #303133;
+  color: var(--text-primary);
   font-size: 18px;
   margin: 0;
 }
 
 .timeline-card {
-  background: #f8fafc;
-  border: 1px solid #edf2f7;
-  border-radius: 8px;
+  background: var(--clas-warm-50);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
   padding: 12px 14px;
 }
 
 .timeline-card p {
-  color: #606266;
+  color: var(--text-secondary);
   line-height: 1.6;
   margin: 8px 0 0;
 }
 
 .timeline-card small {
-  color: #909399;
+  color: var(--text-muted);
   display: block;
   margin-top: 8px;
 }
 
 .empty-timeline {
   align-items: center;
-  color: #909399;
+  color: var(--text-muted);
   display: flex;
   flex-direction: column;
   gap: 10px;
