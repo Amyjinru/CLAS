@@ -115,7 +115,7 @@ watch(() => props.visible, (v) => {
 
       <el-form-item label="商品价格" prop="price">
         <el-input-number v-model="form.price" :precision="2" :step="0.5" :min="0" placeholder="单位：元" style="width: 180px;" />
-        <span style="margin-left: 10px; color: #909399; font-size: 13px;">单位：元</span>
+        <span style="margin-left: 10px; color: var(--text-muted); font-size: 13px;">单位：元</span>
       </el-form-item>
 
       <el-form-item label="商品库存" prop="stock">
@@ -154,5 +154,5 @@ watch(() => props.visible, (v) => {
 
 <style scoped>
 .image-upload-box { display: grid; gap: 10px; width: 100%; }
-.product-preview-img { border: 1px solid #e4e7ed; border-radius: 8px; height: 120px; width: 120px; }
+.product-preview-img { border: 1px solid var(--border-color); border-radius: var(--radius-sm); height: 120px; width: 120px; }
 </style>

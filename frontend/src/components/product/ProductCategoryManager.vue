@@ -77,7 +77,7 @@ async function handleDelete(category) {
 .work-card { border-radius: 12px; }
 .category-card { margin-bottom: 20px; }
 .card-header.justify-between { display: flex; align-items: center; justify-content: space-between; }
-.card-header h3 { margin: 0; font-size: 16px; color: #303133; }
+.card-header h3 { margin: 0; font-size: 16px; color: var(--text-primary); }
 .category-create-row,
 .category-item {
   display: grid;

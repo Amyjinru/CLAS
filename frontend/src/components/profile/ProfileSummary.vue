@@ -47,11 +47,11 @@ const emit = defineEmits(['select'])
 }
 .summary-item:hover,
 .summary-item:focus-visible {
-  border-color: #2563eb;
+  border-color: var(--color-accent);
   outline: none;
   transform: translateY(-1px);
 }
-.summary-item.active { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+.summary-item.active { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12); }
 .summary-item strong { font-size: 24px; }
 .summary-item span { color: var(--text-secondary); font-size: 13px; }
 

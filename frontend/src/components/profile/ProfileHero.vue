@@ -99,10 +99,10 @@ function avatarStyle() {
 .avatar-btn.uploading { cursor: wait; opacity: 0.75; }
 .avatar-input { display: none; }
 .avatar {
-  align-items: center; background: linear-gradient(135deg, #2563eb, #0f766e); border: 3px solid #fff; border-radius: 50%;
+  align-items: center; background: linear-gradient(135deg, var(--color-accent), var(--clas-teal-700)); border: 3px solid #fff; border-radius: 50%;
   color: #fff; display: flex; font-size: 28px; font-weight: 800; height: 84px; justify-content: center; width: 84px;
 }
-.avatar-btn:hover .avatar { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12); }
+.avatar-btn:hover .avatar { border-color: var(--color-accent); box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.12); }
 .avatar-tip { color: var(--text-secondary); font-size: 12px; }
 .profile-meta { display: grid; gap: 10px; min-width: 240px; }
 .profile-meta h1 { margin: 0; }
