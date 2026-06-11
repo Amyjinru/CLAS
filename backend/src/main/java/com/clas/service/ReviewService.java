@@ -27,6 +27,7 @@ import com.clas.mapper.ReviewReplyMapper;
 import com.clas.mapper.ReviewUserHiddenMapper;
 import com.clas.mapper.ReviewVoteMapper;
 import com.clas.mapper.UserMapper;
+import com.clas.service.NotificationService.NotificationTarget;
 import com.clas.config.UserContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -240,7 +241,19 @@ public class ReviewService {
         contentModerationService.assertTextAllowed(reply, "商家回复");
         review.setMerchantReply(reply);
         reviewMapper.updateById(review);
-        notificationService.send(review.getUserId(), "商家回复了评价", "您的订单 " + review.getOrderId() + " 评价收到商家回复。");
+        notificationService.send(new NotificationTarget(
+            review.getUserId(),
+            "商家回复了评价",
+            "您的订单 " + review.getOrderId() + " 评价收到商家回复。",
+            "MERCHANT_REVIEW_REPLY",
+            "REVIEW",
+            review.getId(),
+            review.getId(),
+            null,
+            review.getOrderId(),
+            order.getMerchantId(),
+            reviewTargetPath(review.getOrderId(), review.getId(), null)
+        ));
         return review;
     }
 
@@ -263,6 +276,8 @@ public class ReviewService {
         reply.setDeleted(false);
         reply.setCreatedAt(LocalDateTime.now());
         reviewReplyMapper.insert(reply);
+        Orders order = orderService.requireOrder(review.getOrderId());
+        notifyReviewReplyRecipients(review, reply, order, request.parentReplyId(), userId);
         return reply;
     }
 
@@ -557,6 +572,45 @@ public class ReviewService {
 
     private String voteKey(String targetType, Long targetId) {
         return targetType + ":" + targetId;
+    }
+
+    private void notifyReviewReplyRecipients(
+        Review review,
+        ReviewReply reply,
+        Orders order,
+        Long parentReplyId,
+        String senderId
+    ) {
+        Set<String> recipientIds = new HashSet<>();
+        if (!review.getUserId().equals(senderId)) {
+            recipientIds.add(review.getUserId());
+        }
+        if (parentReplyId != null) {
+            ReviewReply parent = reviewReplyMapper.selectById(parentReplyId);
+            if (parent != null && !parent.getUserId().equals(senderId)) {
+                recipientIds.add(parent.getUserId());
+            }
+        }
+        for (String recipientId : recipientIds) {
+            notificationService.send(new NotificationTarget(
+                recipientId,
+                "评价收到新回复",
+                "您的订单 " + review.getOrderId() + " 评价收到新回复。",
+                "REVIEW_REPLY",
+                "REPLY",
+                reply.getId(),
+                review.getId(),
+                reply.getId(),
+                review.getOrderId(),
+                order.getMerchantId(),
+                reviewTargetPath(review.getOrderId(), review.getId(), reply.getId())
+            ));
+        }
+    }
+
+    private String reviewTargetPath(Long orderId, Long reviewId, Long replyId) {
+        String path = "/review/" + orderId + "?reviewId=" + reviewId;
+        return replyId == null ? path : path + "&replyId=" + replyId;
     }
 
     private void validateVoteTarget(Long targetId, String targetType) {

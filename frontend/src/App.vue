@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { logout, sessionUser } from './api/clas'
 import { ElMessage } from 'element-plus'
 import ChatSidebar from './components/ChatSidebar.vue'
+import { preferenceState } from './utils/preferences'
 
 const router = useRouter()
 const route = useRoute()
@@ -20,18 +21,21 @@ const brandLink = computed(() => {
   if (role.value === 'ADMIN') return '/admin/dashboard'
   return '/home'
 })
-const userPrimaryNav = [
-  { label: '外卖', to: '/home' },
-  { label: '团购', to: '/deals' },
-  { label: '预订/到店', to: '/bookings' },
-  { label: '消息', to: '/user/announcements' },
-  { label: '我的', to: '/profile' }
-]
-const userUtilityNav = [
-  { label: '购物车', to: '/cart' },
-  { label: '订单', to: '/orders' },
-  { label: '商家入驻', to: '/merchant-register' }
-]
+const navLabels = {
+  'zh-CN': ['外卖', '团购', '预订/到店', '消息', '个人中心', '设置'],
+  en: ['Delivery', 'Deals', 'Booking', 'Messages', 'Profile', 'Settings']
+}
+const userPrimaryNav = computed(() => {
+  const labels = navLabels[preferenceState.language] || navLabels['zh-CN']
+  return [
+    { label: labels[0], to: '/home' },
+    { label: labels[1], to: '/deals' },
+    { label: labels[2], to: '/bookings' },
+    { label: labels[3], to: '/profile/notifications' },
+    { label: labels[4], to: '/profile' },
+    { label: labels[5], to: '/settings' }
+  ]
+})
 
 function updateUser() {
   // sessionUser 为响应式 computed，路由变化时自动更新
@@ -82,23 +86,13 @@ async function handleLogout() {
           >
             {{ item.label }}
           </RouterLink>
-          <span class="nav-divider" aria-hidden="true"></span>
-          <RouterLink
-            v-for="item in userUtilityNav"
-            :key="item.to"
-            :to="item.to"
-          >
-            {{ item.label }}
-          </RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
 
         <!-- ===== MERCHANT 商家 ===== -->
         <template v-else-if="role === 'MERCHANT'">
           <RouterLink to="/merchant-console">商家工作台</RouterLink>
-          <RouterLink to="/merchant/deals">团购管理</RouterLink>
-          <RouterLink to="/merchant/bookings">预约管理</RouterLink>
-          <RouterLink to="/merchant/announcements">平台公告</RouterLink>
+          <RouterLink to="/merchant/info">商家信息</RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
 

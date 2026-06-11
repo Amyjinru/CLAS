@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { Close, Message, Promotion, User } from '@element-plus/icons-vue'
 import { currentRole } from '../api/session'
 import { useChatStore } from '../composables/useChatStore'
+import { listMerchantOrdersByUser } from '../api/clas'
 
 const chatStore = useChatStore()
 const draft = ref('')
@@ -11,6 +12,11 @@ const bodyRef = ref(null)
 
 const role = computed(() => currentRole())
 const isMerchant = computed(() => role.value === 'MERCHANT')
+const conversationTab = ref('customer')
+const userOrders = ref([])
+const userOrdersLoading = ref(false)
+const showUserOrders = ref(false)
+
 const activeTitle = computed(() => {
   if (isMerchant.value) return userLabel(chatStore.activeUserId.value)
   const merchant = chatStore.merchantCache.value[chatStore.activeMerchantId.value]
@@ -20,6 +26,17 @@ const activeLogo = computed(() => {
   const merchant = chatStore.merchantCache.value[chatStore.activeMerchantId.value]
   return merchant?.logo || ''
 })
+
+const orderStatusLabel = {
+  PENDING_PAYMENT: '待支付',
+  PAID: '已支付',
+  ACCEPTED: '已接单',
+  COMPLETED: '已完成',
+  CANCELED: '已取消',
+  REJECTED: '已拒单',
+  REFUNDED: '已退款',
+  REFUND_PENDING: '退款中'
+}
 
 function formatTime(value) {
   if (!value) return ''
@@ -47,6 +64,11 @@ function isActive(item) {
   return item.merchantId === chatStore.activeMerchantId.value
 }
 
+function formatPrice(fen) {
+  if (fen == null) return '0.00'
+  return (fen / 100).toFixed(2)
+}
+
 async function send() {
   if (!draft.value.trim() || sending.value) return
   sending.value = true
@@ -71,6 +93,35 @@ async function scrollToBottom() {
   if (bodyRef.value) bodyRef.value.scrollTop = bodyRef.value.scrollHeight
 }
 
+async function toggleUserOrders(userId) {
+  if (showUserOrders.value) {
+    showUserOrders.value = false
+    return
+  }
+  showUserOrders.value = true
+  await loadUserOrders(userId)
+}
+
+async function loadUserOrders(userId) {
+  if (!userId) return
+  userOrdersLoading.value = true
+  try {
+    userOrders.value = await listMerchantOrdersByUser(userId)
+  } catch {
+    userOrders.value = []
+  } finally {
+    userOrdersLoading.value = false
+  }
+}
+
+watch(
+  () => chatStore.activeUserId.value,
+  () => {
+    showUserOrders.value = false
+    userOrders.value = []
+  }
+)
+
 watch(
   () => chatStore.activeMessages.value.length,
   () => scrollToBottom()
@@ -86,6 +137,16 @@ watch(
             <el-icon><Message /></el-icon>
             <strong>{{ isMerchant ? '客户会话' : '客服咨询' }}</strong>
           </div>
+          <div v-if="isMerchant" class="conversation-tabs">
+            <button
+              :class="['tab-btn', { active: conversationTab === 'customer' }]"
+              @click="conversationTab = 'customer'"
+            >客户消息</button>
+            <button
+              :class="['tab-btn', { active: conversationTab === 'all' }]"
+              @click="conversationTab = 'all'"
+            >全部</button>
+          </div>
           <button
             v-for="item in chatStore.conversations.value"
             :key="`${item.merchantId}-${item.userId}`"
@@ -93,7 +154,11 @@ watch(
             :class="['conversation-item', { active: isActive(item) }]"
             @click="chatStore.selectConversation(item)"
           >
-            <span class="conversation-avatar">{{ avatarText(item) }}</span>
+            <span
+              class="conversation-avatar clickable"
+              @click.stop="toggleUserOrders(item.userId)"
+              :title="isMerchant ? '查看用户订单' : ''"
+            >{{ avatarText(item) }}</span>
             <span class="conversation-meta">
               <strong>{{ itemTitle(item) }}</strong>
               <small>{{ item.lastMessage || '暂无消息' }}</small>
@@ -106,7 +171,13 @@ watch(
 
         <section class="chat-main">
           <header class="chat-main-head">
-            <div class="active-avatar" :class="{ 'has-logo': activeLogo }" :style="activeLogo ? { backgroundImage: `url(${activeLogo})` } : null">
+            <div
+              class="active-avatar"
+              :class="{ 'has-logo': activeLogo, 'clickable': isMerchant }"
+              :style="activeLogo ? { backgroundImage: `url(${activeLogo})` } : null"
+              @click="isMerchant && toggleUserOrders(chatStore.activeUserId.value)"
+              :title="isMerchant ? '点击查看用户订单历史' : ''"
+            >
               <el-icon v-if="!activeLogo && isMerchant"><User /></el-icon>
               <span v-else-if="!activeLogo">{{ activeTitle.slice(0, 1) }}</span>
             </div>
@@ -130,6 +201,30 @@ watch(
             >
               <span class="message-time">{{ formatTime(message.createdAt) }}</span>
               <p>{{ message.content }}</p>
+            </div>
+          </div>
+
+          <div v-if="showUserOrders && isMerchant" class="user-orders-panel">
+            <header>
+              <h4>用户 {{ userLabel(chatStore.activeUserId.value) }} 的订单</h4>
+              <button class="icon-button" @click="showUserOrders = false">
+                <el-icon><Close /></el-icon>
+              </button>
+            </header>
+            <div v-loading="userOrdersLoading" class="user-orders-body">
+              <el-empty v-if="!userOrders.length && !userOrdersLoading" description="该用户暂无订单" />
+              <div v-for="entry in userOrders" :key="entry.order.id" class="order-mini-card">
+                <div class="order-mini-head">
+                  <span class="order-id">订单 #{{ entry.order.id }}</span>
+                  <el-tag size="small">{{ orderStatusLabel[entry.order.status] || entry.order.status }}</el-tag>
+                  <span class="price">&yen;{{ formatPrice(entry.order.totalPrice) }}</span>
+                </div>
+                <div class="order-mini-items">
+                  <span v-for="item in entry.items" :key="item.id" class="order-item-text">
+                    {{ item.productName || item.name }} x{{ item.quantity }}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -186,6 +281,30 @@ watch(
   gap: 6px;
   font-size: 13px;
   margin: 0 4px 12px;
+}
+
+.conversation-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 4px 12px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+  background: #fff7ed;
+  border-color: #f97316;
+  color: #f97316;
+  font-weight: 600;
 }
 
 .conversation-item {
@@ -251,6 +370,15 @@ watch(
 .conversation-empty {
   padding: 20px 8px;
   text-align: center;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  transform: scale(1.08);
+  transition: transform 0.2s ease;
 }
 
 .chat-main {
@@ -357,6 +485,72 @@ watch(
 .message-bubble.mine p {
   background: #f97316;
   color: #fff;
+}
+
+.user-orders-panel {
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  max-height: 45%;
+  overflow: hidden;
+}
+
+.user-orders-panel header {
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+
+.user-orders-panel header h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.user-orders-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+}
+
+.order-mini-card {
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  padding: 10px;
+}
+
+.order-mini-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.order-mini-head .order-id {
+  color: #64748b;
+}
+
+.order-mini-head .price {
+  color: #f56c6c;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.order-mini-items {
+  color: #94a3b8;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.order-item-text {
+  white-space: nowrap;
 }
 
 .chat-input-row {

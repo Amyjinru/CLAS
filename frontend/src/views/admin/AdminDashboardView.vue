@@ -138,7 +138,7 @@ function initOrderStatusChart(echarts) {
     PAID: '待接单',
     ACCEPTED: '已接单',
     COMPLETED: '已完成',
-    REFUND_REQUESTED: '退款中',
+    REFUND_PENDING: '退款中',
     REFUNDED: '已退款'
   }
   orderChart.setOption({

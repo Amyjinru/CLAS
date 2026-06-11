@@ -30,6 +30,79 @@ const loading = ref(false)
 
 const unreadCount = computed(() => notifications.value.filter((item) => !item.readFlag).length)
 
+function safeTargetPath(path) {
+  if (!path || typeof path !== 'string') return ''
+  const trimmed = path.trim()
+  return trimmed.startsWith('/') && !trimmed.startsWith('//') ? trimmed : ''
+}
+
+function extractOrderId(text) {
+  const match = String(text || '').match(/订单\s*(\d+)/)
+  return match ? Number(match[1]) : null
+}
+
+function notificationTarget(item) {
+  // 1) Explicit targetPath from backend (most reliable)
+  const explicitPath = safeTargetPath(item.targetPath)
+  if (explicitPath) return explicitPath
+
+  // 2) Review-related notifications → review page
+  if (item.type === 'MERCHANT_REVIEW_REPLY' || item.type === 'REVIEW_REPLY') {
+    if (item.orderId) {
+      const params = []
+      if (item.reviewId) params.push(`reviewId=${item.reviewId}`)
+      if (item.replyId) params.push(`replyId=${item.replyId}`)
+      const query = params.length ? `?${params.join('&')}` : ''
+      return `/review/${item.orderId}${query}`
+    }
+  }
+
+  // 3) Order status notifications → user's order list (with explicit orderId & type)
+  if (item.orderId && (item.type === 'ORDER_STATUS' || item.type === 'ORDER')) {
+    return `/orders?orderId=${item.orderId}`
+  }
+
+  // 4) Generic order notification with orderId but unknown/legacy type
+  if (item.orderId) {
+    return `/orders?orderId=${item.orderId}`
+  }
+
+  // 5) Review-reply fallback by title / content
+  if (item.title === '商家回复了评价' || item.content?.includes('评价收到商家回复')) {
+    const orderId = extractOrderId(item.content)
+    if (orderId) return `/review/${orderId}`
+  }
+
+  // 6) Legacy order notifications without metadata — extract orderId from content
+  const fallbackOrderId = extractOrderId(item.content) || extractOrderId(item.title)
+  if (fallbackOrderId) {
+    return `/orders?orderId=${fallbackOrderId}`
+  }
+
+  return ''
+}
+
+async function openNotification(item) {
+  const target = notificationTarget(item)
+  if (!target) {
+    if (!item.readFlag) {
+      await readNotification(item.id)
+    }
+    ElMessage.info('这条通知暂无可打开的详情页')
+    return
+  }
+
+  try {
+    if (!item.readFlag) {
+      await markNotificationRead(item.id)
+    }
+    await router.push(target)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '打开通知失败')
+    await load()
+  }
+}
+
 
 
 async function load() {
@@ -192,7 +265,15 @@ onMounted(load)
 
       <div v-else class="notifications-list">
 
-        <article v-for="item in notifications" :key="item.id" class="notice-row">
+        <article
+          v-for="item in notifications"
+          :key="item.id"
+          class="notice-row"
+          :class="{ clickable: notificationTarget(item) }"
+          tabindex="0"
+          @click="openNotification(item)"
+          @keydown.enter.prevent="openNotification(item)"
+        >
 
           <div>
 
@@ -204,11 +285,11 @@ onMounted(load)
 
           <div class="row-actions">
 
-            <el-button v-if="!item.readFlag" text type="primary" @click="readNotification(item.id)">标记已读</el-button>
+            <el-button v-if="!item.readFlag" text type="primary" @click.stop="readNotification(item.id)">标记已读</el-button>
 
             <el-tag v-else type="info">已读</el-tag>
 
-            <el-button class="btn-delete-soft" size="small" type="danger" @click="removeNotification(item.id)">删除</el-button>
+            <el-button class="btn-delete-soft" size="small" type="danger" @click.stop="removeNotification(item.id)">删除</el-button>
 
           </div>
 
@@ -295,6 +376,19 @@ onMounted(load)
   padding: 16px 0;
 }
 
+.notice-row.clickable {
+  cursor: pointer;
+}
+
+.notice-row.clickable:hover {
+  background: var(--bg-subtle);
+}
+
+.notice-row:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .notice-row > div:first-child {
   flex: 1;
   min-width: 0;
@@ -347,5 +441,3 @@ onMounted(load)
   }
 }
 </style>
-
-

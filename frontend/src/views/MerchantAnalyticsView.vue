@@ -2,12 +2,10 @@
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { getMyMerchant, getMyMerchantStats } from '../api/clas'
 import { formatFen } from '../utils/formatters'
-import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
-import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
+import MerchantWorkspaceShell from '../components/merchant/MerchantWorkspaceShell.vue'
 
 const loading = ref(true)
 const merchant = ref(null)
-const profileDialogVisible = ref(false)
 const stats = ref({
   todayOrders: 0,
   todaySales: 0,
@@ -79,67 +77,50 @@ function onMerchantProfileSaved(nextMerchant) {
 </script>
 
 <template>
-  <div class="merchant-page" v-loading="loading">
-    <aside class="sidebar-panel">
-      <MerchantSidebar active="analytics" @edit-profile="profileDialogVisible = true" />
-    </aside>
+  <MerchantWorkspaceShell
+    :merchant="merchant"
+    :loading="loading"
+    active-module="analytics"
+    @merchant-updated="onMerchantProfileSaved"
+  >
     <main class="analytics-page">
-    <div class="page-head">
-      <h1>经营分析</h1>
-    </div>
+      <div class="page-head">
+        <h1>经营分析</h1>
+      </div>
 
-    <div class="stats-grid">
-      <el-card shadow="hover">
-        <div class="stat-value">{{ stats.todayOrders || 0 }}</div>
-        <div class="stat-label">今日订单数</div>
+      <div class="stats-grid">
+        <el-card shadow="hover">
+          <div class="stat-value">{{ stats.todayOrders || 0 }}</div>
+          <div class="stat-label">今日订单数</div>
+        </el-card>
+        <el-card shadow="hover">
+          <div class="stat-value">¥{{ formatFen(stats.todaySales) }}</div>
+          <div class="stat-label">今日销售额</div>
+        </el-card>
+      </div>
+
+      <el-card class="chart-card" shadow="hover">
+        <template #header>近 7 天销售额趋势</template>
+        <div id="merchantSalesChart" class="chart"></div>
       </el-card>
+
       <el-card shadow="hover">
-        <div class="stat-value">¥{{ formatFen(stats.todaySales) }}</div>
-        <div class="stat-label">今日销售额</div>
+        <template #header>热销商品 TOP 10</template>
+        <el-table :data="stats.topProducts" stripe empty-text="暂无销售数据">
+          <el-table-column type="index" label="#" width="60" />
+          <el-table-column prop="productName" label="商品名" min-width="180" />
+          <el-table-column prop="soldCount" label="销量" width="120" />
+          <el-table-column label="销售额" width="140">
+            <template #default="{ row }">¥{{ formatFen(row.totalAmount) }}</template>
+          </el-table-column>
+        </el-table>
       </el-card>
-    </div>
-
-    <el-card class="chart-card" shadow="hover">
-      <template #header>近 7 天销售额趋势</template>
-      <div id="merchantSalesChart" class="chart"></div>
-    </el-card>
-
-    <el-card shadow="hover">
-      <template #header>热销商品 TOP 10</template>
-      <el-table :data="stats.topProducts" stripe empty-text="暂无销售数据">
-        <el-table-column type="index" label="#" width="60" />
-        <el-table-column prop="productName" label="商品名" min-width="180" />
-        <el-table-column prop="soldCount" label="销量" width="120" />
-        <el-table-column label="销售额" width="140">
-          <template #default="{ row }">¥{{ formatFen(row.totalAmount) }}</template>
-        </el-table-column>
-      </el-table>
-    </el-card>
     </main>
-    <MerchantProfileEditDialog
-      v-model:visible="profileDialogVisible"
-      :merchant="merchant"
-      @saved="onMerchantProfileSaved"
-    />
-  </div>
+  </MerchantWorkspaceShell>
 </template>
 
 <style scoped>
-.merchant-page {
-  display: flex;
-  gap: 24px;
-  max-width: 1120px;
-  margin: 30px auto;
-  padding: 0 20px 48px;
-}
-
-.sidebar-panel {
-  flex: 1;
-  min-width: 260px;
-}
-
 .analytics-page {
-  flex: 3;
   min-width: 0;
 }
 
@@ -178,10 +159,6 @@ function onMerchantProfileSaved(nextMerchant) {
 }
 
 @media (max-width: 640px) {
-  .merchant-page {
-    flex-direction: column;
-  }
-
   .stats-grid {
     grid-template-columns: 1fr;
   }

@@ -87,6 +87,12 @@ public class OrderController {
         return Result.ok(orderService.listForMerchant(merchantService.getCurrentMerchantId()));
     }
 
+    @GetMapping("/merchant/me/user/{userId}")
+    @RequireRole("MERCHANT")
+    public Result<List<OrderResponse>> myMerchantOrdersByUser(@PathVariable String userId) {
+        return Result.ok(orderService.listForMerchantAndUser(merchantService.getCurrentMerchantId(), userId));
+    }
+
     @PostMapping("/pay/{orderId}")
     @RequireRole("USER")
     public Result<PaymentResponse> pay(@PathVariable Long orderId) {

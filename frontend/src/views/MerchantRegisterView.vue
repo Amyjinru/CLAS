@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { registerMerchant, currentUser, sendRegisterCode } from '../api/clas'
 import { ElMessage } from 'element-plus'
@@ -117,6 +117,8 @@ const categories = ['美食', '饮品', '超市', '水果', '生鲜', '鲜花']
 const submitting = ref(false)
 const codeSending = ref(false)
 const codeCooldown = ref(0)
+const accountCodeSent = ref(false)
+const lastSentAccountPhone = ref('')
 let cooldownTimer = null
 
 async function sendMerchantCode() {
@@ -126,9 +128,13 @@ async function sendMerchantCode() {
   }
   codeSending.value = true
   try {
-    await sendRegisterCode({ phone: form.accountPhone })
+    const phone = form.accountPhone.trim()
+    await sendRegisterCode({ phone })
+    accountCodeSent.value = true
+    lastSentAccountPhone.value = phone
     ElMessage.success('验证码已发送，请查看后端控制台输出')
     codeCooldown.value = 60
+    cooldownTimer && clearInterval(cooldownTimer)
     cooldownTimer = setInterval(() => {
       codeCooldown.value--
       if (codeCooldown.value <= 0) {
@@ -142,6 +148,14 @@ async function sendMerchantCode() {
 }
 
 const cooldownText = computed(() => codeCooldown.value ? `${codeCooldown.value}秒后重发` : '发送验证码')
+const accountPhoneReady = computed(() => validPhone(form.accountPhone))
+
+watch(() => form.accountPhone, (phone) => {
+  if (phone.trim() !== lastSentAccountPhone.value) {
+    form.code = ''
+    accountCodeSent.value = false
+  }
+})
 
 async function submitForm() {
   if (!formRef.value) return
@@ -154,6 +168,10 @@ async function submitForm() {
 
     if (!user.value && !merchantPasswordOk.value) {
       ElMessage.warning('密码至少6位，必须包含大小写英文字母、数字和特殊符号')
+      return
+    }
+    if (!user.value && (!accountCodeSent.value || !form.code.trim())) {
+      ElMessage.warning('请先发送并填写验证码')
       return
     }
     if (!user.value && !merchantPasswordMatches.value) {
@@ -193,6 +211,10 @@ async function submitForm() {
     }
   })
 }
+
+onUnmounted(() => {
+  cooldownTimer && clearInterval(cooldownTimer)
+})
 </script>
 
 <template>
@@ -237,15 +259,16 @@ async function submitForm() {
             <div class="code-row">
               <el-input v-model="form.accountPhone" maxlength="11" placeholder="请输入用于登录的手机号" />
               <el-button
+                :type="accountPhoneReady ? 'success' : 'info'"
                 :loading="codeSending"
-                :disabled="codeCooldown > 0 || !validPhone(form.accountPhone)"
+                :disabled="codeCooldown > 0 || !accountPhoneReady"
                 @click="sendMerchantCode"
               >
                 {{ cooldownText }}
               </el-button>
             </div>
           </el-form-item>
-          <el-form-item label="验证码" prop="code">
+          <el-form-item v-if="accountCodeSent" label="验证码" prop="code">
             <el-input v-model="form.code" maxlength="6" placeholder="请输入后端控制台输出的6位验证码" />
           </el-form-item>
           <el-form-item label="展示名" prop="username">

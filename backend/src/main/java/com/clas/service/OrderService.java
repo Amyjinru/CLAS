@@ -157,7 +157,19 @@ public class OrderService {
             return orderItem;
         }).toList();
 
-        notificationService.send(order.getUserId(), "订单已创建", "订单 " + order.getId() + " 已创建，请及时完成支付。");
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(),
+            "订单已创建",
+            "订单 " + order.getId() + " 已创建，请及时完成支付。",
+            "ORDER_STATUS",
+            "ORDER",
+            order.getId(),
+            null,
+            null,
+            order.getId(),
+            order.getMerchantId(),
+            "/orders?orderId=" + order.getId()
+        ));
         return new OrderResponse(order, orderItems);
     }
 
@@ -252,6 +264,14 @@ public class OrderService {
         return withItems(orders);
     }
 
+    public List<OrderResponse> listForMerchantAndUser(Long merchantId, String userId) {
+        List<Orders> orders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
+            .eq(Orders::getMerchantId, merchantId)
+            .eq(Orders::getUserId, userId)
+            .orderByDesc(Orders::getCreateTime));
+        return withItems(orders);
+    }
+
     public Orders accept(Long orderId) {
         Orders order = requireOrder(orderId);
         requireStatus(order, STATUS_PAID);
@@ -266,7 +286,19 @@ public class OrderService {
         order.setStatus(STATUS_ACCEPTED);
         order.setDeliveryStatus("PREPARING");
         ordersMapper.updateById(order);
-        notificationService.send(order.getUserId(), "商家已接单", "订单 " + order.getId() + " 正在备餐。");
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(),
+            "商家已接单",
+            "订单 " + order.getId() + " 正在备餐。",
+            "ORDER_STATUS",
+            "ORDER",
+            order.getId(),
+            null,
+            null,
+            order.getId(),
+            merchantId,
+            "/orders?orderId=" + order.getId()
+        ));
         return order;
     }
 
@@ -276,7 +308,19 @@ public class OrderService {
         order.setDeliveryStatus("DELIVERING");
         order.setEstimatedMinutes(15);
         ordersMapper.updateById(order);
-        notificationService.send(order.getUserId(), "订单配送中", "订单 " + order.getId() + " 已进入配送流程。");
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(),
+            "订单配送中",
+            "订单 " + order.getId() + " 已进入配送流程。",
+            "ORDER_STATUS",
+            "ORDER",
+            order.getId(),
+            null,
+            null,
+            order.getId(),
+            merchantId,
+            "/orders?orderId=" + order.getId()
+        ));
         return order;
     }
 
@@ -294,7 +338,19 @@ public class OrderService {
         order.setStatus(STATUS_COMPLETED);
         order.setDeliveryStatus("DELIVERED");
         ordersMapper.updateById(order);
-        notificationService.send(order.getUserId(), "订单已完成", "订单 " + order.getId() + " 已完成，欢迎评价本次体验。");
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(),
+            "订单已完成",
+            "订单 " + order.getId() + " 已完成，欢迎评价本次体验。",
+            "ORDER_STATUS",
+            "ORDER",
+            order.getId(),
+            null,
+            null,
+            order.getId(),
+            order.getMerchantId(),
+            "/orders?orderId=" + order.getId()
+        ));
         return order;
     }
 
@@ -333,7 +389,19 @@ public class OrderService {
         order.setRejectReason(trimToNull(reason));
         ordersMapper.updateById(order);
         String rejectText = order.getRejectReason() == null ? "商家暂时无法接单" : order.getRejectReason();
-        notificationService.send(order.getUserId(), "商家已拒单", "订单 " + order.getId() + " 已被拒单：" + rejectText);
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(),
+            "商家已拒单",
+            "订单 " + order.getId() + " 已被拒单：" + rejectText,
+            "ORDER_STATUS",
+            "ORDER",
+            order.getId(),
+            null,
+            null,
+            order.getId(),
+            merchantId,
+            "/orders?orderId=" + order.getId()
+        ));
         return order;
     }
 
@@ -363,7 +431,19 @@ public class OrderService {
         order.setRefundResolvedAt(null);
         order.setRefundRejectReason(null);
         ordersMapper.updateById(order);
-        notificationService.send(userId, "退款申请已提交", "订单 " + orderId + " 的退款申请已提交，等待商家处理。");
+        notificationService.send(new NotificationService.NotificationTarget(
+            userId,
+            "退款申请已提交",
+            "订单 " + orderId + " 的退款申请已提交，等待商家处理。",
+            "ORDER_STATUS",
+            "ORDER",
+            orderId,
+            null,
+            null,
+            orderId,
+            order.getMerchantId(),
+            "/orders?orderId=" + orderId
+        ));
         return order;
     }
 
@@ -376,7 +456,19 @@ public class OrderService {
         if (approved) {
             restoreOrderStock(orderId);
             order.setStatus(STATUS_REFUNDED);
-            notificationService.send(order.getUserId(), "退款已通过", "订单 " + orderId + " 已退款。");
+            notificationService.send(new NotificationService.NotificationTarget(
+                order.getUserId(),
+                "退款已通过",
+                "订单 " + orderId + " 已退款。",
+                "ORDER_STATUS",
+                "ORDER",
+                orderId,
+                null,
+                null,
+                orderId,
+                merchantId,
+                "/orders?orderId=" + orderId
+            ));
         } else {
             order.setStatus(resolveStatusAfterRefundReject(order));
             order.setRefundRejectReason(trimToNull(rejectReason));
@@ -384,7 +476,19 @@ public class OrderService {
             String content = reasonText == null
                 ? "订单 " + orderId + " 的退款申请未通过。"
                 : "订单 " + orderId + " 的退款申请未通过：" + reasonText;
-            notificationService.send(order.getUserId(), "退款被拒绝", content);
+            notificationService.send(new NotificationService.NotificationTarget(
+                order.getUserId(),
+                "退款被拒绝",
+                content,
+                "ORDER_STATUS",
+                "ORDER",
+                orderId,
+                null,
+                null,
+                orderId,
+                merchantId,
+                "/orders?orderId=" + orderId
+            ));
         }
         ordersMapper.updateById(order);
         return order;

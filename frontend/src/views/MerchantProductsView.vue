@@ -7,7 +7,6 @@ import {
   updateProductStatus,
   deleteProduct,
   listProductCategories,
-  uploadMerchantLogo,
   currentUser
 } from '../api/clas'
 import { ElMessage } from 'element-plus'
@@ -16,9 +15,8 @@ import StatusTag from '../components/StatusTag.vue'
 import ProductStatusAction from '../components/product/ProductStatusAction.vue'
 import ProductCategoryManager from '../components/product/ProductCategoryManager.vue'
 import ProductFormDialog from '../components/product/ProductFormDialog.vue'
-import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
-import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
-import { merchantStatusMap, productStatusMap } from '../utils/status'
+import MerchantWorkspaceShell from '../components/merchant/MerchantWorkspaceShell.vue'
+import { productStatusMap } from '../utils/status'
 
 const router = useRouter()
 const merchant = ref(null)
@@ -38,9 +36,6 @@ const categories = ref([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const selectedProduct = ref(null)
-const logoInputRef = ref(null)
-const logoUploading = ref(false)
-const profileDialogVisible = ref(false)
 
 async function loadMerchant() {
   loading.value = true
@@ -152,36 +147,6 @@ function onProductSaved() {
   loadProducts()
 }
 
-function openLogoPicker() {
-  logoInputRef.value?.click()
-}
-
-function beforeLogoUpload(file) {
-  const allowed = ['image/jpeg', 'image/png']
-  if (!allowed.includes(file.type)) {
-    ElMessage.warning('仅支持 jpg/png 图片')
-    return false
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.warning('图片不能超过 5MB')
-    return false
-  }
-  return true
-}
-
-async function onLogoSelected(event) {
-  const file = event.target.files?.[0]
-  event.target.value = ''
-  if (!file || !beforeLogoUpload(file)) return
-  logoUploading.value = true
-  try {
-    merchant.value = await uploadMerchantLogo(file)
-    ElMessage.success('店铺头像已更新')
-  } finally {
-    logoUploading.value = false
-  }
-}
-
 function onMerchantProfileSaved(nextMerchant) {
   merchant.value = nextMerchant
 }
@@ -190,93 +155,13 @@ onMounted(loadMerchant)
 </script>
 
 <template>
-  <div class="console-container" v-loading="loading">
-    <!-- No merchant registered yet -->
-    <el-card v-if="!merchant && !loading" class="box-card welcome-card">
-      <div class="welcome-content">
-        <el-icon class="welcome-icon" color="#409eff" :size="80"><Shop /></el-icon>
-        <h2>欢迎来到 CLAS 商家中心</h2>
-        <p>您目前还没有入驻平台。赶快提交商家入驻资质申请，开始您的商业之旅吧！</p>
-        <div class="welcome-actions">
-          <el-button type="primary" size="large" @click="router.push('/merchant-register')">
-            立即申请入驻
-          </el-button>
-        </div>
-      </div>
-    </el-card>
-
-    <div v-else-if="merchant" class="console-layout">
-      <!-- Left Info Panel -->
-      <div class="sidebar-panel">
-        <MerchantSidebar active="products" @edit-profile="profileDialogVisible = true" />
-        <!-- Navigation Menu -->
-        <el-card v-if="false" class="box-card nav-card" style="margin-bottom: 20px;">
-          <div class="menu-list">
-            <div 
-              class="menu-item"
-              @click="router.push('/merchant-console')"
-            >
-              <el-icon><List /></el-icon>
-              <span>接单管理</span>
-            </div>
-            <div 
-              class="menu-item active"
-              @click="router.push('/merchant/products')"
-            >
-              <el-icon><Goods /></el-icon>
-              <span>商品管理</span>
-            </div>
-          </div>
-        </el-card>
-
-        <el-card class="box-card info-card">
-          <template #header>
-            <div class="card-header">
-              <h3>店铺基本信息</h3>
-            </div>
-          </template>
-
-          <div class="merchant-badge">
-            <button class="store-logo-button" type="button" :disabled="logoUploading" @click="openLogoPicker">
-              <img v-if="merchant.logo" :src="merchant.logo" alt="店铺头像" class="store-logo-img" />
-              <span v-else class="store-icon">{{ merchant.merchantName.substring(0, 1) }}</span>
-            </button>
-            <input
-              ref="logoInputRef"
-              class="logo-input"
-              type="file"
-              accept="image/jpeg,image/png"
-              @change="onLogoSelected"
-            />
-            <el-button size="small" type="primary" :loading="logoUploading" @click="openLogoPicker">
-              上传店铺头像
-            </el-button>
-            <h4>{{ merchant.merchantName }}</h4>
-            <StatusTag :status="merchant.status" :map="merchantStatusMap" size="large" effect="dark" />
-          </div>
-
-          <el-divider />
-
-          <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="商家ID">{{ merchant.id }}</el-descriptions-item>
-            <el-descriptions-item label="主营品类">{{ merchant.category }}</el-descriptions-item>
-            <el-descriptions-item label="联系电话">{{ merchant.phone }}</el-descriptions-item>
-            <el-descriptions-item label="银行账号">{{ merchant.bankAccount }}</el-descriptions-item>
-            <el-descriptions-item label="结算周期">{{ merchant.settlementCycle }} 天</el-descriptions-item>
-            <el-descriptions-item label="综合评分">
-              <el-rate v-model="merchant.score" disabled show-score text-color="var(--clas-amber-400)" />
-            </el-descriptions-item>
-          </el-descriptions>
-
-          <div v-if="merchant.adminRemarks" class="admin-remarks">
-            <h5>管理员备注:</h5>
-            <p>{{ merchant.adminRemarks }}</p>
-          </div>
-        </el-card>
-      </div>
-
-      <!-- Right Work Area -->
-      <div class="main-work-area">
+  <MerchantWorkspaceShell
+    :merchant="merchant"
+    :loading="loading"
+    active-module="products"
+    @merchant-updated="onMerchantProfileSaved"
+  >
+    <div v-if="merchant" class="main-work-area">
         <!-- Status Tip Alert (Show alerts for non-active states) -->
         <el-alert
           v-if="merchant.status === 'PENDING'"
@@ -320,9 +205,9 @@ onMounted(loadMerchant)
               v-model="searchKeyword"
               placeholder="搜索商品名称/描述"
               clearable
+              class="search-input"
               @clear="handleSearch"
               @keyup.enter="handleSearch"
-              style="width: 300px; margin-right: 12px;"
             >
               <template #prefix>
                 <el-icon><Search /></el-icon>
@@ -333,7 +218,7 @@ onMounted(loadMerchant)
               v-model="categoryFilter"
               placeholder="全部分类"
               clearable
-              style="width: 180px; margin-left: 12px;"
+              class="category-select"
               @change="handleSearch"
               @clear="handleSearch"
             >
@@ -407,27 +292,29 @@ onMounted(loadMerchant)
               </template>
             </el-table-column>
 
-            <el-table-column label="操作" width="160" fixed="right">
+            <el-table-column label="操作" width="120" fixed="right">
               <template #default="scope">
-                <el-button
-                  type="primary"
-                  size="small"
-                  icon="Edit"
-                  @click="openEditDialog(scope.row)"
-                  :disabled="merchant.status === 'BLOCKED'"
-                >
-                  编辑
-                </el-button>
-                <el-popconfirm
-                  title="确定要删除这件商品吗？"
-                  confirm-button-text="确定"
-                  cancel-button-text="取消"
-                  @confirm="handleDelete(scope.row.id)"
-                >
-                  <template #reference>
-                    <el-button type="danger" size="small" icon="Delete">删除</el-button>
-                  </template>
-                </el-popconfirm>
+                <div class="action-stack">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    icon="Edit"
+                    @click="openEditDialog(scope.row)"
+                    :disabled="merchant.status === 'BLOCKED'"
+                  >
+                    编辑
+                  </el-button>
+                  <el-popconfirm
+                    title="确定要删除这件商品吗？"
+                    confirm-button-text="确定"
+                    cancel-button-text="取消"
+                    @confirm="handleDelete(scope.row.id)"
+                  >
+                    <template #reference>
+                      <el-button class="action-danger-btn" type="danger" size="small" icon="Delete">删除</el-button>
+                    </template>
+                  </el-popconfirm>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -445,14 +332,7 @@ onMounted(loadMerchant)
             />
           </div>
         </el-card>
-      </div>
     </div>
-
-    <MerchantProfileEditDialog
-      v-model:visible="profileDialogVisible"
-      :merchant="merchant"
-      @saved="onMerchantProfileSaved"
-    />
 
     <ProductFormDialog
       v-model:visible="dialogVisible"
@@ -461,49 +341,12 @@ onMounted(loadMerchant)
       :categories="categories"
       @saved="onProductSaved"
     />
-  </div>
+  </MerchantWorkspaceShell>
 </template>
 
 <style scoped>
-.console-container {
-  max-width: 1200px;
-  margin: 30px auto;
-  padding: 0 20px;
-}
-
-.welcome-card {
-  text-align: center;
-  padding: 60px 0;
-  border-radius: 12px;
-}
-
-.welcome-content h2 {
-  margin: 20px 0 10px 0;
-  color: var(--text-primary);
-}
-
-.welcome-content p {
-  color: var(--text-secondary);
-  max-width: 480px;
-  margin: 0 auto 30px auto;
-}
-
-.console-layout {
-  display: flex;
-  gap: 24px;
-}
-
-.sidebar-panel {
-  flex: 1;
-  min-width: 320px;
-}
-
 .main-work-area {
-  flex: 3;
-}
-
-.info-card {
-  border-radius: 12px;
+  min-width: 0;
 }
 
 .card-header {
@@ -521,85 +364,6 @@ onMounted(loadMerchant)
   color: var(--text-primary);
 }
 
-.merchant-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 10px 0;
-}
-
-.store-icon {
-  width: 64px;
-  height: 64px;
-  background-color: #409eff;
-  color: #fff;
-  font-size: 28px;
-  font-weight: bold;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-}
-
-.store-logo-button {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  height: 64px;
-  justify-content: center;
-  margin-bottom: 10px;
-  padding: 0;
-  width: 64px;
-}
-
-.store-logo-button:disabled {
-  cursor: wait;
-  opacity: 0.75;
-}
-
-.store-logo-img {
-  border: 1px solid var(--border-color);
-  border-radius: 50%;
-  height: 64px;
-  object-fit: cover;
-  width: 64px;
-}
-
-.logo-input {
-  display: none;
-}
-
-.merchant-badge h4 {
-  margin: 0 0 12px 0;
-  font-size: 18px;
-  color: #303133;
-}
-
-.admin-remarks {
-  margin-top: 20px;
-  background-color: #fef0f0;
-  border: 1px solid #fde2e2;
-  border-radius: 6px;
-  padding: 12px;
-}
-
-.admin-remarks h5 {
-  margin: 0 0 6px 0;
-  color: #f56c6c;
-}
-
-.admin-remarks p {
-  margin: 0;
-  font-size: 12px;
-  color: #606266;
-  line-height: 1.5;
-}
-
 .status-alert {
   margin-bottom: 20px;
   border-radius: 8px;
@@ -611,8 +375,13 @@ onMounted(loadMerchant)
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
   margin-bottom: 20px;
 }
+
+.search-input { width: 300px; }
+
+.category-select { width: 180px; }
 
 .product-table-img {
   width: 50px;
@@ -651,38 +420,23 @@ onMounted(loadMerchant)
   margin-top: 20px;
 }
 
-.nav-card {
-  border-radius: 12px;
-}
-
-.menu-list {
+.action-stack {
+  align-items: stretch;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: var(--text-secondary);
-  font-size: 15px;
-  font-weight: 500;
-  transition-property: color, background-color;
-  transition-duration: 0.3s;
-  transition-timing-function: ease;
+/* 把 popconfirm 行内span强制改成块级，占满整行 */
+.action-stack :deep(.el-popconfirm) {
+  display: block !important;
+  width: 100%;
+  margin: 0 !important;
 }
 
-.menu-item:hover {
-  color: var(--color-primary);
-  background-color: var(--color-primary-light);
-}
-
-.menu-item.active {
-  color: var(--text-primary);
-  background-color: var(--color-primary);
+/* 两个按钮统一清空外边距、100%宽度铺满 */
+.action-stack :deep(.el-button) {
+  width: 100%;
+  margin: 0 !important;
 }
 </style>
