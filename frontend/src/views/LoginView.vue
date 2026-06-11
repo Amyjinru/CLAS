@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { login, register, sendRegisterCode, setSessionUser } from '../api/clas'
+import { login, register, sendRegisterCode, setSessionUser, currentRole } from '../api/clas'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,12 +23,6 @@ const roleHome = {
   USER: '/home',
   MERCHANT: '/merchant-console',
   ADMIN: '/admin/dashboard'
-}
-
-function redirectByRole(user) {
-  const redirect = route.query.redirect
-  const target = typeof redirect === 'string' ? redirect : roleHome[user.role] || '/home'
-  router.push(target)
 }
 
 // ============================================================
@@ -60,12 +54,17 @@ async function submitLogin() {
   showMessage('')
   try {
     const data = await login(loginForm)
-    setSessionUser({ ...data.user, token: data.token })
-    showMessage(`已登录：${data.user.username}（${data.user.role}）`, 'success')
-    setTimeout(() => redirectByRole(data.user), 400)
+    // 将用户信息和 token 一并写入 session
+    const sessionData = { ...data.user, token: data.token }
+    setSessionUser(sessionData)
+    showMessage(`已登录：${sessionData.username}（${sessionData.role}）`, 'success')
+    // 直接从 session 读取角色做跳转，避免 data.user.role 未定义
+    const role = currentRole()
+    const redirect = route.query.redirect
+    const target = typeof redirect === 'string' && redirect ? redirect : roleHome[role] || '/home'
+    await router.push(target)
   } catch (error) {
     showMessage(error.response?.data?.message || '登录失败', 'error')
-  } finally {
     loginLoading.value = false
   }
 }
@@ -160,10 +159,9 @@ async function submitRegister() {
     const data = await register(payload)
     setSessionUser({ ...data.user, token: data.token })
     showMessage(`注册成功：${data.user.username}`, 'success')
-    setTimeout(() => router.push('/home'), 600)
+    await router.push('/home')
   } catch (error) {
     showMessage(error.response?.data?.message || '注册失败', 'error')
-  } finally {
     registerLoading.value = false
   }
 }

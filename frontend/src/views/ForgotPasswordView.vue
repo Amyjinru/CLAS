@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { resetForgotPassword, sendForgotPasswordCode, setSessionUser } from '../api/clas'
+import { resetForgotPassword, sendForgotPasswordCode, setSessionUser, currentRole } from '../api/clas'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,12 +37,6 @@ function passwordChecks(password) {
   return [
     { key: 'length', label: '不少于8位', ok: value.length >= 8 }
   ]
-}
-
-function redirectByRole(user) {
-  const redirect = route.query.redirect
-  const target = typeof redirect === 'string' ? redirect : roleHome[user.role] || '/home'
-  router.push(target)
 }
 
 const passwordState = computed(() => passwordChecks(form.newPassword))
@@ -113,10 +107,12 @@ async function submitReset() {
     })
     setSessionUser({ ...data.user, token: data.token })
     showMessage('密码已重置，已自动登录', 'success')
-    setTimeout(() => redirectByRole(data.user), 600)
+    const role = currentRole()
+    const redirect = route.query.redirect
+    const target = typeof redirect === 'string' && redirect ? redirect : roleHome[role] || '/home'
+    await router.push(target)
   } catch (error) {
     showMessage(error.response?.data?.message || '重置密码失败', 'error')
-  } finally {
     loading.value = false
   }
 }
