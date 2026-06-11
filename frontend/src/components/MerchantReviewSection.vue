@@ -214,16 +214,16 @@ onMounted(load)
 .review-card { border-top: 1px solid var(--border-light); padding: 16px 0; }
 .review-head { align-items: center; display: flex; gap: 12px; margin-bottom: 8px; }
 .avatar {
-  align-items: center; background: #dbeafe; border-radius: 50%; color: #1d4ed8;
+  align-items: center; background: var(--color-accent-light); border-radius: 50%; color: var(--color-accent);
   display: flex; height: 42px; justify-content: center; width: 42px; font-weight: 700;
 }
 .avatar.small { height: 32px; width: 32px; font-size: 12px; }
 .content { margin: 8px 0; }
 .images { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-.images img { border-radius: 8px; height: 88px; object-fit: cover; width: 88px; }
+.images img { border-radius: var(--radius-sm); height: 88px; object-fit: cover; width: 88px; }
 .actions { display: flex; flex-wrap: wrap; gap: 4px; }
 .merchant-reply, .nested-reply, .reply-box {
-  background: #f8fafc; border-radius: 10px; margin-top: 10px; padding: 10px 12px;
+  background: var(--clas-warm-50); border-radius: var(--radius-sm); margin-top: 10px; padding: 10px 12px;
 }
 .reply-box { display: grid; gap: 8px; }
 </style>

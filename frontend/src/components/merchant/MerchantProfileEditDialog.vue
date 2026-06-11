@@ -236,7 +236,7 @@ async function save() {
 
 .logo-row img,
 .logo-placeholder {
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--border-color);
   border-radius: 50%;
   height: 64px;
   object-fit: cover;
@@ -245,7 +245,7 @@ async function save() {
 
 .logo-placeholder {
   align-items: center;
-  background: #409eff;
+  background: var(--color-accent);
   color: #fff;
   display: flex;
   font-size: 26px;
