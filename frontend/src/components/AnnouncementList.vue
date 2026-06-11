@@ -72,13 +72,13 @@ onMounted(async () => {
 }
 
 .announcement-time {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 13px;
   margin: 0 0 10px;
 }
 
 .announcement-content {
-  color: #667085;
+  color: var(--text-secondary);
   flex: 1;
   line-height: 1.6;
   margin: 0;

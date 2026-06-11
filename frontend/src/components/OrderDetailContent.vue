@@ -60,8 +60,8 @@ function itemName(productId) {
 
 <style scoped>
 .order-detail {
-  background: #fafafa;
-  border-radius: 8px;
+  background: var(--clas-warm-50);
+  border-radius: var(--radius-sm);
   padding: 12px;
 }
 
@@ -71,7 +71,7 @@ function itemName(productId) {
 }
 
 .meta {
-  color: #667085;
+  color: var(--text-muted);
   font-size: 13px;
   margin: 0 0 8px;
 }
@@ -108,11 +108,11 @@ function itemName(productId) {
 }
 
 .item-qty {
-  color: #667085;
+  color: var(--text-muted);
 }
 
 .item-price {
-  color: #667085;
+  color: var(--text-muted);
   display: flex;
   flex-wrap: wrap;
   font-size: 13px;
@@ -120,11 +120,11 @@ function itemName(productId) {
 }
 
 .item-subtotal {
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .total {
-  border-top: 1px solid #eef2f7;
+  border-top: 1px solid var(--border-light);
   font-weight: 700;
   margin: 10px 0 0;
   padding-top: 10px;
