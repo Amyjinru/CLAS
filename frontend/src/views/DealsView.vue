@@ -1,10 +1,11 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { listDeals, listMerchants } from '../api/clas'
 
 const deals = ref([])
 const merchants = ref([])
 const merchantId = ref(null)
+const merchantSearch = ref('')
 
 function yuan(value) {
   return ((value || 0) / 100).toFixed(2)
@@ -14,16 +15,59 @@ function merchantName(id) {
   return merchants.value.find((item) => item.id === id)?.merchantName || `商家 #${id}`
 }
 
-async function load() {
-  const [dealList, merchantList] = await Promise.all([
-    listDeals({ merchantId: merchantId.value || undefined }),
-    listMerchants()
-  ])
-  deals.value = dealList
-  merchants.value = merchantList
+function queryMerchants(queryString, cb) {
+  const keyword = queryString.trim().toLowerCase()
+  if (!keyword) {
+    cb([])
+    return
+  }
+  cb(
+    merchants.value.filter((item) =>
+      (item.merchantName || '').toLowerCase().includes(keyword)
+    )
+  )
 }
 
-onMounted(load)
+function handleMerchantSelect(item) {
+  merchantId.value = item.id
+  merchantSearch.value = item.merchantName
+  loadDeals()
+}
+
+function clearMerchantFilter() {
+  merchantId.value = null
+  merchantSearch.value = ''
+  loadDeals()
+}
+
+async function loadMerchants() {
+  merchants.value = await listMerchants()
+}
+
+async function loadDeals() {
+  deals.value = await listDeals({ merchantId: merchantId.value || undefined })
+}
+
+watch(merchantSearch, (value) => {
+  if (!value?.trim()) {
+    merchantId.value = null
+    loadDeals()
+    return
+  }
+  const matched = merchants.value.find((item) => item.merchantName === value)
+  if (matched && merchantId.value !== matched.id) {
+    merchantId.value = matched.id
+    loadDeals()
+  } else if (!matched && merchantId.value !== null) {
+    merchantId.value = null
+    loadDeals()
+  }
+})
+
+onMounted(async () => {
+  await loadMerchants()
+  await loadDeals()
+})
 </script>
 
 <template>
@@ -36,10 +80,22 @@ onMounted(load)
     </section>
 
     <section class="panel filter-bar">
-      <p class="filter-tip">按商家筛选团购套餐</p>
-      <el-select v-model="merchantId" clearable placeholder="全部商家" @change="load">
-        <el-option v-for="item in merchants" :key="item.id" :label="item.merchantName" :value="item.id" />
-      </el-select>
+      <p class="filter-tip">搜索商家筛选团购套餐</p>
+      <el-autocomplete
+        v-model="merchantSearch"
+        class="merchant-search"
+        clearable
+        placeholder="输入商家名称搜索"
+        value-key="merchantName"
+        :fetch-suggestions="queryMerchants"
+        :trigger-on-focus="false"
+        @select="handleMerchantSelect"
+        @clear="clearMerchantFilter"
+      >
+        <template #default="{ item }">
+          <span class="merchant-suggestion">{{ item.merchantName }}</span>
+        </template>
+      </el-autocomplete>
     </section>
 
     <section class="user-page-grid-3 deals-grid">
@@ -81,8 +137,15 @@ onMounted(load)
   margin: 0;
 }
 
-.filter-bar :deep(.el-select) {
-  width: 260px;
+.merchant-search {
+  width: 320px;
+}
+
+.merchant-suggestion {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .deal-card {
@@ -128,9 +191,10 @@ onMounted(load)
   .filter-bar {
     align-items: stretch;
     flex-direction: column;
+    gap: 10px;
   }
 
-  .filter-bar :deep(.el-select) {
+  .merchant-search {
     width: 100%;
   }
 }
