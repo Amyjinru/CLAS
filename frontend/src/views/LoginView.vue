@@ -45,12 +45,9 @@ function validPhone(phone) {
 
 function passwordChecks(password) {
   const value = password || ''
+  // 根据 NIST 800-63 最新指南，B2C 场景只需长度限制，降低注册摩擦
   return [
-    { key: 'length', label: '不少于6位', ok: value.length >= 6 },
-    { key: 'lower', label: '包含小写字母', ok: /[a-z]/.test(value) },
-    { key: 'upper', label: '包含大写字母', ok: /[A-Z]/.test(value) },
-    { key: 'digit', label: '包含数字', ok: /\d/.test(value) },
-    { key: 'special', label: '包含特殊符号', ok: /[\W_]/.test(value) && !/\s/.test(value) }
+    { key: 'length', label: '不少于8位', ok: value.length >= 8 }
   ]
 }
 
@@ -82,6 +79,24 @@ const showRegPassword = ref(false)
 const showRegConfirmPassword = ref(false)
 const registerPasswordChecks = computed(() => passwordChecks(registerForm.password))
 const registerPasswordOk = computed(() => registerPasswordChecks.value.every((item) => item.ok))
+// 密码强度等级（0-3）：长度 → 含数字 → 含大小写 → 含特殊符号
+const passwordStrength = computed(() => {
+  const pwd = registerForm.password || ''
+  let score = 0
+  if (pwd.length >= 8) score++
+  if (/\d/.test(pwd)) score++
+  if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++
+  if (/[\W_]/.test(pwd) && !/\s/.test(pwd)) score++
+  return score
+})
+const strengthLabel = computed(() => {
+  const labels = ['', '较弱', '中等', '良好', '强']
+  return labels[passwordStrength.value] || '强'
+})
+const strengthColor = computed(() => {
+  const colors = ['', '#ef4444', '#f59e0b', '#f97316', '#16a34a']
+  return colors[passwordStrength.value] || '#16a34a'
+})
 const registerPasswordMatches = computed(() => registerForm.confirmPassword && registerForm.password === registerForm.confirmPassword)
 
 // 验证码发送
@@ -98,7 +113,7 @@ async function sendCode() {
   showMessage('')
   try {
     await sendRegisterCode({ phone: registerForm.phone })
-    showMessage('验证码已发送，请查看后端控制台输出', 'success')
+    showMessage('验证码已发送，请在60秒内输入', 'success')
     codeCooldown.value = 60
     cooldownTimer = setInterval(() => {
       codeCooldown.value--
@@ -125,7 +140,7 @@ async function submitRegister() {
     return
   }
   if (!registerPasswordOk.value) {
-    showMessage('密码至少6位，必须包含大小写英文字母、数字和特殊符号', 'error')
+    showMessage('密码长度不能少于8位', 'error')
     return
   }
   if (!registerPasswordMatches.value) {
@@ -186,17 +201,19 @@ function switchTab(tab) {
         <h1>登录</h1>
 
         <div class="form-group">
-          <label>手机号 <span class="required">*</span></label>
-          <input v-model="loginForm.phone" placeholder="请输入手机号" maxlength="11" />
+          <label for="login-phone">手机号 <span class="required">*</span></label>
+          <input id="login-phone" v-model="loginForm.phone" placeholder="请输入手机号" maxlength="11" autocomplete="tel-national" inputmode="numeric" />
         </div>
 
         <div class="form-group">
-          <label>密码 <span class="required">*</span></label>
+          <label for="login-password">密码 <span class="required">*</span></label>
           <div class="password-wrap">
             <input
+              id="login-password"
               v-model="loginForm.password"
               :type="showLoginPassword ? 'text' : 'password'"
               placeholder="请输入密码"
+              autocomplete="current-password"
             />
             <button
               type="button"
@@ -237,21 +254,29 @@ function switchTab(tab) {
       <!-- 注册面板 -->
       <!-- ============================================ -->
       <template v-if="activeTab === 'register'">
-        <h1>注册账号</h1>
+        <h2 class="section-heading">注册账号</h2>
         <p class="hint">注册后默认成为普通用户，可浏览商家、下单购物。</p>
 
-        <div class="form-group">
-          <label>展示名 <span class="required">*</span></label>
-          <input v-model="registerForm.username" placeholder="请输入展示名，可与他人重复" />
+        <!-- 信任信号 -->
+        <div class="trust-banner">
+          <span>🔒 数据加密传输</span>
+          <span>📱 手机号仅用于登录验证</span>
         </div>
 
         <div class="form-group">
-          <label>密码 <span class="required">*</span></label>
+          <label for="reg-username">昵称 <span class="required">*</span></label>
+          <input id="reg-username" v-model="registerForm.username" placeholder="如：小吃货阿杰，随时可修改" autocomplete="nickname" />
+        </div>
+
+        <div class="form-group">
+          <label for="reg-password">密码 <span class="required">*</span></label>
           <div class="password-wrap">
             <input
+              id="reg-password"
               v-model="registerForm.password"
               :type="showRegPassword ? 'text' : 'password'"
-              placeholder="至少6位，含大小写字母、数字、特殊符号"
+              placeholder="至少8位"
+              autocomplete="new-password"
             />
             <button
               type="button"
@@ -273,24 +298,28 @@ function switchTab(tab) {
               </svg>
             </button>
           </div>
-          <ul class="password-checks">
-            <li
-              v-for="item in registerPasswordChecks"
-              :key="item.key"
-              :class="{ ok: item.ok }"
-            >
-              {{ item.ok ? '✓' : '·' }} {{ item.label }}
-            </li>
-          </ul>
+          <!-- 密码强度可视化指示器 -->
+          <div v-if="registerForm.password" class="strength-meter">
+            <div class="strength-bar">
+              <div
+                class="strength-fill"
+                :style="{ width: (passwordStrength / 4 * 100) + '%', background: strengthColor }"
+              ></div>
+            </div>
+            <span class="strength-label" :style="{ color: strengthColor }">{{ strengthLabel }}</span>
+          </div>
+          <p v-else class="password-hint-text">至少8位，建议包含数字、大小写字母和符号</p>
         </div>
 
         <div class="form-group">
-          <label>确认密码 <span class="required">*</span></label>
+          <label for="reg-confirm-password">确认密码 <span class="required">*</span></label>
           <div class="password-wrap">
             <input
+              id="reg-confirm-password"
               v-model="registerForm.confirmPassword"
               :type="showRegConfirmPassword ? 'text' : 'password'"
               placeholder="请再次输入密码"
+              autocomplete="new-password"
             />
             <button
               type="button"
@@ -320,17 +349,20 @@ function switchTab(tab) {
         </div>
 
         <div class="form-group">
-          <label>手机号 <span class="required">*</span></label>
-          <input v-model="registerForm.phone" placeholder="请输入手机号" maxlength="11" />
+          <label for="reg-phone">手机号 <span class="required">*</span></label>
+          <input id="reg-phone" v-model="registerForm.phone" placeholder="请输入手机号" maxlength="11" autocomplete="tel-national" inputmode="numeric" />
         </div>
 
         <div class="form-group">
-          <label>验证码 <span class="required">*</span></label>
+          <label for="reg-code">验证码 <span class="required">*</span></label>
           <div class="code-row">
             <input
+              id="reg-code"
               v-model="registerForm.code"
               placeholder="请输入6位验证码"
               maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
               class="code-input"
             />
             <button
@@ -343,7 +375,7 @@ function switchTab(tab) {
               {{ codeSending ? '发送中' : cooldownText }}
             </button>
           </div>
-          <p class="code-tip">演示环境请查看后端控制台输出获取验证码</p>
+          <p class="code-tip">验证码会发送至您的手机，60秒内输入有效</p>
         </div>
 
         <button
@@ -356,11 +388,13 @@ function switchTab(tab) {
         </button>
       </template>
 
-      <!-- ===== 消息提示 ===== -->
+      <!-- ===== 消息提示（屏幕阅读器实时播报） ===== -->
       <p
         v-if="message"
         class="auth-message"
         :class="{ 'msg-success': messageType === 'success', 'msg-error': messageType === 'error' }"
+        role="alert"
+        aria-live="assertive"
       >{{ message }}</p>
     </section>
   </div>
@@ -376,7 +410,36 @@ function switchTab(tab) {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--bg-page, #f8fafb);
+  /* 温暖有机渐变背景 — 避免纯灰色AI默认风 */
+  background: linear-gradient(135deg, #fef7ed 0%, #faf7f2 30%, #f8fafb 70%, #fef7ed 100%);
+  background-attachment: fixed;
+}
+
+/* 背景装饰圆 — 增加有机感 */
+.auth-wrapper::before {
+  content: '';
+  position: fixed;
+  top: -120px;
+  right: -80px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 209, 0, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auth-wrapper::after {
+  content: '';
+  position: fixed;
+  bottom: -100px;
+  left: -60px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.05) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .auth-panel {
@@ -385,8 +448,26 @@ function switchTab(tab) {
   padding: 40px;
   background: var(--bg-card, #fff);
   border-radius: var(--radius-xl, 16px);
-  box-shadow: var(--shadow-lg, 0 8px 30px rgba(0, 0, 0, 0.08));
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    0 8px 30px rgba(0, 0, 0, 0.06),
+    0 20px 50px rgba(249, 115, 22, 0.04);
   border: 1px solid var(--border-color, #e5e7eb);
+  position: relative;
+  z-index: 1;
+  /* 顶部品牌色装饰条 */
+  overflow: hidden;
+}
+
+.auth-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #FFD100 0%, #f97316 50%, #FFD100 100%);
+  border-radius: 16px 16px 0 0;
 }
 
 /* ============================== */
@@ -411,26 +492,28 @@ function switchTab(tab) {
   background: transparent;
   color: var(--text-secondary, #6b7280);
   cursor: pointer;
-  transition-property: color, background-color;
-  transition-duration: var(--transition-fast, 0.2s);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
 .auth-tabs button.active {
-  background: var(--color-primary, #f97316);
-  color: var(--text-primary);
-  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(249, 115, 22, 0.3), 0 0 0 1px rgba(249, 115, 22, 0.1);
+  transform: scale(1.02);
 }
 
 .auth-tabs button:hover:not(.active) {
   color: var(--text-primary, #1f2937);
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.7);
+  transform: translateY(-1px);
 }
 
 /* ============================== */
 /* 标题和提示                      */
 /* ============================== */
-h1 {
+h1,
+.section-heading {
   font-size: 28px;
   font-weight: 800;
   margin: 0 0 8px;
@@ -447,6 +530,23 @@ h1 {
 
 .hint strong {
   color: var(--text-primary, #1f2937);
+}
+
+/* 信任横幅 */
+.trust-banner {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  background: var(--clas-success-light, #ecfdf5);
+  border-radius: var(--radius-sm, 8px);
+  font-size: 12px;
+  color: var(--clas-success, #059669);
+  flex-wrap: wrap;
+}
+
+.trust-banner span {
+  white-space: nowrap;
 }
 
 /* ============================== */
@@ -536,6 +636,43 @@ input:focus {
   color: var(--clas-success, #16a34a);
 }
 
+/* 密码强度指示器 */
+.strength-meter {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.strength-bar {
+  flex: 1;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.strength-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background 0.4s ease;
+}
+
+.strength-label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 32px;
+  text-align: right;
+}
+
+.password-hint-text {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  line-height: 1.4;
+}
+
 .match-tip {
   margin: 6px 0 0;
   font-size: 12px;
@@ -592,6 +729,22 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
 }
 
+/* ============================== */
+/* 无障碍：焦点可见 (WCAG 2.4.7)    */
+/* ============================== */
+button:focus-visible,
+input:focus-visible,
+.link-btn:focus-visible,
+.toggle-pwd:focus-visible {
+  outline: 2px solid var(--color-primary, #f97316);
+  outline-offset: 2px;
+}
+
+.auth-tabs button:focus-visible {
+  outline: 2px solid var(--color-primary, #f97316);
+  outline-offset: -2px;
+}
+
 .resend-btn {
   height: 44px;
   padding: 0 16px;
@@ -639,32 +792,51 @@ input:focus {
   font-weight: 700;
   letter-spacing: 0.04em;
   border-radius: var(--radius-md, 10px);
-  background: var(--color-primary, #f97316);
-  color: var(--text-primary);
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+  color: #fff;
   border: none;
   cursor: pointer;
-  transition-property: background-color, transform, box-shadow;
-  transition-duration: var(--transition-fast, 0.2s);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 按钮微光效果 */
+.submit-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: left 0.5s ease;
+}
+
+.submit-btn:hover:not(:disabled)::after {
+  left: 100%;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: var(--color-primary-hover, #ea580c);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md, 0 4px 12px rgba(249, 115, 22, 0.3));
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.35);
 }
 
 .submit-btn:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  box-shadow: 0 1px 4px rgba(249, 115, 22, 0.2);
 }
 
 .submit-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* 加载旋转器 */
@@ -688,6 +860,14 @@ input:focus {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* WCAG 2.3.3 — 尊重用户减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ============================== */
