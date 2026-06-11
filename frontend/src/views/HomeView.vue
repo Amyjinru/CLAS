@@ -15,28 +15,60 @@ const merchants = ref([])
 const announcements = ref([])
 const keyword = ref('')
 const category = ref('')
-const sort = ref('score')
+const sort = ref('')
 const loading = ref(false)
 const onlyDeliverable = ref(false)
 const addresses = ref([])
 const selectedAddressId = ref('')
 const currentLocation = ref(getCurrentLocation())
-const locationDialogVisible = ref(false)
+const filterDialogVisible = ref(false)
+const locationPickerVisible = ref(false)
+const draftCategory = ref('')
+const draftSort = ref('')
+const draftOnlyDeliverable = ref(false)
+const draftAddressId = ref('')
+const draftLocation = ref(null)
 const activeOrders = ref([])
 const chatOrder = ref(null)
 const ordersLoading = ref(false)
 const chatStore = useChatStore()
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
+const DEFAULT_SORT = 'recommend'
+const sortOptions = [
+  { label: '距离最近', value: 'distance' },
+  { label: '评分优先', value: 'score' },
+  { label: '人均低价', value: 'price' },
+  { label: '最新入驻', value: 'latest' }
+]
 const sortLabels = {
+  recommend: '智能推荐',
   distance: '距离最近',
   score: '评分优先',
   price: '人均低价',
   latest: '最新入驻'
 }
-
 const hasSearchLocation = computed(() => Boolean(
   currentLocation.value?.longitude && currentLocation.value?.latitude
 ))
+
+const draftHasSearchLocation = computed(() => {
+  if (draftLocation.value?.longitude && draftLocation.value?.latitude) {
+    return true
+  }
+  if (!draftAddressId.value) {
+    return false
+  }
+  const address = addresses.value.find((item) => item.id === draftAddressId.value)
+  return Boolean(address?.longitude && address?.latitude)
+})
+
+const appliedFilterCount = computed(() => {
+  let count = 0
+  if (category.value) count += 1
+  if (sort.value) count += 1
+  if (onlyDeliverable.value) count += 1
+  return count
+})
 
 const resultSummary = computed(() => {
   if (loading.value) return '正在查找附近商家'
@@ -52,7 +84,7 @@ const activeFilters = computed(() => {
     filters.push({ key: 'category', label: `分类：${category.value}` })
   }
   if (sort.value) {
-    filters.push({ key: 'sort', label: `排序：${sortLabels[sort.value] || '评分优先'}` })
+    filters.push({ key: 'sort', label: `排序：${sortLabels[sort.value] || sort.value}` })
   }
   if (currentLocation.value?.address) {
     filters.push({ key: 'location', label: `位置：${currentLocation.value.address}` })
@@ -100,7 +132,7 @@ async function load() {
   const params = {
     keyword: keyword.value.trim() || undefined,
     category: category.value || undefined,
-    sort: sort.value
+    sort: sort.value || DEFAULT_SORT
   }
   if (currentLocation.value?.longitude && currentLocation.value?.latitude) {
     params.lng = currentLocation.value.longitude
@@ -143,9 +175,6 @@ async function loadAddresses() {
         source: 'manual'
       }
     }
-    if (selectedAddressId.value && sort.value === 'score') {
-      sort.value = 'distance'
-    }
   } catch {
     addresses.value = []
   }
@@ -172,7 +201,6 @@ async function autoLocate() {
         currentLocation.value = next
         setCurrentLocation(next)
         selectedAddressId.value = ''
-        sort.value = 'distance'
         resolve()
       })
     })
@@ -181,18 +209,50 @@ async function autoLocate() {
   }
 }
 
-function applyAddress(id) {
-  const address = addresses.value.find((item) => item.id === id)
-  if (!address?.longitude || !address?.latitude) {
-    currentLocation.value = null
-    if (onlyDeliverable.value) {
-      onlyDeliverable.value = false
-      ElMessage.warning('该地址缺少地图坐标，已关闭可配送筛选')
-    }
-    load()
+function cloneLocation(location) {
+  return location ? { ...location } : null
+}
+
+function openFilterDialog() {
+  draftCategory.value = category.value
+  draftSort.value = sort.value
+  draftOnlyDeliverable.value = onlyDeliverable.value
+  draftAddressId.value = selectedAddressId.value
+  draftLocation.value = cloneLocation(currentLocation.value)
+  filterDialogVisible.value = true
+}
+
+function toggleDraftCategory(value) {
+  draftCategory.value = draftCategory.value === value ? '' : value
+}
+
+function toggleDraftSort(value) {
+  draftSort.value = draftSort.value === value ? '' : value
+}
+
+function toggleDraftDeliverable() {
+  if (!draftHasSearchLocation.value) {
+    ElMessage.warning('请先选择当前位置或带坐标的收货地址')
     return
   }
-  currentLocation.value = {
+  draftOnlyDeliverable.value = !draftOnlyDeliverable.value
+}
+
+function onDraftAddressChange(id) {
+  draftAddressId.value = id || ''
+  if (!id) {
+    return
+  }
+  const address = addresses.value.find((item) => item.id === id)
+  if (!address?.longitude || !address?.latitude) {
+    draftLocation.value = null
+    if (draftOnlyDeliverable.value) {
+      draftOnlyDeliverable.value = false
+      ElMessage.warning('该地址缺少地图坐标，已关闭可配送筛选')
+    }
+    return
+  }
+  draftLocation.value = {
     province: '',
     city: '',
     district: '',
@@ -202,25 +262,46 @@ function applyAddress(id) {
     latitude: Number(address.latitude),
     source: 'manual'
   }
-  setCurrentLocation(currentLocation.value)
-  sort.value = 'distance'
+  if (!draftSort.value) {
+    draftSort.value = 'distance'
+  }
+}
+
+function confirmDraftLocation(location) {
+  draftLocation.value = location
+  draftAddressId.value = ''
+  if (!draftSort.value) {
+    draftSort.value = 'distance'
+  }
+  locationPickerVisible.value = false
+  ElMessage.success('位置已选择，点击应用生效')
+}
+
+function applyFilterDialog() {
+  category.value = draftCategory.value
+  sort.value = draftSort.value
+  onlyDeliverable.value = draftOnlyDeliverable.value
+  selectedAddressId.value = draftAddressId.value
+  currentLocation.value = cloneLocation(draftLocation.value)
+  if (currentLocation.value) {
+    setCurrentLocation(currentLocation.value)
+  }
+  filterDialogVisible.value = false
   load()
 }
 
-function confirmLocation(location) {
-  currentLocation.value = location
-  setCurrentLocation(location)
-  selectedAddressId.value = ''
-  sort.value = 'distance'
-  locationDialogVisible.value = false
-  ElMessage.success('已切换当前位置')
-  load()
+function resetFilterDialog() {
+  draftCategory.value = ''
+  draftSort.value = ''
+  draftOnlyDeliverable.value = false
+  draftAddressId.value = ''
+  draftLocation.value = null
 }
 
-function resetFilters() {
+function resetAllFilters() {
   keyword.value = ''
   category.value = ''
-  sort.value = 'score'
+  sort.value = ''
   onlyDeliverable.value = false
   load()
 }
@@ -287,6 +368,17 @@ onMounted(async () => {
     </div>
   </section>
 
+  <section class="panel" v-if="announcements.length">
+    <div class="section-head">
+      <h2>平台公告</h2>
+      <RouterLink to="/user/announcements">查看全部</RouterLink>
+    </div>
+    <article class="announcement-preview" v-for="item in announcements.slice(0, 2)" :key="item.id">
+      <h3>{{ item.title }}</h3>
+      <p>{{ item.content }}</p>
+    </article>
+  </section>
+
   <!-- 进行中的订单 -->
   <section class="panel active-orders-panel" v-if="currentRole() === 'USER' && hasActiveOrders()" v-loading="ordersLoading">
     <div class="section-head">
@@ -313,46 +405,26 @@ onMounted(async () => {
   </section>
 
   <section class="panel search-panel">
-    <el-input v-model="keyword" placeholder="搜索商家、地点或分类" clearable @clear="load" @keyup.enter="load" />
-    <el-select v-model="category" placeholder="全部分类" clearable>
-      <el-option v-for="item in categories" :key="item" :label="item" :value="item" />
-    </el-select>
-    <el-select v-model="selectedAddressId" placeholder="附近地址" clearable @change="applyAddress">
-      <el-option v-for="item in addresses" :key="item.id" :label="`${item.contactName} · ${item.address}`" :value="item.id" />
-    </el-select>
-    <el-segmented v-model="sort" :options="[
-      { label: '智能推荐', value: 'recommend' },
-      { label: '距离最近', value: 'distance' },
-      { label: '评分优先', value: 'score' },
-      { label: '人均低价', value: 'price' },
-      { label: '最新入驻', value: 'latest' }
-    ]" />
-    <el-switch
-      v-model="onlyDeliverable"
-      :disabled="!hasSearchLocation"
-      active-text="仅看可配送"
-      @change="load"
-    />
-    <el-button type="primary" @click="load">搜索</el-button>
-    <el-button @click="resetFilters">重置</el-button>
-    <el-button @click="locationDialogVisible = true">选择位置</el-button>
+    <div class="search-row">
+      <el-input
+        v-model="keyword"
+        class="search-input"
+        placeholder="搜索商家名称"
+        clearable
+        @clear="load"
+        @keyup.enter="load"
+      />
+      <el-button type="primary" @click="load">搜索</el-button>
+      <el-button @click="openFilterDialog">
+        筛选<span v-if="appliedFilterCount" class="filter-count">({{ appliedFilterCount }})</span>
+      </el-button>
+    </div>
   </section>
 
   <section class="panel location-panel">
     <strong>当前定位</strong>
     <span>{{ currentLocation?.address || '未定位，请选择位置' }}</span>
     <small v-if="!hasSearchLocation">选择位置后可筛选可配送商家</small>
-  </section>
-
-  <section class="panel" v-if="announcements.length">
-    <div class="section-head">
-      <h2>平台公告</h2>
-      <RouterLink to="/user/announcements">查看全部</RouterLink>
-    </div>
-    <article class="announcement-preview" v-for="item in announcements.slice(0, 2)" :key="item.id">
-      <h3>{{ item.title }}</h3>
-      <p>{{ item.content }}</p>
-    </article>
   </section>
 
   <section class="panel result-panel">
@@ -401,17 +473,92 @@ onMounted(async () => {
   <section class="panel empty-panel" v-else>
     <el-empty description="没有找到符合条件的商家">
       <div class="empty-actions">
-        <el-button type="primary" @click="resetFilters">重置筛选</el-button>
-        <el-button @click="locationDialogVisible = true">更换位置</el-button>
+        <el-button type="primary" @click="openFilterDialog">调整筛选</el-button>
+        <el-button @click="resetAllFilters">清空条件</el-button>
       </div>
     </el-empty>
   </section>
 
-  <el-dialog v-model="locationDialogVisible" title="选择当前位置" width="760px">
+  <el-dialog v-model="filterDialogVisible" title="筛选商家" width="640px" class="filter-dialog">
+    <div class="filter-section">
+      <h3>商家分类</h3>
+      <div class="filter-chip-group">
+        <button
+          v-for="item in categories"
+          :key="item"
+          type="button"
+          class="filter-chip"
+          :class="{ active: draftCategory === item }"
+          @click="toggleDraftCategory(item)"
+        >
+          {{ item }}
+        </button>
+      </div>
+    </div>
+
+    <div class="filter-section">
+      <h3>排序方式</h3>
+      <div class="filter-chip-group">
+        <button
+          v-for="item in sortOptions"
+          :key="item.value"
+          type="button"
+          class="filter-chip"
+          :class="{ active: draftSort === item.value }"
+          @click="toggleDraftSort(item.value)"
+        >
+          {{ item.label }}
+        </button>
+      </div>
+    </div>
+
+    <div class="filter-section">
+      <h3>参考位置</h3>
+      <div class="location-filter-row">
+        <el-select
+          v-model="draftAddressId"
+          placeholder="选择收货地址"
+          clearable
+          @change="onDraftAddressChange"
+          @clear="onDraftAddressChange('')"
+        >
+          <el-option
+            v-for="item in addresses"
+            :key="item.id"
+            :label="`${item.contactName} · ${item.address}`"
+            :value="item.id"
+          />
+        </el-select>
+        <el-button @click="locationPickerVisible = true">选择位置</el-button>
+      </div>
+      <p class="filter-hint">{{ draftLocation?.address || '未选择位置时将使用默认地址或定位' }}</p>
+    </div>
+
+    <div class="filter-section">
+      <h3>配送范围</h3>
+      <button
+        type="button"
+        class="filter-chip"
+        :class="{ active: draftOnlyDeliverable, disabled: !draftHasSearchLocation }"
+        :disabled="!draftHasSearchLocation"
+        @click="toggleDraftDeliverable"
+      >
+        仅看可配送
+      </button>
+      <p v-if="!draftHasSearchLocation" class="filter-hint">请先选择参考位置后再启用</p>
+    </div>
+
+    <template #footer>
+      <el-button @click="resetFilterDialog">重置</el-button>
+      <el-button type="primary" @click="applyFilterDialog">应用</el-button>
+    </template>
+  </el-dialog>
+
+  <el-dialog v-model="locationPickerVisible" title="选择当前位置" width="760px" append-to-body>
     <LocationSelector
-      v-model="currentLocation"
+      v-model="draftLocation"
       save-enabled
-      @confirm="confirmLocation"
+      @confirm="confirmDraftLocation"
     />
   </el-dialog>
 
@@ -447,18 +594,121 @@ onMounted(async () => {
 
 .hero-actions,
 .search-panel {
+  margin-bottom: 0;
+}
+
+.search-row {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.search-panel :deep(.el-input) {
-  max-width: 320px;
+.search-input {
+  flex: 1;
+  min-width: 220px;
 }
 
-.search-panel :deep(.el-select) {
-  width: 150px;
+.filter-count {
+  margin-left: 4px;
+}
+
+.filter-section {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.filter-section h3 {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.location-filter-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.location-filter-row :deep(.el-select) {
+  flex: 1;
+  min-width: 240px;
+}
+
+.filter-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.filter-dialog :deep(.el-dialog__footer) {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.filter-chip-group {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-chip-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.filter-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.2;
+  padding: 7px 14px;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.filter-chip:hover:not(.disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.filter-chip.active {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.filter-chip.disabled,
+.filter-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.deliverable-chip {
+  align-self: center;
+}
+
+@media (max-width: 768px) {
+  .search-row {
+    align-items: stretch;
+  }
+
+  .search-row .el-button {
+    flex: 1;
+  }
 }
 
 .location-panel {
