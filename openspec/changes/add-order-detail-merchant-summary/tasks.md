@@ -6,4 +6,4 @@
 ## 2. Verification and Release
 
 - [x] 2.1 Run frontend build and OpenSpec validation.
-- [ ] 2.2 Push `dev` and deploy to the cloud server.
+- [x] 2.2 Push `dev` and deploy to the cloud server.
