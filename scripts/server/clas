@@ -33,6 +33,14 @@ need_root() {
 }
 
 build_app() {
+  # Load runtime env so Vite picks up VITE_* variables during build.
+  if [ -f /etc/clas/clas.env ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . /etc/clas/clas.env
+    set +a
+  fi
+
   cd "$FRONTEND_DIR"
   npm install
   npm run build
@@ -55,6 +63,7 @@ migrate_db() {
   local mysql_password="${MYSQL_PASSWORD:-}"
   local mysql_host="${MYSQL_HOST:-127.0.0.1}"
   local mysql_port="${MYSQL_PORT:-3306}"
+  local mysql_database="${MYSQL_DATABASE:-clas}"
 
   shopt -s nullglob
   local migrations=("$APP_DIR"/database/migration-*.sql)
@@ -69,6 +78,7 @@ migrate_db() {
       --host="$mysql_host" \
       --port="$mysql_port" \
       --user="$mysql_user" \
+      "$mysql_database" \
       < "$migration"
   done
 }
