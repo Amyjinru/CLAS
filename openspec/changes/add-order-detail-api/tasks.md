@@ -12,4 +12,4 @@
 
 - [x] 3.1 Add integration coverage for scoped order detail access.
 - [x] 3.2 Run backend tests, frontend build, and OpenSpec validation.
-- [ ] 3.3 Push `dev` and deploy to the cloud server.
+- [x] 3.3 Push `dev` and deploy to the cloud server.
