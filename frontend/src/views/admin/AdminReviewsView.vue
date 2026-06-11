@@ -252,7 +252,7 @@ onMounted(refreshAll)
         <el-table-column prop="merchantId" label="商家ID" width="90" />
         <el-table-column label="评分" width="130">
           <template #default="{ row }">
-            <el-rate :model-value="row.score" disabled show-score text-color="#ff9900" />
+            <el-rate :model-value="row.score" disabled show-score text-color="var(--clas-amber-400)" />
           </template>
         </el-table-column>
         <el-table-column prop="content" label="评价内容" min-width="200" show-overflow-tooltip />

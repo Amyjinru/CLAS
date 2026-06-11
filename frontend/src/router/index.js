@@ -77,14 +77,14 @@ const routes = [
     meta: { roles: ['ADMIN'] },
     children: [
       { path: '', redirect: '/admin/dashboard' },
-      { path: 'dashboard', component: AdminDashboardView },
-      { path: 'orders', component: AdminOrdersView },
-      { path: 'users', component: AdminUsersView },
-      { path: 'audit', component: AdminAuditView },
-      { path: 'reviews', component: AdminReviewsView },
-      { path: 'appeals', component: AdminAppealsView },
-      { path: 'announcements', component: AdminAnnouncementsView },
-      { path: 'messages', component: AdminMessagesView }
+      { path: 'dashboard', component: AdminDashboardView, meta: { title: '管理后台' } },
+      { path: 'orders', component: AdminOrdersView, meta: { title: '订单管理' } },
+      { path: 'users', component: AdminUsersView, meta: { title: '用户管理' } },
+      { path: 'audit', component: AdminAuditView, meta: { title: '商家审核' } },
+      { path: 'reviews', component: AdminReviewsView, meta: { title: '评价管理' } },
+      { path: 'appeals', component: AdminAppealsView, meta: { title: '申诉处理' } },
+      { path: 'announcements', component: AdminAnnouncementsView, meta: { title: '公告管理' } },
+      { path: 'messages', component: AdminMessagesView, meta: { title: '消息管理' } }
     ]
   },
 

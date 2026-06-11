@@ -144,7 +144,7 @@ function onMerchantProfileSaved(nextMerchant) {
 }
 
 .page-head h1 {
-  color: #303133;
+  color: var(--text-primary);
   font-size: 24px;
   margin: 0 0 18px;
 }
@@ -157,14 +157,14 @@ function onMerchantProfileSaved(nextMerchant) {
 }
 
 .stat-value {
-  color: #2563eb;
+  color: var(--color-accent);
   font-size: 32px;
   font-weight: 800;
   line-height: 1.2;
 }
 
 .stat-label {
-  color: #606266;
+  color: var(--text-secondary);
   font-size: 13px;
   margin-top: 8px;
 }

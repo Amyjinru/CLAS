@@ -264,7 +264,7 @@ onMounted(loadMerchant)
             <el-descriptions-item label="银行账号">{{ merchant.bankAccount }}</el-descriptions-item>
             <el-descriptions-item label="结算周期">{{ merchant.settlementCycle }} 天</el-descriptions-item>
             <el-descriptions-item label="综合评分">
-              <el-rate v-model="merchant.score" disabled show-score text-color="#ff9900" />
+              <el-rate v-model="merchant.score" disabled show-score text-color="var(--clas-amber-400)" />
             </el-descriptions-item>
           </el-descriptions>
 
