@@ -8,6 +8,9 @@ import { ElMessage } from 'element-plus'
 const route = useRoute()
 const router = useRouter()
 const orderId = computed(() => Number(route.params.orderId))
+const fromNotifications = computed(() => route.query.from === 'notifications')
+const backTo = computed(() => fromNotifications.value ? '/profile/notifications' : '/orders')
+const backLabel = computed(() => fromNotifications.value ? '← 返回通知' : '返回我的订单')
 const score = ref(5)
 const content = ref('')
 const existingReview = ref(null)
@@ -55,7 +58,7 @@ async function submit() {
 }
 
 function goOrders() {
-  router.push('/orders')
+  router.push(backTo.value)
 }
 
 async function report() {
@@ -69,7 +72,7 @@ onMounted(load)
 </script>
 
 <template>
-  <BackButton to="/orders" label="返回我的订单" />
+  <BackButton :to="backTo" :label="backLabel" />
 
   <section class="panel narrow">
     <h1>订单评价</h1>

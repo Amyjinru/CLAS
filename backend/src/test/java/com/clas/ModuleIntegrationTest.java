@@ -1314,6 +1314,34 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void buyingGroupDealCreatesClickableDealOrderNotification() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/deals/1/buy")
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andReturn();
+
+        Long dealOrderId = objectMapper.readTree(result.getResponse().getContentAsString())
+            .path("data").path("id").asLong();
+
+        Notification notification = notificationMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Notification>()
+                    .eq(Notification::getUserId, USER_PHONE)
+                    .eq(Notification::getType, "DEAL_ORDER_STATUS")
+                    .eq(Notification::getTargetId, dealOrderId)
+                    .orderByDesc(Notification::getId)
+            )
+            .stream()
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals("DEAL_ORDER", notification.getTargetType());
+        assertEquals(dealOrderId, notification.getOrderId());
+        assertEquals(1L, notification.getMerchantId());
+        assertEquals("/deal-order/" + dealOrderId, notification.getTargetPath());
+    }
+
+    @Test
     void bookingFlowRequiresOwnerAndMerchantRoles() throws Exception {
         mockMvc.perform(get("/api/bookings/merchant")
                 .header("Authorization", auth(USER_PHONE)))

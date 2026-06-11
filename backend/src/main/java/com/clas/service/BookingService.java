@@ -76,17 +76,33 @@ public class BookingService {
         booking.setStatus(STATUS_PENDING);
         bookingMapper.insert(booking);
 
-        notificationService.send(
+        notificationService.send(new NotificationService.NotificationTarget(
             booking.getUserId(),
             "预约已提交",
-            merchant.getMerchantName() + " 已收到你的预约申请，请等待确认"
-        );
+            merchant.getMerchantName() + " 已收到你的预约申请，请等待确认",
+            "BOOKING_STATUS",
+            "BOOKING",
+            booking.getId(),
+            null,
+            null,
+            null,
+            booking.getMerchantId(),
+            "/bookings?bookingId=" + booking.getId()
+        ));
         if (merchant.getUserId() != null) {
-            notificationService.send(
+            notificationService.send(new NotificationService.NotificationTarget(
                 merchant.getUserId(),
                 "新的预约申请",
-                booking.getServiceName() + " 预约待处理"
-            );
+                booking.getServiceName() + " 预约待处理",
+                "BOOKING_STATUS",
+                "BOOKING",
+                booking.getId(),
+                null,
+                null,
+                null,
+                booking.getMerchantId(),
+                "/merchant/bookings?bookingId=" + booking.getId()
+            ));
         }
         return booking;
     }
@@ -117,7 +133,19 @@ public class BookingService {
         bookingMapper.updateById(booking);
         Merchant merchant = merchantMapper.selectById(booking.getMerchantId());
         if (merchant != null && merchant.getUserId() != null) {
-            notificationService.send(merchant.getUserId(), "预约已取消", booking.getServiceName() + " 预约已由用户取消");
+            notificationService.send(new NotificationService.NotificationTarget(
+                merchant.getUserId(),
+                "预约已取消",
+                booking.getServiceName() + " 预约已由用户取消",
+                "BOOKING_STATUS",
+                "BOOKING",
+                booking.getId(),
+                null,
+                null,
+                null,
+                booking.getMerchantId(),
+                "/merchant/bookings?bookingId=" + booking.getId()
+            ));
         }
         return booking;
     }
@@ -132,11 +160,19 @@ public class BookingService {
         }
         booking.setStatus(normalizedStatus);
         bookingMapper.updateById(booking);
-        notificationService.send(
+        notificationService.send(new NotificationService.NotificationTarget(
             booking.getUserId(),
             "预约状态更新",
-            booking.getServiceName() + " 当前状态：" + normalizedStatus
-        );
+            booking.getServiceName() + " 当前状态：" + normalizedStatus,
+            "BOOKING_STATUS",
+            "BOOKING",
+            booking.getId(),
+            null,
+            null,
+            null,
+            booking.getMerchantId(),
+            "/bookings?bookingId=" + booking.getId()
+        ));
         return booking;
     }
 

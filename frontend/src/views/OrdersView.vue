@@ -158,20 +158,10 @@ onMounted(async () => {
       }
     }
   }
-  // If navigated from a notification, open the order chat automatically
-  if (route.query.orderId) {
-    openOrderById(route.query.orderId)
-  }
 })
 
 watch(() => route.query.tab, (tab) => {
   activeTab.value = tab || 'all'
-})
-
-watch(() => route.query.orderId, (orderId) => {
-  if (orderId) {
-    openOrderById(orderId)
-  }
 })
 </script>
 
