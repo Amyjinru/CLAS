@@ -327,6 +327,39 @@ body {
 }
 .el-input__inner {
   font-family: var(--font-body);
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.el-input__inner:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* 文本域 — 阻止全局 textarea 样式穿透 */
+.el-textarea__inner {
+  font-family: var(--font-body);
+  border: 1px solid var(--border-color) !important;
+  box-shadow: none !important;
+  background: var(--bg-card) !important;
+}
+.el-textarea__inner:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px var(--color-primary-soft) !important;
+  outline: none !important;
+}
+
+/* 日期范围选择器 — 阻止全局 input 样式穿透到内部输入框 */
+.el-range-input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.el-range-input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 /* 标签 */
@@ -407,6 +440,31 @@ body {
 }
 
 /* 选择器 */
+.el-select__wrapper {
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 0 0 1px var(--border-color) inset !important;
+  transition-property: box-shadow, border-color;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--clas-warm-300) inset !important;
+}
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--color-primary) inset !important;
+}
+/* 阻止全局 input 样式穿透到 Select 内部输入框 */
+.el-select__input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.el-select__input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+/* 兼容旧版 Select 架构 */
 .el-select .el-input__wrapper {
   border-radius: var(--radius-sm) !important;
 }
