@@ -125,7 +125,8 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.code").value(400))
             .andExpect(jsonPath("$.message").value("团购券不存在"))
             .andExpect(jsonPath("$.timestamp").isNumber())
-            .andExpect(jsonPath("$.requestId").value("missing-deal-trace"));
+            .andExpect(jsonPath("$.requestId").value("missing-deal-trace"))
+            .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
     }
 
     @Test
@@ -1001,7 +1002,8 @@ class ModuleIntegrationTest {
                     "payMethod", "MOCK"
                 ))))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("幂等键已用于其他订单"));
+            .andExpect(jsonPath("$.message").value("幂等键已用于其他订单"))
+            .andExpect(jsonPath("$.errorCode").value("PAYMENT_IDEMPOTENCY_CONFLICT"));
     }
 
     @Test

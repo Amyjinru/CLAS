@@ -1,8 +1,12 @@
 package com.clas.common;
 
-public record Result<T>(int code, String message, T data, long timestamp, String requestId) {
+public record Result<T>(int code, String message, T data, long timestamp, String requestId, String errorCode) {
     public Result(int code, String message, T data) {
-        this(code, message, data, System.currentTimeMillis(), RequestTraceContext.currentRequestId());
+        this(code, message, data, null);
+    }
+
+    public Result(int code, String message, T data, String errorCode) {
+        this(code, message, data, System.currentTimeMillis(), RequestTraceContext.currentRequestId(), errorCode);
     }
 
     public static <T> Result<T> ok(T data) {

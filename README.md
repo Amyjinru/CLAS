@@ -113,7 +113,8 @@ npm run dev
   "message": "success",
   "data": {},
   "timestamp": 1781179200000,
-  "requestId": "trace-test-123"
+  "requestId": "trace-test-123",
+  "errorCode": null
 }
 ```
 
@@ -127,9 +128,12 @@ npm run dev
   "message": "手机号或密码错误",
   "data": null,
   "timestamp": 1781179200000,
-  "requestId": "trace-test-123"
+  "requestId": "trace-test-123",
+  "errorCode": "BUSINESS_ERROR"
 }
 ```
+
+错误响应会额外提供稳定的 `errorCode`，用于前端分支处理和联调排查。常见取值包括：`AUTH_UNAUTHORIZED`、`AUTH_FORBIDDEN`、`VALIDATION_ERROR`、`RESOURCE_NOT_FOUND`、`ORDER_INVALID_STATE`、`PAYMENT_IDEMPOTENCY_CONFLICT`、`STOCK_NOT_ENOUGH`、`SYSTEM_ERROR`。
 
 ### JWT 鉴权与角色
 
