@@ -124,52 +124,54 @@ function handleNotificationClick(item) {
 
         <el-empty v-if="!notifications.length" description="暂无通知" />
 
-        <article
-          v-for="item in notifications"
-          v-else
-          :key="item.id"
-          class="list-row notification-row"
-          :class="{ unread: !item.readFlag, clickable: !!notificationTarget(item) }"
-          tabindex="0"
-          @click="handleNotificationClick(item)"
-          @keydown.enter.prevent="handleNotificationClick(item)"
-        >
-          <div>
-            <div class="row-title">
-              <strong>{{ item.title }}</strong>
-              <el-tag v-if="!item.readFlag" type="danger" size="small">未读</el-tag>
-              <el-tag v-else type="info" size="small">已读</el-tag>
+        <div v-else class="list-stack">
+          <article
+            v-for="item in notifications"
+            :key="item.id"
+            class="list-row notification-row"
+            :class="{ unread: !item.readFlag, clickable: !!notificationTarget(item) }"
+            tabindex="0"
+            @click="handleNotificationClick(item)"
+            @keydown.enter.prevent="handleNotificationClick(item)"
+          >
+            <div>
+              <div class="row-title">
+                <strong>{{ item.title }}</strong>
+                <el-tag v-if="!item.readFlag" type="danger" size="small">未读</el-tag>
+                <el-tag v-else type="info" size="small">已读</el-tag>
+              </div>
+              <p>{{ item.content }}</p>
             </div>
-            <p>{{ item.content }}</p>
-          </div>
-          <div class="row-actions">
-            <el-button v-if="!item.readFlag" text type="primary" :loading="actionId === item.id" @click="emit('read', item.id)">标记已读</el-button>
-            <el-button text type="danger" @click="emit('remove', item.id)">删除</el-button>
-          </div>
-        </article>
+            <div class="row-actions">
+              <el-button v-if="!item.readFlag" text type="primary" :loading="actionId === item.id" @click.stop="emit('read', item.id)">标记已读</el-button>
+              <el-button text type="danger" @click.stop="emit('remove', item.id)">删除</el-button>
+            </div>
+          </article>
+        </div>
       </el-tab-pane>
 
       <el-tab-pane label="客服消息" name="chats">
         <div v-loading="chatLoading">
           <el-empty v-if="!conversations.length" description="暂无客服消息" />
-          <article
-            v-for="conv in conversations"
-            v-else
-            :key="conv.merchantId"
-            class="list-row chat-conversation-row"
-            @click="emit('open-chat', conv.merchantId)"
-          >
-            <span class="chat-merchant-avatar" :style="merchantLogo(conv.merchantId) ? { backgroundImage: `url(${merchantLogo(conv.merchantId)})` } : null">
-              <template v-if="!merchantLogo(conv.merchantId)">{{ merchantInitial(conv.merchantId) }}</template>
-            </span>
-            <div class="chat-conversation-meta">
-              <div class="chat-conversation-head">
-                <strong>{{ merchantName(conv.merchantId) }}</strong>
-                <small>{{ formatChatTime(conv.lastMessageTime) }}</small>
+          <div v-else class="list-stack">
+            <article
+              v-for="conv in conversations"
+              :key="conv.merchantId"
+              class="list-row chat-conversation-row"
+              @click="emit('open-chat', conv.merchantId)"
+            >
+              <span class="chat-merchant-avatar" :style="merchantLogo(conv.merchantId) ? { backgroundImage: `url(${merchantLogo(conv.merchantId)})` } : null">
+                <template v-if="!merchantLogo(conv.merchantId)">{{ merchantInitial(conv.merchantId) }}</template>
+              </span>
+              <div class="chat-conversation-meta">
+                <div class="chat-conversation-head">
+                  <strong>{{ merchantName(conv.merchantId) }}</strong>
+                  <small>{{ formatChatTime(conv.lastMessageTime) }}</small>
+                </div>
+                <p>{{ conv.lastMessage || '暂无消息' }}</p>
               </div>
-              <p>{{ conv.lastMessage || '暂无消息' }}</p>
-            </div>
-          </article>
+            </article>
+          </div>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -182,13 +184,13 @@ function handleNotificationClick(item) {
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
 }
 .section-head h2 { margin: 0; }
 .section-head p { color: var(--text-secondary); font-size: 13px; margin: 6px 0 0; }
 
 .message-sub-tabs :deep(.el-tabs__header) {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .message-sub-tabs :deep(.el-tabs__nav-wrap::after) {
   height: 1px;
@@ -197,15 +199,22 @@ function handleNotificationClick(item) {
 .sub-tab-toolbar {
   display: flex;
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.list-stack {
+  display: grid;
+  gap: 12px;
 }
 
 .list-row {
   align-items: center;
-  border-top: 1px solid var(--border-light);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
   display: flex;
   justify-content: space-between;
-  padding: 14px 0;
+  padding: 14px 16px;
 }
 .list-row p { color: var(--text-secondary); font-size: 13px; margin: 6px 0 0; }
 
@@ -226,10 +235,6 @@ function handleNotificationClick(item) {
 
 .notification-row.unread {
   background: var(--color-primary-light);
-  margin-left: -12px;
-  margin-right: -12px;
-  padding-left: 12px;
-  padding-right: 12px;
 }
 
 .notification-row.clickable {
@@ -237,7 +242,8 @@ function handleNotificationClick(item) {
 }
 
 .notification-row.clickable:hover {
-  background: var(--bg-subtle);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .notification-row.clickable:focus-visible {
@@ -252,11 +258,8 @@ function handleNotificationClick(item) {
 
 .chat-conversation-row:hover {
   background: var(--color-primary-light);
-  margin-left: -12px;
-  margin-right: -12px;
-  padding-left: 12px;
-  padding-right: 12px;
-  border-radius: 8px;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .chat-merchant-avatar {

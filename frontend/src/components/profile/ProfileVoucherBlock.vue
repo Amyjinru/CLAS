@@ -49,21 +49,27 @@ function couponStatusLabel(item) {
       <RouterLink class="button secondary" to="/deals">去团购页看看</RouterLink>
     </el-empty>
 
-    <article v-for="item in dealOrders" v-else :key="`deal-${item.id}`" class="list-row voucher-row">
-      <div>
-        <strong>{{ item.voucherCode || `团购券 #${item.id}` }}</strong>
-        <p>支付金额 {{ formatMoney(item.payAmount) }}</p>
+    <div v-else class="voucher-stack">
+      <div v-if="dealOrders.length" class="list-stack">
+        <article v-for="item in dealOrders" :key="`deal-${item.id}`" class="list-row voucher-row">
+          <div>
+            <strong>{{ item.voucherCode || `团购券 #${item.id}` }}</strong>
+            <p>支付金额 {{ formatMoney(item.payAmount) }}</p>
+          </div>
+          <el-tag :type="dealStatusType(item.status)">{{ dealStatusLabel(item.status) }}</el-tag>
+        </article>
       </div>
-      <el-tag :type="dealStatusType(item.status)">{{ dealStatusLabel(item.status) }}</el-tag>
-    </article>
 
-    <article v-for="item in coupons" :key="`coupon-${item.id || item.userCouponId}`" class="list-row voucher-row">
-      <div>
-        <strong>{{ item.name || item.couponName || `优惠券 #${item.couponId || item.id}` }}</strong>
-        <p>{{ item.description || item.thresholdText || '平台优惠券' }}</p>
+      <div v-if="coupons.length" class="list-stack">
+        <article v-for="item in coupons" :key="`coupon-${item.id || item.userCouponId}`" class="list-row voucher-row">
+          <div>
+            <strong>{{ item.name || item.couponName || `优惠券 #${item.couponId || item.id}` }}</strong>
+            <p>{{ item.description || item.thresholdText || '平台优惠券' }}</p>
+          </div>
+          <el-tag type="success">{{ couponStatusLabel(item) }}</el-tag>
+        </article>
       </div>
-      <el-tag type="success">{{ couponStatusLabel(item) }}</el-tag>
-    </article>
+    </div>
   </div>
 </template>
 
@@ -72,7 +78,18 @@ function couponStatusLabel(item) {
 .section-head h2 { margin: 0; }
 .section-head p,
 .list-row p { color: var(--text-secondary); font-size: 13px; margin: 6px 0 0; }
-.list-row { align-items: center; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; padding: 14px 0; }
+.voucher-stack,
+.list-stack { display: grid; gap: 12px; }
+.voucher-stack { gap: 20px; }
+.list-row {
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
 .voucher-row strong { font-family: var(--font-mono); }
 @media (max-width: 900px) {
   .list-row { align-items: flex-start; flex-direction: column; }

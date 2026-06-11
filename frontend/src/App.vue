@@ -14,6 +14,33 @@ const user = sessionUser
 const role = computed(() => user.value?.role || null)
 const welcomeName = computed(() => user.value?.nickname || user.value?.username || user.value?.phone || '')
 
+const userAvatarInitial = computed(() => {
+  const name = welcomeName.value.trim()
+  if (!name) return 'U'
+  return name.charAt(0).toUpperCase()
+})
+
+const userAvatarStyle = computed(() => {
+  const avatar = user.value?.avatar
+  if (!avatar) return {}
+  return {
+    backgroundImage: `url(${avatar})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center'
+  }
+})
+
+function isPrimaryNavActive(targetPath) {
+  const path = route.path
+  if (targetPath === '/home') return path === '/home'
+  if (targetPath === '/profile') return path === '/profile'
+  if (targetPath === '/profile/notifications') return path.startsWith('/profile/notifications')
+  if (targetPath === '/deals') return path === '/deals' || path.startsWith('/deals/')
+  if (targetPath === '/bookings') return path === '/bookings' || path.startsWith('/bookings/')
+  if (targetPath === '/settings') return path === '/settings' || path.startsWith('/settings/')
+  return path === targetPath || path.startsWith(`${targetPath}/`)
+}
+
 // version_314: 按角色动态品牌链接
 const brandLink = computed(() => {
   if (!user.value) return '/login'
@@ -64,8 +91,11 @@ async function handleLogout() {
       <div class="header-left">
         <RouterLink class="brand" :to="brandLink">CLAS 生活助手</RouterLink>
         <span v-if="user" class="user-welcome">
-          欢迎, {{ welcomeName }}
-          <el-tag size="small" type="info" class="role-tag">{{ user.role }}</el-tag>
+          <span class="user-avatar" :style="userAvatarStyle">{{ user.avatar ? '' : userAvatarInitial }}</span>
+          <span class="user-welcome-text">
+            欢迎, {{ welcomeName }}
+            <el-tag size="small" type="info" class="role-tag">{{ user.role }}</el-tag>
+          </span>
         </span>
       </div>
       <nav>
@@ -82,6 +112,7 @@ async function handleLogout() {
             v-for="item in userPrimaryNav"
             :key="item.to"
             class="primary-nav-link"
+            :class="{ 'nav-active': isPrimaryNavActive(item.to) }"
             :to="item.to"
           >
             {{ item.label }}
@@ -160,9 +191,32 @@ async function handleLogout() {
   color: var(--text-secondary);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding-left: 18px;
   border-left: 1px solid var(--border-color);
+}
+
+.user-avatar {
+  align-items: center;
+  background: linear-gradient(135deg, var(--color-accent), var(--clas-teal-700));
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border-color);
+  color: #fff;
+  display: flex;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 800;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.user-welcome-text {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .role-tag {
@@ -174,7 +228,7 @@ nav {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 10px;
   justify-content: flex-end;
 }
 
@@ -191,15 +245,18 @@ nav a {
   letter-spacing: 0.02em;
 }
 
-nav a:hover,
-nav a.router-link-active {
+nav a:hover {
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
+}
+
+nav a.router-link-active:not(.primary-nav-link) {
   color: var(--color-primary);
   background-color: var(--color-primary-light);
 }
 
 .logout-link {
   color: var(--clas-danger) !important;
-  margin-left: 4px;
   font-weight: 600;
 }
 .logout-link:hover {
@@ -207,8 +264,17 @@ nav a.router-link-active {
 }
 
 .primary-nav-link {
+  border: 2px solid transparent;
   color: var(--text-primary);
-  font-weight: 700;
+  font-weight: 600;
+}
+
+.primary-nav-link.nav-active {
+  background-color: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.14);
+  color: var(--color-primary);
+  font-weight: 800;
 }
 
 .nav-divider {
