@@ -93,7 +93,7 @@ const strengthLabel = computed(() => {
   return labels[passwordStrength.value] || '强'
 })
 const strengthColor = computed(() => {
-  const colors = ['', '#ef4444', '#f59e0b', '#f97316', '#16a34a']
+  const colors = ['', '#ef4444', '#f59e0b', '#FFD100', '#16a34a']
   return colors[passwordStrength.value] || '#16a34a'
 })
 const registerPasswordMatches = computed(() => registerForm.confirmPassword && registerForm.password === registerForm.confirmPassword)
@@ -408,64 +408,28 @@ function switchTab(tab) {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  /* 温暖有机渐变背景 — 避免纯灰色AI默认风 */
-  background: linear-gradient(135deg, #fef7ed 0%, #faf7f2 30%, #f8fafb 70%, #fef7ed 100%);
-  background-attachment: fixed;
+  background: #FFF9E6;
 }
 
-/* 背景装饰圆 — 增加有机感 */
-.auth-wrapper::before {
-  content: '';
-  position: fixed;
-  top: -120px;
-  right: -80px;
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 209, 0, 0.06) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
+.auth-wrapper::before,
 .auth-wrapper::after {
-  content: '';
-  position: fixed;
-  bottom: -100px;
-  left: -60px;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(249, 115, 22, 0.05) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 
 .auth-panel {
   width: 100%;
   max-width: 420px;
   padding: 40px;
-  background: var(--bg-card, #fff);
-  border-radius: var(--radius-xl, 16px);
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.04),
-    0 8px 30px rgba(0, 0, 0, 0.06),
-    0 20px 50px rgba(249, 115, 22, 0.04);
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
   position: relative;
   z-index: 1;
-  /* 顶部品牌色装饰条 */
-  overflow: hidden;
 }
 
 .auth-panel::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #FFD100 0%, #f97316 50%, #FFD100 100%);
-  border-radius: 16px 16px 0 0;
+  display: none;
 }
 
 /* ============================== */
@@ -476,7 +440,7 @@ function switchTab(tab) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 28px;
-  background: var(--bg-page, #f3f4f6);
+  background: rgba(255, 209, 0, 0.12);
   border-radius: var(--radius-md, 10px);
   padding: 4px;
 }
@@ -495,9 +459,9 @@ function switchTab(tab) {
 }
 
 .auth-tabs button.active {
-  background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
-  color: #fff;
-  box-shadow: 0 2px 12px rgba(249, 115, 22, 0.3), 0 0 0 1px rgba(249, 115, 22, 0.1);
+  background: linear-gradient(135deg, #FFD100 0%, #ffe033 100%);
+  color: #1a1510;
+  box-shadow: 0 2px 12px rgba(255, 209, 0, 0.3), 0 0 0 1px rgba(255, 209, 0, 0.1);
   transform: scale(1.02);
 }
 
@@ -574,15 +538,15 @@ input:not(.code-input) {
   border-radius: var(--radius-md, 10px);
   font-size: 15px;
   color: var(--text-primary, #1f2937);
-  background: var(--bg-page, #f9fafb);
+  background: #fff;
   transition: border-color var(--transition-fast, 0.2s), box-shadow var(--transition-fast, 0.2s);
   box-sizing: border-box;
 }
 
 input:focus {
   outline: none;
-  border-color: var(--color-primary, #f97316);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  border-color: var(--color-primary, #FFD100);
+  box-shadow: 0 0 0 3px rgba(255, 209, 0, 0.15);
 }
 
 /* 密码输入框 */
@@ -616,7 +580,7 @@ input:focus {
 
 .toggle-pwd:hover,
 .toggle-pwd.visible {
-  color: var(--color-primary, #f97316);
+  color: var(--color-primary, #FFD100);
 }
 
 .password-checks {
@@ -689,7 +653,7 @@ input:focus {
 .link-btn {
   border: none;
   background: transparent;
-  color: var(--color-primary, #f97316);
+  color: var(--color-primary, #FFD100);
   font-size: 13px;
   cursor: pointer;
   padding: 0;
@@ -717,14 +681,14 @@ input:focus {
   letter-spacing: 0.2em;
   text-align: center;
   color: var(--text-primary, #1f2937);
-  background: var(--bg-page, #f9fafb);
+  background: #fff;
   box-sizing: border-box;
 }
 
 .code-input:focus {
   outline: none;
-  border-color: var(--color-primary, #f97316);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  border-color: var(--color-primary, #FFD100);
+  box-shadow: 0 0 0 3px rgba(255, 209, 0, 0.15);
 }
 
 /* ============================== */
@@ -734,12 +698,12 @@ button:focus-visible,
 input:focus-visible,
 .link-btn:focus-visible,
 .toggle-pwd:focus-visible {
-  outline: 2px solid var(--color-primary, #f97316);
+  outline: 2px solid var(--color-primary, #FFD100);
   outline-offset: 2px;
 }
 
 .auth-tabs button:focus-visible {
-  outline: 2px solid var(--color-primary, #f97316);
+  outline: 2px solid var(--color-primary, #FFD100);
   outline-offset: -2px;
 }
 
@@ -751,7 +715,7 @@ input:focus-visible,
   border: 1px solid var(--border-color, #d1d5db);
   border-radius: var(--radius-md, 10px);
   background: var(--bg-page, #f9fafb);
-  color: var(--color-primary, #f97316);
+  color: var(--color-primary, #FFD100);
   cursor: pointer;
   white-space: nowrap;
   transition-property: color, background-color;
@@ -763,9 +727,9 @@ input:focus-visible,
 }
 
 .resend-btn:hover:not(:disabled) {
-  background: var(--color-primary, #f97316);
+  background: var(--color-primary, #FFD100);
   color: var(--text-primary);
-  border-color: var(--color-primary, #f97316);
+  border-color: var(--color-primary, #FFD100);
 }
 
 .resend-btn:disabled {
@@ -790,8 +754,8 @@ input:focus-visible,
   font-weight: 700;
   letter-spacing: 0.04em;
   border-radius: var(--radius-md, 10px);
-  background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #FFD100 0%, #ffe033 100%);
+  color: #1a1510;
   border: none;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -799,7 +763,7 @@ input:focus-visible,
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.2);
+  box-shadow: 0 2px 8px rgba(255, 209, 0, 0.2);
   position: relative;
   overflow: hidden;
 }
@@ -821,14 +785,14 @@ input:focus-visible,
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+  background: linear-gradient(135deg, #e6c000 0%, #FFD100 100%);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.35);
+  box-shadow: 0 6px 20px rgba(255, 209, 0, 0.35);
 }
 
 .submit-btn:active:not(:disabled) {
   transform: scale(0.97);
-  box-shadow: 0 1px 4px rgba(249, 115, 22, 0.2);
+  box-shadow: 0 1px 4px rgba(255, 209, 0, 0.2);
 }
 
 .submit-btn:disabled {
@@ -841,8 +805,8 @@ input:focus-visible,
 .spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border: 2px solid rgba(26, 21, 16, 0.2);
+  border-top-color: #1a1510;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
@@ -850,8 +814,8 @@ input:focus-visible,
 .spinner-small {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(249, 115, 22, 0.3);
-  border-top-color: var(--color-primary, #f97316);
+  border: 2px solid rgba(255, 209, 0, 0.3);
+  border-top-color: var(--color-primary, #FFD100);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
