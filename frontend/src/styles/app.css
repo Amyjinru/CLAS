@@ -215,18 +215,47 @@ nav a.router-link-active {
 .toolbar,
 .checkout {
   background: var(--bg-card);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   margin-bottom: 20px;
   padding: 24px;
   box-shadow: var(--shadow-sm);
+  position: relative;
+}
+
+/* ═══════════ 蕾丝花边 — 伪元素方案（兼容 border-radius） ═══════════ */
+.panel::before,
+.checkout::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 6px solid transparent;
+  border-image-source: url('../assets/lace-border.svg');
+  border-image-slice: 12;
+  border-image-width: 6px;
+  border-image-repeat: round;
+  border-radius: calc(var(--radius-lg) + 6px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.85;
+}
+
+/* 面板内容置于蕾丝花边之上 */
+.panel > *,
+.checkout > * {
+  position: relative;
+  z-index: 1;
 }
 .hero {
   align-items: center;
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  background: linear-gradient(135deg, #faf7f2 0%, #FFF4CC 50%, #fcfaf5 100%);
+  background: linear-gradient(135deg, rgba(250,247,242,0.75) 0%, rgba(255,244,204,0.70) 50%, rgba(252,250,245,0.78) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: none;
   position: relative;
   overflow: hidden;
@@ -267,6 +296,8 @@ nav a.router-link-active {
 .card,
 .row {
   background: var(--bg-card);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 20px;
@@ -274,6 +305,28 @@ nav a.router-link-active {
   transition-property: box-shadow, transform;
   transition-duration: var(--transition-base);
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+/* 卡片/条目 蕾丝花边 */
+.card::before,
+.row::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 5px solid transparent;
+  border-image-source: url('../assets/lace-border.svg');
+  border-image-slice: 12;
+  border-image-width: 5px;
+  border-image-repeat: round;
+  border-radius: calc(var(--radius-lg) + 5px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.8;
+}
+.card > *,
+.row > * {
+  position: relative;
+  z-index: 1;
 }
 .card:hover,
 .row:hover {
@@ -360,7 +413,26 @@ nav a.router-link-active {
 /* ─── 统计卡片 ─── */
 .stat-card {
   border-radius: var(--radius-lg) !important;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 5px solid transparent;
+  border-image-source: url('../assets/lace-border.svg');
+  border-image-slice: 12;
+  border-image-width: 5px;
+  border-image-repeat: round;
+  border-radius: calc(var(--radius-lg) + 5px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.75;
+}
+.stat-card > * {
+  position: relative;
+  z-index: 1;
 }
 .stat-card .el-card__body {
   padding: 28px 24px !important;
@@ -385,6 +457,25 @@ nav a.router-link-active {
 .chart-card {
   border-radius: var(--radius-lg);
   margin-bottom: 20px;
+  position: relative;
+}
+.chart-card::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 5px solid transparent;
+  border-image-source: url('../assets/lace-border.svg');
+  border-image-slice: 12;
+  border-image-width: 5px;
+  border-image-repeat: round;
+  border-radius: calc(var(--radius-lg) + 5px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.75;
+}
+.chart-card > * {
+  position: relative;
+  z-index: 1;
 }
 .chart-card .el-card__body {
   padding: 16px 8px 8px 8px;
@@ -514,6 +605,106 @@ body {
   }
   .page-title {
     padding-left: 10px;
+  }
+}
+
+/* ═══════════ 底部装饰页脚 — 透明底，图案由 shell 层提供 ═══════════ */
+.app-footer {
+  width: 100%;
+  min-height: 160px;
+  position: relative;
+  background: transparent;
+  border-top: 1px solid rgba(255, 181, 167, 0.25);
+  margin-top: auto;
+}
+
+.footer-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.footer-brand {
+  font-family: Georgia, 'Times New Roman', 'Noto Serif SC', serif;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #E8A89A;
+  text-shadow: 0 1px 2px rgba(255, 181, 167, 0.3);
+}
+
+.footer-tagline {
+  font-size: 12px;
+  color: #D4B896;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.footer-copy {
+  font-size: 10.5px;
+  color: #CCBBAA;
+  letter-spacing: 0.04em;
+  font-weight: 400;
+}
+
+/* 暗色模式 — 底部页脚 */
+:root[data-theme='dark'] .app-footer {
+  background-color: #1E1B18;
+  border-top-color: rgba(255, 181, 167, 0.12);
+}
+
+:root[data-theme='dark'] .footer-overlay {
+  background:
+    linear-gradient(180deg,
+      rgba(30, 27, 24, 0.55) 0%,
+      rgba(30, 27, 24, 0.78) 35%,
+      rgba(30, 27, 24, 0.90) 70%,
+      rgba(30, 27, 24, 0.96) 100%
+    );
+}
+
+:root[data-theme='dark'] .footer-brand {
+  color: #C48B80;
+  text-shadow: 0 1px 2px rgba(255, 181, 167, 0.15);
+}
+
+:root[data-theme='dark'] .footer-tagline {
+  color: #9B8470;
+}
+
+:root[data-theme='dark'] .footer-copy {
+  color: #7A7065;
+}
+
+/* 暗色模式 — 蕾丝花边降低亮度 */
+:root[data-theme='dark'] .card::before,
+:root[data-theme='dark'] .row::before,
+:root[data-theme='dark'] .panel::before,
+:root[data-theme='dark'] .checkout::before {
+  opacity: 0.45;
+  filter: brightness(0.7);
+}
+
+@media (max-width: 640px) {
+  .app-footer {
+    min-height: 130px;
+    background-size: 280px 187px;
+  }
+  .footer-brand {
+    font-size: 18px;
+  }
+  .footer-tagline {
+    font-size: 11px;
   }
 }
 

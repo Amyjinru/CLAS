@@ -1,0 +1,1 @@
+import{n as e}from"./element-r533nVL1.js";function t(){async function t(t,n,r={}){return await e.confirm(t,r.title||`确认操作`,{confirmButtonText:r.confirmText||`确认`,cancelButtonText:r.cancelText||`取消`,type:r.type||`warning`}),n()}return{confirmAction:t}}export{t};
