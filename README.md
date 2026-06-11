@@ -163,6 +163,8 @@ npm run dev
 
 用户订单详情页使用 `GET /api/order/{orderId}` 按 ID 加载单个订单，后端会校验当前用户只能查看自己的订单。商家可通过 `GET /api/order/merchant/detail/{orderId}` 查看本店订单，管理员可通过 `GET /api/order/admin/{orderId}` 查看任意订单。三个接口均返回与订单列表一致的 `OrderResponse` 结构。
 
+订单详情会随订单返回 `paidAt`、`acceptedAt`、`deliveredAt`、`completedAt`、`canceledAt`、`rejectedAt` 等关键状态时间戳，前端据此渲染订单时间线。
+
 ### AI 内容安全审核（2026-06-10）
 
 本次重点补充了头像与文本内容的提交前安全审核，保持现有 Spring Boot + Vue 框架、数据库结构和接口路径不变，只在后端 Service 层复用原有上传/提交入口进行拦截。

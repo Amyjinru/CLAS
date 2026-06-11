@@ -289,6 +289,7 @@ public class OrderService {
         Orders order = requireOrder(orderId);
         requireStatus(order, STATUS_PAID);
         order.setStatus(STATUS_ACCEPTED);
+        order.setAcceptedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         return order;
     }
@@ -298,6 +299,7 @@ public class OrderService {
         requireStatus(order, STATUS_PAID);
         order.setStatus(STATUS_ACCEPTED);
         order.setDeliveryStatus("PREPARING");
+        order.setAcceptedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
@@ -320,6 +322,7 @@ public class OrderService {
         requireStatus(order, STATUS_ACCEPTED);
         order.setDeliveryStatus("DELIVERING");
         order.setEstimatedMinutes(15);
+        order.setDeliveredAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
@@ -341,6 +344,7 @@ public class OrderService {
         Orders order = requireOrder(orderId);
         requireStatus(order, STATUS_ACCEPTED);
         order.setStatus(STATUS_COMPLETED);
+        order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         return order;
     }
@@ -350,6 +354,7 @@ public class OrderService {
         requireStatus(order, STATUS_ACCEPTED);
         order.setStatus(STATUS_COMPLETED);
         order.setDeliveryStatus("DELIVERED");
+        order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
@@ -375,6 +380,7 @@ public class OrderService {
             restoreOrderStock(orderId);
         }
         order.setStatus(STATUS_CANCELED);
+        order.setCanceledAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         couponService.releaseForOrder(order.getUserCouponId());
         return order;
@@ -388,6 +394,7 @@ public class OrderService {
             restoreOrderStock(orderId);
         }
         order.setStatus(STATUS_CANCELED);
+        order.setCanceledAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         couponService.releaseForOrder(order.getUserCouponId());
         return order;
@@ -400,6 +407,7 @@ public class OrderService {
         restoreOrderStock(orderId);
         order.setStatus(STATUS_REJECTED);
         order.setRejectReason(trimToNull(reason));
+        order.setRejectedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         String rejectText = order.getRejectReason() == null ? "商家暂时无法接单" : order.getRejectReason();
         notificationService.send(new NotificationService.NotificationTarget(

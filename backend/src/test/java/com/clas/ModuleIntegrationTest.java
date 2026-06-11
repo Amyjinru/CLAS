@@ -993,6 +993,61 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void orderLifecycleTimestampsProgressThroughDetail() throws Exception {
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.createTime").isString())
+            .andReturn();
+
+        Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        mockMvc.perform(post("/api/order/pay/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
+
+        mockMvc.perform(post("/api/order/accept/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.acceptedAt").isString());
+
+        mockMvc.perform(post("/api/order/deliver/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.deliveredAt").isString());
+
+        mockMvc.perform(post("/api/order/complete/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.completedAt").isString());
+
+        mockMvc.perform(get("/api/order/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.paidAt").isString())
+            .andExpect(jsonPath("$.data.order.acceptedAt").isString())
+            .andExpect(jsonPath("$.data.order.deliveredAt").isString())
+            .andExpect(jsonPath("$.data.order.completedAt").isString());
+    }
+
+    @Test
     void paymentIdempotencyKeyReusesSamePayment() throws Exception {
         Long orderId = createPendingOrderForUser();
         String key = "payment-key-" + orderId;

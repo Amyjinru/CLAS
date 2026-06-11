@@ -59,6 +59,9 @@ public class OrderTimeoutService {
             if (updated == 0) {
                 continue;
             }
+            order.setStatus(OrderService.STATUS_CANCELED);
+            order.setCanceledAt(now);
+            ordersMapper.updateById(order);
             couponService.releaseForOrder(order.getUserCouponId());
             notifyUser(order);
             expired++;

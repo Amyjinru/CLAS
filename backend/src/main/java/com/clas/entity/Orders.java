@@ -35,4 +35,10 @@ public class Orders {
     private String rejectReason;
     private String refundRejectReason;
     private LocalDateTime createTime;
+    private LocalDateTime paidAt;
+    private LocalDateTime acceptedAt;
+    private LocalDateTime deliveredAt;
+    private LocalDateTime completedAt;
+    private LocalDateTime canceledAt;
+    private LocalDateTime rejectedAt;
 }

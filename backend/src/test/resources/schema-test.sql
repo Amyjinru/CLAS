@@ -180,7 +180,13 @@ CREATE TABLE orders (
     remark VARCHAR(255),
     reject_reason VARCHAR(255),
     refund_reject_reason VARCHAR(255),
-    create_time TIMESTAMP NOT NULL
+    create_time TIMESTAMP NOT NULL,
+    paid_at TIMESTAMP,
+    accepted_at TIMESTAMP,
+    delivered_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    canceled_at TIMESTAMP,
+    rejected_at TIMESTAMP
 );
 
 CREATE TABLE order_item (

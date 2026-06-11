@@ -29,6 +29,22 @@ const refundStatusLabel = {
   REJECTED: '已拒绝'
 }
 
+const orderTimeline = computed(() => {
+  const order = orderEntry.value?.order
+  if (!order) return []
+  return [
+    { label: '订单创建', time: order.createTime },
+    { label: '支付成功', time: order.paidAt },
+    { label: '商家接单', time: order.acceptedAt },
+    { label: '配送开始', time: order.deliveredAt },
+    { label: '订单完成', time: order.completedAt },
+    { label: '订单取消', time: order.canceledAt },
+    { label: '商家拒单', time: order.rejectedAt },
+    { label: '申请退款', time: order.refundRequestedAt },
+    { label: '退款处理', time: order.refundResolvedAt }
+  ].filter((item) => item.time)
+})
+
 function distanceText(distance) {
   if (!distance) return ''
   return formatDistance(distance)
@@ -78,6 +94,15 @@ onMounted(async () => {
             <StatusTag :status="orderEntry.order.status" :map="orderStatusMap" />
             <span v-if="orderEntry.order.deliveryStatus"> · {{ deliveryLabel[orderEntry.order.deliveryStatus] || orderEntry.order.deliveryStatus }}</span>
           </p>
+          <el-timeline v-if="orderTimeline.length" class="order-timeline">
+            <el-timeline-item
+              v-for="item in orderTimeline"
+              :key="`${item.label}-${item.time}`"
+              :timestamp="formatCompactDateTime(item.time).slice(0, 16)"
+            >
+              {{ item.label }}
+            </el-timeline-item>
+          </el-timeline>
         </div>
 
         <div class="detail-block">
@@ -202,6 +227,11 @@ onMounted(async () => {
 
 .warn {
   color: var(--clas-warning);
+}
+
+.order-timeline {
+  margin-top: 14px;
+  padding-left: 2px;
 }
 
 .item-list {

@@ -138,6 +138,8 @@ public class PaymentService {
             paymentRepository.save(payment);
             ordersMapper.updateStatusIfCurrent(order.getId(), ORDER_STATUS_PAYING, OrderService.STATUS_PAID);
             order.setStatus(OrderService.STATUS_PAID);
+            order.setPaidAt(LocalDateTime.now());
+            ordersMapper.updateById(order);
             return new PaymentOutcome(PaymentResponse.from(payment, order.getStatus()), null);
         } catch (RuntimeException exception) {
             payment.setStatus(STATUS_FAILED);
