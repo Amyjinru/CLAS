@@ -30,6 +30,7 @@ import com.clas.mapper.ReviewReplyMapper;
 import com.clas.mapper.ReviewVoteMapper;
 import com.clas.mapper.UserCouponMapper;
 import com.clas.service.CouponService;
+import com.clas.service.OrderTimeoutService;
 import java.util.Base64;
 import java.util.Properties;
 import java.time.LocalDateTime;
@@ -104,6 +105,9 @@ class ModuleIntegrationTest {
 
     @Autowired
     private NotificationMapper notificationMapper;
+
+    @Autowired
+    private OrderTimeoutService orderTimeoutService;
 
     @Test
     void apiResponsesIncludeTimestampAndRequestId() throws Exception {
@@ -1004,6 +1008,37 @@ class ModuleIntegrationTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("幂等键已用于其他订单"))
             .andExpect(jsonPath("$.errorCode").value("PAYMENT_IDEMPOTENCY_CONFLICT"));
+    }
+
+    @Test
+    void pendingPaymentTimeoutCancelsOldOrders() throws Exception {
+        Long orderId = createPendingOrderForUser();
+        jdbcTemplate.update(
+            "UPDATE orders SET create_time = ? WHERE id = ?",
+            LocalDateTime.now().minusMinutes(31),
+            orderId
+        );
+
+        int expired = orderTimeoutService.expirePendingPaymentOrders(LocalDateTime.now());
+        assertEquals(1, expired);
+
+        mockMvc.perform(get("/api/payment/status/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orderStatus").value("CANCELED"))
+            .andExpect(jsonPath("$.data.paymentStatus").value("FAILED"));
+
+        Notification notification = notificationMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Notification>()
+                    .eq(Notification::getUserId, USER_PHONE)
+                    .eq(Notification::getOrderId, orderId)
+                    .eq(Notification::getType, "ORDER_STATUS")
+                    .orderByDesc(Notification::getId)
+            )
+            .stream()
+            .findFirst()
+            .orElseThrow();
+        assertEquals("订单已超时取消", notification.getTitle());
     }
 
     @Test

@@ -155,6 +155,10 @@ npm run dev
 
 `POST /api/payment/mock` 和兼容入口 `POST /api/order/pay/{orderId}` 支持可选请求头 `Idempotency-Key`。同一用户对同一订单重复提交相同幂等键时，会复用同一条支付流水并在响应 `data.idempotencyKey` 中回传；同一幂等键不能用于该用户的其他订单。
 
+### 待支付订单超时
+
+后端默认每 60 秒扫描一次超过 30 分钟未支付的 `PENDING_PAYMENT` 订单，自动改为 `CANCELED`，释放已预占优惠券，并发送订单状态通知。可通过 `app.order-timeout.enabled`、`app.order-timeout.pending-payment-minutes`、`app.order-timeout.scan-delay-ms` 调整。
+
 ### AI 内容安全审核（2026-06-10）
 
 本次重点补充了头像与文本内容的提交前安全审核，保持现有 Spring Boot + Vue 框架、数据库结构和接口路径不变，只在后端 Service 层复用原有上传/提交入口进行拦截。

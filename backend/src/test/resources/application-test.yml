@@ -22,3 +22,7 @@ jwt:
 
 dashscope:
   api-key: ""
+
+app:
+  order-timeout:
+    enabled: false
