@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getOrderDetail } from '../api/clas'
+import { getMerchant, getOrderDetail } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
@@ -13,6 +13,7 @@ const orderId = computed(() => Number(route.params.orderId))
 const fromNotifications = computed(() => route.query.from === 'notifications')
 
 const orderEntry = ref(null)
+const merchant = ref(null)
 const loading = ref(true)
 const error = ref('')
 
@@ -67,6 +68,15 @@ onMounted(async () => {
     orderEntry.value = await getOrderDetail(orderId.value)
     if (!orderEntry.value) {
       error.value = '订单不存在或无权查看'
+      return
+    }
+    const merchantId = orderEntry.value.order?.merchantId
+    if (merchantId) {
+      try {
+        merchant.value = await getMerchant(merchantId)
+      } catch (e) {
+        merchant.value = null
+      }
     }
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || '加载订单失败'
@@ -111,6 +121,17 @@ onMounted(async () => {
           <p>配送费：<MoneyText :amount="orderEntry.order.deliveryFee || 0" /></p>
           <p v-if="orderEntry.order.couponDiscount > 0">优惠券：<MoneyText :amount="orderEntry.order.couponDiscount" negative /></p>
           <p class="total-line">实付：<MoneyText :amount="orderEntry.order.totalPrice" /></p>
+        </div>
+
+        <div v-if="merchant" class="detail-block merchant-summary">
+          <h2>商家</h2>
+          <p class="merchant-name">{{ merchant.merchantName }}</p>
+          <p class="merchant-meta">
+            <span v-if="merchant.category">{{ merchant.category }}</span>
+            <span v-if="merchant.score">评分 {{ Number(merchant.score).toFixed(1) }}</span>
+          </p>
+          <p v-if="merchant.phone">电话：{{ merchant.phone }}</p>
+          <p v-if="merchant.address">地址：{{ merchant.address }}</p>
         </div>
 
         <div class="detail-block">
@@ -223,6 +244,18 @@ onMounted(async () => {
   font-weight: 700;
   font-size: 16px;
   margin-top: 8px;
+}
+
+.merchant-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.merchant-meta {
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .warn {
