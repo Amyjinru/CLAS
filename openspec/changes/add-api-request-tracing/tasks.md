@@ -9,4 +9,4 @@
 - [x] 2.1 Add integration tests for success and error envelopes.
 - [x] 2.2 Document the updated unified response format.
 - [x] 2.3 Run backend tests and frontend build.
-- [ ] 2.4 Push `dev` and deploy to the cloud server.
+- [x] 2.4 Push `dev` and deploy to the cloud server.
