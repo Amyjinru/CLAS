@@ -20,6 +20,7 @@ const props = defineProps({
 
 const reviews = ref([])
 const commentDrafts = ref({})
+const replyTargets = ref({})
 const loading = ref(false)
 
 function avatarText(name) {
@@ -59,13 +60,49 @@ async function submitComment(review) {
   const text = commentDrafts.value[review.id]
   if (!text?.trim()) return
   try {
-    await addReviewComment(review.id, { content: text.trim() })
+    const target = replyTargets.value[review.id]
+    await addReviewComment(review.id, {
+      content: text.trim(),
+      parentReplyId: target?.parentReplyId ?? null
+    })
     commentDrafts.value[review.id] = ''
+    delete replyTargets.value[review.id]
     ElMessage.success('评论已发布')
     await load()
   } catch (error) {
     ElMessage.error(error.response?.data?.message || error.message || '评论失败')
   }
+}
+
+function selectReplyTarget(review, reply = null) {
+  if (!currentRole()) {
+    ElMessage.warning('请先登录后再回复')
+    return
+  }
+  const displayName = reply
+    ? reply.displayName || reply.userId
+    : review.displayName || review.userId
+  replyTargets.value[review.id] = {
+    parentReplyId: reply?.id ?? null,
+    displayName
+  }
+}
+
+function clearReplyTarget(reviewId) {
+  delete replyTargets.value[reviewId]
+}
+
+function replyTargetName(review, reply) {
+  if (reply.parentReplyId) {
+    const parent = (review.replies || []).find((item) => item.id === reply.parentReplyId)
+    return parent?.displayName || parent?.userId || null
+  }
+  return review.displayName || review.userId || null
+}
+
+function replyPlaceholder(review) {
+  const target = replyTargets.value[review.id]
+  return target ? `回复 ${target.displayName}` : '回复这条评论'
 }
 
 async function hideOrDelete(review) {
@@ -150,6 +187,7 @@ onMounted(load)
         <el-button text type="danger" @click="hideOrDelete(review)">{{ review.mine ? '删除' : '隐藏' }}</el-button>
         <el-button v-if="currentRole() && !review.mine && !showMerchantActions" text type="warning" @click="reportComment(review)">举报</el-button>
         <el-button v-if="showMerchantActions" text type="warning" @click="requestDelete(review)">申请删评</el-button>
+        <el-button text class="reply-action" @click="selectReplyTarget(review)">回复</el-button>
       </div>
 
       <div v-for="reply in review.replies || []" :key="reply.id" class="nested-reply">
@@ -157,17 +195,25 @@ onMounted(load)
           <div class="avatar small" :style="avatarStyle(reply.avatar)">{{ reply.avatar ? '' : avatarText(reply.displayName) }}</div>
           <strong>{{ reply.displayName }}</strong>
         </div>
-        <p>{{ reply.content }}</p>
+        <p>
+          <span v-if="replyTargetName(review, reply)" class="reply-prefix">回复{{ replyTargetName(review, reply) }}:</span>
+          {{ reply.content }}
+        </p>
         <div class="actions">
           <el-button text @click="vote('REPLY', reply.id, 'LIKE')">赞 {{ reply.likeCount || 0 }}</el-button>
           <el-button text @click="vote('REPLY', reply.id, 'DISLIKE')">踩 {{ reply.dislikeCount || 0 }}</el-button>
           <el-button v-if="reply.mine" text type="danger" @click="removeReply(reply)">删除</el-button>
           <el-button v-else-if="currentRole() && !showMerchantActions" text type="warning" @click="reportReplyComment(reply)">举报</el-button>
+          <el-button text class="reply-action" @click="selectReplyTarget(review, reply)">回复</el-button>
         </div>
       </div>
 
       <div v-if="currentRole()" class="reply-box">
-        <el-input v-model="commentDrafts[review.id]" placeholder="回复这条评论" />
+        <div v-if="replyTargets[review.id]" class="reply-target">
+          <span>回复 {{ replyTargets[review.id].displayName }}</span>
+          <el-button text @click="clearReplyTarget(review.id)">取消</el-button>
+        </div>
+        <el-input v-model="commentDrafts[review.id]" :placeholder="replyPlaceholder(review)" />
         <el-button @click="submitComment(review)">发表评论</el-button>
       </div>
     </article>
@@ -189,8 +235,11 @@ onMounted(load)
 .images { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .images img { border-radius: var(--radius-sm); height: 88px; object-fit: cover; width: 88px; }
 .actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.reply-action { margin-left: auto; }
+.reply-prefix { color: var(--text-secondary); font-weight: 600; margin-right: 4px; }
 .nested-reply, .reply-box {
   background: var(--clas-warm-50); border-radius: var(--radius-sm); margin-top: 10px; padding: 10px 12px;
 }
 .reply-box { display: grid; gap: 8px; }
+.reply-target { align-items: center; color: var(--text-secondary); display: flex; justify-content: space-between; }
 </style>
