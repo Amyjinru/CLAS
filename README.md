@@ -111,9 +111,13 @@ npm run dev
 {
   "code": 200,
   "message": "success",
-  "data": {}
+  "data": {},
+  "timestamp": 1781179200000,
+  "requestId": "trace-test-123"
 }
 ```
+
+后端会读取请求头 `X-Request-Id` 并在响应头与响应体中回传；未传入时自动生成，用于联调、日志定位和云端冒烟测试关联。
 
 业务错误统一返回 `code=400`，例如：
 
@@ -121,7 +125,9 @@ npm run dev
 {
   "code": 400,
   "message": "手机号或密码错误",
-  "data": null
+  "data": null,
+  "timestamp": 1781179200000,
+  "requestId": "trace-test-123"
 }
 ```
 
