@@ -130,7 +130,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-.score-display { color: #2563eb; font-weight: 700; }
+.score-display { color: var(--color-accent); font-weight: 700; }
 .review-result p { margin-bottom: 10px; }
 .reply { background: var(--color-primary-light); border-radius: var(--radius-sm); padding: 10px 12px; }
 input[type='range'] { width: 100%; min-height: auto; padding: 0; border: 0; }
