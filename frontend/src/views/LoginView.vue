@@ -538,7 +538,7 @@ input:not(.code-input) {
   border-radius: var(--radius-md, 10px);
   font-size: 15px;
   color: var(--text-primary, #1f2937);
-  background: #fff;
+  background: var(--bg-page, #f9fafb);
   transition: border-color var(--transition-fast, 0.2s), box-shadow var(--transition-fast, 0.2s);
   box-sizing: border-box;
 }
@@ -681,7 +681,7 @@ input:focus {
   letter-spacing: 0.2em;
   text-align: center;
   color: var(--text-primary, #1f2937);
-  background: #fff;
+  background: var(--bg-page, #f9fafb);
   box-sizing: border-box;
 }
 
