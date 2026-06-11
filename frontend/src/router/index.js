@@ -50,22 +50,22 @@ function defaultPath() {
 const routes = [
   { path: '/', redirect: () => defaultPath() },
 
-  { path: '/login', component: LoginView, meta: { public: true } },
-  { path: '/forgot-password', component: ForgotPasswordView, meta: { public: true } },
-  { path: '/home', component: HomeView, meta: { roles: ['USER'], userPortal: true } },
-  { path: '/merchant/:id', component: MerchantDetailView, meta: { roles: ['USER'], userPortal: true } },
+  { path: '/login', component: LoginView, meta: { public: true, title: '登录' } },
+  { path: '/forgot-password', component: ForgotPasswordView, meta: { public: true, title: '忘记密码' } },
+  { path: '/home', component: HomeView, meta: { roles: ['USER'], userPortal: true, title: '浏览商家' } },
+  { path: '/merchant/:id', component: MerchantDetailView, meta: { roles: ['USER'], userPortal: true, title: '商家详情' } },
 
-  { path: '/cart', component: CartView, meta: { roles: ['USER'] } },
-  { path: '/deals', component: DealsView, meta: { roles: ['USER'] } },
-  { path: '/bookings', component: BookingsView, meta: { roles: ['USER'] } },
-  { path: '/profile', component: ProfileView, meta: { roles: ['USER'] } },
-  { path: '/profile/notifications', component: NotificationsView, meta: { roles: ['USER'] } },
+  { path: '/cart', component: CartView, meta: { roles: ['USER'], title: '购物车' } },
+  { path: '/deals', component: DealsView, meta: { roles: ['USER'], title: '团购' } },
+  { path: '/bookings', component: BookingsView, meta: { roles: ['USER'], title: '到店预约' } },
+  { path: '/profile', component: ProfileView, meta: { roles: ['USER'], title: '个人中心' } },
+  { path: '/profile/notifications', component: NotificationsView, meta: { roles: ['USER'], title: '通知中心' } },
 
-  { path: '/orders', component: OrdersView, meta: { roles: ['USER'] } },
+  { path: '/orders', component: OrdersView, meta: { roles: ['USER'], title: '我的订单' } },
 
-  { path: '/payment/deal/:orderId', name: 'DealPayment', component: PaymentView, meta: { roles: ['USER'] } },
-  { path: '/payment/:orderId', name: 'OrderPayment', component: PaymentView, meta: { roles: ['USER'] } },
-  { path: '/review/:orderId', component: ReviewView, meta: { roles: ['USER'] } },
+  { path: '/payment/deal/:orderId', name: 'DealPayment', component: PaymentView, meta: { roles: ['USER'], title: '支付' } },
+  { path: '/payment/:orderId', name: 'OrderPayment', component: PaymentView, meta: { roles: ['USER'], title: '支付' } },
+  { path: '/review/:orderId', component: ReviewView, meta: { roles: ['USER'], title: '评价' } },
 
   { path: '/merchant-register', component: MerchantRegisterView },
 
@@ -88,22 +88,28 @@ const routes = [
     ]
   },
 
-  { path: '/merchant/products', component: MerchantProductsView, meta: { roles: ['MERCHANT'] } },
-  { path: '/merchant/analytics', component: MerchantAnalyticsView, meta: { roles: ['MERCHANT'] } },
-  { path: '/merchant/audit-status', component: MerchantAuditStatusView, meta: { roles: ['MERCHANT'] } },
-  { path: '/merchant/deals', component: MerchantDealsView, meta: { roles: ['MERCHANT'] } },
-  { path: '/merchant/bookings', component: MerchantBookingsView, meta: { roles: ['MERCHANT'] } },
+  { path: '/merchant/products', component: MerchantProductsView, meta: { roles: ['MERCHANT'], title: '商品管理' } },
+  { path: '/merchant/analytics', component: MerchantAnalyticsView, meta: { roles: ['MERCHANT'], title: '数据分析' } },
+  { path: '/merchant/audit-status', component: MerchantAuditStatusView, meta: { roles: ['MERCHANT'], title: '审核状态' } },
+  { path: '/merchant/deals', component: MerchantDealsView, meta: { roles: ['MERCHANT'], title: '团购管理' } },
+  { path: '/merchant/bookings', component: MerchantBookingsView, meta: { roles: ['MERCHANT'], title: '预约管理' } },
 
-  { path: '/merchant-console', component: MerchantConsoleView, meta: { roles: ['MERCHANT'] } },
+  { path: '/merchant-console', component: MerchantConsoleView, meta: { roles: ['MERCHANT'], title: '商家工作台' } },
 
-  { path: '/user/announcements', component: UserAnnouncementsView, meta: { roles: ['USER'] } },
-  { path: '/merchant/announcements', component: MerchantAnnouncementsView, meta: { roles: ['MERCHANT'] } },
+  { path: '/user/announcements', component: UserAnnouncementsView, meta: { roles: ['USER'], title: '平台公告' } },
+  { path: '/merchant/announcements', component: MerchantAnnouncementsView, meta: { roles: ['MERCHANT'], title: '平台公告' } },
   { path: '/announcements', redirect: () => defaultPath() }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 动态设置页面标题
+router.afterEach((to) => {
+  const title = to.meta.title
+  document.title = title ? `${title} — CLAS` : 'CLAS 综合生活助手平台'
 })
 
 router.beforeEach((to, from, next) => {
