@@ -258,7 +258,6 @@ async function submitReset() {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #FFF9E6;
 }
 
 .auth-panel {

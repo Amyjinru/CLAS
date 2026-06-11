@@ -408,7 +408,6 @@ function switchTab(tab) {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #FFF9E6;
 }
 
 .auth-wrapper::before,
@@ -420,16 +419,24 @@ function switchTab(tab) {
   width: 100%;
   max-width: 420px;
   padding: 40px;
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
-  border: none;
+  background: var(--bg-card, #fff);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: var(--shadow-lg, 0 8px 30px rgba(0, 0, 0, 0.08));
+  border: 1px solid var(--border-color, #e5e7eb);
   position: relative;
   z-index: 1;
+  overflow: hidden;
 }
 
 .auth-panel::before {
-  display: none;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #FFD100 0%, #FFD100 50%, #FFD100 100%);
+  border-radius: 16px 16px 0 0;
 }
 
 /* ============================== */
