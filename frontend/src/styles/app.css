@@ -224,7 +224,6 @@ nav a.router-link-active {
   box-shadow: var(--shadow-sm);
   position: relative;
 }
-
 .hero {
   align-items: center;
   display: flex;

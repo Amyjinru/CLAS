@@ -259,8 +259,6 @@ body {
 .el-card__body {
   border-radius: inherit;
   background: var(--bg-card);
-  position: relative;
-  z-index: 1;
 }
 .el-card__header {
   padding: 18px 24px !important;

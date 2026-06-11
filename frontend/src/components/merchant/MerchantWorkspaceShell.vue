@@ -142,9 +142,10 @@ function openProfileDialog() {
             <h2>{{ merchant.merchantName }}</h2>
             <el-tag :type="displayStatus.type" effect="dark">{{ displayStatus.text }}</el-tag>
             <div class="shop-actions">
-              <el-button size="small" type="primary" :loading="logoUploading" @click="openLogoPicker">上传头像</el-button>
+              <el-button class="shop-action-btn" size="small" type="primary" :loading="logoUploading" @click="openLogoPicker">上传头像</el-button>
               <el-button
                 v-if="merchant.status === 'OPEN'"
+                class="shop-action-btn"
                 size="small"
                 :type="merchant.manualClosed ? 'success' : 'warning'"
                 @click="toggleManualStatus"
@@ -328,6 +329,12 @@ function openProfileDialog() {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
+}
+
+.shop-actions :deep(.shop-action-btn) {
+  font-size: 12px;
+  min-height: 28px;
+  padding: 4px 12px;
 }
 
 .admin-remarks {
