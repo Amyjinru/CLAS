@@ -61,7 +61,6 @@ async function handleLogout() {
 <template>
   <div class="shell" :style="{ backgroundImage: `url(${patternBg})` }">
     <div class="shell-pattern-overlay" aria-hidden="true"></div>
-    <a href="#main-content" class="skip-link">跳到主要内容</a>
     <header class="topbar">
       <div class="header-left">
         <RouterLink class="brand" :to="brandLink">CLAS 生活助手</RouterLink>
@@ -135,6 +134,7 @@ async function handleLogout() {
   position: relative;
   background-repeat: repeat;
   background-size: 360px 240px;
+  background-attachment: fixed;
   background-color: #FFFBF5;
   font-family: var(--font-body);
 }
@@ -152,6 +152,57 @@ async function handleLogout() {
       rgba(255, 245, 235, 0.70) 60%,
       rgba(255, 242, 230, 0.78) 100%
     );
+}
+
+/* ═══════════ 水波流动动效 ═══════════ */
+@keyframes rippleFlow1 {
+  0%   { opacity: 0.15; transform: scale(1.0) translateY(0); }
+  25%  { opacity: 0.35; transform: scale(1.08) translateY(-4px); }
+  50%  { opacity: 0.25; transform: scale(1.04) translateY(2px); }
+  75%  { opacity: 0.38; transform: scale(1.10) translateY(-2px); }
+  100% { opacity: 0.15; transform: scale(1.0) translateY(0); }
+}
+@keyframes rippleFlow2 {
+  0%   { opacity: 0.12; transform: scale(0.97) translateY(0); }
+  30%  { opacity: 0.30; transform: scale(1.06) translateY(3px); }
+  60%  { opacity: 0.20; transform: scale(1.02) translateY(-3px); }
+  100% { opacity: 0.12; transform: scale(0.97) translateY(0); }
+}
+@keyframes rippleFlow3 {
+  0%   { opacity: 0.10; transform: scale(0.94) translateY(0); }
+  20%  { opacity: 0.28; transform: scale(1.05) translateY(-5px); }
+  50%  { opacity: 0.18; transform: scale(1.0) translateY(3px); }
+  80%  { opacity: 0.32; transform: scale(1.07) translateY(-1px); }
+  100% { opacity: 0.10; transform: scale(0.94) translateY(0); }
+}
+
+/* 水波涟漪元素 — 通过 SVG 中的渐变圆 + CSS 缩放产生流动感 */
+.ripple-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-size: 360px 240px;
+  background-attachment: fixed;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+}
+
+/* 在 shell 上叠加一层 */
+.shell::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('../assets/pattern-bg.svg');
+  background-repeat: repeat;
+  background-size: 360px 240px;
+  background-attachment: fixed;
+  opacity: 0.18;
+  animation: rippleFlow1 8s ease-in-out infinite;
+  filter: blur(3px);
 }
 
 /* 暗色模式 — 整页遮罩 */
