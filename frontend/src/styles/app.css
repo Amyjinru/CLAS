@@ -225,29 +225,6 @@ nav a.router-link-active {
   position: relative;
 }
 
-/* ═══════════ 蕾丝花边 — 伪元素方案（兼容 border-radius） ═══════════ */
-.panel::before,
-.checkout::before {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border: 6px solid transparent;
-  border-image-source: url('../assets/lace-border.svg');
-  border-image-slice: 12;
-  border-image-width: 6px;
-  border-image-repeat: round;
-  border-radius: calc(var(--radius-lg) + 6px);
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.85;
-}
-
-/* 面板内容置于蕾丝花边之上 */
-.panel > *,
-.checkout > * {
-  position: relative;
-  z-index: 1;
-}
 .hero {
   align-items: center;
   display: flex;
@@ -306,27 +283,6 @@ nav a.router-link-active {
   transition-duration: var(--transition-base);
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-}
-/* 卡片/条目 蕾丝花边 */
-.card::before,
-.row::before {
-  content: '';
-  position: absolute;
-  inset: -5px;
-  border: 5px solid transparent;
-  border-image-source: url('../assets/lace-border.svg');
-  border-image-slice: 12;
-  border-image-width: 5px;
-  border-image-repeat: round;
-  border-radius: calc(var(--radius-lg) + 5px);
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.8;
-}
-.card > *,
-.row > * {
-  position: relative;
-  z-index: 1;
 }
 .card:hover,
 .row:hover {
@@ -413,26 +369,7 @@ nav a.router-link-active {
 /* ─── 统计卡片 ─── */
 .stat-card {
   border-radius: var(--radius-lg) !important;
-  overflow: visible;
-  position: relative;
-}
-.stat-card::before {
-  content: '';
-  position: absolute;
-  inset: -5px;
-  border: 5px solid transparent;
-  border-image-source: url('../assets/lace-border.svg');
-  border-image-slice: 12;
-  border-image-width: 5px;
-  border-image-repeat: round;
-  border-radius: calc(var(--radius-lg) + 5px);
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.75;
-}
-.stat-card > * {
-  position: relative;
-  z-index: 1;
+  overflow: hidden;
 }
 .stat-card .el-card__body {
   padding: 28px 24px !important;
@@ -457,25 +394,6 @@ nav a.router-link-active {
 .chart-card {
   border-radius: var(--radius-lg);
   margin-bottom: 20px;
-  position: relative;
-}
-.chart-card::before {
-  content: '';
-  position: absolute;
-  inset: -5px;
-  border: 5px solid transparent;
-  border-image-source: url('../assets/lace-border.svg');
-  border-image-slice: 12;
-  border-image-width: 5px;
-  border-image-repeat: round;
-  border-radius: calc(var(--radius-lg) + 5px);
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.75;
-}
-.chart-card > * {
-  position: relative;
-  z-index: 1;
 }
 .chart-card .el-card__body {
   padding: 16px 8px 8px 8px;
@@ -684,15 +602,6 @@ body {
 
 :root[data-theme='dark'] .footer-copy {
   color: #7A7065;
-}
-
-/* 暗色模式 — 蕾丝花边降低亮度 */
-:root[data-theme='dark'] .card::before,
-:root[data-theme='dark'] .row::before,
-:root[data-theme='dark'] .panel::before,
-:root[data-theme='dark'] .checkout::before {
-  opacity: 0.45;
-  filter: brightness(0.7);
 }
 
 @media (max-width: 640px) {

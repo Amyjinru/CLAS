@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <style>
+      .food-path {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 3;
+      }
+      .food-path-thin {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2;
+      }
+    </style>
+  </defs>
+
+  <!-- 8个图案水平一排居中，每个占据~68×78区域，scale统一1.0，间距均匀
+       中心y = 300, 中心x间隔 = (720-50)/7 ≈ 95.7，取96
+       起始x = 50, 每96一步: 50,146,242,338,434,530,626,722 -->
+
+  <!-- ══ 1. 🍔 汉堡 x=50 ══ -->
+  <g transform="translate(16, 260) scale(0.95)">
+    <g><animate attributeName="opacity" values="0;0;0.70;0.70;0" keyTimes="0;0.06;0.18;0.85;1" dur="8s" repeatCount="indefinite"/>
+      <path class="food-path" stroke="#F4A261" stroke-dasharray="200" stroke-dashoffset="200" d="M10,50 Q10,22 48,17 Q88,12 108,25 Q128,38 123,55"><animate attributeName="stroke-dashoffset" values="200;0;0;0;200" keyTimes="0;0.15;0.72;0.82;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#76C893" stroke-dasharray="110" stroke-dashoffset="110" d="M18,53 Q36,44 54,48 Q74,40 94,46 Q114,42 118,53"><animate attributeName="stroke-dashoffset" values="110;0;0;0;110" keyTimes="0;0.21;0.72;0.82;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#F4A261" stroke-dasharray="105" stroke-dashoffset="105" d="M14,60 L122,60"><animate attributeName="stroke-dashoffset" values="105;0;0;0;105" keyTimes="0;0.25;0.72;0.82;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#F4A261" stroke-dasharray="105" stroke-dashoffset="105" d="M14,68 L122,68"><animate attributeName="stroke-dashoffset" values="105;0;0;0;105" keyTimes="0;0.30;0.72;0.82;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#F4A261" stroke-dasharray="170" stroke-dashoffset="170" d="M12,60 Q10,68 12,78 Q38,88 62,90 Q92,88 118,82 Q126,72 124,62"><animate attributeName="stroke-dashoffset" values="170;0;0;0;170" keyTimes="0;0.33;0.72;0.82;1" dur="8s" repeatCount="indefinite"/></path>
+      <ellipse cx="52" cy="30" rx="2.5" ry="2" fill="#FFD100"><animate attributeName="opacity" values="0;0;0.85;0.85;0" keyTimes="0;0.35;0.50;0.74;0.84;1" dur="8s" repeatCount="indefinite"/></ellipse>
+      <ellipse cx="40" cy="36" rx="2.5" ry="2" fill="#FFD100"><animate attributeName="opacity" values="0;0;0.85;0.85;0" keyTimes="0;0.39;0.54;0.74;0.84;1" dur="8s" repeatCount="indefinite"/></ellipse>
+      <ellipse cx="65" cy="28" rx="2.5" ry="2" fill="#FFD100"><animate attributeName="opacity" values="0;0;0.85;0.85;0" keyTimes="0;0.43;0.58;0.74;0.84;1" dur="8s" repeatCount="indefinite"/></ellipse>
+    </g>
+  </g>
+
+  <!-- ══ 2. 🍟 薯条 x=146 ══ -->
+  <g transform="translate(114, 262) scale(0.95)">
+    <g><animate attributeName="opacity" values="0;0;0.68;0.68;0" keyTimes="0;0.06;0.18;0.85;1" dur="8s" repeatCount="indefinite"/>
+      <path class="food-path" stroke="#FFC107" stroke-dasharray="195" stroke-dashoffset="195" d="M10,30 L5,80 L85,80 L82,30 Z"><animate attributeName="stroke-dashoffset" values="195;0;0;0;195" keyTimes="0;0.15;0.68;0.78;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#FFC107" stroke-dasharray="72" stroke-dashoffset="72" d="M10,30 L46,46 L82,30"><animate attributeName="stroke-dashoffset" values="72;0;0;0;72" keyTimes="0;0.25;0.68;0.78;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="48" stroke-dashoffset="48" d="M22,30 L22,8 L28,8"><animate attributeName="stroke-dashoffset" values="48;0;0;0;48" keyTimes="0;0.31;0.68;0.78;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="48" stroke-dashoffset="48" d="M38,30 L35,6 L42,6"><animate attributeName="stroke-dashoffset" values="48;0;0;0;48" keyTimes="0;0.35;0.68;0.78;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="48" stroke-dashoffset="48" d="M54,30 L50,2 L58,2"><animate attributeName="stroke-dashoffset" values="48;0;0;0;48" keyTimes="0;0.39;0.68;0.78;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="48" stroke-dashoffset="48" d="M68,30 L66,7 L74,7"><animate attributeName="stroke-dashoffset" values="48;0;0;0;48" keyTimes="0;0.43;0.68;0.78;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="38" stroke-dashoffset="38" d="M78,30 L78,10 L84,10"><animate attributeName="stroke-dashoffset" values="38;0;0;0;38" keyTimes="0;0.47;0.68;0.78;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#E6BC00" stroke-dasharray="32" stroke-dashoffset="32" d="M34,56 L38,46 L42,56 L46,46 L50,56 L54,46 L58,56"><animate attributeName="stroke-dashoffset" values="32;0;0;0;32" keyTimes="0;0.51;0.68;0.78;1" dur="8s" repeatCount="indefinite"/></path>
+    </g>
+  </g>
+
+  <!-- ══ 3. 🧋 奶茶 x=242 ══ -->
+  <g transform="translate(210, 258) scale(0.95)">
+    <g><animate attributeName="opacity" values="0;0;0.70;0.70;0" keyTimes="0;0.06;0.18;0.85;1" dur="8s" repeatCount="indefinite"/>
+      <path class="food-path" stroke="#5FC1C7" stroke-dasharray="190" stroke-dashoffset="190" d="M18,18 L12,88 Q12,98 50,100 Q88,98 88,88 L82,18 Z"><animate attributeName="stroke-dashoffset" values="190;0;0;0;190" keyTimes="0;0.14;0.62;0.72;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#5FD4B4" stroke-dasharray="64" stroke-dashoffset="64" d="M16,18 Q50,8 84,18"><animate attributeName="stroke-dashoffset" values="64;0;0;0;64" keyTimes="0;0.22;0.62;0.72;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#FFB5A7" stroke-width="2.5" stroke-dasharray="38" stroke-dashoffset="38" d="M58,18 L58,-14 L66,-14"><animate attributeName="stroke-dashoffset" values="38;0;0;0;38" keyTimes="0;0.30;0.62;0.72;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#5FC1C7" stroke-dasharray="64" stroke-dashoffset="64" opacity="0.45" d="M14,42 Q50,32 86,42"><animate attributeName="stroke-dashoffset" values="64;0;0;0;64" keyTimes="0;0.36;0.62;0.72;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#5FC1C7" stroke-dasharray="64" stroke-dashoffset="64" opacity="0.3" d="M13,56 Q50,46 87,56"><animate attributeName="stroke-dashoffset" values="64;0;0;0;64" keyTimes="0;0.41;0.62;0.72;1" dur="8s" repeatCount="indefinite"/></path>
+      <circle cx="30" cy="74" r="4.5" fill="#5C4033"><animate attributeName="opacity" values="0;0;0.75;0.75;0" keyTimes="0;0.40;0.46;0.64;0.74;1" dur="8s" repeatCount="indefinite"/></circle>
+      <circle cx="52" cy="66" r="4.5" fill="#5C4033"><animate attributeName="opacity" values="0;0;0.75;0.75;0" keyTimes="0;0.43;0.49;0.64;0.74;1" dur="8s" repeatCount="indefinite"/></circle>
+    </g>
+  </g>
+
+  <!-- ══ 4. 🍩 甜甜圈 x=338 ══ -->
+  <g transform="translate(306, 260) scale(0.95)">
+    <g><animate attributeName="opacity" values="0;0;0.70;0.70;0" keyTimes="0;0.06;0.18;0.85;1" dur="8s" repeatCount="indefinite"/>
+      <circle class="food-path" stroke="#FFB5A7" cx="48" cy="44" r="38" stroke-dasharray="239" stroke-dashoffset="239"><animate attributeName="stroke-dashoffset" values="239;0;0;0;239" keyTimes="0;0.22;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></circle>
+      <circle class="food-path" stroke="#FFB5A7" cx="48" cy="44" r="12" stroke-dasharray="76" stroke-dashoffset="76"><animate attributeName="stroke-dashoffset" values="76;0;0;0;76" keyTimes="0;0.32;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></circle>
+      <path class="food-path" stroke="#F28482" stroke-dasharray="100" stroke-dashoffset="100" d="M10,34 Q22,20 36,28 Q46,16 58,26 Q72,18 82,30 Q90,16 92,34"><animate attributeName="stroke-dashoffset" values="100;0;0;0;100" keyTimes="0;0.38;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path" stroke="#F28482" stroke-dasharray="100" stroke-dashoffset="100" d="M9,44 Q22,50 30,42 Q44,52 52,42 Q66,50 74,42 Q86,50 93,44"><animate attributeName="stroke-dashoffset" values="100;0;0;0;100" keyTimes="0;0.43;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></path>
+      <circle cx="22" cy="24" r="2.8" fill="#FFD100"><animate attributeName="opacity" values="0;0;0.85;0.85;0" keyTimes="0;0.50;0.54;0.66;0.76;1" dur="8s" repeatCount="indefinite"/></circle>
+      <circle cx="70" cy="24" r="2.8" fill="#FFB5A7"><animate attributeName="opacity" values="0;0;0.85;0.85;0" keyTimes="0;0.52;0.56;0.66;0.76;1" dur="8s" repeatCount="indefinite"/></circle>
+      <circle cx="72" cy="60" r="2.5" fill="#FEC89A"><animate attributeName="opacity" values="0;0;0.85;0.85;0" keyTimes="0;0.54;0.58;0.66;0.76;1" dur="8s" repeatCount="indefinite"/></circle>
+    </g>
+  </g>
+
+  <!-- ══ 5. 🍎 苹果 x=434 — 圆润饱满 ══ -->
+  <g transform="translate(402, 256) scale(0.95)">
+    <g><animate attributeName="opacity" values="0;0;0.70;0.70;0" keyTimes="0;0.06;0.18;0.85;1" dur="8s" repeatCount="indefinite"/>
+      <!-- 苹果主体：大圆润 -->
+      <path class="food-path" stroke="#E74C3C" stroke-dasharray="170" stroke-dashoffset="170" d="M52,8 C72,10 80,28 78,46 C76,64 62,76 50,74 C30,76 20,62 18,44 C16,26 30,6 52,8Z"><animate attributeName="stroke-dashoffset" values="170;0;0;0;170" keyTimes="0;0.14;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 顶部凹陷 -->
+      <path class="food-path-thin" stroke="#C0392B" d="M38,18 Q48,12 58,18" stroke-dasharray="24" stroke-dashoffset="24"><animate attributeName="stroke-dashoffset" values="24;0;0;0;24" keyTimes="0;0.26;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 柄 -->
+      <path class="food-path-thin" stroke="#6B4226" d="M48,14 Q48,4 50,0" stroke-dasharray="16" stroke-dashoffset="16"><animate attributeName="stroke-dashoffset" values="16;0;0;0;16" keyTimes="0;0.30;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 叶片 -->
+      <path class="food-path-thin" stroke="#5DAA3A" stroke-dasharray="26" stroke-dashoffset="26" d="M50,6 Q64,-2 68,6 Q62,12 50,6"><animate attributeName="stroke-dashoffset" values="26;0;0;0;26" keyTimes="0;0.36;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 高光弧 -->
+      <path class="food-path-thin" stroke="#FFF" opacity="0.4" d="M34,32 Q36,24 42,20" stroke-dasharray="14" stroke-dashoffset="14"><animate attributeName="stroke-dashoffset" values="14;0;0;0;14" keyTimes="0;0.42;0.56;0.66;1" dur="8s" repeatCount="indefinite"/></path>
+    </g>
+  </g>
+
+  <!-- ══ 6. 🥬 青菜 x=530 — 饱满蓬松 ══ -->
+  <g transform="translate(498, 258) scale(0.95)">
+    <g><animate attributeName="opacity" values="0;0;0.68;0.68;0" keyTimes="0;0.06;0.18;0.85;1" dur="8s" repeatCount="indefinite"/>
+      <!-- 茎 -->
+      <path class="food-path-thin" stroke="#6B8E23" d="M42,60 L38,32 L46,32 Z" stroke-dasharray="34" stroke-dashoffset="34"><animate attributeName="stroke-dashoffset" values="34;0;0;0;34" keyTimes="0;0.16;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 左下叶 — 饱满曲线 -->
+      <path class="food-path" stroke="#5DAA3A" stroke-dasharray="68" stroke-dashoffset="68" d="M40,34 C28,26 12,22 10,36 C8,48 18,52 32,48"><animate attributeName="stroke-dashoffset" values="68;0;0;0;68" keyTimes="0;0.20;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 右上叶 — 外展 -->
+      <path class="food-path" stroke="#5DAA3A" stroke-dasharray="68" stroke-dashoffset="68" d="M44,34 C56,24 74,20 78,34 C82,48 68,52 52,48"><animate attributeName="stroke-dashoffset" values="68;0;0;0;68" keyTimes="0;0.26;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 中叶 — 挺立 -->
+      <path class="food-path" stroke="#4CAF50" stroke-dasharray="50" stroke-dashoffset="50" d="M42,36 C40,24 46,14 52,14 C58,14 64,24 60,36"><animate attributeName="stroke-dashoffset" values="50;0;0;0;50" keyTimes="0;0.32;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 叶脉 -->
+      <path class="food-path-thin" stroke="#3D8B37" d="M24,38 L32,42" stroke-dasharray="12" stroke-dashoffset="12"><animate attributeName="stroke-dashoffset" values="12;0;0;0;12" keyTimes="0;0.40;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#3D8B37" d="M60,38 L52,42" stroke-dasharray="12" stroke-dashoffset="12"><animate attributeName="stroke-dashoffset" values="12;0;0;0;12" keyTimes="0;0.44;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#3D8B37" d="M44,26 L44,34" stroke-dasharray="10" stroke-dashoffset="10"><animate attributeName="stroke-dashoffset" values="10;0;0;0;10" keyTimes="0;0.48;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <!-- 露珠 -->
+      <circle cx="18" cy="32" r="2.5" fill="#A8DADC"><animate attributeName="opacity" values="0;0;0.75;0.75;0" keyTimes="0;0.50;0.55;0.62;0.74;1" dur="8s" repeatCount="indefinite"/></circle>
+    </g>
+  </g>
+
+  <!-- ══ 7. 🍣 寿司 x=626 ══ -->
+  <g transform="translate(594, 264) scale(0.95)">
+    <g><animate attributeName="opacity" values="0;0;0.68;0.68;0" keyTimes="0;0.06;0.18;0.85;1" dur="8s" repeatCount="indefinite"/>
+      <rect class="food-path" stroke="#2D5016" x="8" y="4" width="76" height="22" rx="5" stroke-dasharray="180" stroke-dashoffset="180"><animate attributeName="stroke-dashoffset" values="180;0;0;0;180" keyTimes="0;0.14;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></rect>
+      <path class="food-path-thin" stroke="#F5E6CA" d="M18,6 Q20,10 18,14" stroke-dasharray="14" stroke-dashoffset="14"><animate attributeName="stroke-dashoffset" values="14;0;0;0;14" keyTimes="0;0.24;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#F5E6CA" d="M30,6 Q32,10 30,14" stroke-dasharray="14" stroke-dashoffset="14"><animate attributeName="stroke-dashoffset" values="14;0;0;0;14" keyTimes="0;0.27;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#F5E6CA" d="M42,6 Q44,10 42,14" stroke-dasharray="14" stroke-dashoffset="14"><animate attributeName="stroke-dashoffset" values="14;0;0;0;14" keyTimes="0;0.30;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#F5E6CA" d="M54,6 Q56,10 54,14" stroke-dasharray="14" stroke-dashoffset="14"><animate attributeName="stroke-dashoffset" values="14;0;0;0;14" keyTimes="0;0.33;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#FA8072" d="M16,18 L26,24" stroke-dasharray="13" stroke-dashoffset="13"><animate attributeName="stroke-dashoffset" values="13;0;0;0;13" keyTimes="0;0.36;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#FA8072" d="M32,18 L42,24" stroke-dasharray="13" stroke-dashoffset="13"><animate attributeName="stroke-dashoffset" values="13;0;0;0;13" keyTimes="0;0.40;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#FA8072" d="M48,18 L58,24" stroke-dasharray="13" stroke-dashoffset="13"><animate attributeName="stroke-dashoffset" values="13;0;0;0;13" keyTimes="0;0.44;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#FA8072" d="M64,18 L72,24" stroke-dasharray="13" stroke-dashoffset="13"><animate attributeName="stroke-dashoffset" values="13;0;0;0;13" keyTimes="0;0.48;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#F4A261" d="M64,4 Q70,-2 74,2" stroke-dasharray="16" stroke-dashoffset="16"><animate attributeName="stroke-dashoffset" values="16;0;0;0;16" keyTimes="0;0.52;0.58;0.68;1" dur="8s" repeatCount="indefinite"/></path>
+    </g>
+  </g>
+
+  <!-- ══ 8. 🍜 面条 x=722 ══ -->
+  <g transform="translate(690, 260) scale(0.95)">
+    <g><animate attributeName="opacity" values="0;0;0.68;0.68;0" keyTimes="0;0.06;0.18;0.85;1" dur="8s" repeatCount="indefinite"/>
+      <path class="food-path" stroke="#D4A574" stroke-dasharray="140" stroke-dashoffset="140" d="M8,12 L5,52 Q5,58 42,60 Q78,58 78,52 L75,12 Z"><animate attributeName="stroke-dashoffset" values="140;0;0;0;140" keyTimes="0;0.14;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <ellipse class="food-path" stroke="#D4A574" cx="42" cy="12" rx="34" ry="6" stroke-dasharray="75" stroke-dashoffset="75"><animate attributeName="stroke-dashoffset" values="75;0;0;0;75" keyTimes="0;0.22;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></ellipse>
+      <path class="food-path-thin" stroke="#F4C430" d="M18,12 Q22,24 20,34 Q18,42 24,48" stroke-dasharray="30" stroke-dashoffset="30"><animate attributeName="stroke-dashoffset" values="30;0;0;0;30" keyTimes="0;0.28;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#F4C430" d="M30,10 Q34,22 32,36 Q30,44 36,50" stroke-dasharray="30" stroke-dashoffset="30"><animate attributeName="stroke-dashoffset" values="30;0;0;0;30" keyTimes="0;0.32;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#F4C430" d="M42,8 Q44,22 42,38 Q40,46 46,52" stroke-dasharray="30" stroke-dashoffset="30"><animate attributeName="stroke-dashoffset" values="30;0;0;0;30" keyTimes="0;0.36;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#F4C430" d="M54,10 Q56,22 54,36 Q52,44 58,50" stroke-dasharray="30" stroke-dashoffset="30"><animate attributeName="stroke-dashoffset" values="30;0;0;0;30" keyTimes="0;0.40;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#F4C430" d="M66,12 Q68,24 66,36 Q64,44 70,48" stroke-dasharray="26" stroke-dashoffset="26"><animate attributeName="stroke-dashoffset" values="26;0;0;0;26" keyTimes="0;0.44;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#8B4513" d="M14,10 L14,-10" stroke-dasharray="20" stroke-dashoffset="20"><animate attributeName="stroke-dashoffset" values="20;0;0;0;20" keyTimes="0;0.48;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+      <path class="food-path-thin" stroke="#8B4513" d="M20,10 L20,-10" stroke-dasharray="20" stroke-dashoffset="20"><animate attributeName="stroke-dashoffset" values="20;0;0;0;20" keyTimes="0;0.50;0.54;0.64;1" dur="8s" repeatCount="indefinite"/></path>
+    </g>
+  </g>
+
+  <!-- ═══ 流动装饰线 ═══ -->
+  <path d="M0,280 Q200,262 400,284 Q600,306 800,280" fill="none" stroke="#FFD100" stroke-width="1.4">
+    <animate attributeName="opacity" values="0.2;0.38;0.22;0.4;0.2" dur="8s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-8; 0,5; 0,-5; 0,0" dur="8s" repeatCount="indefinite"/>
+  </path>
+  <path d="M0,320 Q200,338 400,318 Q600,302 800,320" fill="none" stroke="#A8DADC" stroke-width="1.3">
+    <animate attributeName="opacity" values="0.15;0.34;0.18;0.36;0.15" dur="8s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,8; 0,-4; 0,5; 0,0" dur="8s" repeatCount="indefinite"/>
+  </path>
+  <path d="M350,8 Q375,22 400,8 Q425,24 450,8" fill="none" stroke="#FFB5A7" stroke-width="1.5">
+    <animate attributeName="opacity" values="0.12;0.38;0.18;0.4;0.12" dur="8s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-5; 0,3; 0,-3; 0,0" dur="8s" repeatCount="indefinite"/>
+  </path>
+</svg>

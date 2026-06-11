@@ -243,30 +243,19 @@ body {
 /* 卡片 */
 .el-card {
   border-radius: var(--radius-lg) !important;
-  border: 6px solid transparent !important;
-  border-image-source: url('../assets/lace-border.svg') !important;
-  border-image-slice: 12 !important;
-  border-image-width: 6px !important;
-  border-image-repeat: round !important;
-  border-image-outset: 2px !important;
+  border: 1px solid var(--border-light) !important;
   box-shadow: var(--shadow-sm) !important;
   transition-property: box-shadow, transform;
   transition-duration: var(--transition-base);
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: visible;
+  overflow: hidden;
   background: var(--bg-card) !important;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  background-clip: padding-box;
 }
 .el-card:hover {
   box-shadow: var(--shadow-md) !important;
 }
-/* 暗色模式 — el-card 蕾丝 */
-:root[data-theme='dark'] .el-card {
-  border-image-source: url('../assets/lace-border.svg') !important;
-}
-/* el-card 内部保留圆角（通过 overflow:hidden 在 body 上） */
 .el-card__body {
   border-radius: inherit;
   background: var(--bg-card);
@@ -320,14 +309,15 @@ body {
   color: var(--color-primary) !important;
 }
 
-/* 对话框 */
+/* 对话框 — 实色不透明，保留毛玻璃效果 */
 .el-dialog {
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-xl) !important;
-  background: var(--bg-card) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--bg-card-solid) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
+/* 对话框遮罩 — 恢复默认半透明暗色 overlay */
 .el-dialog__header {
   padding: 20px 24px 0 !important;
   font-weight: 600;
@@ -495,6 +485,33 @@ body {
 }
 .el-select-dropdown__item.selected {
   color: var(--color-primary) !important;
+}
+/* 下拉菜单/弹窗 — 实色不透明 */
+.el-select-dropdown,
+.el-dropdown-menu,
+.el-popper,
+.el-popover,
+.el-cascader__dropdown,
+.el-picker-panel,
+.el-date-picker,
+.el-time-panel,
+.el-autocomplete-suggestion {
+  background: var(--bg-card-solid) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+/* 暗色模式 */
+:root[data-theme='dark'] .el-select-dropdown,
+:root[data-theme='dark'] .el-dropdown-menu,
+:root[data-theme='dark'] .el-popper,
+:root[data-theme='dark'] .el-popover,
+:root[data-theme='dark'] .el-cascader__dropdown,
+:root[data-theme='dark'] .el-picker-panel,
+:root[data-theme='dark'] .el-date-picker,
+:root[data-theme='dark'] .el-time-panel,
+:root[data-theme='dark'] .el-autocomplete-suggestion,
+:root[data-theme='dark'] .el-dialog {
+  background: var(--bg-card-solid) !important;
 }
 
 /* 弹出确认框 */
