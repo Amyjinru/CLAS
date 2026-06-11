@@ -386,6 +386,16 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.profile-page {
+  display: grid;
+  gap: 20px;
+}
+
+.profile-page :deep(.hero),
+.profile-page .panel {
+  margin-bottom: 0;
+}
+
 .profile-workspace { overflow: hidden; }
 .profile-tabs :deep(.el-tabs__header) { margin-bottom: 18px; }
 .profile-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; }

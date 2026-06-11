@@ -357,6 +357,10 @@ function hasActiveOrders() {
   return activeOrders.value.length > 0
 }
 
+const showActiveOrdersPanel = computed(() => currentRole() === 'USER' && (ordersLoading.value || hasActiveOrders()))
+const showAnnouncementsPanel = computed(() => announcements.value.length > 0)
+const hasTopSidePanels = computed(() => showAnnouncementsPanel.value || showActiveOrdersPanel.value)
+
 watch(
   () => [
     currentLocation.value?.longitude,
@@ -372,59 +376,70 @@ watch(
   }
 )
 
-onMounted(() => {
-  loadAddresses()
-  autoLocate()
-  load()
-  loadActiveOrders()
+onMounted(async () => {
+  await loadAddresses()
+  await autoLocate()
+  await Promise.all([load(), loadActiveOrders()])
 })
 </script>
 
 <template>
-  <section class="hero">
-    <div>
-      <h1>CLAS 综合生活助手平台</h1>
-      <p>搜索附近商家、购买外卖与团购券，让吃喝玩乐一键触达。</p>
-    </div>
-    <div class="hero-actions" v-if="currentRole() === 'USER'">
-      <RouterLink class="button" to="/deals">团购到店</RouterLink>
-      <RouterLink class="button secondary" to="/orders">我的订单</RouterLink>
-    </div>
-  </section>
+  <section
+    class="home-top-grid"
+    :class="{ 'home-top-grid--hero-only': !hasTopSidePanels }"
+  >
+    <section class="hero home-top-hero">
+      <div class="home-top-hero-copy">
+        <h1>CLAS 综合生活助手平台</h1>
+        <p>搜索附近商家、购买外卖与团购券，让吃喝玩乐一键触达。</p>
+      </div>
+      <div class="hero-actions" v-if="currentRole() === 'USER'">
+        <RouterLink class="button" to="/deals">团购到店</RouterLink>
+        <RouterLink class="button secondary" to="/orders">我的订单</RouterLink>
+      </div>
+    </section>
 
-  <section class="panel" v-if="announcements.length">
-    <div class="section-head">
-      <h2>平台公告</h2>
-      <RouterLink to="/user/announcements">查看全部</RouterLink>
-    </div>
-    <article class="announcement-preview" v-for="item in announcements.slice(0, 2)" :key="item.id">
-      <h3>{{ item.title }}</h3>
-      <p>{{ item.content }}</p>
-    </article>
-  </section>
+    <div v-if="hasTopSidePanels" class="home-top-side">
+      <section v-if="showAnnouncementsPanel" class="panel home-top-panel announcements-panel">
+        <div class="section-head">
+          <h2>平台公告</h2>
+          <RouterLink to="/user/announcements">查看全部</RouterLink>
+        </div>
+        <div class="home-top-panel-body">
+          <article class="announcement-preview" v-for="item in announcements" :key="item.id">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.content }}</p>
+          </article>
+        </div>
+      </section>
 
-  <!-- 进行中的订单 -->
-  <section class="panel active-orders-panel" v-if="currentRole() === 'USER' && hasActiveOrders()" v-loading="ordersLoading">
-    <div class="section-head">
-      <h2>进行中的订单</h2>
-      <RouterLink to="/orders">查看全部订单</RouterLink>
-    </div>
-    <div class="active-order-list">
-      <article class="active-order-card" v-for="order in activeOrders" :key="order.order.id">
-        <div class="ao-info">
-          <span class="ao-id">订单 #{{ order.order.id }}</span>
-          <el-tag size="small" :type="order.order.status === 'PAID' ? 'warning' : 'success'">
-            {{ orderStatusLabel[order.order.status] || order.order.status }}
-          </el-tag>
-          <span class="ao-delivery">{{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }}</span>
-          <span class="ao-price">¥{{ (order.order.totalPrice / 100).toFixed(2) }}</span>
-          <span class="ao-items">{{ order.items.length }} 件商品</span>
+      <section
+        v-if="showActiveOrdersPanel"
+        class="panel home-top-panel active-orders-panel"
+        v-loading="ordersLoading"
+      >
+        <div class="section-head">
+          <h2>进行中的订单</h2>
+          <RouterLink to="/orders">查看全部订单</RouterLink>
         </div>
-        <div class="ao-actions">
-          <button class="secondary" @click="openChat(order)">联系商家</button>
-          <RouterLink class="button secondary" :to="`/orders`">查看详情</RouterLink>
+        <div v-if="hasActiveOrders()" class="home-top-panel-body active-order-list">
+          <article class="active-order-card" v-for="order in activeOrders.slice(0, 1)" :key="order.order.id">
+            <div class="ao-info">
+              <span class="ao-id">订单 #{{ order.order.id }}</span>
+              <el-tag size="small" :type="order.order.status === 'PAID' ? 'warning' : 'success'">
+                {{ orderStatusLabel[order.order.status] || order.order.status }}
+              </el-tag>
+              <span class="ao-delivery">{{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }}</span>
+              <span class="ao-price">¥{{ (order.order.totalPrice / 100).toFixed(2) }}</span>
+              <span class="ao-items">{{ order.items.length }} 件商品</span>
+            </div>
+            <div class="ao-actions">
+              <button class="button secondary ao-action-btn" type="button" @click="openChat(order)">联系商家</button>
+              <RouterLink class="button secondary ao-action-btn" :to="`/orders`">查看详情</RouterLink>
+            </div>
+          </article>
         </div>
-      </article>
+      </section>
     </div>
   </section>
 
@@ -488,8 +503,8 @@ onMounted(() => {
         <el-tag v-else effect="plain">选择位置查看配送</el-tag>
       </p>
       <div class="card-actions">
-        <RouterLink class="button secondary" :to="`/merchant/${merchant.id}`">进入店铺</RouterLink>
-        <button class="button" type="button" @click="chatStore.openMerchantChat(merchant.id)">咨询客服</button>
+        <RouterLink class="button secondary merchant-card-btn" :to="`/merchant/${merchant.id}`">进入店铺</RouterLink>
+        <button class="button secondary merchant-card-btn" type="button" @click="chatStore.openMerchantChat(merchant.id)">咨询客服</button>
       </div>
     </article>
   </section>
@@ -609,6 +624,122 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.home-top-grid {
+  align-items: stretch;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  margin-bottom: 20px;
+  min-height: 360px;
+}
+
+.home-top-grid--hero-only {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.home-top-hero {
+  align-items: flex-start;
+  align-self: stretch;
+  border: 1px solid var(--border-color) !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: space-between;
+  margin-bottom: 0;
+  min-height: 360px;
+}
+
+.home-top-hero-copy {
+  position: relative;
+}
+
+.home-top-side {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 360px;
+  min-width: 0;
+}
+
+.home-top-panel {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  margin-bottom: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.announcements-panel {
+  flex: 0.75 1 0;
+}
+
+.active-orders-panel {
+  flex: 1.25 1 0;
+  min-height: 168px;
+}
+
+.home-top-panel-body {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.active-orders-panel .home-top-panel-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.active-orders-panel .active-order-card {
+  align-items: stretch;
+  display: grid;
+  flex: 1 1 auto;
+  gap: 10px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  padding: 12px 14px;
+}
+
+.active-orders-panel .ao-info {
+  align-content: start;
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.active-orders-panel .ao-items {
+  display: none;
+}
+
+.active-orders-panel .ao-actions {
+  flex-shrink: 0;
+  justify-content: stretch;
+  width: 100%;
+}
+
+.active-orders-panel .ao-action-btn {
+  flex: 1 1 0;
+  font-size: 13px;
+  min-height: 36px;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.home-top-panel .section-head {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
 .section-head {
   align-items: center;
   display: flex;
@@ -616,9 +747,14 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
-.hero-actions,
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
 .search-panel {
-  margin-bottom: 0;
+  margin-bottom: 16px;
 }
 
 .search-row {
@@ -725,6 +861,25 @@ onMounted(() => {
   align-self: center;
 }
 
+@media (max-width: 960px) {
+  .home-top-grid,
+  .home-top-grid--hero-only {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .home-top-hero,
+  .home-top-side {
+    height: auto;
+    min-height: 0;
+  }
+
+  .home-top-panel {
+    flex: 0 0 auto;
+    max-height: 220px;
+  }
+}
+
 @media (max-width: 768px) {
   .search-row {
     align-items: stretch;
@@ -772,14 +927,34 @@ onMounted(() => {
 }
 
 .delivery-status {
+  margin-bottom: 0;
   min-height: 28px;
+}
+
+.grid .card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .card-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   margin-top: auto;
+  padding-top: 16px;
+}
+
+.merchant-card-btn {
+  flex: 1 1 0;
+  font-size: 14px;
+  font-weight: 600;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 40px;
+  min-width: 0;
+  padding: 0 14px;
+  text-align: center;
 }
 
 .merchant-logo-thumb {
@@ -816,34 +991,29 @@ onMounted(() => {
 }
 
 .announcement-preview {
-  border-top: 1px solid var(--border-light);
-  padding-top: 14px;
-  margin-top: 14px;
-}
-.announcement-preview:first-of-type {
-  border-top: 0;
-  margin-top: 0;
-  padding-top: 0;
+  min-width: 0;
 }
 .announcement-preview h3 {
   font-size: 16px;
   margin: 0 0 6px;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .announcement-preview p {
   color: var(--text-secondary);
+  display: -webkit-box;
+  line-clamp: 2;
   margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   line-height: 1.6;
-}
-
-/* 进行中的订单 */
-.active-orders-panel {
-  margin-bottom: 20px;
+  overflow: hidden;
 }
 
 .active-order-list {
-  display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .active-order-card {
@@ -852,6 +1022,7 @@ onMounted(() => {
   border: 1px solid var(--border-light);
   border-radius: 10px;
   display: flex;
+  flex-shrink: 0;
   flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
@@ -887,7 +1058,15 @@ onMounted(() => {
 
 .ao-actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ao-action-btn {
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 40px;
+  padding: 0 16px;
 }
 
 /* 聊天弹窗 */
