@@ -1,14 +1,16 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { getMerchant, getOrderDetail } from '../api/clas'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { cancelOrder, completeOrder, getMerchant, getOrderDetail, requestRefund } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
+import { useConfirmAction } from '../composables/useConfirmAction'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
 import { orderStatusMap } from '../utils/status'
 
 const route = useRoute()
 const router = useRouter()
+const { confirmAction } = useConfirmAction()
 const orderId = computed(() => Number(route.params.orderId))
 const fromNotifications = computed(() => route.query.from === 'notifications')
 
@@ -16,6 +18,7 @@ const orderEntry = ref(null)
 const merchant = ref(null)
 const loading = ref(true)
 const error = ref('')
+const actionMessage = ref('')
 
 const deliveryLabel = {
   WAITING: '等待商家接单',
@@ -46,6 +49,8 @@ const orderTimeline = computed(() => {
   ].filter((item) => item.time)
 })
 
+const currentStatus = computed(() => orderEntry.value?.order?.status)
+
 function distanceText(distance) {
   if (!distance) return ''
   return formatDistance(distance)
@@ -63,7 +68,10 @@ function goBack() {
   }
 }
 
-onMounted(async () => {
+async function loadDetail() {
+  merchant.value = null
+  actionMessage.value = ''
+  error.value = ''
   try {
     orderEntry.value = await getOrderDetail(orderId.value)
     if (!orderEntry.value) {
@@ -80,6 +88,36 @@ onMounted(async () => {
     }
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || '加载订单失败'
+  }
+}
+
+async function cancelCurrentOrder() {
+  await confirmAction('确认取消该订单？', async () => {
+    await cancelOrder(orderEntry.value.order.id)
+    await loadDetail()
+    actionMessage.value = '订单已取消'
+  })
+}
+
+async function completeCurrentOrder() {
+  await confirmAction('确认该订单已经完成？', async () => {
+    await completeOrder(orderEntry.value.order.id)
+    await loadDetail()
+    actionMessage.value = '订单已完成'
+  }, { type: 'success' })
+}
+
+async function refundCurrentOrder() {
+  const reason = window.prompt('请输入退款原因', '配送超时')
+  if (!reason) return
+  await requestRefund(orderEntry.value.order.id, reason.trim())
+  await loadDetail()
+  actionMessage.value = '退款申请已提交'
+}
+
+onMounted(async () => {
+  try {
+    await loadDetail()
   } finally {
     loading.value = false
   }
@@ -96,6 +134,47 @@ onMounted(async () => {
 
     <section v-else class="panel order-detail-panel">
       <h1>订单 #{{ orderEntry.order.id }}</h1>
+      <p v-if="actionMessage" class="action-message">{{ actionMessage }}</p>
+
+      <div class="detail-actions">
+        <RouterLink
+          v-if="currentStatus === 'PENDING_PAYMENT'"
+          class="button"
+          :to="`/payment/${orderEntry.order.id}`"
+        >
+          去支付
+        </RouterLink>
+        <button
+          v-if="['PENDING_PAYMENT', 'PAID'].includes(currentStatus)"
+          class="secondary"
+          type="button"
+          @click="cancelCurrentOrder"
+        >
+          取消订单
+        </button>
+        <button
+          v-if="currentStatus === 'ACCEPTED'"
+          type="button"
+          @click="completeCurrentOrder"
+        >
+          确认完成
+        </button>
+        <button
+          v-if="['PAID', 'ACCEPTED', 'COMPLETED'].includes(currentStatus)"
+          class="secondary"
+          type="button"
+          @click="refundCurrentOrder"
+        >
+          申请退款
+        </button>
+        <RouterLink
+          v-if="currentStatus === 'COMPLETED'"
+          class="button secondary"
+          :to="`/review/${orderEntry.order.id}`"
+        >
+          去评价
+        </RouterLink>
+      </div>
 
       <div class="detail-grid">
         <div class="detail-block">
@@ -215,6 +294,19 @@ onMounted(async () => {
 
 .order-detail-panel h1 {
   margin-top: 0;
+}
+
+.action-message {
+  color: var(--clas-success);
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .detail-grid {
