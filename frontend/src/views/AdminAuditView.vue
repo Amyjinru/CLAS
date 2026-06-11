@@ -379,7 +379,7 @@ onMounted(load)
   height: 32px;
 }
 
-/* 搜索栏 */
+/* 搜索栏 — 样式统一由 theme.css 管理 */
 .toolbar > .el-input {
   width: 340px;
   display: flex;
@@ -387,12 +387,6 @@ onMounted(load)
 .toolbar > .el-input :deep(.el-input__wrapper) {
   flex: 1;
   box-sizing: border-box !important;
-}
-.toolbar > .el-input :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--border-color) inset !important;
-}
-.toolbar > .el-input :deep(.el-input__wrapper.is-focus) {
-  box-shadow: none !important;
 }
 
 /* 筛选栏 */
