@@ -13,7 +13,7 @@
 | 原则 | 说明 |
 |------|------|
 | **温暖而非冰冷** | 暖灰背景、美团黄主色、半透明卡片，避免纯黑白工具风 |
-| **层次清晰** | 页面背景 → 面板/卡片 → 内容；用阴影与蕾丝边区分层级 |
+| **层次清晰** | 页面背景 → 面板/卡片 → 内容；用边框与阴影区分层级 |
 | **可触达** | 主操作按钮最小高度 **44px**；链接与按钮有明确 hover / focus |
 | **克制动效** | 150–250ms 过渡；卡片 hover 轻微上浮；背景水波低对比循环 |
 | **组件一致** | 优先复用 `.panel` / `.hero` / `.card` / Element Plus 主题覆盖，少写一次性样式 |
@@ -128,14 +128,11 @@
 
 **约定**：固定定位的装饰层 `z-index: 0`，内容区（顶栏、main、footer）`z-index: 1`。
 
-### 5.2 蕾丝花边（Lace Border）
+### 5.2 卡片边框
 
-`.panel`、`.checkout`、`.card`、`.row`、`.el-card` 等通过 `::before` + `lace-border.svg` 的 `border-image` 实现外圈花边：
+`.panel`、`.checkout`、`.card`、`.row`、`.el-card` 使用 **1px 暖色实线边框**（`var(--border-color)`）+ 圆角 + 轻阴影，不再使用装饰性花边。
 
-- 不依赖真实 border，兼容 `border-radius`
-- 内容子元素需 `position: relative; z-index: 1`
-
-**Hero 区**不使用蕾丝，改用渐变背景 + 右上 radial 光斑（`.hero::before`）。
+**Hero 区**使用渐变背景 + 右上 radial 光斑（`.hero::before`），无边框或单独描边。
 
 ---
 
@@ -164,7 +161,7 @@
 | 类名 | 说明 |
 |------|------|
 | `.hero` | 宣传区；flex 布局，渐变底；常用于首页顶部、个人中心头图 |
-| `.panel` | 标准内容块；白半透明 + 蕾丝 + 阴影 |
+| `.panel` | 标准内容块；白半透明 + 1px 边框 + 阴影 |
 | `.section-head` | 区块标题行：左标题 + 右链接/按钮，`margin-bottom: 12–16px` |
 | `.grid` + `.card` | 商家列表等：`repeat(auto-fit, minmax(230px, 1fr))` |
 
@@ -266,11 +263,10 @@
 ```
 frontend/src/styles/
 ├── theme.css      # 变量、Element Plus 全局覆盖、暗色模式
-└── app.css        # 布局、panel/card/hero、按钮、蕾丝装饰
+└── app.css        # 布局、panel/card/hero、按钮
 
 frontend/src/assets/
-├── pattern-bg.svg # 整页平铺图案
-└── lace-border.svg # 卡片/面板花边
+└── pattern-bg.svg # 整页平铺图案
 ```
 
 **新增页面 checklist**
