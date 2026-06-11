@@ -9,4 +9,4 @@
 
 - [x] 2.1 Add integration coverage for repeated payment submissions.
 - [x] 2.2 Run backend tests and frontend build.
-- [ ] 2.3 Push `dev` and deploy to the cloud server.
+- [x] 2.3 Push `dev` and deploy to the cloud server.
