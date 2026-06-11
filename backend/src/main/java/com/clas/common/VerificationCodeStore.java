@@ -6,15 +6,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 public class VerificationCodeStore {
-    private static final Logger log = LoggerFactory.getLogger(VerificationCodeStore.class);
     private static final long TTL_SECONDS = 10 * 60;
     private static final long COOLDOWN_SECONDS = 30;
     private static final int MAX_ATTEMPTS = 5;
@@ -48,7 +45,11 @@ public class VerificationCodeStore {
             storeInMemory(normalizedPhone, normalizedScene, code);
         }
 
-        log.debug("场景 {}，手机号 {} 验证码已生成", normalizedScene, maskPhone(normalizedPhone));
+        System.out.println("═══════════════════════════════════════════");
+        System.out.println("  验证码: " + code);
+        System.out.println("  场景: " + normalizedScene);
+        System.out.println("  手机号: " + maskPhone(normalizedPhone));
+        System.out.println("═══════════════════════════════════════════");
         return code;
     }
 

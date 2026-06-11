@@ -3,8 +3,9 @@ export const orderStatusMap = {
   PAID: { text: '待接单', type: 'primary' },
   ACCEPTED: { text: '已接单', type: 'info' },
   COMPLETED: { text: '已完成', type: 'success' },
-  REFUND_REQUESTED: { text: '退款中', type: 'warning' },
+  REFUND_PENDING: { text: '退款中', type: 'warning' },
   REFUNDED: { text: '已退款', type: 'danger' },
+  REJECTED: { text: '已拒单', type: 'danger' },
   CANCELED: { text: '已取消', type: 'info' }
 }
 

@@ -8,6 +8,8 @@ export const getMyMerchant = () => api.get('/merchant/my').then(unwrap)
 export const getMyMerchantAuditStatus = () => api.get('/merchant/my/audit-status').then(unwrap)
 export const getMyMerchantStats = () => api.get('/merchant/my/stats').then(unwrap)
 export const sendMerchantProfileCode = (payload) => api.post('/merchant/my/profile/send-code', payload).then(unwrap)
+export const sendMerchantPhoneCode = (phone) => api.post('/merchant/my/profile/send-phone-code', { phone }).then(unwrap)
+export const sendMerchantBankCode = () => api.post('/merchant/my/profile/send-bank-code').then(unwrap)
 export const updateMyMerchantProfile = (payload) => api.put('/merchant/my/profile', payload).then(unwrap)
 export const toggleMerchantManualClosed = () => api.post('/merchant/my/manual-closed/toggle').then(unwrap)
 export const adminListMerchants = () => api.get('/merchant/admin/list').then(unwrap)
@@ -31,4 +33,8 @@ export async function currentMerchantId() {
 
 export async function listMerchantOrders() {
   return api.get('/order/merchant/me').then(unwrap)
+}
+
+export async function listMerchantOrdersByUser(userId) {
+  return api.get(`/order/merchant/me/user/${userId}`).then(unwrap)
 }

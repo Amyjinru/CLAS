@@ -1,7 +1,6 @@
 package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.GeoUtils;
 import com.clas.common.MerchantStatusEnum;
@@ -30,6 +29,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -171,33 +171,53 @@ public class MerchantService {
         return merchant != null ? convertToResponse(merchant) : null;
     }
 
+    public void sendPhoneUpdateCode(String phone) {
+        currentMerchant();
+        String nextPhone = PhoneValidator.normalizeAndValidate(phone);
+        verificationCodeStore.generateAndStore(nextPhone, "merchant-phone-change");
+    }
+
+    public void sendBankUpdateCode() {
+        Merchant merchant = currentMerchant();
+        verificationCodeStore.generateAndStore(merchant.getPhone(), "merchant-bank-change");
+    }
+
     public void sendProfileUpdateCode(MerchantProfileUpdateRequest request) {
         Merchant merchant = currentMerchant();
         String nextPhone = PhoneValidator.normalizeAndValidate(request.phone());
-        String targetPhone = nextPhone.equals(merchant.getPhone()) ? merchant.getPhone() : nextPhone;
-        verificationCodeStore.generateAndStore(targetPhone, "merchant-profile");
+        String nextBankAccount = normalizeOptional(request.bankAccount());
+        if (!nextPhone.equals(merchant.getPhone())) {
+            verificationCodeStore.generateAndStore(nextPhone, "merchant-phone-change");
+        }
+        if (!Objects.equals(nextBankAccount, normalizeOptional(merchant.getBankAccount()))) {
+            verificationCodeStore.generateAndStore(merchant.getPhone(), "merchant-bank-change");
+        }
     }
 
     @Transactional
     public MerchantResponse updateMyProfile(MerchantProfileUpdateRequest request) {
         Merchant merchant = currentMerchant();
         String oldPhone = merchant.getPhone();
-        String oldUserId = merchant.getUserId();
         String nextName = normalizeRequired(request.merchantName(), "店铺名称不能为空");
         String nextAddress = normalizeRequired(request.address(), "店铺地址不能为空");
         String nextPhone = PhoneValidator.normalizeAndValidate(request.phone());
-        String nextBankAccount = normalizeRequired(request.bankAccount(), "银行账号不能为空");
-        if (!nextBankAccount.matches("^\\d{9,25}$")) {
-            throw new BusinessException("银行账号必须是 9 到 25 位数字");
-        }
+        String nextBankAccount = normalizeOptional(request.bankAccount());
         if (!GeoUtils.hasCoordinate(request.longitude(), request.latitude())) {
             throw new BusinessException("请选择店铺地图位置");
         }
         boolean phoneChanged = !nextPhone.equals(oldPhone);
-        boolean bankChanged = !nextBankAccount.equals(merchant.getBankAccount());
-        if (phoneChanged || bankChanged) {
-            String verifyPhone = phoneChanged ? nextPhone : oldPhone;
-            verificationCodeStore.verify(verifyPhone, "merchant-profile", request.code());
+        boolean bankChanged = !Objects.equals(nextBankAccount, normalizeOptional(merchant.getBankAccount()));
+        if (phoneChanged) {
+            verificationCodeStore.verify(nextPhone, "merchant-phone-change", firstPresent(request.phoneCode(), request.code()));
+        }
+        if (bankChanged) {
+            if (nextBankAccount.isBlank()) {
+                throw new BusinessException("银行账号不能为空");
+            }
+            if (!nextBankAccount.matches("^\\d{9,25}$")) {
+                throw new BusinessException("银行账号必须是 9 到 25 位数字");
+            }
+            verificationCodeStore.verify(oldPhone, "merchant-bank-change", firstPresent(request.bankCode(), request.code()));
         }
         if (phoneChanged) {
             // Check for duplicate contact phone among other merchants
@@ -206,10 +226,6 @@ public class MerchantService {
                 .ne(Merchant::getId, merchant.getId()));
             if (phoneCount > 0) {
                 throw new BusinessException("联系电话已被其他商家占用");
-            }
-            // Check if the new phone is already registered as a different user
-            if (userMapper.selectById(nextPhone) != null && !nextPhone.equals(oldUserId)) {
-                throw new BusinessException("该手机号已被注册，无法使用");
             }
         }
 
@@ -220,17 +236,8 @@ public class MerchantService {
         merchant.setDeliveryRadiusM(normalizeDeliveryRadius(request.deliveryRadiusM()));
         merchant.setBusinessHours(normalizeBusinessHours(request.businessHours(), merchant.getBusinessHours()));
         merchant.setPhone(nextPhone);
-        merchant.setBankAccount(nextBankAccount);
+        merchant.setBankAccount(bankChanged ? nextBankAccount : merchant.getBankAccount());
         merchantMapper.updateById(merchant);
-
-        if (phoneChanged) {
-            // Update user.phone (login credential) and merchant.userId in sync
-            userMapper.update(null, new LambdaUpdateWrapper<User>()
-                .eq(User::getPhone, oldUserId)
-                .set(User::getPhone, nextPhone));
-            merchant.setUserId(nextPhone);
-            merchantMapper.updateById(merchant);
-        }
 
         return convertToResponse(merchantMapper.selectById(merchant.getId()));
     }
@@ -544,6 +551,14 @@ public class MerchantService {
             throw new BusinessException(message);
         }
         return value.trim();
+    }
+
+    private String normalizeOptional(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String firstPresent(String preferred, String fallback) {
+        return preferred == null || preferred.isBlank() ? fallback : preferred;
     }
 
     public Long getCurrentMerchantId() {

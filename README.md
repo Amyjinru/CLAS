@@ -14,7 +14,7 @@
 
 - 后端：Spring Boot 3、MyBatis Plus、MySQL、Redis、Lombok
 - 前端：Vue3、Vite、axios
-- 数据库：28 张业务表，见 `database/schema.sql`；旧本地库请先执行 `database/migration-20260608.sql` 补齐字段。
+- 数据库：28 张业务表，见 `database/schema.sql`；旧本地库请按文件名顺序执行 `database/migration-*.sql` 补齐字段和新增表。
 
 ## 项目结构
 
@@ -37,19 +37,21 @@ backend/src/main/java/com/clas
 mysql -h127.0.0.1 -P3306 -uroot -p < database/schema.sql
 ```
 
-已经有本地旧数据、不想清空时，执行非破坏性迁移脚本补齐缺失字段和表：
+已经有本地旧数据、不想清空时，按文件名顺序执行非破坏性迁移脚本补齐缺失字段和表：
 
 ```bash
-mysql -h127.0.0.1 -P3306 -uroot -p < database/migration-20260608.sql
+for f in database/migration-*.sql; do mysql -h127.0.0.1 -P3306 -uroot -p < "$f"; done
 ```
 
 PowerShell 不能使用 `<` 重定向时，可以改用：
 
 ```powershell
-Get-Content -Raw database\migration-20260608.sql | mysql --host=127.0.0.1 --port=3306 --user=root --password=你的密码
+Get-ChildItem database\migration-*.sql | Sort-Object Name | ForEach-Object {
+  Get-Content -Raw $_.FullName | mysql --host=127.0.0.1 --port=3306 --user=root --password=你的密码
+}
 ```
 
-`schema.sql` 会重建 `clas` 数据库和 28 张业务表（含优惠券/评价治理/违规处理/团购核销等）；`migration-20260608.sql` 只补字段/表并保留已有数据。
+`schema.sql` 会重建 `clas` 数据库和 28 张业务表（含优惠券/评价治理/违规处理/团购核销等）；`migration-*.sql` 只补字段/表并保留已有数据。
 
 ## 启动后端
 

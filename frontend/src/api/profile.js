@@ -2,6 +2,9 @@ import { api, unwrap } from './client'
 
 export const getProfile = (config = {}) => api.get('/user/profile', config).then(unwrap)
 export const updateProfile = (payload) => api.put('/user/profile', payload).then(unwrap)
+export const sendPhoneChangeCode = (payload) => api.post('/user/phone-change/send-code', payload).then(unwrap)
+export const updateBoundPhone = (payload) => api.put('/user/phone', payload).then(unwrap)
+export const changePassword = (payload) => api.put('/user/password', payload, { silent: true }).then(unwrap)
 export async function uploadAvatar(file) {
   const formData = new FormData()
   formData.append('file', file)

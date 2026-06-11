@@ -22,6 +22,7 @@ DROP TABLE IF EXISTS group_deal;
 DROP TABLE IF EXISTS notification;
 DROP TABLE IF EXISTS favorite;
 DROP TABLE IF EXISTS user_address;
+DROP TABLE IF EXISTS user_bank_card;
 DROP TABLE IF EXISTS payment;
 DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS chat_message;
@@ -136,6 +137,19 @@ CREATE TABLE user_address (
     INDEX idx_address_user (user_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE user_bank_card (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    bank_name VARCHAR(50) NOT NULL,
+    cardholder_name VARCHAR(50) NOT NULL,
+    card_no_encrypted VARCHAR(64) NOT NULL,
+    card_last4 VARCHAR(4) NOT NULL,
+    card_type VARCHAR(20) NOT NULL DEFAULT '借记卡',
+    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    create_time DATETIME NOT NULL,
+    INDEX idx_user_bank_card_user (user_id, create_time DESC)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE favorite (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,
@@ -151,6 +165,14 @@ CREATE TABLE notification (
     title VARCHAR(100) NOT NULL,
     content VARCHAR(255) NOT NULL,
     read_flag TINYINT(1) NOT NULL DEFAULT 0,
+    type VARCHAR(50),
+    target_type VARCHAR(50),
+    target_id BIGINT,
+    review_id BIGINT,
+    reply_id BIGINT,
+    order_id BIGINT,
+    merchant_id BIGINT,
+    target_path VARCHAR(255),
     created_at DATETIME NOT NULL,
     INDEX idx_notification_user_read (user_id, read_flag, created_at DESC)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

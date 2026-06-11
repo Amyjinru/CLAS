@@ -4,7 +4,11 @@ import com.clas.common.Result;
 import com.clas.config.RequireRole;
 import com.clas.config.UserContext;
 import com.clas.dto.AppealRequest;
+import com.clas.dto.LoginResponse;
+import com.clas.dto.PasswordChangeRequest;
+import com.clas.dto.PhoneChangeRequest;
 import com.clas.dto.ProfileUpdateRequest;
+import com.clas.dto.SendCodeRequest;
 import com.clas.entity.Appeal;
 import com.clas.entity.User;
 import com.clas.entity.UserPenalty;
@@ -53,6 +57,26 @@ public class UserProfileController {
     @RequireRole({"USER", "MERCHANT", "ADMIN"})
     public Result<User> updateProfile(@Valid @RequestBody ProfileUpdateRequest request) {
         return Result.ok(userProfileService.updateProfile(UserContext.getUserId(), request));
+    }
+
+    @PostMapping("/phone-change/send-code")
+    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    public Result<String> sendPhoneChangeCode(@Valid @RequestBody SendCodeRequest request) {
+        userProfileService.sendPhoneChangeCode(UserContext.getUserId(), request);
+        return Result.ok("验证码已发送");
+    }
+
+    @PutMapping("/phone")
+    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    public Result<LoginResponse> changePhone(@Valid @RequestBody PhoneChangeRequest request) {
+        return Result.ok(userProfileService.changePhone(UserContext.getUserId(), request));
+    }
+
+    @PutMapping("/password")
+    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    public Result<Void> changePassword(@Valid @RequestBody PasswordChangeRequest request) {
+        userProfileService.changePassword(UserContext.getUserId(), request);
+        return Result.ok();
     }
 
     @PostMapping("/profile/avatar")

@@ -115,10 +115,24 @@ public class MerchantController {
         return Result.ok(merchantLogoUploadService.uploadAndUpdate(file));
     }
 
+    @PostMapping("/my/profile/send-phone-code")
+    @RequireRole("MERCHANT")
+    public Result<String> sendPhoneUpdateCode(@RequestBody Map<String, String> body) {
+        merchantService.sendPhoneUpdateCode(body.get("phone"));
+        return Result.ok("验证码已发送");
+    }
+
     @PostMapping("/my/profile/send-code")
     @RequireRole("MERCHANT")
-    public Result<String> sendProfileUpdateCode(@Valid @RequestBody MerchantProfileUpdateRequest request) {
+    public Result<String> sendProfileUpdateCode(@RequestBody MerchantProfileUpdateRequest request) {
         merchantService.sendProfileUpdateCode(request);
+        return Result.ok("验证码已发送");
+    }
+
+    @PostMapping("/my/profile/send-bank-code")
+    @RequireRole("MERCHANT")
+    public Result<String> sendBankUpdateCode() {
+        merchantService.sendBankUpdateCode();
         return Result.ok("验证码已发送");
     }
 

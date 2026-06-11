@@ -33,7 +33,7 @@ const emit = defineEmits(['select'])
 .profile-summary {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .summary-item {
   background: #fff;
@@ -55,7 +55,15 @@ const emit = defineEmits(['select'])
 .summary-item strong { font-size: 24px; }
 .summary-item span { color: var(--text-secondary); font-size: 13px; }
 
-@media (max-width: 760px) {
-  .profile-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1100px) {
+  .profile-summary { gap: 8px; }
+  .summary-item { padding: 12px; }
+  .summary-item strong { font-size: 22px; }
+}
+@media (max-width: 900px) {
+  .profile-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .profile-summary { grid-template-columns: 1fr; }
 }
 </style>

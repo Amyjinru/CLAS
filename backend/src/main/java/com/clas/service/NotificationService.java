@@ -22,11 +22,35 @@ public class NotificationService {
     }
 
     public void send(String userId, String title, String content) {
+        send(new NotificationTarget(
+            userId,
+            title,
+            content,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        ));
+    }
+
+    public void send(NotificationTarget target) {
         Notification notification = new Notification();
-        notification.setUserId(userId);
-        notification.setTitle(title);
-        notification.setContent(content);
+        notification.setUserId(target.userId());
+        notification.setTitle(target.title());
+        notification.setContent(target.content());
         notification.setReadFlag(false);
+        notification.setType(target.type());
+        notification.setTargetType(target.targetType());
+        notification.setTargetId(target.targetId());
+        notification.setReviewId(target.reviewId());
+        notification.setReplyId(target.replyId());
+        notification.setOrderId(target.orderId());
+        notification.setMerchantId(target.merchantId());
+        notification.setTargetPath(target.targetPath());
         notificationMapper.insert(notification);
     }
 
@@ -74,5 +98,20 @@ public class NotificationService {
     public void deleteAllMine() {
         notificationMapper.delete(new LambdaQueryWrapper<Notification>()
             .eq(Notification::getUserId, UserContext.getUserId()));
+    }
+
+    public record NotificationTarget(
+        String userId,
+        String title,
+        String content,
+        String type,
+        String targetType,
+        Long targetId,
+        Long reviewId,
+        Long replyId,
+        Long orderId,
+        Long merchantId,
+        String targetPath
+    ) {
     }
 }

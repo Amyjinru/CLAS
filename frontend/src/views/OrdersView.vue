@@ -1,6 +1,6 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
 import { cancelOrder, completeOrder, getReviewByOrder, listOrders, requestRefund, getOrderMessages } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
@@ -16,6 +16,8 @@ const reviewedOrderIds = ref(new Set())
 const { confirmAction } = useConfirmAction()
 const chatOrder = ref(null)
 const chatHasHistory = ref(new Set())
+const route = useRoute()
+const activeTab = ref(route.query.tab || 'all')
 
 const refundStatusLabel = {
   PENDING: '待商家审核',
@@ -37,6 +39,34 @@ const deliveryLabel = {
   DELIVERING: '配送中',
   DELIVERED: '已送达'
 }
+
+const orderTabs = [
+  { label: '全部订单', name: 'all' },
+  { label: '待收货/使用', name: 'receiving' },
+  { label: '待评价', name: 'review' },
+  { label: '退款/售后', name: 'after-sale' }
+]
+
+const filteredOrders = computed(() => {
+  if (activeTab.value === 'receiving') {
+    return orders.value.filter((entry) => {
+      const { status, deliveryStatus, refundStatus } = entry.order
+      // 明确排除退款、取消和拒单订单
+      if (['REFUNDED', 'REFUND_PENDING', 'CANCELED', 'REJECTED'].includes(status)) return false
+      if (refundStatus && refundStatus !== 'NONE') return false
+      // 已接单且已配送/已送达（未确认收货）
+      if (status === 'ACCEPTED' && ['DELIVERING', 'DELIVERED'].includes(deliveryStatus)) return true
+      return false
+    })
+  }
+  if (activeTab.value === 'review') {
+    return orders.value.filter((entry) => entry.order.status === 'COMPLETED' && !hasReview(entry.order.id))
+  }
+  if (activeTab.value === 'after-sale') {
+    return orders.value.filter((entry) => entry.order.status === 'REFUND_PENDING' || entry.order.status === 'REFUNDED' || (entry.order.refundStatus && entry.order.refundStatus !== 'NONE'))
+  }
+  return orders.value
+})
 
 async function load() {
   try {
@@ -108,6 +138,15 @@ async function checkChatHistory(order) {
   }
 }
 
+function openOrderById(orderId) {
+  const id = Number(orderId)
+  if (!id) return
+  const order = orders.value.find((o) => o.order.id === id)
+  if (order) {
+    openChat(order)
+  }
+}
+
 onMounted(async () => {
   await load()
   // Check chat history for completed orders
@@ -119,6 +158,20 @@ onMounted(async () => {
       }
     }
   }
+  // If navigated from a notification, open the order chat automatically
+  if (route.query.orderId) {
+    openOrderById(route.query.orderId)
+  }
+})
+
+watch(() => route.query.tab, (tab) => {
+  activeTab.value = tab || 'all'
+})
+
+watch(() => route.query.orderId, (orderId) => {
+  if (orderId) {
+    openOrderById(orderId)
+  }
 })
 </script>
 
@@ -129,10 +182,13 @@ onMounted(async () => {
     <section class="panel orders-head">
       <h1>我的订单</h1>
       <p>{{ message }}</p>
+      <el-tabs v-model="activeTab" class="order-tabs">
+        <el-tab-pane v-for="tab in orderTabs" :key="tab.name" :label="tab.label" :name="tab.name" />
+      </el-tabs>
     </section>
 
     <section class="user-page-grid-2 orders-list">
-      <article class="row order-card" v-for="order in orders" :key="order.order.id">
+      <article class="row order-card" v-for="order in filteredOrders" :key="order.order.id">
         <div class="order-body">
           <h2>订单 {{ order.order.id }}</h2>
           <p><StatusTag :status="order.order.status" :map="orderStatusMap" /> · {{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }} · <MoneyText :amount="order.order.totalPrice" /></p>
@@ -210,7 +266,7 @@ onMounted(async () => {
       </article>
     </section>
 
-    <el-empty v-if="!orders.length && !message" description="暂无订单" />
+    <el-empty v-if="!filteredOrders.length && !message" description="暂无订单" />
 
     <!-- Chat overlay -->
     <div v-if="chatOrder" class="order-overlay" @click.self="closeChat">
@@ -243,6 +299,10 @@ onMounted(async () => {
 
 .orders-head {
   margin-bottom: 0;
+}
+
+.order-tabs {
+  margin-top: 14px;
 }
 
 .orders-list {

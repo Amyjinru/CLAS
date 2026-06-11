@@ -17,6 +17,14 @@ public class Notification {
     private String title;
     private String content;
     private Boolean readFlag;
+    private String type;
+    private String targetType;
+    private Long targetId;
+    private Long reviewId;
+    private Long replyId;
+    private Long orderId;
+    private Long merchantId;
+    private String targetPath;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

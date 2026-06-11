@@ -1,17 +1,15 @@
 ﻿<script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund, uploadMerchantLogo, toggleMerchantManualClosed } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
 import OrderDetailContent from '../components/OrderDetailContent.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
-import MerchantSidebar from '../components/merchant/MerchantSidebar.vue'
-import MerchantProfileEditDialog from '../components/merchant/MerchantProfileEditDialog.vue'
-import { useChatStore } from '../composables/useChatStore'
+import MerchantWorkspaceShell from '../components/merchant/MerchantWorkspaceShell.vue'
 
 const router = useRouter()
 const merchant = ref(null)
@@ -21,11 +19,6 @@ const loginUser = ref(null)
 const voucherCode = ref('')
 const reviews = ref([])
 const replyDrafts = ref({})
-const logoInputRef = ref(null)
-const logoUploading = ref(false)
-const profileDialogVisible = ref(false)
-const chatStore = useChatStore()
-const displayStatus = computed(() => resolveDisplayStatus(merchant.value))
 
 // ===== version_314: 订单详情弹窗 & 商品名映射 =====
 const productNames = ref({})
@@ -209,36 +202,6 @@ async function handleReply(review) {
   await load()
 }
 
-function openLogoPicker() {
-  logoInputRef.value?.click()
-}
-
-function beforeLogoUpload(file) {
-  const allowed = ['image/jpeg', 'image/png']
-  if (!allowed.includes(file.type)) {
-    ElMessage.warning('仅支持 jpg/png 图片')
-    return false
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.warning('图片不能超过 5MB')
-    return false
-  }
-  return true
-}
-
-async function onLogoSelected(event) {
-  const file = event.target.files?.[0]
-  event.target.value = ''
-  if (!file || !beforeLogoUpload(file)) return
-  logoUploading.value = true
-  try {
-    merchant.value = await uploadMerchantLogo(file)
-    ElMessage.success('店铺头像已更新')
-  } finally {
-    logoUploading.value = false
-  }
-}
-
 // ===== version_314: 通用订单操作方法 =====
 async function operate(action, order) {
   if (action === 'accept') await acceptOrder(order.order.id)
@@ -270,17 +233,8 @@ function closeChat() {
   chatOrder.value = null
 }
 
-async function openReplyPanel() {
-  await chatStore.openReplyPanel()
-}
-
 function onMerchantProfileSaved(nextMerchant) {
   merchant.value = nextMerchant
-}
-
-async function toggleManualClosed() {
-  merchant.value = await toggleMerchantManualClosed()
-  ElMessage.success(merchant.value.manualClosed ? '已手动打烊' : '已恢复默认营业状态')
 }
 
 onMounted(() => {
@@ -293,84 +247,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="console-container" v-loading="loading">
-    <!-- No merchant registered yet -->
-    <el-card v-if="!merchant && !loading" class="box-card welcome-card">
-      <div class="welcome-content">
-        <el-icon class="welcome-icon" color="#409eff" :size="80"><Shop /></el-icon>
-        <h2>欢迎来到 CLAS 商家中心</h2>
-        <p>您目前还没有入驻平台。赶快提交商家入驻资质申请，开始您的商业之旅吧！</p>
-        <div class="welcome-actions">
-          <el-button type="primary" size="large" @click="router.push('/merchant-register')">
-            立即申请入驻
-          </el-button>
-        </div>
-      </div>
-    </el-card>
-
-    <div v-else-if="merchant" class="console-layout">
-      <!-- Left Info Panel -->
-      <div class="sidebar-panel">
-        <MerchantSidebar active="orders" @edit-profile="profileDialogVisible = true" />
-
-        <el-card class="box-card info-card">
-          <template #header>
-            <div class="card-header">
-              <h3>店铺基本信息</h3>
-            </div>
-          </template>
-
-          <div class="merchant-badge">
-            <button class="store-logo-button" type="button" :disabled="logoUploading" @click="openLogoPicker">
-              <img v-if="merchant.logo" :src="merchant.logo" alt="店铺头像" class="store-logo-img" />
-              <span v-else class="store-icon">{{ merchant.merchantName.substring(0, 1) }}</span>
-            </button>
-            <input
-              ref="logoInputRef"
-              class="logo-input"
-              type="file"
-              accept="image/jpeg,image/png"
-              @change="onLogoSelected"
-            />
-            <el-button size="small" type="primary" :loading="logoUploading" @click="openLogoPicker">
-              上传店铺头像
-            </el-button>
-            <h4>{{ merchant.merchantName }}</h4>
-            <el-tag :type="displayStatus.type" size="large" effect="dark">
-              {{ displayStatus.text }}
-            </el-tag>
-            <el-button
-              v-if="merchant.status === 'OPEN'"
-              size="small"
-              :type="merchant.manualClosed ? 'success' : 'warning'"
-              @click="toggleManualClosed"
-            >
-              {{ merchant.manualClosed ? '恢复默认状态' : '手动打烊' }}
-            </el-button>
-          </div>
-
-          <el-divider />
-
-          <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="商家ID">{{ merchant.id }}</el-descriptions-item>
-            <el-descriptions-item label="主营品类">{{ merchant.category }}</el-descriptions-item>
-            <el-descriptions-item label="联系电话">{{ merchant.phone }}</el-descriptions-item>
-            <el-descriptions-item label="银行账号">{{ merchant.bankAccount }}</el-descriptions-item>
-            <el-descriptions-item label="结算周期">{{ merchant.settlementCycle }} 天</el-descriptions-item>
-            <el-descriptions-item label="综合评分">
-              <el-rate v-model="merchant.score" disabled show-score text-color="#ff9900" />
-            </el-descriptions-item>
-          </el-descriptions>
-
-          <div v-if="merchant.adminRemarks" class="admin-remarks">
-            <h5>管理员备注:</h5>
-            <p>{{ merchant.adminRemarks }}</p>
-          </div>
-        </el-card>
-      </div>
-
-      <!-- Right Work Area -->
-      <div class="main-work-area">
+  <MerchantWorkspaceShell
+    :merchant="merchant"
+    :loading="loading"
+    active-module="orders"
+    @merchant-updated="onMerchantProfileSaved"
+  >
+      <div v-if="merchant" class="main-work-area">
         <!-- Status Tip Alert -->
         <el-alert
           v-if="merchant.status === 'PENDING'"
@@ -423,7 +306,6 @@ onMounted(() => {
           <template #header>
           <div class="card-header">
             <h3>待接单管理 (营业中)</h3>
-            <el-button type="primary" @click="openReplyPanel">回复客户</el-button>
           </div>
           </template>
 
@@ -457,6 +339,26 @@ onMounted(() => {
                 <div v-for="item in scope.row.items" :key="item.id" class="order-item-list">
                   {{ productNames[item.productId] || item.name }} x {{ item.quantity }}
                 </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="联系" width="100">
+              <template #default="scope">
+                <el-button
+                  v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status)"
+                  type="primary"
+                  size="small"
+                  plain
+                  @click="openChat(scope.row)"
+                >
+                  联系用户
+                </el-button>
+                <el-button
+                  v-else
+                  size="small"
+                  @click="openChat(scope.row)"
+                >
+                  查看聊天
+                </el-button>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="180" fixed="right">
@@ -545,14 +447,7 @@ onMounted(() => {
           </div>
         </el-card>
       </div>
-    </div>
-    </div>
-
-    <MerchantProfileEditDialog
-      v-model:visible="profileDialogVisible"
-      :merchant="merchant"
-      @saved="onMerchantProfileSaved"
-    />
+  </MerchantWorkspaceShell>
 
     <!-- Chat overlay -->
     <div v-if="chatOrder" class="order-overlay" @click.self="closeChat">

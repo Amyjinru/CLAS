@@ -1,16 +1,18 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import {
-  deleteNotification,
   deleteAllNotifications,
+  deleteNotification,
+  getCart,
+  getConversations,
+  getMerchant,
   getProfile,
+  getReviewByOrder,
   listFavorites,
-  listAddresses,
-  listMyAppeals,
+  listMyCoupons,
   listMyDealOrders,
-  listMyPenalties,
   listNotifications,
+  listOrders,
   markAllNotificationsRead,
   markNotificationRead,
   removeFavorite,
@@ -22,40 +24,67 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ProfileHero from '../components/profile/ProfileHero.vue'
 import ProfileSummary from '../components/profile/ProfileSummary.vue'
-import ProfileAddressSection from '../components/profile/ProfileAddressSection.vue'
-import ProfilePenaltySection from '../components/profile/ProfilePenaltySection.vue'
+import ProfileOrderBlock from '../components/profile/ProfileOrderBlock.vue'
+import ProfileCartBlock from '../components/profile/ProfileCartBlock.vue'
+import ProfileFavoritesBlock from '../components/profile/ProfileFavoritesBlock.vue'
+import ProfileVoucherBlock from '../components/profile/ProfileVoucherBlock.vue'
+import ProfileMessageBlock from '../components/profile/ProfileMessageBlock.vue'
+import { useChatStore } from '../composables/useChatStore'
 
-const addresses = ref([])
-const dealOrders = ref([])
-const favorites = ref([])
-const notifications = ref([])
-const penalties = ref([])
-const appeals = ref([])
+const activeProfileTab = ref('orders')
+const chatStore = useChatStore()
+const chatConversations = ref([])
+const merchantCache = ref({})
+const chatLoading = ref(false)
 const loading = ref(false)
 const loadError = ref('')
+const orders = ref([])
+const reviewedOrderIds = ref(new Set())
+const cartItems = ref([])
+const favorites = ref([])
+const dealOrders = ref([])
+const coupons = ref([])
+const notifications = ref([])
 const favoriteActionId = ref(null)
 const notificationActionId = ref(null)
 const markingAllRead = ref(false)
 const deletingAllNotifications = ref(false)
-const activeProfileTab = ref('transactions')
 const profileForm = reactive({ nickname: '', avatar: '' })
 const avatarUploading = ref(false)
 const nicknameSaving = ref(false)
 
 const currentUser = computed(() => sessionUser.value || {})
-const unreadCount = computed(() => notifications.value.filter(item => !item.readFlag).length)
-const summaryCards = computed(() => [
-  { label: '收货地址', value: addresses.value.length, targetTab: 'addresses' },
-  { label: '收藏店铺', value: favorites.value.length, targetTab: 'shopping' },
-  { label: '券包', value: dealOrders.value.length, targetTab: 'vouchers' },
-  { label: '未读通知', value: unreadCount.value, targetTab: 'messages' }
-])
-const transactionShortcuts = computed(() => [
-  { label: '全部订单', value: '查看外卖与到店订单', to: '/orders', type: 'primary' },
-  { label: '购物车', value: '继续结算已选商品', to: '/cart', type: 'success' },
-  { label: '生活预约', value: '查看预约记录', to: '/bookings', type: 'warning' }
-])
 const displayName = computed(() => profileForm.nickname || currentUser.value?.username || currentUser.value?.phone || '未命名用户')
+const unreadCount = computed(() => notifications.value.filter((item) => !item.readFlag).length)
+const pendingPaymentOrders = computed(() => orders.value.filter((item) => item.order.status === 'PENDING_PAYMENT'))
+const pendingDealOrders = computed(() => dealOrders.value.filter((item) => item.status === 'PENDING_PAYMENT'))
+const waitingReceiveOrders = computed(() => orders.value.filter((item) => {
+  const { status, deliveryStatus, refundStatus } = item.order
+  if (['REFUNDED', 'REFUND_PENDING', 'CANCELED', 'REJECTED'].includes(status)) return false
+  if (refundStatus && refundStatus !== 'NONE') return false
+  if (status === 'ACCEPTED' && ['DELIVERING', 'DELIVERED'].includes(deliveryStatus)) return true
+  return false
+}))
+const pendingReviewOrders = computed(() => orders.value.filter((item) => item.order.status === 'COMPLETED' && !reviewedOrderIds.value.has(item.order.id)))
+const afterSaleOrders = computed(() => orders.value.filter((item) => item.order.status === 'REFUND_PENDING' || item.order.status === 'REFUNDED' || (item.order.refundStatus && item.order.refundStatus !== 'NONE')))
+const unusedDealOrders = computed(() => dealOrders.value.filter((item) => item.status === 'UNUSED'))
+const voucherCount = computed(() => dealOrders.value.length + coupons.value.length)
+
+const summaryCards = computed(() => [
+  { label: '订单', value: orders.value.length, targetTab: 'orders' },
+  { label: '购物车', value: cartItems.value.length + pendingPaymentOrders.value.length + pendingDealOrders.value.length, targetTab: 'cart' },
+  { label: '收藏', value: favorites.value.length, targetTab: 'favorites' },
+  { label: '券包', value: voucherCount.value, targetTab: 'vouchers' },
+  { label: '消息', value: unreadCount.value, targetTab: 'messages' }
+])
+
+const orderModules = computed(() => [
+  { label: '全部订单', count: orders.value.length, to: '/orders', description: '查看所有外卖订单' },
+  { label: '待支付', count: pendingPaymentOrders.value.length + pendingDealOrders.value.length, to: '/cart', description: '继续完成支付' },
+  { label: '待收货/使用', count: waitingReceiveOrders.value.length + unusedDealOrders.value.length, to: '/orders?tab=receiving', description: '外卖配送与团购到店履约' },
+  { label: '待评价', count: pendingReviewOrders.value.length, to: '/orders?tab=review', description: '给已完成订单评价' },
+  { label: '退款/售后', count: afterSaleOrders.value.length, to: '/orders?tab=after-sale', description: '查看退款与售后进度' }
+])
 
 function getErrorMessage(error, fallback = '操作失败，请稍后重试') {
   return error?.response?.data?.message || error?.message || fallback
@@ -65,18 +94,16 @@ function openSummaryCard(item) {
   activeProfileTab.value = item.targetTab
 }
 
-const silentConfig = { silent: true }
-
 async function loadProfile() {
   try {
-    const profile = await getProfile(silentConfig)
+    const profile = await getProfile({ silent: true })
     profileForm.nickname = profile.nickname || profile.username || ''
     profileForm.avatar = profile.avatar || ''
     if (profile && sessionUser.value) {
       setSessionUser({ ...sessionUser.value, ...profile, password: undefined })
     }
   } catch {
-    // 资料接口失败时不阻塞个人中心其余内容加载
+    // 资料加载失败不阻塞用户中心主体。
   }
 }
 
@@ -127,23 +154,67 @@ function avatarText() {
   return (displayName.value || '?').slice(0, 1).toUpperCase()
 }
 
+async function loadReviewState(orderList) {
+  const reviewed = await Promise.all(
+    orderList
+      .filter((entry) => entry.order.status === 'COMPLETED')
+      .map(async (entry) => {
+        try {
+          const review = await getReviewByOrder(entry.order.id)
+          return review ? entry.order.id : null
+        } catch {
+          return null
+        }
+      })
+  )
+  reviewedOrderIds.value = new Set(reviewed.filter(Boolean))
+}
+
+async function loadChatConversations() {
+  chatLoading.value = true
+  try {
+    chatConversations.value = await getConversations()
+    await Promise.all(
+      chatConversations.value.map(async (conv) => {
+        if (!merchantCache.value[conv.merchantId]) {
+          try {
+            merchantCache.value[conv.merchantId] = await getMerchant(conv.merchantId)
+          } catch {
+            merchantCache.value[conv.merchantId] = { id: conv.merchantId, merchantName: `商家 #${conv.merchantId}` }
+          }
+        }
+      })
+    )
+  } catch {
+    chatConversations.value = []
+  } finally {
+    chatLoading.value = false
+  }
+}
+
+function handleOpenChat(merchantId) {
+  chatStore.openMerchantChat(merchantId)
+}
+
 async function load() {
   loading.value = true
   loadError.value = ''
   const results = await Promise.allSettled([
-    listAddresses(silentConfig),
-    listMyDealOrders(silentConfig),
-    listFavorites(silentConfig),
-    listNotifications(silentConfig),
-    listMyPenalties(silentConfig),
-    listMyAppeals(silentConfig)
+    listOrders(),
+    getCart(),
+    listFavorites({ silent: true }),
+    listMyDealOrders({ silent: true }),
+    listMyCoupons({ silent: true }),
+    listNotifications({ silent: true })
   ])
-  addresses.value = results[0].status === 'fulfilled' ? results[0].value : []
-  dealOrders.value = results[1].status === 'fulfilled' ? results[1].value : []
+  orders.value = results[0].status === 'fulfilled' ? results[0].value : []
+  cartItems.value = results[1].status === 'fulfilled' ? results[1].value : []
   favorites.value = results[2].status === 'fulfilled' ? results[2].value : []
-  notifications.value = results[3].status === 'fulfilled' ? results[3].value : []
-  penalties.value = results[4].status === 'fulfilled' ? results[4].value : []
-  appeals.value = results[5].status === 'fulfilled' ? results[5].value : []
+  dealOrders.value = results[3].status === 'fulfilled' ? results[3].value : []
+  coupons.value = results[4].status === 'fulfilled' ? results[4].value : []
+  notifications.value = results[5].status === 'fulfilled' ? results[5].value : []
+  await loadReviewState(orders.value)
+  loadChatConversations()
   const rejected = results.filter((item) => item.status === 'rejected')
   const allAre401 = rejected.length > 0 && rejected.every((item) => item.reason?.response?.data?.code === 401 || item.reason?.response?.status === 401)
   if (rejected.length === results.length && !allAre401) {
@@ -232,28 +303,6 @@ async function clearAllNotifications() {
   }
 }
 
-function formatMoney(cents) {
-  return `¥${((cents || 0) / 100).toFixed(2)}`
-}
-
-function dealStatusLabel(status) {
-  return {
-    UNUSED: '待使用',
-    USED: '已使用',
-    EXPIRED: '已过期',
-    REFUNDED: '已退款'
-  }[status] || status || '未知'
-}
-
-function dealStatusType(status) {
-  return {
-    UNUSED: 'success',
-    USED: 'info',
-    EXPIRED: 'warning',
-    REFUNDED: 'danger'
-  }[status] || 'info'
-}
-
 onMounted(async () => {
   await Promise.all([loadProfile(), load()])
 })
@@ -261,241 +310,84 @@ onMounted(async () => {
 
 <template>
   <div class="user-page profile-page">
-  <ProfileHero
-    v-model:nickname="profileForm.nickname"
-    :display-name="displayName"
-    :phone="currentUser.phone"
-    :avatar="profileForm.avatar"
-    :avatar-text="avatarText()"
-    :avatar-uploading="avatarUploading"
-    :nickname-saving="nicknameSaving"
-    @avatar-selected="onAvatarSelected"
-    @save-profile="saveProfile"
-  />
+    <ProfileHero
+      v-model:nickname="profileForm.nickname"
+      :display-name="displayName"
+      :phone="currentUser.phone"
+      :avatar="profileForm.avatar"
+      :avatar-text="avatarText()"
+      :avatar-uploading="avatarUploading"
+      :nickname-saving="nicknameSaving"
+      @avatar-selected="onAvatarSelected"
+      @save-profile="saveProfile"
+    />
 
-  <ProfileSummary
-    :cards="summaryCards"
-    :active-tab="activeProfileTab"
-    @select="openSummaryCard"
-  />
+    <ProfileSummary
+      :cards="summaryCards"
+      :active-tab="activeProfileTab"
+      @select="openSummaryCard"
+    />
 
-  <section v-if="loading" class="panel state-panel">
-    <el-skeleton :rows="8" animated />
-  </section>
+    <section v-if="loading" class="panel state-panel">
+      <el-skeleton :rows="8" animated />
+    </section>
 
-  <section v-else-if="loadError" class="panel state-panel">
-    <el-alert :title="loadError" type="error" show-icon :closable="false" />
-    <el-button type="primary" plain @click="load">重新加载</el-button>
-  </section>
+    <section v-else-if="loadError" class="panel state-panel">
+      <el-alert :title="loadError" type="error" show-icon :closable="false" />
+      <el-button type="primary" plain @click="load">重新加载</el-button>
+    </section>
 
-  <section v-else class="panel profile-workspace">
-    <el-tabs v-model="activeProfileTab" class="profile-tabs">
-      <el-tab-pane label="我的交易" name="transactions">
-        <div class="shortcut-grid">
-          <RouterLink
-            v-for="item in transactionShortcuts"
-            :key="item.label"
-            class="shortcut-card"
-            :to="item.to"
-          >
-            <strong>{{ item.label }}</strong>
-            <span>{{ item.value }}</span>
-          </RouterLink>
-        </div>
-      </el-tab-pane>
+    <section v-else class="panel profile-workspace">
+      <el-tabs v-model="activeProfileTab" class="profile-tabs">
+        <el-tab-pane label="订单" name="orders">
+          <ProfileOrderBlock :modules="orderModules" />
+        </el-tab-pane>
 
-      <el-tab-pane label="我的购物" name="shopping">
-        <div class="section-head">
-          <div>
-            <h2>我的收藏</h2>
-            <p>常用商家和购物入口集中在这里</p>
-          </div>
-          <RouterLink class="button secondary" to="/cart">查看购物车</RouterLink>
-        </div>
+        <el-tab-pane label="购物车" name="cart">
+          <ProfileCartBlock
+            :cart-items="cartItems"
+            :pending-payment-orders="pendingPaymentOrders"
+            :pending-deal-orders="pendingDealOrders"
+          />
+        </el-tab-pane>
 
-        <el-empty v-if="!favorites.length" description="暂无收藏商家">
-          <RouterLink class="button secondary" to="/">去首页浏览</RouterLink>
-        </el-empty>
+        <el-tab-pane label="收藏" name="favorites">
+          <ProfileFavoritesBlock
+            :favorites="favorites"
+            :action-id="favoriteActionId"
+            @remove="removeFavoriteMerchant"
+          />
+        </el-tab-pane>
 
-        <article v-for="item in favorites" v-else :key="item.id" class="list-row">
-          <div>
-            <strong>{{ item.merchantName }}</strong>
-            <p>{{ item.category || '未分类' }} · {{ item.address || '暂无地址' }}</p>
-          </div>
-          <div class="row-actions">
-            <RouterLink class="button secondary" :to="`/merchant/${item.id}`">进入店铺</RouterLink>
-            <el-button
-              text
-              type="danger"
-              :loading="favoriteActionId === item.id"
-              @click="removeFavoriteMerchant(item.id)"
-            >
-              取消收藏
-            </el-button>
-          </div>
-        </article>
-      </el-tab-pane>
+        <el-tab-pane label="券包" name="vouchers">
+          <ProfileVoucherBlock :deal-orders="dealOrders" :coupons="coupons" />
+        </el-tab-pane>
 
-      <el-tab-pane label="我的券包" name="vouchers">
-        <div class="section-head">
-          <div>
-            <h2>优惠券 / 团购券</h2>
-            <p>当前展示已购买团购券，后续可接入平台优惠券</p>
-          </div>
-          <el-tag type="warning">{{ dealOrders.length }} 张</el-tag>
-        </div>
-
-        <el-empty v-if="!dealOrders.length" description="暂无团购券">
-          <RouterLink class="button secondary" to="/deals">去团购页看看</RouterLink>
-        </el-empty>
-
-        <article v-for="item in dealOrders" v-else :key="item.id" class="list-row voucher-row">
-          <div>
-            <strong>{{ item.voucherCode }}</strong>
-            <p>支付金额 {{ formatMoney(item.payAmount) }}</p>
-          </div>
-          <el-tag :type="dealStatusType(item.status)">
-            {{ dealStatusLabel(item.status) }}
-          </el-tag>
-        </article>
-      </el-tab-pane>
-
-      <el-tab-pane label="账号与申诉" name="account">
-        <ProfilePenaltySection :penalties="penalties" :appeals="appeals" @reload="load" />
-      </el-tab-pane>
-
-      <el-tab-pane label="地址与资料" name="addresses" lazy>
-        <ProfileAddressSection :addresses="addresses" @reload="load" />
-      </el-tab-pane>
-
-      <el-tab-pane label="消息与服务" name="messages">
-        <div class="section-head">
-          <div>
-            <h2>通知中心</h2>
-            <p>{{ unreadCount }} 条未读</p>
-          </div>
-          <div class="row-actions">
-            <RouterLink class="button secondary" to="/user/announcements">平台公告</RouterLink>
-            <el-button
-              type="primary"
-              plain
-              :disabled="!unreadCount"
-              :loading="markingAllRead"
-              @click="readAllNotifications"
-            >
-              全部已读
-            </el-button>
-            <el-button
-              type="danger"
-              plain
-              :disabled="!notifications.length"
-              :loading="deletingAllNotifications"
-              @click="clearAllNotifications"
-            >
-              清空通知
-            </el-button>
-          </div>
-        </div>
-
-        <el-empty v-if="!notifications.length" description="暂无通知" />
-
-        <article
-          v-for="item in notifications"
-          v-else
-          :key="item.id"
-          class="list-row notification-row"
-          :class="{ unread: !item.readFlag }"
-        >
-          <div>
-            <div class="row-title">
-              <strong>{{ item.title }}</strong>
-              <el-tag v-if="!item.readFlag" type="danger" size="small">未读</el-tag>
-              <el-tag v-else type="info" size="small">已读</el-tag>
-            </div>
-            <p>{{ item.content }}</p>
-          </div>
-          <el-button
-            v-if="!item.readFlag"
-            text
-            type="primary"
-            :loading="notificationActionId === item.id"
-            @click="readNotification(item.id)"
-          >
-            标记已读
-          </el-button>
-          <el-button text type="danger" @click="removeNotification(item.id)">删除</el-button>
-        </article>
-      </el-tab-pane>
-    </el-tabs>
-  </section>
+        <el-tab-pane label="消息" name="messages">
+          <ProfileMessageBlock
+            :notifications="notifications"
+            :unread-count="unreadCount"
+            :marking-all-read="markingAllRead"
+            :deleting-all="deletingAllNotifications"
+            :action-id="notificationActionId"
+            :conversations="chatConversations"
+            :merchant-cache="merchantCache"
+            :chat-loading="chatLoading"
+            @read="readNotification"
+            @read-all="readAllNotifications"
+            @remove="removeNotification"
+            @clear="clearAllNotifications"
+            @open-chat="handleOpenChat"
+          />
+        </el-tab-pane>
+      </el-tabs>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.profile-workspace {
-  overflow: hidden;
-}
-.profile-tabs :deep(.el-tabs__header) {
-  margin-bottom: 18px;
-}
-.profile-tabs :deep(.el-tabs__nav-wrap::after) {
-  height: 1px;
-}
-.shortcut-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.shortcut-card {
-  background: #fff;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  color: var(--text-primary);
-  display: grid;
-  gap: 8px;
-  min-height: 104px;
-  padding: 16px;
-  text-decoration: none;
-}
-.shortcut-card:hover {
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-sm);
-}
-.shortcut-card strong {
-  font-size: 18px;
-}
-.shortcut-card span {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-.state-panel {
-  display: grid;
-  gap: 16px;
-}
-.section-head {
-  align-items: flex-start;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.section-head h2 { margin: 0; }
-.section-head p { color: var(--text-secondary); font-size: 13px; margin: 6px 0 0; }
-.list-row {
-  align-items: center; border-top: 1px solid var(--border-light);
-  display: flex; justify-content: space-between; padding: 14px 0;
-}
-.notification-fold p { color: var(--text-secondary); margin: 0; }
-.row-title { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
-.row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.notification-row.unread {
-  background: var(--color-primary-light); margin-left: -12px; margin-right: -12px;
-  padding-left: 12px; padding-right: 12px;
-}
-.voucher-row strong { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-@media (max-width: 900px) {
-  .shortcut-grid { grid-template-columns: 1fr; }
-  .list-row { align-items: flex-start; flex-direction: column; }
-  .row-actions { justify-content: flex-start; }
-}
+.profile-workspace { overflow: hidden; }
+.profile-tabs :deep(.el-tabs__header) { margin-bottom: 18px; }
+.profile-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; }
+.state-panel { display: grid; gap: 16px; }
 </style>

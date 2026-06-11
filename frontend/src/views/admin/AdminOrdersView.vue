@@ -14,7 +14,7 @@ const statusOptions = [
   { label: '待接单', value: 'PAID' },
   { label: '已接单', value: 'ACCEPTED' },
   { label: '已完成', value: 'COMPLETED' },
-  { label: '退款中', value: 'REFUND_REQUESTED' },
+  { label: '退款中', value: 'REFUND_PENDING' },
   { label: '已退款', value: 'REFUNDED' }
 ]
 
