@@ -1195,6 +1195,24 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void groupDealDetailReturnsExistingDeal() throws Exception {
+        mockMvc.perform(get("/api/deals/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.id").value(1))
+            .andExpect(jsonPath("$.data.title").exists())
+            .andExpect(jsonPath("$.data.merchantId").value(1));
+    }
+
+    @Test
+    void groupDealDetailRejectsMissingDeal() throws Exception {
+        mockMvc.perform(get("/api/deals/999999"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("团购券不存在"));
+    }
+
+    @Test
     void bookingFlowRequiresOwnerAndMerchantRoles() throws Exception {
         mockMvc.perform(get("/api/bookings/merchant")
                 .header("Authorization", auth(USER_PHONE)))

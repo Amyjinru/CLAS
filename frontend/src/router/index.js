@@ -9,6 +9,7 @@ const MerchantDetailView = () => import('../views/MerchantDetailView.vue')
 const CartView = () => import('../views/CartView.vue')
 const OrdersView = () => import('../views/OrdersView.vue')
 const DealsView = () => import('../views/DealsView.vue')
+const DealDetailView = () => import('../views/DealDetailView.vue')
 const BookingsView = () => import('../views/BookingsView.vue')
 const ProfileView = () => import('../views/ProfileView.vue')
 const UserSettingsView = () => import('../views/UserSettingsView.vue')
@@ -60,6 +61,7 @@ const routes = [
 
   { path: '/cart', component: CartView, meta: { roles: ['USER'], title: '购物车' } },
   { path: '/deals', component: DealsView, meta: { roles: ['USER'], title: '团购' } },
+  { path: '/deals/:id', component: DealDetailView, meta: { roles: ['USER'], title: '团购详情' } },
   { path: '/bookings', component: BookingsView, meta: { roles: ['USER'], title: '到店预约' } },
   { path: '/profile', component: ProfileView, meta: { roles: ['USER'], title: '个人中心' } },
   { path: '/settings', component: UserSettingsView, meta: { roles: ['USER'], userPortal: true, title: '设置' } },

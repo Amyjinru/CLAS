@@ -33,6 +33,11 @@ public class DealController {
         return Result.ok(dealService.list(merchantId));
     }
 
+    @GetMapping("/{dealId}")
+    public Result<GroupDeal> detail(@PathVariable Long dealId) {
+        return Result.ok(dealService.getById(dealId));
+    }
+
     @GetMapping("/merchant")
     @RequireRole("MERCHANT")
     public Result<List<GroupDeal>> merchantDeals() {

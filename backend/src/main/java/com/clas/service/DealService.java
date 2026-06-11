@@ -65,6 +65,14 @@ public class DealService {
         return groupDealMapper.selectList(wrapper);
     }
 
+    public GroupDeal getById(Long dealId) {
+        GroupDeal deal = groupDealMapper.selectById(dealId);
+        if (deal == null) {
+            throw new BusinessException("团购券不存在");
+        }
+        return deal;
+    }
+
     public List<GroupDeal> merchantDeals() {
         return groupDealMapper.selectList(new LambdaQueryWrapper<GroupDeal>()
             .eq(GroupDeal::getMerchantId, merchantService.getCurrentMerchantId())

@@ -1,6 +1,7 @@
 import { api, unwrap } from './client'
 
-export const listDeals = (params) => api.get('/deals', { params }).then(unwrap)
+export const listDeals = (params, config = {}) => api.get('/deals', { ...config, params }).then(unwrap)
+export const getDeal = (id, config = {}) => api.get(`/deals/${id}`, config).then(unwrap)
 export const listMerchantDeals = () => api.get('/deals/merchant').then(unwrap)
 export const createDeal = (payload) => api.post('/deals/merchant', payload).then(unwrap)
 export const buyDeal = (id) => api.post(`/deals/${id}/buy`).then(unwrap)
