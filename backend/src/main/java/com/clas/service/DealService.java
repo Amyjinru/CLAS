@@ -119,7 +119,7 @@ public class DealService {
         order.setCreateTime(LocalDateTime.now());
         dealOrderMapper.insert(order);
         try {
-            notificationService.send(order.getUserId(), "团购券待支付", "您有一笔团购订单待支付，请尽快完成支付。");
+            sendDealOrderNotification(order, "团购券待支付", "您有一笔团购订单待支付，请尽快完成支付。");
         } catch (RuntimeException ignored) {
             // 通知失败不应影响下单与跳转支付。
         }
@@ -172,8 +172,8 @@ public class DealService {
         order.setExpireTime(paidTime.plusDays(deal.getValidDays() == null ? 30 : deal.getValidDays()));
         dealOrderMapper.updateById(order);
         try {
-            notificationService.send(
-                order.getUserId(),
+            sendDealOrderNotification(
+                order,
                 "团购券购买成功",
                 "券码 " + order.getVoucherCode() + " 已生成，有效期至 "
                     + order.getExpireTime().toLocalDate() + "，可到店核销。"
@@ -260,7 +260,7 @@ public class DealService {
         log.setRedeemedAt(order.getUsedTime());
         dealRedeemLogMapper.insert(log);
 
-        notificationService.send(order.getUserId(), "团购券已核销", "券码 " + order.getVoucherCode() + " 已成功核销。");
+        sendDealOrderNotification(order, "团购券已核销", "券码 " + order.getVoucherCode() + " 已成功核销。");
         return order;
     }
 
@@ -277,8 +277,24 @@ public class DealService {
         groupDealMapper.restoreStock(order.getDealId());
         order.setStatus(STATUS_REFUNDED);
         dealOrderMapper.updateById(order);
-        notificationService.send(userId, "团购券已退款", "券码 " + order.getVoucherCode() + " 已退款。");
+        sendDealOrderNotification(order, "团购券已退款", "券码 " + order.getVoucherCode() + " 已退款。");
         return order;
+    }
+
+    private void sendDealOrderNotification(DealOrder order, String title, String content) {
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(),
+            title,
+            content,
+            "DEAL_ORDER_STATUS",
+            "DEAL_ORDER",
+            order.getId(),
+            null,
+            null,
+            order.getId(),
+            order.getMerchantId(),
+            "/deal-order/" + order.getId()
+        ));
     }
 
     public List<DealRedeemLogResponse> redeemLogs() {

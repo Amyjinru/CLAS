@@ -3,6 +3,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { useRouter } from 'vue-router'
+import { notificationTarget } from '../../utils/notificationTarget'
 
 import {
 
@@ -29,58 +30,6 @@ const loading = ref(false)
 
 
 const unreadCount = computed(() => notifications.value.filter((item) => !item.readFlag).length)
-
-function safeTargetPath(path) {
-  if (!path || typeof path !== 'string') return ''
-  const trimmed = path.trim()
-  return trimmed.startsWith('/') && !trimmed.startsWith('//') ? trimmed : ''
-}
-
-function extractOrderId(text) {
-  const match = String(text || '').match(/订单\s*(\d+)/)
-  return match ? Number(match[1]) : null
-}
-
-function notificationTarget(item) {
-  // 1) Explicit targetPath from backend (most reliable)
-  const explicitPath = safeTargetPath(item.targetPath)
-  if (explicitPath) return explicitPath
-
-  // 2) Review-related notifications → review page
-  if (item.type === 'MERCHANT_REVIEW_REPLY' || item.type === 'REVIEW_REPLY') {
-    if (item.orderId) {
-      const params = []
-      if (item.reviewId) params.push(`reviewId=${item.reviewId}`)
-      if (item.replyId) params.push(`replyId=${item.replyId}`)
-      const query = params.length ? `?${params.join('&')}` : ''
-      return `/review/${item.orderId}${query}`
-    }
-  }
-
-  // 3) Order status notifications → user's order list (with explicit orderId & type)
-  if (item.orderId && (item.type === 'ORDER_STATUS' || item.type === 'ORDER')) {
-    return `/orders?orderId=${item.orderId}`
-  }
-
-  // 4) Generic order notification with orderId but unknown/legacy type
-  if (item.orderId) {
-    return `/orders?orderId=${item.orderId}`
-  }
-
-  // 5) Review-reply fallback by title / content
-  if (item.title === '商家回复了评价' || item.content?.includes('评价收到商家回复')) {
-    const orderId = extractOrderId(item.content)
-    if (orderId) return `/review/${orderId}`
-  }
-
-  // 6) Legacy order notifications without metadata — extract orderId from content
-  const fallbackOrderId = extractOrderId(item.content) || extractOrderId(item.title)
-  if (fallbackOrderId) {
-    return `/orders?orderId=${fallbackOrderId}`
-  }
-
-  return ''
-}
 
 async function openNotification(item) {
   const target = notificationTarget(item)

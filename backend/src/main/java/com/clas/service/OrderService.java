@@ -168,7 +168,7 @@ public class OrderService {
             null,
             order.getId(),
             order.getMerchantId(),
-            "/orders?orderId=" + order.getId()
+            "/order/" + order.getId()
         ));
         return new OrderResponse(order, orderItems);
     }
@@ -297,7 +297,7 @@ public class OrderService {
             null,
             order.getId(),
             merchantId,
-            "/orders?orderId=" + order.getId()
+            "/order/" + order.getId()
         ));
         return order;
     }
@@ -319,7 +319,7 @@ public class OrderService {
             null,
             order.getId(),
             merchantId,
-            "/orders?orderId=" + order.getId()
+            "/order/" + order.getId()
         ));
         return order;
     }
@@ -349,7 +349,7 @@ public class OrderService {
             null,
             order.getId(),
             order.getMerchantId(),
-            "/orders?orderId=" + order.getId()
+            "/order/" + order.getId()
         ));
         return order;
     }
@@ -400,7 +400,7 @@ public class OrderService {
             null,
             order.getId(),
             merchantId,
-            "/orders?orderId=" + order.getId()
+            "/order/" + order.getId()
         ));
         return order;
     }
@@ -442,7 +442,7 @@ public class OrderService {
             null,
             orderId,
             order.getMerchantId(),
-            "/orders?orderId=" + orderId
+            "/order/" + orderId
         ));
         return order;
     }
@@ -467,7 +467,7 @@ public class OrderService {
                 null,
                 orderId,
                 merchantId,
-                "/orders?orderId=" + orderId
+                "/order/" + orderId
             ));
         } else {
             order.setStatus(resolveStatusAfterRefundReject(order));
@@ -487,7 +487,7 @@ public class OrderService {
                 null,
                 orderId,
                 merchantId,
-                "/orders?orderId=" + orderId
+                "/order/" + orderId
             ));
         }
         ordersMapper.updateById(order);

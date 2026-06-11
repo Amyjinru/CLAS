@@ -1,7 +1,15 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import BackButton from '../components/BackButton.vue'
 import { cancelBooking, createBooking, listMerchants, listMyBookings } from '../api/clas'
+
+const route = useRoute()
+const fromNotifications = computed(() => route.query.from === 'notifications')
+const highlightedBookingId = computed(() => route.query.bookingId ? Number(route.query.bookingId) : null)
+const backTo = computed(() => fromNotifications.value ? '/profile/notifications' : '/')
+const backLabel = computed(() => fromNotifications.value ? '← 返回通知' : '← 返回')
 
 const merchants = ref([])
 const bookings = ref([])
@@ -72,11 +80,22 @@ async function cancel(id) {
   await load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  if (highlightedBookingId.value) {
+    await nextTick()
+    const el = document.querySelector(`[data-booking-id="${highlightedBookingId.value}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+})
 </script>
 
 <template>
   <section class="booking-page">
+    <BackButton :to="backTo" :label="backLabel" />
+
     <div class="booking-workbench">
       <section class="panel booking-form">
         <div class="section-heading">
@@ -111,7 +130,13 @@ onMounted(load)
           <h1>跟踪确认与履约进度</h1>
         </div>
         <div class="list booking-list">
-          <article class="row booking-row" v-for="booking in bookings" :key="booking.id">
+          <article
+            class="row booking-row"
+            :class="{ highlighted: highlightedBookingId === booking.id }"
+            :data-booking-id="booking.id"
+            v-for="booking in bookings"
+            :key="booking.id"
+          >
             <div>
               <div class="booking-title">
                 <h2>{{ booking.serviceName }}</h2>
@@ -180,6 +205,14 @@ onMounted(load)
 .booking-row {
   align-items: flex-start;
 }
+.booking-row.highlighted {
+  background: var(--color-primary-soft);
+  border: 2px solid var(--clas-amber-200);
+  border-radius: var(--radius-sm);
+  margin: -2px;
+  padding: calc(14px + 2px);
+}
+
 @media (max-width: 900px) {
   .booking-workbench {
     grid-template-columns: 1fr;

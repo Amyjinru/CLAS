@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { notificationTarget } from '../../utils/notificationTarget'
 
 const router = useRouter()
 
@@ -37,65 +38,14 @@ function merchantInitial(merchantId) {
   return merchantName(merchantId).slice(0, 1)
 }
 
-// -- notification navigation helpers (shared logic with NotificationsView) --
-
-function safeTargetPath(path) {
-  if (!path || typeof path !== 'string') return ''
-  const trimmed = path.trim()
-  return trimmed.startsWith('/') && !trimmed.startsWith('//') ? trimmed : ''
-}
-
-function extractOrderId(text) {
-  const match = String(text || '').match(/订单\s*(\d+)/)
-  return match ? Number(match[1]) : null
-}
-
-function notificationTarget(item) {
-  // 1) Explicit targetPath from backend
-  const explicit = safeTargetPath(item.targetPath)
-  if (explicit) return explicit
-
-  // 2) Review-related → review page
-  if (item.type === 'MERCHANT_REVIEW_REPLY' || item.type === 'REVIEW_REPLY') {
-    if (item.orderId) {
-      const params = []
-      if (item.reviewId) params.push(`reviewId=${item.reviewId}`)
-      if (item.replyId) params.push(`replyId=${item.replyId}`)
-      const query = params.length ? `?${params.join('&')}` : ''
-      return `/review/${item.orderId}${query}`
-    }
-  }
-
-  // 3) Order with type metadata
-  if (item.orderId && (item.type === 'ORDER_STATUS' || item.type === 'ORDER')) {
-    return `/orders?orderId=${item.orderId}`
-  }
-
-  // 4) Generic orderId
-  if (item.orderId) {
-    return `/orders?orderId=${item.orderId}`
-  }
-
-  // 5) Review-reply fallback by title / content
-  if (item.title === '商家回复了评价' || item.content?.includes('评价收到商家回复')) {
-    const oid = extractOrderId(item.content)
-    if (oid) return `/review/${oid}`
-  }
-
-  // 6) Legacy notification — extract orderId from content
-  const fallback = extractOrderId(item.content) || extractOrderId(item.title)
-  if (fallback) {
-    return `/orders?orderId=${fallback}`
-  }
-
-  return ''
-}
-
 function handleNotificationClick(item) {
   const target = notificationTarget(item)
   if (!target) {
     ElMessage.info('这条通知暂无可打开的详情页')
     return
+  }
+  if (!item.readFlag) {
+    emit('read', item.id)
   }
   router.push(target).catch((err) => {
     ElMessage.error(err?.response?.data?.message || err?.message || '打开失败')
@@ -143,8 +93,8 @@ function handleNotificationClick(item) {
             <p>{{ item.content }}</p>
           </div>
           <div class="row-actions">
-            <el-button v-if="!item.readFlag" text type="primary" :loading="actionId === item.id" @click="emit('read', item.id)">标记已读</el-button>
-            <el-button text type="danger" @click="emit('remove', item.id)">删除</el-button>
+            <el-button v-if="!item.readFlag" text type="primary" :loading="actionId === item.id" @click.stop="emit('read', item.id)">标记已读</el-button>
+            <el-button text type="danger" @click.stop="emit('remove', item.id)">删除</el-button>
           </div>
         </article>
       </el-tab-pane>
