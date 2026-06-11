@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, listReviewsByMerchant, replyReview, approveRefund, rejectRefund } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -17,8 +17,6 @@ const orders = ref([])
 const loading = ref(true)
 const loginUser = ref(null)
 const voucherCode = ref('')
-const reviews = ref([])
-const replyDrafts = ref({})
 
 // ===== version_314: 订单详情弹窗 & 商品名映射 =====
 const productNames = ref({})
@@ -96,13 +94,11 @@ async function load() {
     if (merchant.value && merchant.value.status === 'OPEN') {
       // version_314: 并行加载订单 + 商品名映射
       const merchantId = merchant.value.id
-      const [orderList, products, reviewList] = await Promise.all([
+      const [orderList, products] = await Promise.all([
         listMerchantOrders(),
-        listProducts(merchantId),
-        listReviewsByMerchant(merchantId)
+        listProducts(merchantId)
       ])
       orders.value = orderList
-      reviews.value = reviewList
       productNames.value = Object.fromEntries(products.map((p) => [p.id, p.name]))
     }
   } catch (error) {
@@ -188,18 +184,6 @@ async function handleRedeem() {
   const order = await redeemDeal(voucherCode.value.trim())
   ElMessage.success(`核销成功：${order.voucherCode}`)
   voucherCode.value = ''
-}
-
-async function handleReply(review) {
-  const reply = replyDrafts.value[review.id]
-  if (!reply?.trim()) {
-    ElMessage.warning('请输入回复内容')
-    return
-  }
-  await replyReview(review.id, reply.trim())
-  ElMessage.success('回复已发布')
-  replyDrafts.value[review.id] = ''
-  await load()
 }
 
 // ===== version_314: 通用订单操作方法 =====
@@ -409,25 +393,6 @@ onMounted(() => {
                 >
                   拒绝退款
                 </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-
-        <el-card v-if="merchant.status === 'OPEN'" class="box-card work-card review-card">
-          <template #header>
-            <div class="card-header">
-              <h3>评价回复</h3>
-            </div>
-          </template>
-          <el-table :data="reviews" style="width: 100%" empty-text="暂无评价">
-            <el-table-column prop="score" label="评分" width="90" />
-            <el-table-column prop="content" label="评价内容" />
-            <el-table-column prop="merchantReply" label="商家回复" />
-            <el-table-column label="回复" width="260">
-              <template #default="scope">
-                <el-input v-model="replyDrafts[scope.row.id]" placeholder="输入回复" size="small" />
-                <el-button size="small" type="primary" @click="handleReply(scope.row)">发布</el-button>
               </template>
             </el-table-column>
           </el-table>

@@ -2,11 +2,9 @@
 import { onMounted, ref } from 'vue'
 import {
   addReviewComment,
-  deleteMerchantReply,
   deleteReview,
   deleteReviewReply,
   listReviewsByMerchant,
-  replyReview,
   reportReview,
   reportReviewReply,
   requestReviewDelete,
@@ -21,7 +19,6 @@ const props = defineProps({
 })
 
 const reviews = ref([])
-const replyDrafts = ref({})
 const commentDrafts = ref({})
 const loading = ref(false)
 
@@ -58,15 +55,6 @@ async function vote(targetType, targetId, voteType) {
   }
 }
 
-async function submitMerchantReply(review) {
-  const text = replyDrafts.value[review.id]
-  if (!text?.trim()) return
-  await replyReview(review.id, text.trim())
-  replyDrafts.value[review.id] = ''
-  ElMessage.success('回复成功')
-  await load()
-}
-
 async function submitComment(review) {
   const text = commentDrafts.value[review.id]
   if (!text?.trim()) return
@@ -83,12 +71,6 @@ async function submitComment(review) {
 async function hideOrDelete(review) {
   await deleteReview(review.id)
   ElMessage.success(review.mine ? '评价已删除' : '该评价已对当前账号隐藏')
-  await load()
-}
-
-async function removeMerchantReply(review) {
-  await deleteMerchantReply(review.id)
-  ElMessage.success('商家回复已删除')
   await load()
 }
 
@@ -170,21 +152,6 @@ onMounted(load)
         <el-button v-if="showMerchantActions" text type="warning" @click="requestDelete(review)">申请删评</el-button>
       </div>
 
-      <div v-if="review.merchantReply" class="merchant-reply">
-        <strong>商家回复</strong>
-        <p>{{ review.merchantReply }}</p>
-        <div class="actions">
-          <el-button text @click="vote('MERCHANT_REPLY', review.id, 'LIKE')">赞 {{ review.merchantReplyLikeCount || 0 }}</el-button>
-          <el-button text @click="vote('MERCHANT_REPLY', review.id, 'DISLIKE')">踩 {{ review.merchantReplyDislikeCount || 0 }}</el-button>
-          <el-button v-if="showMerchantActions" text type="danger" @click="removeMerchantReply(review)">删除回复</el-button>
-        </div>
-      </div>
-
-      <div v-else-if="showMerchantActions" class="reply-box">
-        <el-input v-model="replyDrafts[review.id]" placeholder="回复顾客评价" />
-        <el-button type="primary" @click="submitMerchantReply(review)">商家回复</el-button>
-      </div>
-
       <div v-for="reply in review.replies || []" :key="reply.id" class="nested-reply">
         <div class="review-head">
           <div class="avatar small" :style="avatarStyle(reply.avatar)">{{ reply.avatar ? '' : avatarText(reply.displayName) }}</div>
@@ -222,7 +189,7 @@ onMounted(load)
 .images { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .images img { border-radius: var(--radius-sm); height: 88px; object-fit: cover; width: 88px; }
 .actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.merchant-reply, .nested-reply, .reply-box {
+.nested-reply, .reply-box {
   background: var(--clas-warm-50); border-radius: var(--radius-sm); margin-top: 10px; padding: 10px 12px;
 }
 .reply-box { display: grid; gap: 8px; }

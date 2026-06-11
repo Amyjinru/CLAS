@@ -8,7 +8,6 @@ import com.clas.dto.MerchantRatingResponse;
 import com.clas.dto.ReviewDeleteRequestDto;
 import com.clas.dto.ReviewDetailResponse;
 import com.clas.dto.ReviewReplyCreateRequest;
-import com.clas.dto.ReviewReplyRequest;
 import com.clas.dto.ReviewReportRequest;
 import com.clas.dto.ReviewRequest;
 import com.clas.dto.ReviewVoteRequest;
@@ -70,12 +69,6 @@ public class ReviewController {
         return Result.ok(reviewService.getMerchantRating(merchantId));
     }
 
-    @PostMapping("/{reviewId}/reply")
-    @RequireRole("MERCHANT")
-    public Result<Review> reply(@PathVariable Long reviewId, @Valid @RequestBody ReviewReplyRequest request) {
-        return Result.ok(reviewService.reply(reviewId, request.reply()));
-    }
-
     @PostMapping("/{reviewId}/comments")
     @RequireRole({"USER", "MERCHANT", "ADMIN"})
     public Result<ReviewReply> addComment(@PathVariable Long reviewId, @Valid @RequestBody ReviewReplyCreateRequest request) {
@@ -103,13 +96,6 @@ public class ReviewController {
         } else {
             reviewService.deleteOwnReview(reviewId, UserContext.getUserId());
         }
-        return Result.ok();
-    }
-
-    @DeleteMapping("/{reviewId}/merchant-reply")
-    @RequireRole("MERCHANT")
-    public Result<Void> deleteMerchantReply(@PathVariable Long reviewId) {
-        reviewService.deleteMerchantReply(reviewId);
         return Result.ok();
     }
 

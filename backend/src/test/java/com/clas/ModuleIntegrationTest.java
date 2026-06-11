@@ -906,48 +906,6 @@ class ModuleIntegrationTest {
     }
 
     @Test
-    void merchantReplyCreatesNotificationWithNavigationTarget() throws Exception {
-        Long orderId = createCompletedOrder();
-
-        MvcResult reviewResult = mockMvc.perform(post("/api/review/add")
-                .header("Authorization", auth(USER_PHONE))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of(
-                    "orderId", orderId,
-                    "userId", USER_PHONE,
-                    "score", 5,
-                    "content", "需要收到商家回复通知"
-                ))))
-            .andExpect(status().isOk())
-            .andReturn();
-        Long reviewId = objectMapper.readTree(reviewResult.getResponse().getContentAsString())
-            .path("data").path("id").asLong();
-
-        mockMvc.perform(post("/api/review/" + reviewId + "/reply")
-                .header("Authorization", auth(MERCHANT_PHONE))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of("reply", "谢谢您的评价"))))
-            .andExpect(status().isOk());
-
-        Notification notification = notificationMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Notification>()
-                    .eq(Notification::getUserId, USER_PHONE)
-                    .eq(Notification::getType, "MERCHANT_REVIEW_REPLY")
-                    .eq(Notification::getReviewId, reviewId)
-                    .orderByDesc(Notification::getId)
-            )
-            .stream()
-            .findFirst()
-            .orElseThrow();
-
-        assertEquals("REVIEW", notification.getTargetType());
-        assertEquals(reviewId, notification.getTargetId());
-        assertEquals(orderId, notification.getOrderId());
-        assertEquals(1L, notification.getMerchantId());
-        assertEquals("/review/" + orderId + "?reviewId=" + reviewId, notification.getTargetPath());
-    }
-
-    @Test
     void reviewCommentCreatesReplyNotificationAndLegacyNotificationsRemainValid() throws Exception {
         Long orderId = createCompletedOrder();
 

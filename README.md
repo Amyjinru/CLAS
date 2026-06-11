@@ -153,7 +153,6 @@ npm run dev
 | 头像 URL 更新 | `PUT /api/user/profile` | `avatar` URL 指向的图片 |
 | 昵称更新 | `PUT /api/user/profile` | `nickname` 文本 |
 | 提交评价 | `POST /api/review/add` | 评价正文 |
-| 商家回复 | `POST /api/review/{reviewId}/reply` | 商家回复正文 |
 | 评论回复 | `POST /api/review/{reviewId}/comments` | 评论正文 |
 
 **实现方式**

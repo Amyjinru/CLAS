@@ -210,7 +210,7 @@ public class ReviewService {
         List<Long> replyIds = replies.stream().map(ReviewReply::getId).toList();
         List<ReviewVote> votes = new ArrayList<>();
         votes.addAll(reviewVoteMapper.selectList(new LambdaQueryWrapper<ReviewVote>()
-            .in(ReviewVote::getTargetType, List.of("REVIEW", "MERCHANT_REPLY"))
+            .eq(ReviewVote::getTargetType, "REVIEW")
             .in(ReviewVote::getTargetId, reviewIds)));
         if (!replyIds.isEmpty()) {
             votes.addAll(reviewVoteMapper.selectList(new LambdaQueryWrapper<ReviewVote>()
@@ -229,32 +229,6 @@ public class ReviewService {
         }
         List<Review> reviews = listRawByMerchantId(merchantId);
         return new MerchantRatingResponse(merchantId, merchant.getScore(), (long) reviews.size());
-    }
-
-    public Review reply(Long reviewId, String reply) {
-        penaltyService.assertCanComment(UserContext.getUserId());
-        Review review = requireReview(reviewId);
-        Orders order = orderService.requireOrder(review.getOrderId());
-        if (!merchantService.getCurrentMerchantId().equals(order.getMerchantId())) {
-            throw new BusinessException("只能回复自己店铺的评价");
-        }
-        contentModerationService.assertTextAllowed(reply, "商家回复");
-        review.setMerchantReply(reply);
-        reviewMapper.updateById(review);
-        notificationService.send(new NotificationTarget(
-            review.getUserId(),
-            "商家回复了评价",
-            "您的订单 " + review.getOrderId() + " 评价收到商家回复。",
-            "MERCHANT_REVIEW_REPLY",
-            "REVIEW",
-            review.getId(),
-            review.getId(),
-            null,
-            review.getOrderId(),
-            order.getMerchantId(),
-            reviewTargetPath(review.getOrderId(), review.getId(), null)
-        ));
-        return review;
     }
 
     public ReviewReply addUserReply(Long reviewId, ReviewReplyCreateRequest request, String userId) {
@@ -336,20 +310,6 @@ public class ReviewService {
         if (order != null) {
             recalculateMerchantScore(order.getMerchantId());
         }
-    }
-
-    @Transactional
-    public void deleteMerchantReply(Long reviewId) {
-        Review review = requireReview(reviewId);
-        Orders order = orderService.requireOrder(review.getOrderId());
-        if (!merchantService.getCurrentMerchantId().equals(order.getMerchantId())) {
-            throw new BusinessException("只能删除自己店铺的回复");
-        }
-        review.setMerchantReply(null);
-        reviewVoteMapper.delete(new LambdaQueryWrapper<ReviewVote>()
-            .eq(ReviewVote::getTargetType, "MERCHANT_REPLY")
-            .eq(ReviewVote::getTargetId, reviewId));
-        reviewMapper.updateById(review);
     }
 
     public ReviewDeleteRequest requestDeleteReview(Long reviewId, String reason) {
@@ -499,8 +459,6 @@ public class ReviewService {
         User user = context.users().get(review.getUserId());
         VoteSummary reviewVotes = summarizeVotes(context.votesByTarget()
             .getOrDefault(voteKey("REVIEW", review.getId()), List.of()), viewerId);
-        VoteSummary merchantReplyVotes = summarizeVotes(context.votesByTarget()
-            .getOrDefault(voteKey("MERCHANT_REPLY", review.getId()), List.of()), viewerId);
         List<ReviewReply> replies = context.repliesByReview().getOrDefault(review.getId(), List.of());
         List<ReviewReplyResponse> replyResponses = replies.stream()
             .map(reply -> toReplyResponse(reply, viewerId, context))
@@ -518,9 +476,9 @@ public class ReviewService {
             reviewVotes.likes(),
             reviewVotes.dislikes(),
             reviewVotes.myVote(),
-            merchantReplyVotes.myVote(),
-            merchantReplyVotes.likes(),
-            merchantReplyVotes.dislikes(),
+            null,
+            0L,
+            0L,
             replyResponses,
             review.getCreatedAt() == null ? null : review.getCreatedAt().toString(),
             viewerId != null && viewerId.equals(review.getUserId())
@@ -622,7 +580,6 @@ public class ReviewService {
                     throw new BusinessException("回复不存在");
                 }
             }
-            case "MERCHANT_REPLY" -> requireReview(targetId);
             default -> throw new BusinessException("不支持的投票目标");
         }
     }

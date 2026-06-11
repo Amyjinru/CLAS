@@ -144,4 +144,4 @@ AdminLayout 采用固定侧边栏 + 内容区布局：
 | 通知 | `GET /api/notifications/mine`, `POST /api/notifications/{id}/read` |
 | 退款 | `POST /api/order/refund/{orderId}`, `POST /api/order/refund/{orderId}/approve`, `POST /api/order/refund/{orderId}/reject` |
 | 预约 | `POST /api/bookings`, `GET /api/bookings/mine`, `POST /api/bookings/{id}/cancel`, `GET /api/bookings/merchant`, `POST /api/bookings/{id}/status` |
-| 评价治理 | `POST /api/review/{reviewId}/reply`, `POST /api/review/{reviewId}/report`, `PUT /api/admin/reviews/{id}/report-status` |
+| 评价治理 | `POST /api/review/{reviewId}/comments`, `POST /api/review/{reviewId}/report`, `PUT /api/admin/reviews/{id}/report-status` |
