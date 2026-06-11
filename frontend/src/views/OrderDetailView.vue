@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { listOrders } from '../api/clas'
+import { getOrderDetail } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
@@ -48,8 +48,7 @@ function goBack() {
 
 onMounted(async () => {
   try {
-    const orders = await listOrders()
-    orderEntry.value = orders.find((o) => o.order.id === orderId.value) || null
+    orderEntry.value = await getOrderDetail(orderId.value)
     if (!orderEntry.value) {
       error.value = '订单不存在或无权查看'
     }

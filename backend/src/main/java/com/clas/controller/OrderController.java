@@ -75,6 +75,12 @@ public class OrderController {
         return Result.ok(orderService.listForUser(currentUserId()));
     }
 
+    @GetMapping("/{orderId}")
+    @RequireRole("USER")
+    public Result<OrderResponse> detail(@PathVariable Long orderId) {
+        return Result.ok(orderService.getForUser(orderId, currentUserId()));
+    }
+
     @GetMapping("/merchant/{merchantId}")
     @Deprecated
     @RequireRole("MERCHANT")
@@ -92,6 +98,18 @@ public class OrderController {
     @RequireRole("MERCHANT")
     public Result<List<OrderResponse>> myMerchantOrdersByUser(@PathVariable String userId) {
         return Result.ok(orderService.listForMerchantAndUser(merchantService.getCurrentMerchantId(), userId));
+    }
+
+    @GetMapping("/merchant/detail/{orderId}")
+    @RequireRole("MERCHANT")
+    public Result<OrderResponse> myMerchantOrderDetail(@PathVariable Long orderId) {
+        return Result.ok(orderService.getForMerchant(orderId, merchantService.getCurrentMerchantId()));
+    }
+
+    @GetMapping("/admin/{orderId}")
+    @RequireRole("ADMIN")
+    public Result<OrderResponse> adminOrderDetail(@PathVariable Long orderId) {
+        return Result.ok(orderService.getForAdmin(orderId));
     }
 
     @PostMapping("/pay/{orderId}")

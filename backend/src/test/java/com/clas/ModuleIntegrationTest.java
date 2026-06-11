@@ -785,6 +785,64 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void orderDetailIsScopedToCurrentUserMerchantAndAdmin() throws Exception {
+        String otherUserId = "13900008888";
+        String otherMerchantPhone = "13900008889";
+        registerUser(otherUserId, "order_detail_other", STRONG_PASSWORD);
+        registerMerchant(otherMerchantPhone, "order_detail_merchant", "详情测试商家", "13900008890");
+
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        mockMvc.perform(get("/api/order/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.id").value(orderId))
+            .andExpect(jsonPath("$.data.items.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        mockMvc.perform(get("/api/order/" + orderId)
+                .header("Authorization", auth(otherUserId)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+
+        mockMvc.perform(get("/api/order/merchant/detail/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.id").value(orderId))
+            .andExpect(jsonPath("$.data.items.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        mockMvc.perform(get("/api/order/merchant/detail/" + orderId)
+                .header("Authorization", auth(otherMerchantPhone)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+
+        mockMvc.perform(get("/api/order/admin/" + orderId)
+                .header("Authorization", auth(ADMIN_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.id").value(orderId));
+    }
+
+    @Test
     void cancelPendingOrderRestoresStock() throws Exception {
         MvcResult beforeStockResult = mockMvc.perform(get("/api/product/list/1"))
             .andExpect(status().isOk())
@@ -1541,6 +1599,38 @@ class ModuleIntegrationTest {
                     "confirmPassword", password,
                     "phone", phone,
                     "code", TEST_CODE
+                ))))
+            .andExpect(status().isOk());
+    }
+
+    private void registerMerchant(
+        String accountPhone,
+        String username,
+        String merchantName,
+        String contactPhone
+    ) throws Exception {
+        mockMvc.perform(post("/api/user/register/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", accountPhone))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/merchant/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.ofEntries(
+                    Map.entry("accountPhone", accountPhone),
+                    Map.entry("code", TEST_CODE),
+                    Map.entry("username", username),
+                    Map.entry("password", STRONG_PASSWORD),
+                    Map.entry("confirmPassword", STRONG_PASSWORD),
+                    Map.entry("merchantName", merchantName),
+                    Map.entry("contactPhone", contactPhone),
+                    Map.entry("category", "美食"),
+                    Map.entry("address", "测试地址 3 号"),
+                    Map.entry("longitude", 116.390000),
+                    Map.entry("latitude", 39.910000),
+                    Map.entry("deliveryRadiusM", 3000),
+                    Map.entry("bankAccount", "123456781"),
+                    Map.entry("settlementCycle", 7)
                 ))))
             .andExpect(status().isOk());
     }
