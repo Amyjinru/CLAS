@@ -4,6 +4,7 @@ export const listMerchants = (params) => api.get('/merchant/list', { params }).t
 export const getMerchant = (id) => api.get(`/merchant/${id}`).then(unwrap)
 export const getDeliveryEstimate = (id, params) => api.get(`/merchant/${id}/delivery-estimate`, { params }).then(unwrap)
 export const registerMerchant = (payload) => api.post('/merchant/register', payload).then(unwrap)
+export const sendMerchantRegisterCode = (payload) => api.post('/merchant/register/send-code', payload).then(unwrap)
 export const getMyMerchant = () => api.get('/merchant/my').then(unwrap)
 export const getMyMerchantAuditStatus = () => api.get('/merchant/my/audit-status').then(unwrap)
 export const getMyMerchantStats = () => api.get('/merchant/my/stats').then(unwrap)

@@ -75,7 +75,7 @@ async function submitReset() {
     return
   }
   if (!passwordOk.value) {
-    showMessage('密码长度不能少于8位', 'error')
+    showMessage(passwordRuleMessage, 'error')
     return
   }
   if (!passwordMatches.value) {

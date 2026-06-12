@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { registerMerchant, currentUser, sendRegisterCode, setSessionUser } from '../api/clas'
+import { registerMerchant, currentUser, sendMerchantRegisterCode, setSessionUser } from '../api/clas'
 import { ElMessage } from 'element-plus'
 import LocationSelector from '../components/LocationSelector.vue'
 import { passwordChecks } from '../utils/passwordRules'
@@ -74,7 +74,6 @@ function validPhone(phone) {
 }
 
 const merchantPasswordChecks = computed(() => passwordChecks(form.password))
-const merchantPasswordOk = computed(() => merchantPasswordChecks.value.every((item) => item.ok))
 const merchantPasswordMatches = computed(() => form.confirmPassword && form.password === form.confirmPassword)
 
 onMounted(() => {
@@ -107,15 +106,11 @@ const rules = reactive({
     { pattern: /^\d{9,25}$/, message: '请输入9到25位数字账号', trigger: 'blur' }
   ],
   settlementCycle: [],
-  username: [
-    { required: true, message: '请输入展示名', trigger: 'blur' }
-  ],
+  username: [],
   password: [
-    { required: true, message: '请输入登录密码', trigger: 'blur' }
+    { required: true, message: '请输入账号密码', trigger: 'blur' }
   ],
-  confirmPassword: [
-    { required: true, message: '请再次输入密码', trigger: 'blur' }
-  ]
+  confirmPassword: []
 })
 
 const categories = ['美食', '饮品', '超市', '水果', '生鲜', '鲜花']
@@ -134,7 +129,7 @@ async function sendMerchantCode() {
   codeSending.value = true
   try {
     const phone = form.accountPhone.trim()
-    await sendRegisterCode({ phone })
+    await sendMerchantRegisterCode({ phone })
     accountCodeSent.value = true
     lastSentAccountPhone.value = phone
     ElMessage.success('验证码已发送，请在60秒内输入')
@@ -171,15 +166,11 @@ async function submitForm() {
       return
     }
 
-    if (!user.value && !merchantPasswordOk.value) {
-      ElMessage.warning('密码长度不能少于8位')
-      return
-    }
     if (!user.value && (!accountCodeSent.value || !form.code.trim())) {
       ElMessage.warning('请先发送并填写验证码')
       return
     }
-    if (!user.value && !merchantPasswordMatches.value) {
+    if (!user.value && form.confirmPassword && !merchantPasswordMatches.value) {
       ElMessage.warning('两次输入的密码不一致')
       return
     }
@@ -256,7 +247,7 @@ onUnmounted(() => {
         <div class="step-indicator" v-if="!user">
           <div class="step" :class="{ active: currentStep === 1, done: currentStep > 1 }">
             <span class="step-num">{{ currentStep > 1 ? '✓' : '1' }}</span>
-            <span class="step-label">创建账号</span>
+            <span class="step-label">验证账号</span>
           </div>
           <div class="step-line" :class="{ done: currentStep > 1 }"></div>
           <div class="step" :class="{ active: currentStep === 2 }">
@@ -266,18 +257,18 @@ onUnmounted(() => {
         </div>
 
         <!-- ============================================ -->
-        <!-- 步骤 1：创建登录账号（仅未登录访问者）         -->
+        <!-- 步骤 1：验证登录账号（仅未登录访问者）         -->
         <!-- ============================================ -->
         <template v-if="!user && currentStep === 1">
           <el-alert
-            title="请先创建登录账号，以便后续管理您的商家。"
+            title="请先验证登录账号；已注册手机号可直接使用，未注册手机号将自动创建账号。"
             type="info"
             show-icon
             :closable="false"
             class="alert-tip"
           />
 
-          <h3 class="section-title">创建登录账号</h3>
+          <h3 class="section-title">验证登录账号</h3>
 
           <el-form-item label="账号手机号" prop="accountPhone">
             <div class="code-row">
@@ -299,11 +290,11 @@ onUnmounted(() => {
           </el-form-item>
 
           <el-form-item label="昵称" prop="username">
-            <el-input v-model="form.username" placeholder="如：校园美食家，随时可改" />
+            <el-input v-model="form.username" placeholder="新账号必填；已注册账号可不填" />
           </el-form-item>
 
-          <el-form-item label="登录密码" prop="password">
-            <el-input v-model="form.password" type="password" show-password placeholder="至少6位" />
+          <el-form-item label="账号密码" prop="password">
+            <el-input v-model="form.password" type="password" show-password placeholder="已有账号请输入当前密码；新账号至少6位" />
             <ul class="password-checks">
               <li
                 v-for="item in merchantPasswordChecks"
@@ -316,7 +307,7 @@ onUnmounted(() => {
           </el-form-item>
 
           <el-form-item label="确认密码" prop="confirmPassword">
-            <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" />
+            <el-input v-model="form.confirmPassword" type="password" show-password placeholder="新账号请再次输入密码；已注册账号可不填" />
             <p
               v-if="form.confirmPassword"
               class="match-tip"

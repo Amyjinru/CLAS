@@ -124,7 +124,7 @@ async function submitRegister() {
     return
   }
   if (!registerPasswordOk.value) {
-    showMessage('密码长度不能少于8位', 'error')
+    showMessage(passwordRuleMessage, 'error')
     return
   }
   if (!registerPasswordMatches.value) {

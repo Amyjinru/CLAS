@@ -11,6 +11,7 @@ import com.clas.dto.MerchantRegisterRequest;
 import com.clas.dto.MerchantResponse;
 import com.clas.dto.MerchantStatsDTO;
 import com.clas.dto.OrderResponse;
+import com.clas.dto.SendCodeRequest;
 import com.clas.entity.MerchantAuditLog;
 import com.clas.entity.Orders;
 import com.clas.service.MerchantService;
@@ -97,6 +98,12 @@ public class MerchantController {
     public Result<MerchantResponse> register(@Valid @RequestBody MerchantRegisterRequest request) {
         String loggedInUserId = UserContext.getUserId();
         return Result.ok(merchantService.register(request, loggedInUserId));
+    }
+
+    @PostMapping("/register/send-code")
+    public Result<String> sendRegisterCode(@Valid @RequestBody SendCodeRequest request) {
+        merchantService.sendRegisterCode(request);
+        return Result.ok("验证码已发送");
     }
 
     @GetMapping("/my")

@@ -12,6 +12,7 @@ import com.clas.dto.DeliveryEstimateResponse;
 import com.clas.dto.MerchantProfileUpdateRequest;
 import com.clas.dto.MerchantRegisterRequest;
 import com.clas.dto.MerchantResponse;
+import com.clas.dto.SendCodeRequest;
 import com.clas.entity.Merchant;
 import com.clas.entity.MerchantAuditLog;
 import com.clas.entity.User;
@@ -182,6 +183,11 @@ public class MerchantService {
         verificationCodeStore.generateAndStore(merchant.getPhone(), "merchant-bank-change");
     }
 
+    public void sendRegisterCode(SendCodeRequest request) {
+        String phone = PhoneValidator.normalizeAndValidate(request.phone());
+        verificationCodeStore.generateAndStore(phone, "register");
+    }
+
     public void sendProfileUpdateCode(MerchantProfileUpdateRequest request) {
         Merchant merchant = currentMerchant();
         String nextPhone = PhoneValidator.normalizeAndValidate(request.phone());
@@ -250,27 +256,42 @@ public class MerchantService {
         // 1. If not logged in, we must register a new user first
         if (finalUserId == null) {
             String accountPhone = PhoneValidator.normalizeAndValidate(request.accountPhone());
-            PasswordValidator.validate(request.password());
-            if (!request.password().equals(request.confirmPassword())) {
-                throw new BusinessException("两次输入的密码不一致");
-            }
             verificationCodeStore.verify(accountPhone, "register", request.code());
+            User user = userMapper.selectById(accountPhone);
 
-            if (request.username() == null || request.username().isBlank() ||
-                request.password() == null || request.password().isBlank()) {
-                throw new BusinessException("未登录用户注册商家，必须提供展示名和密码");
+            if (request.password() == null || request.password().isBlank()) {
+                throw new BusinessException("未登录用户入驻商家，必须提供账号密码");
             }
 
-            if (userMapper.selectById(accountPhone) != null) {
-                throw new BusinessException("该手机号已被注册");
+            if (user == null) {
+                if (request.username() == null || request.username().isBlank()) {
+                    throw new BusinessException("新账号入驻商家，必须提供展示名");
+                }
+                PasswordValidator.validate(request.password());
+                if (!request.password().equals(request.confirmPassword())) {
+                    throw new BusinessException("两次输入的密码不一致");
+                }
+                user = new User();
+                user.setPhone(accountPhone);
+                user.setUsername(request.username());
+                user.setPassword(passwordEncoder.encode(request.password()));
+                user.setRole("MERCHANT");
+                userMapper.insert(user);
+            } else {
+                if (user.getEnabled() != null && !user.getEnabled()) {
+                    throw new BusinessException("账号已被禁用，请联系管理员");
+                }
+                boolean passwordMatches = user.getPassword() != null && user.getPassword().startsWith("$2")
+                    ? passwordEncoder.matches(request.password(), user.getPassword())
+                    : request.password().equals(user.getPassword());
+                if (!passwordMatches) {
+                    throw new BusinessException("账号手机号或密码错误");
+                }
+                if ("USER".equals(user.getRole())) {
+                    user.setRole("MERCHANT");
+                    userMapper.updateById(user);
+                }
             }
-
-            User user = new User();
-            user.setPhone(accountPhone);
-            user.setUsername(request.username());
-            user.setPassword(passwordEncoder.encode(request.password()));
-            user.setRole("MERCHANT");
-            userMapper.insert(user);
             finalUserId = accountPhone;
         } else {
             // If already logged in, check if user is already a merchant or has merchant role
