@@ -11,8 +11,8 @@ import { orderStatusMap } from '../../utils/status'
 const statusOptions = [
   { label: '全部状态', value: '' },
   { label: '待支付', value: 'PENDING_PAYMENT' },
-  { label: '待接单', value: 'PAID' },
-  { label: '已接单', value: 'ACCEPTED' },
+  { label: '已支付(自动接单中)', value: 'PAID' },
+  { label: '已支付(自动接单中)', value: 'ACCEPTED' },
   { label: '已完成', value: 'COMPLETED' },
   { label: '退款中', value: 'REFUND_PENDING' },
   { label: '已退款', value: 'REFUNDED' }

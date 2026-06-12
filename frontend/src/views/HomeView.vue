@@ -318,7 +318,7 @@ function resetAllFilters() {
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
   PAID: '已支付',
-  ACCEPTED: '商家已接单',
+  ACCEPTED: '已支付(自动接单中)',
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
@@ -327,7 +327,7 @@ const orderStatusLabel = {
 }
 
 const deliveryLabel = {
-  WAITING: '等待商家接单',
+  WAITING: '等待自动接单',
   PREPARING: '商家备餐中',
   DELIVERING: '配送中',
   DELIVERED: '已送达'

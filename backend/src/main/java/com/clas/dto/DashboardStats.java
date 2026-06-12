@@ -20,7 +20,7 @@ public record DashboardStats(
     Long todaySales,
     /** 待支付订单数 */
     Long pendingPaymentOrders,
-    /** 已支付待接单数 */
+    /** 已支付自动接单数 */
     Long paidOrders,
     /** 已完成订单数 */
     Long completedOrders

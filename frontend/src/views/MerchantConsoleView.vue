@@ -34,8 +34,8 @@ const statusMap = {
 // ===== version_314: 订单状态映射 =====
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
-  PAID: '已支付（自动接单中）',
-  ACCEPTED: '商家已接单',
+  PAID: '已支付(自动接单中)',
+  ACCEPTED: '已支付(自动接单中)',
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
@@ -282,7 +282,7 @@ onMounted(() => {
             </el-table-column>
             <el-table-column prop="order.status" label="订单状态" width="140">
               <template #default="scope">
-                <el-tag :type="scope.row.order.status === 'PAID' ? 'success' : 'info'">
+                <el-tag :type="['PAID', 'ACCEPTED'].includes(scope.row.order.status) ? 'success' : 'info'">
                   {{ orderStatusLabel[scope.row.order.status] || scope.row.order.status }}
                 </el-tag>
               </template>
@@ -330,7 +330,7 @@ onMounted(() => {
                   查看详情
                 </el-button>
                 <el-button
-                  v-if="scope.row.order.status === 'PAID'"
+                  v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status)"
                   type="danger"
                   size="small"
                   @click="handleReject(scope.row.order.id)"
@@ -417,7 +417,7 @@ onMounted(() => {
             联系用户
           </button>
           <button
-            v-if="selectedOrder.order.status === 'PAID'"
+            v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
             class="secondary"
             type="button"
             @click="operate('reject', selectedOrder)"

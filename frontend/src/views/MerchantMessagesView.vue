@@ -23,7 +23,7 @@ const userOrdersLoading = ref(false)
 const showUserOrders = ref(false)
 
 const orderStatusLabel = {
-  PENDING_PAYMENT: '待支付', PAID: '已支付', ACCEPTED: '已接单',
+  PENDING_PAYMENT: '待支付', PAID: '已支付(自动接单中)', ACCEPTED: '已支付(自动接单中)',
   COMPLETED: '已完成', CANCELED: '已取消', REJECTED: '已拒单',
   REFUNDED: '已退款', REFUND_PENDING: '退款中'
 }

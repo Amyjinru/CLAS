@@ -306,7 +306,7 @@ public class OrderService {
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
-            "商家已接单",
+            "已支付(自动接单中)",
             "订单 " + order.getId() + " 正在备餐。",
             "ORDER_STATUS",
             "ORDER",
@@ -408,7 +408,7 @@ public class OrderService {
     @Transactional
     public Orders reject(Long orderId, Long merchantId, String reason) {
         Orders order = requireMerchantOrder(orderId, merchantId);
-        requireStatus(order, STATUS_PAID);
+        requireStatusIn(order, STATUS_PAID, STATUS_ACCEPTED);
         restoreOrderStock(orderId);
         order.setStatus(STATUS_REJECTED);
         order.setRejectReason(trimToNull(reason));

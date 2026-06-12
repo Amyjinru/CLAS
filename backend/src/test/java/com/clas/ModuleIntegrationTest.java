@@ -1106,6 +1106,32 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void merchantCanRejectAutoAcceptedOrder() throws Exception {
+        Long orderId = createPendingOrderForUser();
+
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", orderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
+
+        mockMvc.perform(post("/api/order/reject/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "reason", "商品售罄"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("REJECTED"))
+            .andExpect(jsonPath("$.data.rejectReason").value("商品售罄"));
+    }
+
+    @Test
     void paymentIdempotencyKeyReusesSamePayment() throws Exception {
         Long orderId = createPendingOrderForUser();
         String key = "payment-key-" + orderId;
