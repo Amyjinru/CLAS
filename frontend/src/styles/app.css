@@ -36,12 +36,13 @@ button:active,
 }
 button.secondary,
 .button.secondary {
-  background: var(--color-primary-soft);
-  color: #B8970E;
+  background: #FFD100;
+  color: #ffffff;
 }
 button.secondary:hover,
 .button.secondary:hover {
-  background: #FFE566;
+  background: #E6BC00;
+  color: #ffffff;
 }
 button:disabled {
   background: var(--clas-warm-100);
