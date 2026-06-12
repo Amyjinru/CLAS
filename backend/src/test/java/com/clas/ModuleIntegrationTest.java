@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,6 +30,8 @@ import com.clas.mapper.ReviewReplyMapper;
 import com.clas.mapper.ReviewVoteMapper;
 import com.clas.mapper.UserCouponMapper;
 import com.clas.service.CouponService;
+import com.clas.service.OrderTimeoutService;
+import java.util.Base64;
 import java.util.Properties;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -102,6 +105,33 @@ class ModuleIntegrationTest {
 
     @Autowired
     private NotificationMapper notificationMapper;
+
+    @Autowired
+    private OrderTimeoutService orderTimeoutService;
+
+    @Test
+    void apiResponsesIncludeTimestampAndRequestId() throws Exception {
+        mockMvc.perform(get("/api/health")
+                .header("X-Request-Id", "trace-test-123"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("X-Request-Id", "trace-test-123"))
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.timestamp").isNumber())
+            .andExpect(jsonPath("$.requestId").value("trace-test-123"));
+    }
+
+    @Test
+    void apiErrorsIncludeRequestId() throws Exception {
+        mockMvc.perform(get("/api/deals/999999")
+                .header("X-Request-Id", "missing-deal-trace"))
+            .andExpect(status().isBadRequest())
+            .andExpect(header().string("X-Request-Id", "missing-deal-trace"))
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("团购券不存在"))
+            .andExpect(jsonPath("$.timestamp").isNumber())
+            .andExpect(jsonPath("$.requestId").value("missing-deal-trace"))
+            .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
 
     @Test
     void userRegisterWorksAndHidesPassword() throws Exception {
@@ -595,10 +625,9 @@ class ModuleIntegrationTest {
             "file",
             "logo.png",
             "image/png",
-            new byte[] {
-                (byte) 0x89, 0x50, 0x4E, 0x47,
-                0x0D, 0x0A, 0x1A, 0x0A
-            }
+            Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+            )
         );
 
         mockMvc.perform(multipart("/api/merchant/my/logo")
@@ -756,6 +785,64 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void orderDetailIsScopedToCurrentUserMerchantAndAdmin() throws Exception {
+        String otherUserId = "13900008888";
+        String otherMerchantPhone = "13900008889";
+        registerUser(otherUserId, "order_detail_other", STRONG_PASSWORD);
+        registerMerchant(otherMerchantPhone, "order_detail_merchant", "详情测试商家", "13900008890");
+
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        mockMvc.perform(get("/api/order/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.id").value(orderId))
+            .andExpect(jsonPath("$.data.items.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        mockMvc.perform(get("/api/order/" + orderId)
+                .header("Authorization", auth(otherUserId)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+
+        mockMvc.perform(get("/api/order/merchant/detail/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.id").value(orderId))
+            .andExpect(jsonPath("$.data.items.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        mockMvc.perform(get("/api/order/merchant/detail/" + orderId)
+                .header("Authorization", auth(otherMerchantPhone)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+
+        mockMvc.perform(get("/api/order/admin/" + orderId)
+                .header("Authorization", auth(ADMIN_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.id").value(orderId));
+    }
+
+    @Test
     void cancelPendingOrderRestoresStock() throws Exception {
         MvcResult beforeStockResult = mockMvc.perform(get("/api/product/list/1"))
             .andExpect(status().isOk())
@@ -903,6 +990,168 @@ class ModuleIntegrationTest {
                     "content", "重复评价"
                 ))))
             .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void orderLifecycleTimestampsProgressThroughDetail() throws Exception {
+        mockMvc.perform(post("/api/cart/add")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "productId", 1,
+                    "quantity", 1
+                ))))
+            .andExpect(status().isOk());
+
+        MvcResult orderResult = mockMvc.perform(post("/api/order/create")
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE,
+                    "merchantId", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.createTime").isString())
+            .andReturn();
+
+        Long orderId = objectMapper.readTree(orderResult.getResponse().getContentAsString())
+            .path("data").path("order").path("id").asLong();
+
+        mockMvc.perform(post("/api/order/pay/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
+
+        mockMvc.perform(post("/api/order/accept/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.acceptedAt").isString());
+
+        mockMvc.perform(post("/api/order/deliver/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.deliveredAt").isString());
+
+        mockMvc.perform(post("/api/order/complete/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.completedAt").isString());
+
+        mockMvc.perform(get("/api/order/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.paidAt").isString())
+            .andExpect(jsonPath("$.data.order.acceptedAt").isString())
+            .andExpect(jsonPath("$.data.order.deliveredAt").isString())
+            .andExpect(jsonPath("$.data.order.completedAt").isString());
+    }
+
+    @Test
+    void paymentIdempotencyKeyReusesSamePayment() throws Exception {
+        Long orderId = createPendingOrderForUser();
+        String key = "payment-key-" + orderId;
+
+        MvcResult firstPay = mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", orderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key))
+            .andReturn();
+
+        Long firstPaymentId = objectMapper.readTree(firstPay.getResponse().getContentAsString())
+            .path("data").path("paymentId").asLong();
+
+        MvcResult secondPay = mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", orderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key))
+            .andReturn();
+
+        Long secondPaymentId = objectMapper.readTree(secondPay.getResponse().getContentAsString())
+            .path("data").path("paymentId").asLong();
+        assertEquals(firstPaymentId, secondPaymentId);
+    }
+
+    @Test
+    void paymentIdempotencyKeyCannotBeReusedForAnotherOrder() throws Exception {
+        Long firstOrderId = createPendingOrderForUser();
+        String key = "reused-payment-key";
+
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", firstOrderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.idempotencyKey").value(key));
+
+        Long secondOrderId = createPendingOrderForUser();
+
+        mockMvc.perform(post("/api/payment/mock")
+                .header("Authorization", auth(USER_PHONE))
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "orderId", secondOrderId,
+                    "userId", USER_PHONE,
+                    "payMethod", "MOCK"
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("幂等键已用于其他订单"))
+            .andExpect(jsonPath("$.errorCode").value("PAYMENT_IDEMPOTENCY_CONFLICT"));
+    }
+
+    @Test
+    void pendingPaymentTimeoutCancelsOldOrders() throws Exception {
+        Long orderId = createPendingOrderForUser();
+        jdbcTemplate.update(
+            "UPDATE orders SET create_time = ? WHERE id = ?",
+            LocalDateTime.now().minusMinutes(31),
+            orderId
+        );
+
+        int expired = orderTimeoutService.expirePendingPaymentOrders(LocalDateTime.now());
+        assertEquals(1, expired);
+
+        mockMvc.perform(get("/api/payment/status/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.orderStatus").value("CANCELED"))
+            .andExpect(jsonPath("$.data.paymentStatus").value("FAILED"));
+
+        Notification notification = notificationMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Notification>()
+                    .eq(Notification::getUserId, USER_PHONE)
+                    .eq(Notification::getOrderId, orderId)
+                    .eq(Notification::getType, "ORDER_STATUS")
+                    .orderByDesc(Notification::getId)
+            )
+            .stream()
+            .findFirst()
+            .orElseThrow();
+        assertEquals("订单已超时取消", notification.getTitle());
     }
 
     @Test
@@ -1431,6 +1680,38 @@ class ModuleIntegrationTest {
                     "confirmPassword", password,
                     "phone", phone,
                     "code", TEST_CODE
+                ))))
+            .andExpect(status().isOk());
+    }
+
+    private void registerMerchant(
+        String accountPhone,
+        String username,
+        String merchantName,
+        String contactPhone
+    ) throws Exception {
+        mockMvc.perform(post("/api/user/register/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", accountPhone))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/merchant/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.ofEntries(
+                    Map.entry("accountPhone", accountPhone),
+                    Map.entry("code", TEST_CODE),
+                    Map.entry("username", username),
+                    Map.entry("password", STRONG_PASSWORD),
+                    Map.entry("confirmPassword", STRONG_PASSWORD),
+                    Map.entry("merchantName", merchantName),
+                    Map.entry("contactPhone", contactPhone),
+                    Map.entry("category", "美食"),
+                    Map.entry("address", "测试地址 3 号"),
+                    Map.entry("longitude", 116.390000),
+                    Map.entry("latitude", 39.910000),
+                    Map.entry("deliveryRadiusM", 3000),
+                    Map.entry("bankAccount", "123456781"),
+                    Map.entry("settlementCycle", 7)
                 ))))
             .andExpect(status().isOk());
     }

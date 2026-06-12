@@ -2,15 +2,22 @@ package com.clas.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 @Service
 public class AmapRouteService {
+    private static final Duration CACHE_TTL = Duration.ofDays(1);
+
     private final RestClient restClient;
     private final String webServiceKey;
+    private final ConcurrentHashMap<String, CachedRouteEstimate> estimateCache = new ConcurrentHashMap<>();
 
     public AmapRouteService(@Value("${amap.web-service-key:}") String webServiceKey) {
         this.restClient = RestClient.builder()
@@ -27,6 +34,12 @@ public class AmapRouteService {
     ) {
         if (webServiceKey == null || webServiceKey.isBlank()) {
             return Optional.empty();
+        }
+        String cacheKey = cacheKey(originLongitude, originLatitude, destinationLongitude, destinationLatitude);
+        CachedRouteEstimate cached = estimateCache.get(cacheKey);
+        Instant now = Instant.now();
+        if (cached != null && cached.isFresh(now)) {
+            return Optional.of(cached.estimate());
         }
         try {
             JsonNode body = restClient.get()
@@ -49,10 +62,26 @@ public class AmapRouteService {
                 return Optional.empty();
             }
             int minutes = Math.max(1, (int) Math.ceil(durationSeconds / 60.0));
-            return Optional.of(new RouteEstimate(distanceMeters, minutes));
+            RouteEstimate estimate = new RouteEstimate(distanceMeters, minutes);
+            estimateCache.put(cacheKey, new CachedRouteEstimate(estimate, now));
+            return Optional.of(estimate);
         } catch (RuntimeException ex) {
             return Optional.empty();
         }
+    }
+
+    private String cacheKey(
+        BigDecimal originLongitude,
+        BigDecimal originLatitude,
+        BigDecimal destinationLongitude,
+        BigDecimal destinationLatitude
+    ) {
+        return rounded(originLongitude) + "_" + rounded(originLatitude) + "_"
+            + rounded(destinationLongitude) + "_" + rounded(destinationLatitude);
+    }
+
+    private String rounded(BigDecimal value) {
+        return value.setScale(3, RoundingMode.HALF_UP).toPlainString();
     }
 
     private String coordinate(BigDecimal longitude, BigDecimal latitude) {
@@ -60,5 +89,11 @@ public class AmapRouteService {
     }
 
     public record RouteEstimate(int distanceMeters, int durationMinutes) {
+    }
+
+    private record CachedRouteEstimate(RouteEstimate estimate, Instant cachedAt) {
+        private boolean isFresh(Instant now) {
+            return cachedAt.plus(CACHE_TTL).isAfter(now);
+        }
     }
 }

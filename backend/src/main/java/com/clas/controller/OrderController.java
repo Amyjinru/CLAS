@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -74,6 +75,12 @@ public class OrderController {
         return Result.ok(orderService.listForUser(currentUserId()));
     }
 
+    @GetMapping("/{orderId}")
+    @RequireRole("USER")
+    public Result<OrderResponse> detail(@PathVariable Long orderId) {
+        return Result.ok(orderService.getForUser(orderId, currentUserId()));
+    }
+
     @GetMapping("/merchant/{merchantId}")
     @Deprecated
     @RequireRole("MERCHANT")
@@ -93,11 +100,25 @@ public class OrderController {
         return Result.ok(orderService.listForMerchantAndUser(merchantService.getCurrentMerchantId(), userId));
     }
 
+    @GetMapping("/merchant/detail/{orderId}")
+    @RequireRole("MERCHANT")
+    public Result<OrderResponse> myMerchantOrderDetail(@PathVariable Long orderId) {
+        return Result.ok(orderService.getForMerchant(orderId, merchantService.getCurrentMerchantId()));
+    }
+
+    @GetMapping("/admin/{orderId}")
+    @RequireRole("ADMIN")
+    public Result<OrderResponse> adminOrderDetail(@PathVariable Long orderId) {
+        return Result.ok(orderService.getForAdmin(orderId));
+    }
+
     @PostMapping("/pay/{orderId}")
     @RequireRole("USER")
-    public Result<PaymentResponse> pay(@PathVariable Long orderId) {
-        Orders order = orderService.requireOrder(orderId);
-        PaymentRequest request = new PaymentRequest(orderId, currentUserId(), "MOCK");
+    public Result<PaymentResponse> pay(
+        @PathVariable Long orderId,
+        @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
+    ) {
+        PaymentRequest request = new PaymentRequest(orderId, currentUserId(), "MOCK", idempotencyKey);
         return Result.ok(paymentService.mockPay(request));
     }
 

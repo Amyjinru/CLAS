@@ -17,4 +17,5 @@ public class Payment {
     private String payMethod;
     private String status;
     private LocalDateTime createTime;
+    private String idempotencyKey;
 }

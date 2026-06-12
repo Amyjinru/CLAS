@@ -2,6 +2,7 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.common.DomainErrorCode;
 import com.clas.common.GeoUtils;
 import com.clas.dto.CreateOrderRequest;
 import com.clas.dto.OrderPreviewResponse;
@@ -272,10 +273,23 @@ public class OrderService {
         return withItems(orders);
     }
 
+    public OrderResponse getForUser(Long orderId, String userId) {
+        return withItems(requireUserOrder(orderId, userId));
+    }
+
+    public OrderResponse getForMerchant(Long orderId, Long merchantId) {
+        return withItems(requireMerchantOrder(orderId, merchantId));
+    }
+
+    public OrderResponse getForAdmin(Long orderId) {
+        return withItems(requireOrder(orderId));
+    }
+
     public Orders accept(Long orderId) {
         Orders order = requireOrder(orderId);
         requireStatus(order, STATUS_PAID);
         order.setStatus(STATUS_ACCEPTED);
+        order.setAcceptedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         return order;
     }
@@ -285,6 +299,7 @@ public class OrderService {
         requireStatus(order, STATUS_PAID);
         order.setStatus(STATUS_ACCEPTED);
         order.setDeliveryStatus("PREPARING");
+        order.setAcceptedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
@@ -307,6 +322,7 @@ public class OrderService {
         requireStatus(order, STATUS_ACCEPTED);
         order.setDeliveryStatus("DELIVERING");
         order.setEstimatedMinutes(15);
+        order.setDeliveredAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
@@ -328,6 +344,7 @@ public class OrderService {
         Orders order = requireOrder(orderId);
         requireStatus(order, STATUS_ACCEPTED);
         order.setStatus(STATUS_COMPLETED);
+        order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         return order;
     }
@@ -337,6 +354,7 @@ public class OrderService {
         requireStatus(order, STATUS_ACCEPTED);
         order.setStatus(STATUS_COMPLETED);
         order.setDeliveryStatus("DELIVERED");
+        order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
@@ -362,6 +380,7 @@ public class OrderService {
             restoreOrderStock(orderId);
         }
         order.setStatus(STATUS_CANCELED);
+        order.setCanceledAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         couponService.releaseForOrder(order.getUserCouponId());
         return order;
@@ -375,6 +394,7 @@ public class OrderService {
             restoreOrderStock(orderId);
         }
         order.setStatus(STATUS_CANCELED);
+        order.setCanceledAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         couponService.releaseForOrder(order.getUserCouponId());
         return order;
@@ -387,6 +407,7 @@ public class OrderService {
         restoreOrderStock(orderId);
         order.setStatus(STATUS_REJECTED);
         order.setRejectReason(trimToNull(reason));
+        order.setRejectedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         String rejectText = order.getRejectReason() == null ? "商家暂时无法接单" : order.getRejectReason();
         notificationService.send(new NotificationService.NotificationTarget(
@@ -509,7 +530,7 @@ public class OrderService {
     public Orders requireUserOrder(Long orderId, String userId) {
         Orders order = requireOrder(orderId);
         if (!order.getUserId().equals(userId)) {
-            throw new BusinessException("只能操作自己的订单");
+            throw new BusinessException("只能操作自己的订单", DomainErrorCode.AUTH_FORBIDDEN);
         }
         return order;
     }
@@ -517,7 +538,7 @@ public class OrderService {
     public Orders requireMerchantOrder(Long orderId, Long merchantId) {
         Orders order = requireOrder(orderId);
         if (!order.getMerchantId().equals(merchantId)) {
-            throw new BusinessException("只能操作自己店铺的订单");
+            throw new BusinessException("只能操作自己店铺的订单", DomainErrorCode.AUTH_FORBIDDEN);
         }
         return order;
     }
@@ -534,6 +555,12 @@ public class OrderService {
         return orders.stream()
             .map(order -> new OrderResponse(order, itemsByOrderId.getOrDefault(order.getId(), List.of())))
             .toList();
+    }
+
+    private OrderResponse withItems(Orders order) {
+        List<OrderItem> orderItems = orderItemMapper.selectList(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId()));
+        return new OrderResponse(order, orderItems);
     }
 
     private void requireStatus(Orders order, String status) {

@@ -1,13 +1,31 @@
 <script setup>
 import { computed, reactive, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { registerMerchant, currentUser, sendRegisterCode } from '../api/clas'
+import { registerMerchant, currentUser, sendRegisterCode, setSessionUser } from '../api/clas'
 import { ElMessage } from 'element-plus'
 import LocationSelector from '../components/LocationSelector.vue'
 
 const router = useRouter()
 const user = ref(null)
 const formRef = ref(null)
+
+// ===== 多步骤向导 =====
+const currentStep = ref(1)
+const totalSteps = computed(() => user.value ? 1 : 2)
+
+function nextStep() {
+  if (currentStep.value < totalSteps.value) {
+    currentStep.value++
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
+function prevStep() {
+  if (currentStep.value > 1) {
+    currentStep.value--
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
 
 const form = reactive({
   merchantName: '',
@@ -57,11 +75,7 @@ function validPhone(phone) {
 function passwordChecks(password) {
   const value = password || ''
   return [
-    { key: 'length', label: '不少于6位', ok: value.length >= 6 },
-    { key: 'lower', label: '包含小写字母', ok: /[a-z]/.test(value) },
-    { key: 'upper', label: '包含大写字母', ok: /[A-Z]/.test(value) },
-    { key: 'digit', label: '包含数字', ok: /\d/.test(value) },
-    { key: 'special', label: '包含特殊符号', ok: /[\W_]/.test(value) && !/\s/.test(value) }
+    { key: 'length', label: '不少于8位', ok: value.length >= 8 }
   ]
 }
 
@@ -96,12 +110,9 @@ const rules = reactive({
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
   ],
   bankAccount: [
-    { required: true, message: '请输入银行账号', trigger: 'blur' },
     { pattern: /^\d{9,25}$/, message: '请输入9到25位数字账号', trigger: 'blur' }
   ],
-  settlementCycle: [
-    { required: true, message: '请输入结算周期', trigger: 'blur' }
-  ],
+  settlementCycle: [],
   username: [
     { required: true, message: '请输入展示名', trigger: 'blur' }
   ],
@@ -132,7 +143,7 @@ async function sendMerchantCode() {
     await sendRegisterCode({ phone })
     accountCodeSent.value = true
     lastSentAccountPhone.value = phone
-    ElMessage.success('验证码已发送，请查看后端控制台输出')
+    ElMessage.success('验证码已发送，请在60秒内输入')
     codeCooldown.value = 60
     cooldownTimer && clearInterval(cooldownTimer)
     cooldownTimer = setInterval(() => {
@@ -167,7 +178,7 @@ async function submitForm() {
     }
 
     if (!user.value && !merchantPasswordOk.value) {
-      ElMessage.warning('密码至少6位，必须包含大小写英文字母、数字和特殊符号')
+      ElMessage.warning('密码长度不能少于8位')
       return
     }
     if (!user.value && (!accountCodeSent.value || !form.code.trim())) {
@@ -197,13 +208,16 @@ async function submitForm() {
       const data = await registerMerchant(payload)
       ElMessage.success('入驻申请提交成功，请等待管理员审核！')
       
-      // If a visitor registered, auto log them in or redirect to login
-      if (!user.value && data.userId) {
-        ElMessage.info('系统已为您创建商家账号，请重新登录')
+      // 访问者注册后自动登录，直接跳转审核状态页
+      if (!user.value && data.user && data.token) {
+        setSessionUser({ ...data.user, token: data.token })
+        ElMessage.success('入驻申请提交成功，已自动登录！请等待管理员审核')
+      } else if (!user.value) {
+        ElMessage.info('入驻申请已提交，请使用注册手机号登录查看审核进度')
         router.push({ path: '/login', query: { redirect: '/merchant/audit-status' } })
-      } else {
-        router.push('/merchant/audit-status')
+        return
       }
+      router.push('/merchant/audit-status')
     } catch (err) {
       // Error is handled in client.js response interceptor
     } finally {
@@ -243,21 +257,37 @@ onUnmounted(() => {
           :closable="false"
           class="alert-tip"
         />
-        <el-alert
-          v-else
-          title="您尚未登录。请在下方填写商家信息，系统将自动为您注册专有的商家账号。"
-          type="info"
-          show-icon
-          :closable="false"
-          class="alert-tip"
-        />
 
-        <!-- Account registration section for visitors -->
-        <template v-if="!user">
-          <h3 class="section-title">1. 创建登录账号</h3>
+        <!-- ===== 步骤指示器 ===== -->
+        <div class="step-indicator" v-if="!user">
+          <div class="step" :class="{ active: currentStep === 1, done: currentStep > 1 }">
+            <span class="step-num">{{ currentStep > 1 ? '✓' : '1' }}</span>
+            <span class="step-label">创建账号</span>
+          </div>
+          <div class="step-line" :class="{ done: currentStep > 1 }"></div>
+          <div class="step" :class="{ active: currentStep === 2 }">
+            <span class="step-num">2</span>
+            <span class="step-label">商家信息</span>
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 步骤 1：创建登录账号（仅未登录访问者）         -->
+        <!-- ============================================ -->
+        <template v-if="!user && currentStep === 1">
+          <el-alert
+            title="请先创建登录账号，以便后续管理您的商家。"
+            type="info"
+            show-icon
+            :closable="false"
+            class="alert-tip"
+          />
+
+          <h3 class="section-title">创建登录账号</h3>
+
           <el-form-item label="账号手机号" prop="accountPhone">
             <div class="code-row">
-              <el-input v-model="form.accountPhone" maxlength="11" placeholder="请输入用于登录的手机号" />
+              <el-input v-model="form.accountPhone" maxlength="11" placeholder="用于登录平台的手机号" />
               <el-button
                 :type="accountPhoneReady ? 'success' : 'info'"
                 :loading="codeSending"
@@ -268,14 +298,18 @@ onUnmounted(() => {
               </el-button>
             </div>
           </el-form-item>
+
           <el-form-item v-if="accountCodeSent" label="验证码" prop="code">
-            <el-input v-model="form.code" maxlength="6" placeholder="请输入后端控制台输出的6位验证码" />
+            <el-input v-model="form.code" maxlength="6" placeholder="请输入6位短信验证码" />
+            <p class="code-tip-inline">验证码会发送至您的手机，60秒内输入有效</p>
           </el-form-item>
-          <el-form-item label="展示名" prop="username">
-            <el-input v-model="form.username" placeholder="请输入展示名，可与他人重复" />
+
+          <el-form-item label="昵称" prop="username">
+            <el-input v-model="form.username" placeholder="如：校园美食家，随时可改" />
           </el-form-item>
+
           <el-form-item label="登录密码" prop="password">
-            <el-input v-model="form.password" type="password" show-password placeholder="至少6位，含大小写字母、数字、特殊符号" />
+            <el-input v-model="form.password" type="password" show-password placeholder="至少8位" />
             <ul class="password-checks">
               <li
                 v-for="item in merchantPasswordChecks"
@@ -286,6 +320,7 @@ onUnmounted(() => {
               </li>
             </ul>
           </el-form-item>
+
           <el-form-item label="确认密码" prop="confirmPassword">
             <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" />
             <p
@@ -294,52 +329,86 @@ onUnmounted(() => {
               :class="{ ok: merchantPasswordMatches }"
             >{{ merchantPasswordMatches ? '两次密码一致' : '两次输入的密码不一致' }}</p>
           </el-form-item>
-          <el-divider />
         </template>
 
-        <h3 class="section-title">2. 商家基本信息</h3>
-        
-        <el-form-item label="商家名称" prop="merchantName">
-          <el-input v-model="form.merchantName" placeholder="请输入店铺名称，如：校园轻食铺" />
-        </el-form-item>
-
-        <el-form-item label="经营品类" prop="category">
-          <el-select v-model="form.category" placeholder="请选择品类" style="width: 100%">
-            <el-option
-              v-for="cat in categories"
-              :key="cat"
-              :label="cat"
-              :value="cat"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="联系电话" prop="contactPhone">
-          <el-input v-model="form.contactPhone" maxlength="11" placeholder="请输入店铺联系手机号，可与账号手机号不同" />
-        </el-form-item>
-
-        <el-form-item label="商家地址" prop="address">
-          <LocationSelector
-            v-model="locationData"
-            @update:modelValue="syncLocationDraft"
-            @confirm="onLocationConfirm"
+        <!-- ============================================ -->
+        <!-- 步骤 2：商家基本信息（已登录用户直接显示此步）  -->
+        <!-- ============================================ -->
+        <template v-if="currentStep === totalSteps">
+          <el-alert
+            v-if="!user"
+            title="请填写商家资质信息，提交后将进入审核流程。"
+            type="info"
+            show-icon
+            :closable="false"
+            class="alert-tip"
           />
-        </el-form-item>
 
-        <el-form-item label="配送范围(米)" prop="deliveryRadiusM">
-          <el-input-number v-model="form.deliveryRadiusM" :min="500" :max="10000" :step="500" style="width: 100%" />
-        </el-form-item>
+          <h3 class="section-title">商家基本信息</h3>
 
-        <el-form-item label="银行账号" prop="bankAccount">
-          <el-input v-model="form.bankAccount" placeholder="请输入对公/对私结算银行账号" />
-        </el-form-item>
+          <el-form-item label="商家名称" prop="merchantName">
+            <el-input v-model="form.merchantName" placeholder="请输入店铺名称，如：校园轻食铺" />
+          </el-form-item>
 
-        <el-form-item label="结算周期(天)" prop="settlementCycle">
-          <el-input-number v-model="form.settlementCycle" :min="1" :max="90" style="width: 100%" />
-        </el-form-item>
+          <el-form-item label="经营品类" prop="category">
+            <el-select v-model="form.category" placeholder="请选择品类" style="width: 100%">
+              <el-option
+                v-for="cat in categories"
+                :key="cat"
+                :label="cat"
+                :value="cat"
+              />
+            </el-select>
+          </el-form-item>
 
+          <el-form-item label="联系电话" prop="contactPhone">
+            <el-input v-model="form.contactPhone" maxlength="11" placeholder="客户可见的联系电话" />
+            <p class="field-hint">可与账号手机号相同，用于客户联系您的店铺</p>
+          </el-form-item>
+
+          <el-form-item label="商家地址" prop="address">
+            <LocationSelector
+              v-model="locationData"
+              @update:modelValue="syncLocationDraft"
+              @confirm="onLocationConfirm"
+            />
+          </el-form-item>
+
+          <el-form-item label="配送范围(米)" prop="deliveryRadiusM">
+            <el-input-number v-model="form.deliveryRadiusM" :min="500" :max="10000" :step="500" style="width: 100%" />
+          </el-form-item>
+
+          <!-- 银行信息移至审核通过后补充 -->
+          <el-divider />
+          <el-alert
+            title="银行结算信息可在审核通过后补充，当前可跳过。"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="alert-tip"
+          />
+          <el-form-item label="银行账号" prop="bankAccount">
+            <el-input v-model="form.bankAccount" placeholder="选填：审核通过后可在控制台补充" />
+          </el-form-item>
+
+          <el-form-item label="结算周期(天)" prop="settlementCycle">
+            <el-input-number v-model="form.settlementCycle" :min="1" :max="90" style="width: 100%" />
+          </el-form-item>
+        </template>
+
+        <!-- ===== 步骤导航按钮 ===== -->
         <el-form-item class="form-actions">
-          <el-button type="primary" :loading="submitting" @click="submitForm" class="submit-btn">
+          <el-button v-if="currentStep > 1" @click="prevStep">上一步</el-button>
+          <el-button v-if="!user && currentStep < totalSteps" type="primary" @click="nextStep">
+            下一步
+          </el-button>
+          <el-button
+            v-if="currentStep === totalSteps"
+            type="primary"
+            :loading="submitting"
+            @click="submitForm"
+            class="submit-btn"
+          >
             提交入驻申请
           </el-button>
           <el-button @click="router.back()">返回</el-button>
@@ -428,6 +497,98 @@ onUnmounted(() => {
 .submit-btn {
   padding-left: 32px;
   padding-right: 32px;
+}
+
+/* ===== 步骤指示器 ===== */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 28px;
+  padding: 20px 40px;
+  background: var(--bg-page, #f9fafb);
+  border-radius: 12px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--border-color, #e5e7eb);
+  color: var(--text-muted, #9ca3af);
+  transition: all 0.3s ease;
+}
+
+.step.active .step-num {
+  background: var(--color-primary, #f97316);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
+.step.done .step-num {
+  background: var(--clas-success, #16a34a);
+  color: #fff;
+}
+
+.step-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted, #9ca3af);
+  transition: color 0.3s ease;
+}
+
+.step.active .step-label {
+  color: var(--text-primary, #1f2937);
+}
+
+.step.done .step-label {
+  color: var(--clas-success, #16a34a);
+}
+
+.step-line {
+  width: 60px;
+  height: 2px;
+  margin: 0 16px;
+  background: var(--border-color, #e5e7eb);
+  transition: background 0.3s ease;
+}
+
+.step-line.done {
+  background: var(--clas-success, #16a34a);
+}
+
+/* ===== 字段提示 ===== */
+.field-hint {
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.code-tip-inline {
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  margin-top: 4px;
+}
+
+/* WCAG 2.3.3 — 尊重用户减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 </style>

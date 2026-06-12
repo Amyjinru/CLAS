@@ -1,7 +1,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { hasAmapKey, loadAmap } from '../utils/amap'
+import { ensureAmapPlugins, hasAmapKey } from '../utils/amap'
 
 const props = defineProps({
   merchant: {
@@ -53,7 +53,7 @@ async function initMap() {
     errorText.value = '未配置高德地图 Key'
     return
   }
-  AMapRef = await loadAmap()
+  AMapRef = await ensureAmapPlugins(['AMap.ToolBar', 'AMap.Scale', 'AMap.Driving'])
   await nextTick()
   if (!map) {
     const lng = numberValue(props.merchant.longitude) || 116.397428

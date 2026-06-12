@@ -5,6 +5,8 @@ import { logout, sessionUser } from './api/clas'
 import { ElMessage } from 'element-plus'
 import ChatSidebar from './components/ChatSidebar.vue'
 import { preferenceState } from './utils/preferences'
+import patternBg from './assets/pattern-bg.svg'
+import foodLines from './assets/food-lines.svg'
 
 const router = useRouter()
 const route = useRoute()
@@ -58,8 +60,14 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="shell">
-    <a href="#main-content" class="skip-link">跳到主要内容</a>
+  <div class="shell" :style="{ backgroundImage: `url(${patternBg})` }">
+    <div class="shell-pattern-overlay" aria-hidden="true"></div>
+    <img
+      class="food-lines-layer"
+      :src="foodLines"
+      alt=""
+      aria-hidden="true"
+    />
     <header class="topbar">
       <div class="header-left">
         <RouterLink class="brand" :to="brandLink">CLAS 生活助手</RouterLink>
@@ -108,6 +116,18 @@ async function handleLogout() {
     <main id="main-content" class="main-content">
       <RouterView :key="route.fullPath" />
     </main>
+    <footer
+      class="app-footer"
+      aria-label="页脚装饰"
+    >
+      <div class="footer-overlay">
+        <div class="footer-content">
+          <span class="footer-brand">CLAS</span>
+          <span class="footer-tagline">生活助手 · 温暖每一餐</span>
+          <span class="footer-copy">&copy; {{ new Date().getFullYear() }} CLAS Team</span>
+        </div>
+      </div>
+    </footer>
     <ChatSidebar v-if="sessionUser" />
   </div>
 </template>
@@ -118,8 +138,117 @@ async function handleLogout() {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-page);
+  position: relative;
+  background-repeat: repeat;
+  background-size: 360px 240px;
+  background-attachment: fixed;
+  background-color: #FFFBF5;
   font-family: var(--font-body);
+}
+
+/* 整页柔光遮罩 — 让图案融入背景，不干扰内容阅读 */
+.shell-pattern-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg,
+      rgba(255, 251, 245, 0.45) 0%,
+      rgba(255, 248, 240, 0.60) 30%,
+      rgba(255, 245, 235, 0.70) 60%,
+      rgba(255, 242, 230, 0.78) 100%
+    );
+}
+
+/* ═══════════ 水波流动动效 ═══════════ */
+@keyframes rippleFlow1 {
+  0%   { opacity: 0.15; transform: scale(1.0) translateY(0); }
+  25%  { opacity: 0.35; transform: scale(1.08) translateY(-4px); }
+  50%  { opacity: 0.25; transform: scale(1.04) translateY(2px); }
+  75%  { opacity: 0.38; transform: scale(1.10) translateY(-2px); }
+  100% { opacity: 0.15; transform: scale(1.0) translateY(0); }
+}
+@keyframes rippleFlow2 {
+  0%   { opacity: 0.12; transform: scale(0.97) translateY(0); }
+  30%  { opacity: 0.30; transform: scale(1.06) translateY(3px); }
+  60%  { opacity: 0.20; transform: scale(1.02) translateY(-3px); }
+  100% { opacity: 0.12; transform: scale(0.97) translateY(0); }
+}
+@keyframes rippleFlow3 {
+  0%   { opacity: 0.10; transform: scale(0.94) translateY(0); }
+  20%  { opacity: 0.28; transform: scale(1.05) translateY(-5px); }
+  50%  { opacity: 0.18; transform: scale(1.0) translateY(3px); }
+  80%  { opacity: 0.32; transform: scale(1.07) translateY(-1px); }
+  100% { opacity: 0.10; transform: scale(0.94) translateY(0); }
+}
+
+/* 水波涟漪元素 — 通过 SVG 中的渐变圆 + CSS 缩放产生流动感 */
+.ripple-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-size: 360px 240px;
+  background-attachment: fixed;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+}
+
+/* 在 shell 上叠加一层 */
+.shell::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('../assets/pattern-bg.svg');
+  background-repeat: repeat;
+  background-size: 360px 240px;
+  background-attachment: fixed;
+  opacity: 0.18;
+  animation: rippleFlow1 8s ease-in-out infinite;
+  filter: blur(3px);
+}
+
+/* ═══════════ 食物剪影动画层 ═══════════ */
+.food-lines-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.85;
+}
+
+/* 暗色模式 — 降低食物线条亮度 */
+:root[data-theme='dark'] .food-lines-layer {
+  opacity: 0.45;
+  filter: brightness(0.8);
+}
+
+/* 暗色模式 — 整页遮罩 */
+:root[data-theme='dark'] .shell-pattern-overlay {
+  background:
+    linear-gradient(135deg,
+      rgba(30, 27, 24, 0.60) 0%,
+      rgba(30, 27, 24, 0.75) 30%,
+      rgba(30, 27, 24, 0.85) 60%,
+      rgba(30, 27, 24, 0.92) 100%
+    );
+}
+
+/* 所有交互元素置于遮罩之上 */
+.topbar,
+.main-content,
+.app-footer,
+.chat-sidebar,
+.skip-link {
+  position: relative;
+  z-index: 1;
 }
 
 .topbar {

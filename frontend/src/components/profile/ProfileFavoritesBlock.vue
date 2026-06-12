@@ -23,16 +23,18 @@ defineEmits(['remove'])
       <RouterLink class="button secondary" to="/home">去首页浏览</RouterLink>
     </el-empty>
 
-    <article v-for="item in favorites" v-else :key="item.id" class="list-row">
-      <div>
-        <strong>{{ item.merchantName }}</strong>
-        <p>{{ item.category || '未分类' }} · {{ item.address || '暂无地址' }}</p>
-      </div>
-      <div class="row-actions">
-        <RouterLink class="button secondary" :to="`/merchant/${item.id}`">进入店铺</RouterLink>
-        <el-button text type="danger" :loading="actionId === item.id" @click="$emit('remove', item.id)">取消收藏</el-button>
-      </div>
-    </article>
+    <div v-else class="list-stack">
+      <article v-for="item in favorites" :key="item.id" class="list-row">
+        <div>
+          <strong>{{ item.merchantName }}</strong>
+          <p>{{ item.category || '未分类' }} · {{ item.address || '暂无地址' }}</p>
+        </div>
+        <div class="row-actions">
+          <RouterLink class="button secondary" :to="`/merchant/${item.id}`">进入店铺</RouterLink>
+          <el-button text type="danger" :loading="actionId === item.id" @click="$emit('remove', item.id)">取消收藏</el-button>
+        </div>
+      </article>
+    </div>
   </div>
 </template>
 
@@ -41,7 +43,16 @@ defineEmits(['remove'])
 .section-head h2 { margin: 0; }
 .section-head p,
 .list-row p { color: var(--text-secondary); font-size: 13px; margin: 6px 0 0; }
-.list-row { align-items: center; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; padding: 14px 0; }
+.list-stack { display: grid; gap: 12px; }
+.list-row {
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
 .row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 @media (max-width: 900px) {
   .list-row { align-items: flex-start; flex-direction: column; }

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="description" content="CLAS 校园本地生活服务平台" />
+<meta name="theme-color" content="#FFD100" />
+<title>CLAS — 校园生活，一站搞定</title>
+<style>
+  :root {
+    --yellow: #FFD100;
+    --yellow-dark: #E6BC00;
+    --text: #1a1510;
+    --text-secondary: #5c4f2d;
+    --text-muted: #8c7a5e;
+    --bg: #faf7f2;
+    --white: #ffffff;
+    --border: #ebe3d5;
+    --radius: 16px;
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --smooth: cubic-bezier(0.16, 1, 0.3, 1);
+    --page-h: 100vh;
+    --page-h: 100dvh;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html {
+    font-size: 16px;
+    overflow: hidden;
+  }
+  body { overflow: hidden; touch-action: pan-y; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ═══ Page Container ═══ */
+  .page {
+    min-height: var(--page-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    padding: 60px 24px;
+  }
+  .page-inner {
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ═══ Navigation Dots ═══ */
+  .nav-dots {
+    position: fixed;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .nav-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: rgba(26,21,16,0.2);
+    transition: all 0.4s var(--spring);
+    cursor: pointer;
+    border: none;
+    padding: 0;
+  }
+  .nav-dot.active {
+    background: var(--yellow-dark);
+    transform: scale(1.5);
+    box-shadow: 0 0 8px rgba(255,209,0,0.5);
+  }
+
+  /* ═══ Animations ═══ */
+  @keyframes float1 { 0%,100%{transform:translate(0,0)scale(1)}25%{transform:translate(30px,-20px)scale(1.1)}50%{transform:translate(-15px,-40px)scale(.95)}75%{transform:translate(-25px,-10px)scale(1.05)} }
+  @keyframes float2 { 0%,100%{transform:translate(0,0)scale(1)}33%{transform:translate(-25px,-25px)scale(1.12)}66%{transform:translate(20px,-35px)scale(.9)} }
+  @keyframes gradientShift { 0%,100%{background-position:0% 50%}50%{background-position:100% 50%} }
+  @keyframes springIn { 0%{opacity:0;transform:translateY(40px)scale(.9)}60%{opacity:1;transform:translateY(-8px)scale(1.02)}80%{transform:translateY(3px)scale(.99)}100%{opacity:1;transform:translateY(0)scale(1)} }
+  @keyframes springUp { 0%{opacity:0;transform:translateY(60px)scale(.85)}70%{opacity:1;transform:translateY(-6px)scale(1.01)}85%{transform:translateY(2px)scale(.995)}100%{opacity:1;transform:translateY(0)scale(1)} }
+  @keyframes countPop { 0%{transform:scale(.3);opacity:0}50%{transform:scale(1.15)}70%{transform:scale(.95)}100%{transform:scale(1);opacity:1} }
+  @keyframes pulseGlow { 0%,100%{box-shadow:0 4px 20px rgba(255,209,0,.4)}50%{box-shadow:0 4px 36px rgba(255,209,0,.65),0 0 70px rgba(255,209,0,.2)} }
+  @keyframes bounceArrow { 0%,100%{transform:translateY(0)}50%{transform:translateY(8px)} }
+
+  /* ═══ Reveal Classes ═══ */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s var(--smooth), transform 0.7s var(--smooth); }
+  .reveal.vis { opacity: 1; transform: translateY(0); }
+
+  /* ═══ PAGE 1: HERO ═══ */
+  .page-hero {
+    background: linear-gradient(180deg, #FFF8E1 0%, #FFECB3 40%, #FFF4CC 80%, var(--bg) 100%);
+  }
+  .page-hero .hero-blobs { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+  .page-hero .hero-blob {
+    position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.3;
+  }
+  .page-hero .hero-blob:nth-child(1) { width: 280px; height: 280px; background: rgba(255,209,0,.25); top: -5%; right: -15%; animation: float1 8s ease-in-out infinite; }
+  .page-hero .hero-blob:nth-child(2) { width: 200px; height: 200px; background: rgba(255,209,0,.2); bottom: 10%; left: -10%; animation: float2 10s ease-in-out infinite; }
+  .hero-logo {
+    font-size: 14px; font-weight: 800; letter-spacing: 0.1em; color: var(--yellow-dark);
+    text-transform: uppercase; display: inline-block;
+    background: rgba(255,209,0,.2); padding: 6px 18px; border-radius: 999px;
+    backdrop-filter: blur(8px); margin-bottom: 24px;
+    animation: springIn 0.8s var(--spring) both; animation-delay: 0.1s;
+  }
+  .hero-title {
+    font-size: clamp(32px, 9vw, 44px); font-weight: 900; letter-spacing: 0.02em;
+    line-height: 1.15; margin-bottom: 16px;
+    animation: springUp 1s var(--spring) both; animation-delay: 0.2s;
+  }
+  .hero-title .hl {
+    display: inline-block; position: relative;
+    background: linear-gradient(135deg, var(--yellow-dark) 0%, #f5a623 50%, var(--yellow-dark) 100%);
+    background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    animation: gradientShift 4s ease infinite;
+  }
+  .hero-sub {
+    font-size: 16px; color: var(--text-secondary); line-height: 1.6;
+    animation: springIn 0.8s var(--spring) both; animation-delay: 0.4s;
+  }
+  .hero-arrow {
+    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+    animation: bounceArrow 2s ease-in-out infinite; z-index: 2;
+    color: var(--text-muted); font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .hero-arrow span {
+    display: block; width: 20px; height: 20px;
+    border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted);
+    transform: rotate(45deg); opacity: 0.5;
+  }
+
+  /* ═══ PAGE 2: FEATURES ═══ */
+  .page-features { background: var(--bg); }
+  .section-label {
+    font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--yellow-dark); margin-bottom: 8px; display: inline-block;
+  }
+  .section-title { font-size: clamp(22px, 5vw, 28px); font-weight: 800; margin-bottom: 6px; }
+  .section-sub { font-size: 14px; color: var(--text-secondary); margin-bottom: 28px; }
+  .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: left; }
+  .fc {
+    background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px 16px; position: relative; overflow: hidden;
+    transition: transform 0.5s var(--spring), box-shadow 0.5s var(--spring);
+  }
+  .fc::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; background:var(--yellow); transform:scaleX(0); transform-origin:left; transition:transform 0.5s var(--smooth); }
+  .fc:hover::before { transform:scaleX(1); }
+  .fc:hover { transform:translateY(-4px) scale(1.01); box-shadow:0 12px 40px rgba(0,0,0,.06); }
+  .fc-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 10px; transition: transform 0.4s var(--spring); }
+  .fc:hover .fc-icon { transform:scale(1.15) rotate(-5deg); }
+  .fc h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .fc p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .fc-icon.d1{background:#FFF4CC}.fc-icon.d2{background:#FCE4EC}.fc-icon.d3{background:#E0F2F1}.fc-icon.d4{background:#E8EAF6}
+
+  /* ═══ PAGE 3: STATS ═══ */
+  .page-stats { background: linear-gradient(180deg, var(--bg) 0%, #FFF8E1 50%, var(--bg) 100%); }
+  .stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+  .stat-item {
+    background: var(--white); border-radius: var(--radius); padding: 28px 12px;
+    transition: transform 0.5s var(--spring), box-shadow 0.5s var(--spring);
+  }
+  .stat-item:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 12px 36px rgba(0,0,0,.06); }
+  .stat-num {
+    font-size: clamp(30px,7vw,44px); font-weight: 900;
+    background: linear-gradient(135deg, var(--yellow-dark), #f5a623);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    line-height: 1; margin-bottom: 8px;
+  }
+  .stat-lbl { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+
+  /* ═══ PAGE 4: HOW ═══ */
+  .page-how { background: var(--bg); }
+  .steps-list { display: flex; flex-direction: column; gap: 16px; }
+  .step {
+    display: flex; align-items: flex-start; gap: 16px; text-align: left;
+    background: var(--white); border-radius: var(--radius); padding: 22px 20px;
+    transition: transform 0.5s var(--spring), box-shadow 0.5s var(--spring);
+  }
+  .step:hover { transform: translateX(4px); box-shadow: 0 8px 32px rgba(0,0,0,.06); }
+  .step-num {
+    flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
+    background: var(--yellow); color: var(--text); font-weight: 900; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.4s var(--spring), box-shadow 0.4s var(--spring);
+  }
+  .step:hover .step-num { transform: scale(1.1); box-shadow: 0 4px 16px rgba(255,209,0,.4); }
+  .step h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .step p { font-size: 13px; color: var(--text-secondary); }
+
+  /* ═══ PAGE 5: FINAL ═══ */
+  .page-final { background: var(--white); }
+  .page-final .btns { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-bottom: 40px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: 999px; font-weight: 700; text-decoration: none; cursor: pointer;
+    border: none; letter-spacing: 0.03em; position: relative; overflow: hidden;
+    transition: transform 0.4s var(--spring), box-shadow 0.4s var(--spring), background 0.2s ease;
+    padding: 16px 40px; font-size: 17px; min-width: 240px;
+  }
+  .btn:active { transform: scale(0.94) !important; transition: transform 0.1s ease !important; }
+  .btn-primary {
+    background: var(--yellow); color: var(--text);
+    box-shadow: 0 4px 20px rgba(255,209,0,.4);
+    animation: pulseGlow 3s ease-in-out infinite;
+  }
+  .btn-primary:hover { background: var(--yellow-dark); transform: translateY(-3px) scale(1.03); box-shadow: 0 12px 40px rgba(255,209,0,.55); animation: none; }
+
+  /* ═══ Footer (inside last page) ═══ */
+  .footer {
+    color: var(--text-muted); font-size: 12px; line-height: 2; text-align: center;
+    padding-top: 16px;
+  }
+  .footer-links { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
+  .footer-links a { color: var(--text-secondary); text-decoration: none; font-weight: 500; transition: color 0.2s, transform 0.3s var(--spring); display: inline-block; }
+  .footer-links a:hover { color: var(--yellow-dark); transform: translateY(-1px); }
+  .footer-line { width: 40px; height: 2px; background: var(--border); margin: 12px auto; border-radius: 1px; }
+
+  @media (min-width: 768px) {
+    .page-inner { max-width: 520px; }
+    .page-final .btns { flex-direction: row; justify-content: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV DOTS ═══ -->
+<nav class="nav-dots" aria-label="页面导航">
+  <button class="nav-dot active" data-page="0" aria-label="第1页"></button>
+  <button class="nav-dot" data-page="1" aria-label="第2页"></button>
+  <button class="nav-dot" data-page="2" aria-label="第3页"></button>
+  <button class="nav-dot" data-page="3" aria-label="第4页"></button>
+  <button class="nav-dot" data-page="4" aria-label="第5页"></button>
+</nav>
+
+<!-- ═══ PAGE 1: HERO ═══ -->
+<section class="page page-hero">
+  <div class="hero-blobs">
+    <div class="hero-blob"></div>
+    <div class="hero-blob"></div>
+  </div>
+  <div class="page-inner">
+    <div class="hero-logo">⚡ CLAS</div>
+    <h1 class="hero-title">校园生活，<br><span class="hl">一站搞定</span></h1>
+    <p class="hero-sub">外卖配送 · 团购优惠 · 到店预约<br>你的校园本地生活服务平台</p>
+  </div>
+  <div class="hero-arrow"><span></span>下滑探索</div>
+</section>
+
+<!-- ═══ PAGE 2: FEATURES ═══ -->
+<section class="page page-features">
+  <div class="page-inner">
+    <div class="section-label reveal">核心功能</div>
+    <h2 class="section-title reveal">为什么选择 CLAS？</h2>
+    <p class="section-sub reveal">覆盖校园生活的每一个场景</p>
+    <div class="features-grid">
+      <div class="fc reveal" style="transition-delay:0s">
+        <div class="fc-icon d1">🛵</div>
+        <h3>外卖配送</h3>
+        <p>校园周边美食一键下单，快速配送到宿舍楼下</p>
+      </div>
+      <div class="fc reveal" style="transition-delay:.1s">
+        <div class="fc-icon d2">🎫</div>
+        <h3>团购优惠</h3>
+        <p>超值套餐，双人餐、月卡，比单点便宜30%</p>
+      </div>
+      <div class="fc reveal" style="transition-delay:.2s">
+        <div class="fc-icon d3">📅</div>
+        <h3>到店预约</h3>
+        <p>提前预约餐厅，免排队，合理安排校园生活</p>
+      </div>
+      <div class="fc reveal" style="transition-delay:.3s">
+        <div class="fc-icon d4">💬</div>
+        <h3>实时客服</h3>
+        <p>在线咨询商家，随时沟通订单详情</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PAGE 3: STATS ═══ -->
+<section class="page page-stats">
+  <div class="page-inner">
+    <div class="section-label reveal">平台数据</div>
+    <h2 class="section-title reveal">越来越多同学的选择</h2>
+    <p class="section-sub reveal">持续增长的校园生活服务社区</p>
+    <div class="stats-grid">
+      <div class="stat-item reveal" style="transition-delay:0s">
+        <div class="stat-num counter" data-target="0" id="stat-merchants">0</div>
+        <div class="stat-lbl">合作商家</div>
+      </div>
+      <div class="stat-item reveal" style="transition-delay:.15s">
+        <div class="stat-num counter" data-target="0" id="stat-users">0</div>
+        <div class="stat-lbl">注册用户</div>
+      </div>
+      <div class="stat-item reveal" style="transition-delay:.3s">
+        <div class="stat-num counter" data-target="0" id="stat-products">0</div>
+        <div class="stat-lbl">精选菜品</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PAGE 4: HOW ═══ -->
+<section class="page page-how">
+  <div class="page-inner">
+    <div class="section-label reveal">快速上手</div>
+    <h2 class="section-title reveal">三步开启校园美食之旅</h2>
+    <p class="section-sub reveal">从注册到享用，不到 3 分钟</p>
+    <div class="steps-list">
+      <div class="step reveal" style="transition-delay:0s">
+        <div class="step-num">1</div>
+        <div><h3>注册账号</h3><p>手机号快速注册，选择你的身份——普通用户或商家店主</p></div>
+      </div>
+      <div class="step reveal" style="transition-delay:.15s">
+        <div class="step-num">2</div>
+        <div><h3>选择商家下单</h3><p>浏览周边美食，选菜品加购物车，填写地址一键下单</p></div>
+      </div>
+      <div class="step reveal" style="transition-delay:.3s">
+        <div class="step-num">3</div>
+        <div><h3>享用美食</h3><p>等待配送或到店享用，完成订单后留下你的真实评价</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PAGE 5: FINAL ═══ -->
+<section class="page page-final">
+  <div class="page-inner">
+    <h2 class="section-title reveal">准备好开始了吗？</h2>
+    <p class="section-sub reveal">加入 CLAS，享受便捷的校园生活服务</p>
+    <div class="btns">
+      <a href="/merchant-register" class="btn btn-primary reveal" style="transition-delay:.1s">商家入驻</a>
+      <a href="/login" class="btn btn-primary reveal" style="transition-delay:.25s">开始使用</a>
+    </div>
+    <footer class="footer">
+      <div class="footer-links">
+        <a href="#">制作团队</a><a href="#">联系我们</a><a href="#">用户协议</a><a href="#">隐私政策</a>
+      </div>
+      <div class="footer-line"></div>
+      <p>&copy; 2026 CLAS 综合生活助手平台</p>
+    </footer>
+  </div>
+</section>
+
+<script>
+(function() {
+  'use strict';
+  var pages = document.querySelectorAll('.page');
+  var dots = document.querySelectorAll('.nav-dot');
+  var total = pages.length;
+  var current = 0;
+  var locked = false;  // 动画 + 冷却期锁，防止重复触发
+  var touchStartY = 0;
+  var touchStartTime = 0;
+
+  // ─── Easing: easeOutCubic ───
+  function ease(t) { return 1 - Math.pow(1 - t, 3); }
+
+  // ─── Smooth scroll to page ───
+  function goTo(idx) {
+    if (idx < 0 || idx >= total || locked) return;
+    locked = true;
+    current = idx;
+    var targetY = idx * window.innerHeight;
+    var startY = window.scrollY;
+    var distance = targetY - startY;
+    var duration = Math.min(800, Math.abs(distance) * 1.2 + 300);
+    var start = performance.now();
+
+    function step(now) {
+      var elapsed = now - start;
+      var progress = Math.min(elapsed / duration, 1);
+      window.scrollTo(0, startY + distance * ease(progress));
+      var blobs = document.querySelectorAll('.hero-blob');
+      blobs.forEach(function(b, i) {
+        b.style.transform = 'translateY(' + (window.scrollY * (0.03 + i * 0.02)) + 'px)';
+      });
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        window.scrollTo(0, targetY);
+        updateDots();
+        triggerReveal(idx);
+        // 动画结束后 350ms 冷却，防止触控板惯性余震
+        setTimeout(function() { locked = false; }, 350);
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ─── Update dots ───
+  function updateDots() {
+    dots.forEach(function(d, i) { d.classList.toggle('active', i === current); });
+  }
+
+  // ─── Trigger reveal animations on active page ───
+  var statsLoaded = false;
+  function triggerReveal(idx) {
+    var page = pages[idx];
+    page.querySelectorAll('.reveal').forEach(function(el) {
+      setTimeout(function() { el.classList.add('vis'); }, 80);
+    });
+
+    // 首次进入统计页时从 API 拉取真实数据
+    if (idx === 2 && !statsLoaded) {
+      statsLoaded = true;
+      fetch('/api/public/stats').then(function(r) { return r.json(); }).then(function(d) {
+        if (d && d.code === 200 && d.data) {
+          var m = document.getElementById('stat-merchants');
+          var u = document.getElementById('stat-users');
+          var p = document.getElementById('stat-products');
+          if (m) m.setAttribute('data-target', d.data.merchants || 0);
+          if (u) u.setAttribute('data-target', d.data.users || 0);
+          if (p) p.setAttribute('data-target', d.data.products || 0);
+        }
+        startCounters(page);
+      }).catch(function() { startCounters(page); });
+    } else {
+      startCounters(page);
+    }
+  }
+
+  function startCounters(page) {
+    page.querySelectorAll('.counter').forEach(function(el) {
+      if (el.dataset.done) return;
+      el.dataset.done = '1';
+      var target = parseInt(el.getAttribute('data-target'), 10) || 0;
+      var c = 0, dur = 1800, steps = 60, st = dur/steps, inc = target/steps || 1;
+      function tick() {
+        c += inc;
+        if (c >= target) { el.textContent = target + '+'; el.style.animation = 'countPop 0.5s var(--spring) both'; return; }
+        el.textContent = Math.floor(c) + '+';
+        requestAnimationFrame(function() { setTimeout(tick, st); });
+      }
+      tick();
+    });
+  }
+
+  // ─── Wheel ───
+  var wheelTimer = 0;
+  window.addEventListener('wheel', function(e) {
+    if (locked) return;
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(function() {
+      if (e.deltaY > 15) goTo(current + 1);
+      else if (e.deltaY < -15) goTo(current - 1);
+    }, 50);
+  }, { passive: true });
+
+  // ─── Touch ───
+  window.addEventListener('touchstart', function(e) {
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+  }, { passive: true });
+
+  window.addEventListener('touchend', function(e) {
+    if (locked) return;
+    var dy = touchStartY - e.changedTouches[0].clientY;
+    var dt = Date.now() - touchStartTime;
+    var velocity = Math.abs(dy / dt);
+    if (velocity > 0.4 || Math.abs(dy) > 50) {
+      if (dy > 20) goTo(current + 1);
+      else if (dy < -20) goTo(current - 1);
+    }
+  }, { passive: true });
+
+  // ─── Keyboard ───
+  window.addEventListener('keydown', function(e) {
+    if (locked) return;
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
+  });
+
+  // ─── Dot Click ───
+  dots.forEach(function(dot) {
+    dot.addEventListener('click', function() {
+      goTo(parseInt(dot.getAttribute('data-page'), 10));
+    });
+  });
+
+  // ─── Button Ripple ───
+  document.querySelectorAll('.btn').forEach(function(btn) {
+    btn.addEventListener('pointerdown', function(e) {
+      var r = document.createElement('span');
+      var rect = btn.getBoundingClientRect();
+      var s = Math.max(rect.width, rect.height);
+      r.style.cssText = 'position:absolute;width:'+s+'px;height:'+s+'px;left:'+(e.clientX-rect.left-s/2)+'px;top:'+(e.clientY-rect.top-s/2)+'px;background:rgba(255,255,255,.4);border-radius:50%;transform:scale(0);animation:countPop 0.5s ease-out forwards;pointer-events:none';
+      btn.appendChild(r);
+      setTimeout(function() { r.remove(); }, 500);
+    });
+  });
+
+  // ─── Init: reveal page 0 immediately ───
+  triggerReveal(0);
+  updateDots();
+})();
+</script>
+</body>
+</html>

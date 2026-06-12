@@ -63,7 +63,8 @@
   --color-accent-light: var(--clas-teal-50);
 
   --bg-page: #faf7f2;
-  --bg-card: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.62);
+  --bg-card-solid: #ffffff;
   --bg-sidebar: #2d251c;
   --bg-sidebar-hover: #3d352b;
   --bg-sidebar-active: rgba(255, 209, 0, 0.15);
@@ -121,7 +122,8 @@
 
 :root[data-theme='dark'] {
   --bg-page: #1f1c18;
-  --bg-card: #2b2721;
+  --bg-card: rgba(43, 39, 33, 0.65);
+  --bg-card-solid: #2b2721;
   --bg-sidebar: #17130f;
   --bg-sidebar-hover: #342f27;
   --bg-sidebar-active: rgba(255, 209, 0, 0.18);
@@ -247,9 +249,16 @@ body {
   transition-duration: var(--transition-base);
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  background: var(--bg-card) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 .el-card:hover {
   box-shadow: var(--shadow-md) !important;
+}
+.el-card__body {
+  border-radius: inherit;
+  background: var(--bg-card);
 }
 .el-card__header {
   padding: 18px 24px !important;
@@ -298,11 +307,15 @@ body {
   color: var(--color-primary) !important;
 }
 
-/* 对话框 */
+/* 对话框 — 实色不透明，保留毛玻璃效果 */
 .el-dialog {
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-xl) !important;
+  background: var(--bg-card-solid) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
+/* 对话框遮罩 — 恢复默认半透明暗色 overlay */
 .el-dialog__header {
   padding: 20px 24px 0 !important;
   font-weight: 600;
@@ -327,6 +340,39 @@ body {
 }
 .el-input__inner {
   font-family: var(--font-body);
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.el-input__inner:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* 文本域 — 阻止全局 textarea 样式穿透 */
+.el-textarea__inner {
+  font-family: var(--font-body);
+  border: 1px solid var(--border-color) !important;
+  box-shadow: none !important;
+  background: var(--bg-card) !important;
+}
+.el-textarea__inner:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px var(--color-primary-soft) !important;
+  outline: none !important;
+}
+
+/* 日期范围选择器 — 阻止全局 input 样式穿透到内部输入框 */
+.el-range-input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.el-range-input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 /* 标签 */
@@ -407,11 +453,63 @@ body {
 }
 
 /* 选择器 */
+.el-select__wrapper {
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 0 0 1px var(--border-color) inset !important;
+  transition-property: box-shadow, border-color;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--clas-warm-300) inset !important;
+}
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--color-primary) inset !important;
+}
+/* 阻止全局 input 样式穿透到 Select 内部输入框 */
+.el-select__input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.el-select__input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+/* 兼容旧版 Select 架构 */
 .el-select .el-input__wrapper {
   border-radius: var(--radius-sm) !important;
 }
 .el-select-dropdown__item.selected {
   color: var(--color-primary) !important;
+}
+/* 下拉菜单/弹窗 — 实色不透明 */
+.el-select-dropdown,
+.el-dropdown-menu,
+.el-popper,
+.el-popover,
+.el-cascader__dropdown,
+.el-picker-panel,
+.el-date-picker,
+.el-time-panel,
+.el-autocomplete-suggestion {
+  background: var(--bg-card-solid) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+/* 暗色模式 */
+:root[data-theme='dark'] .el-select-dropdown,
+:root[data-theme='dark'] .el-dropdown-menu,
+:root[data-theme='dark'] .el-popper,
+:root[data-theme='dark'] .el-popover,
+:root[data-theme='dark'] .el-cascader__dropdown,
+:root[data-theme='dark'] .el-picker-panel,
+:root[data-theme='dark'] .el-date-picker,
+:root[data-theme='dark'] .el-time-panel,
+:root[data-theme='dark'] .el-autocomplete-suggestion,
+:root[data-theme='dark'] .el-dialog {
+  background: var(--bg-card-solid) !important;
 }
 
 /* 弹出确认框 */

@@ -206,6 +206,12 @@ CREATE TABLE orders (
     reject_reason VARCHAR(255),
     refund_reject_reason VARCHAR(255),
     create_time DATETIME NOT NULL,
+    paid_at DATETIME,
+    accepted_at DATETIME,
+    delivered_at DATETIME,
+    completed_at DATETIME,
+    canceled_at DATETIME,
+    rejected_at DATETIME,
     INDEX idx_orders_user (user_id, create_time DESC),
     INDEX idx_orders_merchant_status (merchant_id, status, create_time DESC),
     INDEX idx_orders_status (status),
@@ -342,7 +348,9 @@ CREATE TABLE payment (
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
     create_time DATETIME NOT NULL,
+    idempotency_key VARCHAR(128) NULL,
     INDEX idx_payment_order (order_id),
+    UNIQUE KEY uk_payment_user_idempotency (user_id, idempotency_key),
     CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES orders(id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

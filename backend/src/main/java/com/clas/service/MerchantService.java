@@ -111,7 +111,7 @@ public class MerchantService {
         }
         Coordinate coordinate = resolveCoordinate(latitude, longitude, addressId);
         return merchants.stream()
-            .map(merchant -> convertToResponse(merchant, coordinate))
+            .map(merchant -> convertToResponse(merchant, coordinate, false))
             .filter(response -> !Boolean.TRUE.equals(onlyDeliverable) || Boolean.TRUE.equals(response.deliveryAvailable()))
             .sorted(distanceSort ? Comparator
                 .comparing((MerchantResponse response) -> response.distanceMeters() == null ? Integer.MAX_VALUE : response.distanceMeters())
@@ -154,7 +154,7 @@ public class MerchantService {
         if (!GeoUtils.hasCoordinate(longitude, latitude)) {
             throw new BusinessException("请选择当前位置");
         }
-        Estimate estimate = estimateDelivery(merchant, new Coordinate(latitude, longitude));
+        Estimate estimate = estimateDelivery(merchant, new Coordinate(latitude, longitude), true);
         return new DeliveryEstimateResponse(
             merchant.getId(),
             estimate.distanceMeters(),
@@ -401,11 +401,15 @@ public class MerchantService {
     }
 
     private MerchantResponse convertToResponse(Merchant merchant) {
-        return convertToResponse(merchant, null);
+        return convertToResponse(merchant, null, false);
     }
 
     private MerchantResponse convertToResponse(Merchant merchant, Coordinate coordinate) {
-        Estimate estimate = estimateDelivery(merchant, coordinate);
+        return convertToResponse(merchant, coordinate, true);
+    }
+
+    private MerchantResponse convertToResponse(Merchant merchant, Coordinate coordinate, boolean includeRouteEstimate) {
+        Estimate estimate = estimateDelivery(merchant, coordinate, includeRouteEstimate);
         return new MerchantResponse(
             merchant.getId(),
             merchant.getUserId(),
@@ -436,7 +440,7 @@ public class MerchantService {
         );
     }
 
-    private Estimate estimateDelivery(Merchant merchant, Coordinate coordinate) {
+    private Estimate estimateDelivery(Merchant merchant, Coordinate coordinate, boolean includeRouteEstimate) {
         if (coordinate == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) {
             return new Estimate(null, null, null, null);
         }
@@ -448,6 +452,9 @@ public class MerchantService {
         );
         int radius = merchant.getDeliveryRadiusM() == null ? 3000 : merchant.getDeliveryRadiusM();
         boolean deliveryAvailable = distanceMeters <= radius;
+        if (!includeRouteEstimate) {
+            return new Estimate(distanceMeters, null, estimateMinutes(distanceMeters), deliveryAvailable);
+        }
         Optional<AmapRouteService.RouteEstimate> route = amapRouteService.estimateDriving(
             merchant.getLongitude(),
             merchant.getLatitude(),

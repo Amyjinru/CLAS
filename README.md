@@ -111,9 +111,14 @@ npm run dev
 {
   "code": 200,
   "message": "success",
-  "data": {}
+  "data": {},
+  "timestamp": 1781179200000,
+  "requestId": "trace-test-123",
+  "errorCode": null
 }
 ```
+
+后端会读取请求头 `X-Request-Id` 并在响应头与响应体中回传；未传入时自动生成，用于联调、日志定位和云端冒烟测试关联。
 
 业务错误统一返回 `code=400`，例如：
 
@@ -121,9 +126,14 @@ npm run dev
 {
   "code": 400,
   "message": "手机号或密码错误",
-  "data": null
+  "data": null,
+  "timestamp": 1781179200000,
+  "requestId": "trace-test-123",
+  "errorCode": "BUSINESS_ERROR"
 }
 ```
+
+错误响应会额外提供稳定的 `errorCode`，用于前端分支处理和联调排查。常见取值包括：`AUTH_UNAUTHORIZED`、`AUTH_FORBIDDEN`、`VALIDATION_ERROR`、`RESOURCE_NOT_FOUND`、`ORDER_INVALID_STATE`、`PAYMENT_IDEMPOTENCY_CONFLICT`、`STOCK_NOT_ENOUGH`、`SYSTEM_ERROR`。
 
 ### JWT 鉴权与角色
 
@@ -140,6 +150,20 @@ npm run dev
 ### 金额单位
 
 所有金额字段统一使用 `INT`，单位为“分”；前端展示时再除以 `100` 转成“元”。
+
+### 支付幂等
+
+`POST /api/payment/mock` 和兼容入口 `POST /api/order/pay/{orderId}` 支持可选请求头 `Idempotency-Key`。同一用户对同一订单重复提交相同幂等键时，会复用同一条支付流水并在响应 `data.idempotencyKey` 中回传；同一幂等键不能用于该用户的其他订单。
+
+### 待支付订单超时
+
+后端默认每 60 秒扫描一次超过 30 分钟未支付的 `PENDING_PAYMENT` 订单，自动改为 `CANCELED`，释放已预占优惠券，并发送订单状态通知。可通过 `app.order-timeout.enabled`、`app.order-timeout.pending-payment-minutes`、`app.order-timeout.scan-delay-ms` 调整。
+
+### 订单详情
+
+用户订单详情页使用 `GET /api/order/{orderId}` 按 ID 加载单个订单，后端会校验当前用户只能查看自己的订单。商家可通过 `GET /api/order/merchant/detail/{orderId}` 查看本店订单，管理员可通过 `GET /api/order/admin/{orderId}` 查看任意订单。三个接口均返回与订单列表一致的 `OrderResponse` 结构。
+
+订单详情会随订单返回 `paidAt`、`acceptedAt`、`deliveredAt`、`completedAt`、`canceledAt`、`rejectedAt` 等关键状态时间戳，前端据此渲染订单时间线。
 
 ### AI 内容安全审核（2026-06-10）
 

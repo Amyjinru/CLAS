@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 240" width="360" height="240">
+  <defs>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="0.8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- 水波涟漪 -->
+    <radialGradient id="ripple1" cx="50%" cy="50%" r="40%">
+      <stop offset="0%" stop-color="#A8DADC" stop-opacity="0"/>
+      <stop offset="60%" stop-color="#A8DADC" stop-opacity="0.08"/>
+      <stop offset="85%" stop-color="#A8DADC" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#A8DADC" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ripple2" cx="50%" cy="50%" r="30%">
+      <stop offset="0%" stop-color="#FFB5A7" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#FFB5A7" stop-opacity="0.06"/>
+      <stop offset="80%" stop-color="#FFB5A7" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#FFB5A7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ripple3" cx="50%" cy="50%" r="35%">
+      <stop offset="0%" stop-color="#FFD100" stop-opacity="0"/>
+      <stop offset="55%" stop-color="#FFD100" stop-opacity="0.05"/>
+      <stop offset="78%" stop-color="#FFD100" stop-opacity="0.13"/>
+      <stop offset="100%" stop-color="#FFD100" stop-opacity="0"/>
+    </radialGradient>
+    <g id="star">
+      <polygon points="0,-9 2.5,-3 9,-3 4,1.5 5.5,8 0,4.5 -5.5,8 -4,1.5 -9,-3 -2.5,-3" fill="currentColor"/>
+    </g>
+    <g id="sparkle">
+      <path d="M0,-8 Q0,0 8,0 Q0,0 0,8 Q0,0 -8,0 Q0,0 0,-8Z" fill="currentColor"/>
+    </g>
+    <g id="heart">
+      <path d="M0,3 C0,3 -6,-1 -6,-5 C-6,-8 -3,-9 0,-6 C3,-9 6,-8 6,-5 C6,-1 0,3 0,3Z" fill="currentColor"/>
+    </g>
+    <g id="flower">
+      <ellipse cx="0" cy="-5" rx="2.5" ry="4.5" fill="currentColor"/>
+      <ellipse cx="4.8" cy="-1.5" rx="2.5" ry="4.5" fill="currentColor" transform="rotate(72)"/>
+      <ellipse cx="3" cy="4" rx="2.5" ry="4.5" fill="currentColor" transform="rotate(144)"/>
+      <ellipse cx="-3" cy="4" rx="2.5" ry="4.5" fill="currentColor" transform="rotate(216)"/>
+      <ellipse cx="-4.8" cy="-1.5" rx="2.5" ry="4.5" fill="currentColor" transform="rotate(288)"/>
+      <circle cx="0" cy="0" r="2" fill="#FFF4CC"/>
+    </g>
+    <g id="leaf">
+      <path d="M0,0 Q4,-6 0,-12 Q-4,-6 0,0Z" fill="currentColor"/>
+    </g>
+    <g id="dotCluster">
+      <circle cx="0" cy="0" r="3" fill="currentColor"/>
+      <circle cx="6" cy="2" r="1.8" fill="currentColor" opacity="0.6"/>
+      <circle cx="-5" cy="3" r="2.2" fill="currentColor" opacity="0.7"/>
+    </g>
+  </defs>
+
+  <!-- ═══ 水波涟漪圆 ═══ -->
+  <circle cx="90" cy="80" r="70" fill="url(#ripple1)"/>
+  <circle cx="270" cy="160" r="80" fill="url(#ripple2)"/>
+  <circle cx="180" cy="40" r="55" fill="url(#ripple3)"/>
+  <circle cx="50" cy="180" r="60" fill="url(#ripple1)"/>
+  <circle cx="320" cy="60" r="65" fill="url(#ripple2)"/>
+
+  <!-- ═══ 大号 CLAS — 斜向分布，沿对角线排列 ═══ -->
+  <!-- 主斜排：从左上到右下，每个字母有偏移 -->
+  <!-- 光晕 -->
+  <text x="54" y="102" text-anchor="middle" font-family="Georgia, 'Times New Roman', 'Noto Serif SC', serif" font-size="52" font-weight="900" fill="#FFF4CC" opacity="0.5" filter="url(#softGlow)">C L A S</text>
+
+  <!-- C: 左上 -->
+  <text x="36" y="118" text-anchor="start" font-family="Georgia, 'Times New Roman', 'Noto Serif SC', serif" font-size="52" font-weight="900" fill="#FFB5A7">C</text>
+  <!-- L: 向右下偏移 -->
+  <text x="86" y="150" text-anchor="start" font-family="Georgia, 'Times New Roman', 'Noto Serif SC', serif" font-size="52" font-weight="900" fill="#FEC89A">L</text>
+  <!-- A: 继续向右下 -->
+  <text x="138" y="182" text-anchor="start" font-family="Georgia, 'Times New Roman', 'Noto Serif SC', serif" font-size="52" font-weight="900" fill="#FFD100">A</text>
+  <!-- S: 右下角 -->
+  <text x="190" y="214" text-anchor="start" font-family="Georgia, 'Times New Roman', 'Noto Serif SC', serif" font-size="52" font-weight="900" fill="#A8DADC">S</text>
+
+  <!-- 对角线装饰 -->
+  <line x1="28" y1="122" x2="242" y2="218" stroke="#FEC89A" stroke-width="1.2" opacity="0.5" stroke-dasharray="4 3"/>
+  <line x1="36" y1="128" x2="236" y2="224" stroke="#FFD100" stroke-width="0.8" opacity="0.35"/>
+
+  <!-- ═══ 反向斜排小号 CLAS 点缀 ═══ -->
+  <!-- 右上到左下 -->
+  <text x="290" y="60" text-anchor="middle" font-family="Georgia, serif" font-size="12" font-weight="700" letter-spacing="3" fill="#FFB5A7" opacity="0.4" transform="rotate(-25, 290, 60)">CLAS</text>
+  <text x="260" y="90" text-anchor="middle" font-family="Georgia, serif" font-size="11" font-weight="700" letter-spacing="3" fill="#A8DADC" opacity="0.35" transform="rotate(-20, 260, 90)">CLAS</text>
+
+  <!-- 左下角小点缀 -->
+  <text x="40" y="42" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="700" letter-spacing="3" fill="#FEC89A" opacity="0.45">CLAS</text>
+
+  <!-- ═══ 星星 ═══ -->
+  <use href="#star" x="70" y="38" color="#FFD100" opacity="0.5" transform="scale(1.3) translate(-16,-9)"/>
+  <use href="#star" x="88" y="26" color="#FFB5A7" opacity="0.45" transform="scale(0.85) translate(15,5)"/>
+  <use href="#star" x="22" y="58" color="#A8DADC" opacity="0.35" transform="scale(0.7) translate(10,28)"/>
+  <use href="#star" x="310" y="62" color="#FFD100" opacity="0.4"/>
+  <use href="#star" x="340" y="28" color="#FFB5A7" opacity="0.45" transform="scale(0.75) translate(90,8)"/>
+  <use href="#star" x="278" y="82" color="#FEC89A" opacity="0.35" transform="scale(0.6) translate(185,55)"/>
+  <use href="#star" x="50" y="168" color="#FFB5A7" opacity="0.4" transform="scale(0.85) translate(8,-20)"/>
+  <use href="#star" x="16" y="192" color="#FFD100" opacity="0.35" transform="scale(0.65) translate(10,78)"/>
+  <use href="#star" x="328" y="178" color="#A8DADC" opacity="0.4" transform="scale(1.0) translate(0,-18)"/>
+  <use href="#star" x="308" y="208" color="#FFD100" opacity="0.35"/>
+  <use href="#star" x="348" y="152" color="#FFB5A7" opacity="0.3" transform="scale(0.6) translate(232,100)"/>
+
+  <!-- ═══ 闪亮 ═══ -->
+  <use href="#sparkle" x="105" y="58" color="#FFD100" opacity="0.45" transform="scale(0.85) translate(18,10)"/>
+  <use href="#sparkle" x="268" y="48" color="#FFB5A7" opacity="0.4" transform="scale(0.75) translate(88,15)"/>
+  <use href="#sparkle" x="60" y="155" color="#A8DADC" opacity="0.35" transform="scale(0.7) translate(26,66)"/>
+  <use href="#sparkle" x="300" y="148" color="#FFD100" opacity="0.4" transform="scale(0.75) translate(-75,36)"/>
+  <use href="#sparkle" x="200" y="26" color="#FEC89A" opacity="0.35" transform="scale(0.6) translate(133,16)"/>
+  <use href="#sparkle" x="160" y="208" color="#FFB5A7" opacity="0.35" transform="scale(0.6) translate(107,112)"/>
+
+  <!-- ═══ 爱心 ═══ -->
+  <use href="#heart" x="130" y="44" color="#FFB5A7" opacity="0.45"/>
+  <use href="#heart" x="258" y="98" color="#FF9F8F" opacity="0.35"/>
+  <use href="#heart" x="44" y="88" color="#FCD5CE" opacity="0.45" transform="scale(0.75) translate(15,25)"/>
+  <use href="#heart" x="288" y="192" color="#FFB5A7" opacity="0.35" transform="scale(0.8) translate(55,35)"/>
+  <use href="#heart" x="178" y="182" color="#FCD5CE" opacity="0.3"/>
+  <use href="#heart" x="338" y="108" color="#FFB5A7" opacity="0.3" transform="scale(0.65) translate(155,50)"/>
+
+  <!-- ═══ 小花 ═══ -->
+  <use href="#flower" x="30" y="100" color="#FFB5A7" opacity="0.5" transform="scale(1.1) translate(-3,-16)"/>
+  <use href="#flower" x="300" y="42" color="#A8DADC" opacity="0.4" transform="scale(0.95) translate(0,0)"/>
+  <use href="#flower" x="100" y="178" color="#FEC89A" opacity="0.4" transform="scale(0.85) translate(18,20)"/>
+  <use href="#flower" x="258" y="168" color="#FFB5A7" opacity="0.35" transform="scale(0.8) translate(50,30)"/>
+  <use href="#flower" x="198" y="68" color="#FCD5CE" opacity="0.35" transform="scale(0.7) translate(75,22)"/>
+  <use href="#flower" x="16" y="158" color="#A8DADC" opacity="0.3" transform="scale(0.7) translate(8,66)"/>
+
+  <!-- ═══ 小叶子 ═══ -->
+  <use href="#leaf" x="48" y="106" color="#A8DADC" opacity="0.35" transform="rotate(-30,48,106) scale(0.75)"/>
+  <use href="#leaf" x="312" y="106" color="#A8DADC" opacity="0.3" transform="rotate(20,312,106) scale(0.65)"/>
+  <use href="#leaf" x="114" y="186" color="#A8DADC" opacity="0.3" transform="rotate(-45,114,186) scale(0.65)"/>
+  <use href="#leaf" x="84" y="74" color="#C3E8D4" opacity="0.3" transform="rotate(15,84,74) scale(0.55)"/>
+
+  <!-- ═══ 圆点簇 ═══ -->
+  <use href="#dotCluster" x="160" y="54" color="#FFD100" opacity="0.35"/>
+  <use href="#dotCluster" x="22" y="128" color="#FFB5A7" opacity="0.3" transform="scale(0.7) translate(12,55)"/>
+  <use href="#dotCluster" x="300" y="128" color="#FEC89A" opacity="0.3" transform="scale(0.75) translate(-75,32)"/>
+  <use href="#dotCluster" x="98" y="158" color="#A8DADC" opacity="0.25" transform="scale(0.65) translate(45,70)"/>
+
+  <!-- ═══ 装饰小圆点 ═══ -->
+  <circle cx="55" cy="50" r="2" fill="#FFD100" opacity="0.4"/>
+  <circle cx="144" cy="34" r="1.8" fill="#FFB5A7" opacity="0.35"/>
+  <circle cx="240" cy="38" r="2.2" fill="#A8DADC" opacity="0.3"/>
+  <circle cx="335" cy="72" r="1.5" fill="#FEC89A" opacity="0.35"/>
+  <circle cx="70" cy="140" r="1.8" fill="#FFD100" opacity="0.3"/>
+  <circle cx="248" cy="138" r="2" fill="#FFB5A7" opacity="0.25"/>
+  <circle cx="38" cy="202" r="1.8" fill="#FFD100" opacity="0.3"/>
+  <circle cx="178" cy="218" r="2" fill="#A8DADC" opacity="0.25"/>
+  <circle cx="278" cy="218" r="1.5" fill="#FEC89A" opacity="0.3"/>
+  <circle cx="348" cy="198" r="2" fill="#FFB5A7" opacity="0.25"/>
+
+  <!-- ═══ 底部波纹 ═══ -->
+  <path d="M0,232 Q40,226 80,232 Q120,238 160,232 Q200,226 240,232 Q280,238 320,232 Q350,226 360,230" fill="none" stroke="#FFB5A7" stroke-width="1" opacity="0.25"/>
+  <path d="M0,235 Q40,229 80,235 Q120,241 160,235 Q200,229 240,235 Q280,241 320,235 Q350,229 360,233" fill="none" stroke="#FFD100" stroke-width="0.8" opacity="0.2"/>
+
+  <!-- ═══ 顶部波纹 ═══ -->
+  <path d="M0,8 Q30,4 60,8 Q90,12 120,8 Q150,4 180,8 Q210,12 240,8 Q270,4 300,8 Q330,12 360,8" fill="none" stroke="#A8DADC" stroke-width="0.8" opacity="0.2"/>
+</svg>

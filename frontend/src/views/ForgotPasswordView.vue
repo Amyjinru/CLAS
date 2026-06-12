@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { resetForgotPassword, sendForgotPasswordCode, setSessionUser } from '../api/clas'
+import { resetForgotPassword, sendForgotPasswordCode, setSessionUser, currentRole } from '../api/clas'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,22 +35,23 @@ function validPhone(phone) {
 function passwordChecks(password) {
   const value = password || ''
   return [
-    { key: 'length', label: '不少于6位', ok: value.length >= 6 },
-    { key: 'lower', label: '包含小写字母', ok: /[a-z]/.test(value) },
-    { key: 'upper', label: '包含大写字母', ok: /[A-Z]/.test(value) },
-    { key: 'digit', label: '包含数字', ok: /\d/.test(value) },
-    { key: 'special', label: '包含特殊符号', ok: /[\W_]/.test(value) && !/\s/.test(value) }
+    { key: 'length', label: '不少于8位', ok: value.length >= 8 }
   ]
-}
-
-function redirectByRole(user) {
-  const redirect = route.query.redirect
-  const target = typeof redirect === 'string' ? redirect : roleHome[user.role] || '/home'
-  router.push(target)
 }
 
 const passwordState = computed(() => passwordChecks(form.newPassword))
 const passwordOk = computed(() => passwordState.value.every((item) => item.ok))
+const passwordStrength = computed(() => {
+  const pwd = form.newPassword || ''
+  let score = 0
+  if (pwd.length >= 8) score++
+  if (/\d/.test(pwd)) score++
+  if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++
+  if (/[\W_]/.test(pwd) && !/\s/.test(pwd)) score++
+  return score
+})
+const strengthLabel = computed(() => ['', '较弱', '中等', '良好', '强'][passwordStrength.value] || '强')
+const strengthColor = computed(() => ['', '#ef4444', '#f59e0b', '#f97316', '#16a34a'][passwordStrength.value] || '#16a34a')
 const passwordMatches = computed(() => form.confirmPassword && form.newPassword === form.confirmPassword)
 const cooldownText = computed(() => {
   if (!codeCooldown.value) return '发送验证码'
@@ -66,7 +67,7 @@ async function sendCode() {
   showMessage('')
   try {
     await sendForgotPasswordCode({ phone: form.phone })
-    showMessage('验证码已发送，请查看后端控制台输出', 'success')
+    showMessage('验证码已发送，请在60秒内输入', 'success')
     codeCooldown.value = 60
     cooldownTimer = setInterval(() => {
       codeCooldown.value--
@@ -88,7 +89,7 @@ async function submitReset() {
     return
   }
   if (!passwordOk.value) {
-    showMessage('密码至少6位，必须包含大小写英文字母、数字和特殊符号', 'error')
+    showMessage('密码长度不能少于8位', 'error')
     return
   }
   if (!passwordMatches.value) {
@@ -106,10 +107,12 @@ async function submitReset() {
     })
     setSessionUser({ ...data.user, token: data.token })
     showMessage('密码已重置，已自动登录', 'success')
-    setTimeout(() => redirectByRole(data.user), 600)
+    const role = currentRole()
+    const redirect = route.query.redirect
+    const target = typeof redirect === 'string' && redirect ? redirect : roleHome[role] || '/home'
+    await router.push(target)
   } catch (error) {
     showMessage(error.response?.data?.message || '重置密码失败', 'error')
-  } finally {
     loading.value = false
   }
 }
@@ -123,17 +126,20 @@ async function submitReset() {
       <p class="hint">通过已绑定手机号获取验证码，设置符合强度要求的新密码。</p>
 
       <div class="form-group">
-        <label>手机号 <span class="required">*</span></label>
-        <input v-model="form.phone" placeholder="请输入已绑定手机号" maxlength="11" />
+        <label for="forgot-phone">手机号 <span class="required">*</span></label>
+        <input id="forgot-phone" v-model="form.phone" placeholder="请输入已绑定手机号" maxlength="11" autocomplete="tel-national" inputmode="numeric" />
       </div>
 
       <div class="form-group">
-        <label>验证码 <span class="required">*</span></label>
+        <label for="forgot-code">验证码 <span class="required">*</span></label>
         <div class="code-row">
           <input
+            id="forgot-code"
             v-model="form.code"
             placeholder="请输入6位验证码"
             maxlength="6"
+            inputmode="numeric"
+            autocomplete="one-time-code"
             class="code-input"
           />
           <button
@@ -146,16 +152,18 @@ async function submitReset() {
             {{ codeSending ? '发送中' : cooldownText }}
           </button>
         </div>
-        <p class="code-tip">演示环境请查看后端控制台输出获取验证码</p>
+        <p class="code-tip">验证码会发送至您的手机，60秒内输入有效</p>
       </div>
 
       <div class="form-group">
-        <label>新密码 <span class="required">*</span></label>
+        <label for="forgot-new-password">新密码 <span class="required">*</span></label>
         <div class="password-wrap">
           <input
+            id="forgot-new-password"
             v-model="form.newPassword"
             :type="showPassword ? 'text' : 'password'"
-            placeholder="至少6位，含大小写字母、数字、特殊符号"
+            placeholder="至少8位"
+            autocomplete="new-password"
           />
           <button
             type="button"
@@ -177,24 +185,28 @@ async function submitReset() {
             </svg>
           </button>
         </div>
-        <ul class="password-checks">
-          <li
-            v-for="item in passwordState"
-            :key="item.key"
-            :class="{ ok: item.ok }"
-          >
-            {{ item.ok ? '✓' : '·' }} {{ item.label }}
-          </li>
-        </ul>
+        <!-- 密码强度可视化指示器 -->
+        <div v-if="form.newPassword" class="strength-meter">
+          <div class="strength-bar">
+            <div
+              class="strength-fill"
+              :style="{ width: (passwordStrength / 4 * 100) + '%', background: strengthColor }"
+            ></div>
+          </div>
+          <span class="strength-label" :style="{ color: strengthColor }">{{ strengthLabel }}</span>
+        </div>
+        <p v-else class="password-hint-text">至少8位，建议包含数字、大小写字母和符号</p>
       </div>
 
       <div class="form-group">
-        <label>确认新密码 <span class="required">*</span></label>
+        <label for="forgot-confirm-password">确认新密码 <span class="required">*</span></label>
         <div class="password-wrap">
           <input
+            id="forgot-confirm-password"
             v-model="form.confirmPassword"
             :type="showConfirmPassword ? 'text' : 'password'"
             placeholder="请再次输入新密码"
+            autocomplete="new-password"
           />
           <button
             type="button"
@@ -232,6 +244,8 @@ async function submitReset() {
         v-if="message"
         class="auth-message"
         :class="{ 'msg-success': messageType === 'success', 'msg-error': messageType === 'error' }"
+        role="alert"
+        aria-live="assertive"
       >{{ message }}</p>
     </section>
   </div>
@@ -244,23 +258,21 @@ async function submitReset() {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--bg-page, #f8fafb);
 }
 
 .auth-panel {
   width: 100%;
   max-width: 420px;
   padding: 40px;
-  background: var(--bg-card, #fff);
-  border-radius: var(--radius-xl, 16px);
-  box-shadow: var(--shadow-lg, 0 8px 30px rgba(0, 0, 0, 0.08));
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: transparent;
+  position: relative;
+  z-index: 1;
 }
 
 .back-btn {
   border: none;
   background: transparent;
-  color: var(--color-primary, #f97316);
+  color: #b8960f;
   font-size: 13px;
   cursor: pointer;
   padding: 0;
@@ -318,8 +330,16 @@ input:not(.code-input) {
 input:focus,
 .code-input:focus {
   outline: none;
-  border-color: var(--color-primary, #f97316);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  border-color: #FFD100;
+  box-shadow: 0 0 0 3px rgba(255, 209, 0, 0.15);
+}
+
+button:focus-visible,
+input:focus-visible,
+.back-btn:focus-visible,
+.toggle-pwd:focus-visible {
+  outline: 2px solid #FFD100;
+  outline-offset: 2px;
 }
 
 .password-wrap {
@@ -352,22 +372,7 @@ input:focus,
 
 .toggle-pwd:hover,
 .toggle-pwd.visible {
-  color: var(--color-primary, #f97316);
-}
-
-.password-checks {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 10px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
-  color: var(--text-muted, #9ca3af);
-}
-
-.password-checks li.ok {
-  color: var(--clas-success, #16a34a);
+  color: #b8960f;
 }
 
 .match-tip {
@@ -406,8 +411,8 @@ input:focus,
   font-weight: 500;
   border: 1px solid var(--border-color, #d1d5db);
   border-radius: var(--radius-md, 10px);
-  background: var(--bg-page, #f9fafb);
-  color: var(--color-primary, #f97316);
+  background: #fff;
+  color: #b8960f;
   cursor: pointer;
   white-space: nowrap;
   transition-property: color, background-color;
@@ -419,9 +424,9 @@ input:focus,
 }
 
 .resend-btn:hover:not(:disabled) {
-  background: var(--color-primary, #f97316);
-  color: var(--text-primary);
-  border-color: var(--color-primary, #f97316);
+  background: #FFD100;
+  color: #1a1510;
+  border-color: #FFD100;
 }
 
 .resend-btn:disabled {
@@ -443,35 +448,94 @@ input:focus,
   font-weight: 700;
   letter-spacing: 0.04em;
   border-radius: var(--radius-md, 10px);
-  background: var(--color-primary, #f97316);
-  color: var(--text-primary);
+  background: linear-gradient(135deg, #FFD100 0%, #ffe033 100%);
+  color: #1a1510;
   border: none;
   cursor: pointer;
-  transition-property: background-color, transform, box-shadow;
-  transition-duration: var(--transition-fast, 0.2s);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  box-shadow: 0 2px 8px rgba(255, 209, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.submit-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transition: left 0.5s ease;
+}
+
+.submit-btn:hover:not(:disabled)::after {
+  left: 100%;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: var(--color-primary-hover, #ea580c);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md, 0 4px 12px rgba(249, 115, 22, 0.3));
+  background: linear-gradient(135deg, #e6c000 0%, #FFD100 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 209, 0, 0.4);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: 0 1px 4px rgba(255, 209, 0, 0.2);
 }
 
 .submit-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 密码强度指示器 */
+.strength-meter {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.strength-bar {
+  flex: 1;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.strength-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background 0.4s ease;
+}
+
+.strength-label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 32px;
+  text-align: right;
+}
+
+.password-hint-text {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  line-height: 1.4;
 }
 
 .spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border: 2px solid rgba(26, 21, 16, 0.2);
+  border-top-color: #1a1510;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
@@ -479,14 +543,21 @@ input:focus,
 .spinner-small {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(249, 115, 22, 0.3);
-  border-top-color: var(--color-primary, #f97316);
+  border: 2px solid rgba(184, 150, 15, 0.3);
+  border-top-color: #b8960f;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .auth-message {

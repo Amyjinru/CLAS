@@ -1,20 +1,24 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { listOrders } from '../api/clas'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { cancelOrder, completeOrder, getMerchant, getOrderDetail, requestRefund } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
+import { useConfirmAction } from '../composables/useConfirmAction'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
 import { orderStatusMap } from '../utils/status'
 
 const route = useRoute()
 const router = useRouter()
+const { confirmAction } = useConfirmAction()
 const orderId = computed(() => Number(route.params.orderId))
 const fromNotifications = computed(() => route.query.from === 'notifications')
 
 const orderEntry = ref(null)
+const merchant = ref(null)
 const loading = ref(true)
 const error = ref('')
+const actionMessage = ref('')
 
 const deliveryLabel = {
   WAITING: '等待商家接单',
@@ -28,6 +32,24 @@ const refundStatusLabel = {
   APPROVED: '已通过',
   REJECTED: '已拒绝'
 }
+
+const orderTimeline = computed(() => {
+  const order = orderEntry.value?.order
+  if (!order) return []
+  return [
+    { label: '订单创建', time: order.createTime },
+    { label: '支付成功', time: order.paidAt },
+    { label: '商家接单', time: order.acceptedAt },
+    { label: '配送开始', time: order.deliveredAt },
+    { label: '订单完成', time: order.completedAt },
+    { label: '订单取消', time: order.canceledAt },
+    { label: '商家拒单', time: order.rejectedAt },
+    { label: '申请退款', time: order.refundRequestedAt },
+    { label: '退款处理', time: order.refundResolvedAt }
+  ].filter((item) => item.time)
+})
+
+const currentStatus = computed(() => orderEntry.value?.order?.status)
 
 function distanceText(distance) {
   if (!distance) return ''
@@ -46,15 +68,56 @@ function goBack() {
   }
 }
 
-onMounted(async () => {
+async function loadDetail() {
+  merchant.value = null
+  actionMessage.value = ''
+  error.value = ''
   try {
-    const orders = await listOrders()
-    orderEntry.value = orders.find((o) => o.order.id === orderId.value) || null
+    orderEntry.value = await getOrderDetail(orderId.value)
     if (!orderEntry.value) {
       error.value = '订单不存在或无权查看'
+      return
+    }
+    const merchantId = orderEntry.value.order?.merchantId
+    if (merchantId) {
+      try {
+        merchant.value = await getMerchant(merchantId)
+      } catch (e) {
+        merchant.value = null
+      }
     }
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || '加载订单失败'
+  }
+}
+
+async function cancelCurrentOrder() {
+  await confirmAction('确认取消该订单？', async () => {
+    await cancelOrder(orderEntry.value.order.id)
+    await loadDetail()
+    actionMessage.value = '订单已取消'
+  })
+}
+
+async function completeCurrentOrder() {
+  await confirmAction('确认该订单已经完成？', async () => {
+    await completeOrder(orderEntry.value.order.id)
+    await loadDetail()
+    actionMessage.value = '订单已完成'
+  }, { type: 'success' })
+}
+
+async function refundCurrentOrder() {
+  const reason = window.prompt('请输入退款原因', '配送超时')
+  if (!reason) return
+  await requestRefund(orderEntry.value.order.id, reason.trim())
+  await loadDetail()
+  actionMessage.value = '退款申请已提交'
+}
+
+onMounted(async () => {
+  try {
+    await loadDetail()
   } finally {
     loading.value = false
   }
@@ -71,6 +134,47 @@ onMounted(async () => {
 
     <section v-else class="panel order-detail-panel">
       <h1>订单 #{{ orderEntry.order.id }}</h1>
+      <p v-if="actionMessage" class="action-message">{{ actionMessage }}</p>
+
+      <div class="detail-actions">
+        <RouterLink
+          v-if="currentStatus === 'PENDING_PAYMENT'"
+          class="button"
+          :to="`/payment/${orderEntry.order.id}`"
+        >
+          去支付
+        </RouterLink>
+        <button
+          v-if="['PENDING_PAYMENT', 'PAID'].includes(currentStatus)"
+          class="secondary"
+          type="button"
+          @click="cancelCurrentOrder"
+        >
+          取消订单
+        </button>
+        <button
+          v-if="currentStatus === 'ACCEPTED'"
+          type="button"
+          @click="completeCurrentOrder"
+        >
+          确认完成
+        </button>
+        <button
+          v-if="['PAID', 'ACCEPTED', 'COMPLETED'].includes(currentStatus)"
+          class="secondary"
+          type="button"
+          @click="refundCurrentOrder"
+        >
+          申请退款
+        </button>
+        <RouterLink
+          v-if="currentStatus === 'COMPLETED'"
+          class="button secondary"
+          :to="`/review/${orderEntry.order.id}`"
+        >
+          去评价
+        </RouterLink>
+      </div>
 
       <div class="detail-grid">
         <div class="detail-block">
@@ -79,6 +183,15 @@ onMounted(async () => {
             <StatusTag :status="orderEntry.order.status" :map="orderStatusMap" />
             <span v-if="orderEntry.order.deliveryStatus"> · {{ deliveryLabel[orderEntry.order.deliveryStatus] || orderEntry.order.deliveryStatus }}</span>
           </p>
+          <el-timeline v-if="orderTimeline.length" class="order-timeline">
+            <el-timeline-item
+              v-for="item in orderTimeline"
+              :key="`${item.label}-${item.time}`"
+              :timestamp="formatCompactDateTime(item.time).slice(0, 16)"
+            >
+              {{ item.label }}
+            </el-timeline-item>
+          </el-timeline>
         </div>
 
         <div class="detail-block">
@@ -87,6 +200,17 @@ onMounted(async () => {
           <p>配送费：<MoneyText :amount="orderEntry.order.deliveryFee || 0" /></p>
           <p v-if="orderEntry.order.couponDiscount > 0">优惠券：<MoneyText :amount="orderEntry.order.couponDiscount" negative /></p>
           <p class="total-line">实付：<MoneyText :amount="orderEntry.order.totalPrice" /></p>
+        </div>
+
+        <div v-if="merchant" class="detail-block merchant-summary">
+          <h2>商家</h2>
+          <p class="merchant-name">{{ merchant.merchantName }}</p>
+          <p class="merchant-meta">
+            <span v-if="merchant.category">{{ merchant.category }}</span>
+            <span v-if="merchant.score">评分 {{ Number(merchant.score).toFixed(1) }}</span>
+          </p>
+          <p v-if="merchant.phone">电话：{{ merchant.phone }}</p>
+          <p v-if="merchant.address">地址：{{ merchant.address }}</p>
         </div>
 
         <div class="detail-block">
@@ -172,6 +296,19 @@ onMounted(async () => {
   margin-top: 0;
 }
 
+.action-message {
+  color: var(--clas-success);
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
 .detail-grid {
   display: grid;
   gap: 20px;
@@ -201,8 +338,25 @@ onMounted(async () => {
   margin-top: 8px;
 }
 
+.merchant-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.merchant-meta {
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .warn {
   color: var(--clas-warning);
+}
+
+.order-timeline {
+  margin-top: 14px;
+  padding-left: 2px;
 }
 
 .item-list {

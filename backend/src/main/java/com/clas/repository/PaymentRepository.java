@@ -12,4 +12,6 @@ public interface PaymentRepository {
     Optional<Payment> findLatestByOrderId(Long orderId);
 
     Optional<Payment> findSuccessfulByOrderId(Long orderId);
+
+    Optional<Payment> findByUserIdAndIdempotencyKey(String userId, String idempotencyKey);
 }

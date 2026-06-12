@@ -4,6 +4,7 @@ export const previewOrder = (merchantId, addressId, userCouponId) =>
   api.get('/order/preview', { params: { merchantId, addressId, userCouponId } }).then(unwrap)
 export const createOrder = (payload) => api.post('/order/create', payload).then(unwrap)
 export const listOrders = () => api.get('/order/me').then(unwrap)
+export const getOrderDetail = (orderId) => api.get(`/order/${orderId}`).then(unwrap)
 export const payOrder = (orderId) => api.post(`/order/pay/${orderId}`).then(unwrap)
 export const completeOrder = (orderId) => api.post(`/order/complete/${orderId}`).then(unwrap)
 export const cancelOrder = (orderId) => api.post(`/order/cancel/${orderId}`).then(unwrap)

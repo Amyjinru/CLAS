@@ -334,17 +334,20 @@ watch(() => messages.value.length, () => scrollToBottom())
 }
 
 .conversation-item {
-  align-items: center;
+  align-items: start;
   background: transparent;
   border: 0;
   border-radius: 8px;
   cursor: pointer;
-  display: flex;
+  display: grid;
   gap: 8px;
-  min-height: 58px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  height: 58px;
+  overflow: hidden;
   padding: 8px;
   text-align: left;
   transition: background .2s;
+  width: 100%;
 }
 
 .conversation-item:hover,
@@ -354,6 +357,7 @@ watch(() => messages.value.length, () => scrollToBottom())
 
 .conversation-avatar {
   align-items: center;
+  align-self: start;
   background: linear-gradient(135deg, #f97316, #0f766e);
   border-radius: 50%;
   color: #fff;
@@ -363,6 +367,7 @@ watch(() => messages.value.length, () => scrollToBottom())
   font-weight: 700;
   height: 34px;
   justify-content: center;
+  justify-self: start;
   width: 34px;
 }
 
@@ -376,9 +381,12 @@ watch(() => messages.value.length, () => scrollToBottom())
 }
 
 .conversation-meta {
+  align-self: start;
   display: grid;
   gap: 3px;
   min-width: 0;
+  overflow: hidden;
+  padding-top: 1px;
 }
 
 .conversation-meta strong,

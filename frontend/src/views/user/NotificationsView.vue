@@ -196,7 +196,7 @@ onMounted(load)
 
           <el-button v-if="unreadCount" text type="primary" @click="markAllRead">全部标记已读</el-button>
 
-          <el-button v-if="notifications.length" class="btn-delete-soft" size="small" type="danger" @click="removeAllNotifications">删除全部</el-button>
+          <el-button v-if="notifications.length" type="danger" plain @click="removeAllNotifications">删除全部</el-button>
 
         </div>
 
@@ -238,7 +238,7 @@ onMounted(load)
 
             <el-tag v-else type="info">已读</el-tag>
 
-            <el-button class="btn-delete-soft" size="small" type="danger" @click.stop="removeNotification(item.id)">删除</el-button>
+            <el-button type="danger" plain @click.stop="removeNotification(item.id)">删除</el-button>
 
           </div>
 
@@ -361,16 +361,11 @@ onMounted(load)
 }
 
 .row-actions > :first-child {
-  width: 84px;
   flex-shrink: 0;
-  text-align: center;
   justify-content: center;
   margin-right: 8px;
-}
-
-.row-actions .btn-delete-soft {
-  min-width: 56px;
-  flex-shrink: 0;
+  min-width: 84px;
+  text-align: center;
 }
 
 @media (min-width: 1024px) {

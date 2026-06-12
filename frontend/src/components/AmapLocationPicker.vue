@@ -1,7 +1,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { hasAmapKey, loadAmap } from '../utils/amap'
+import { ensureAmapPlugins, hasAmapKey } from '../utils/amap'
 
 const props = defineProps({
   address: {
@@ -89,7 +89,7 @@ async function initMap() {
     return
   }
   try {
-    AMapRef = await loadAmap()
+    AMapRef = await ensureAmapPlugins(['AMap.ToolBar', 'AMap.Scale'])
     await nextTick()
     map = new AMapRef.Map(mapEl.value, {
       zoom: 15,

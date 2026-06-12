@@ -19,3 +19,10 @@ clas:
 
 jwt:
   secret: clas-test-secret-key-2026-must-be-32bytes!
+
+dashscope:
+  api-key: ""
+
+app:
+  order-timeout:
+    enabled: false

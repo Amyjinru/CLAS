@@ -180,7 +180,13 @@ CREATE TABLE orders (
     remark VARCHAR(255),
     reject_reason VARCHAR(255),
     refund_reject_reason VARCHAR(255),
-    create_time TIMESTAMP NOT NULL
+    create_time TIMESTAMP NOT NULL,
+    paid_at TIMESTAMP,
+    accepted_at TIMESTAMP,
+    delivered_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    canceled_at TIMESTAMP,
+    rejected_at TIMESTAMP
 );
 
 CREATE TABLE order_item (
@@ -285,7 +291,9 @@ CREATE TABLE payment (
     amount INT NOT NULL,
     pay_method VARCHAR(20) NOT NULL DEFAULT 'MOCK',
     status VARCHAR(20) NOT NULL,
-    create_time TIMESTAMP NOT NULL
+    create_time TIMESTAMP NOT NULL,
+    idempotency_key VARCHAR(128),
+    UNIQUE(user_id, idempotency_key)
 );
 
 CREATE TABLE announcement (
