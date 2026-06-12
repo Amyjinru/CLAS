@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { currentRole, listAddresses, listAnnouncements, listMerchants, currentUser, listOrders } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
@@ -7,7 +7,7 @@ import ChatWindow from '../components/ChatWindow.vue'
 import { useChatStore } from '../composables/useChatStore'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
-import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
+import { getCurrentLocation, locationFromAddress, setCurrentLocation, subscribeCurrentLocation } from '../utils/locationStore'
 import { formatDistance } from '../utils/formatters'
 import { ElMessage } from 'element-plus'
 
@@ -37,6 +37,7 @@ const chatOrder = ref(null)
 const ordersLoading = ref(false)
 const announcementsExpanded = ref(false)
 const chatStore = useChatStore()
+let unsubscribeLocation = null
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
 const DEFAULT_SORT = 'recommend'
 const sortOptions = [
@@ -172,25 +173,22 @@ async function loadAddresses() {
     addresses.value = await listAddresses({ silent: true })
     const defaultAddress = addresses.value.find((item) => item.isDefault) || addresses.value[0]
     selectedAddressId.value = defaultAddress?.id || ''
-    if (!currentLocation.value && defaultAddress?.longitude && defaultAddress?.latitude) {
-      currentLocation.value = {
-        province: '',
-        city: '',
-        district: '',
-        street: defaultAddress.address,
-        address: defaultAddress.address,
-        longitude: Number(defaultAddress.longitude),
-        latitude: Number(defaultAddress.latitude),
-        source: 'manual'
-      }
+    const storedLocation = getCurrentLocation()
+    if (storedLocation) {
+      currentLocation.value = storedLocation
+      return
+    }
+    const defaultLocation = locationFromAddress(defaultAddress)
+    if (defaultLocation) {
+      currentLocation.value = setCurrentLocation(defaultLocation)
     }
   } catch {
     addresses.value = []
   }
 }
 
-async function autoLocate() {
-  if (currentLocation.value?.longitude && currentLocation.value?.latitude) {
+async function autoLocate(force = false) {
+  if (!force && currentLocation.value?.longitude && currentLocation.value?.latitude) {
     return
   }
   try {
@@ -207,8 +205,7 @@ async function autoLocate() {
           return
         }
         const next = await resolveAutoLocationFromAmap(AMap, result)
-        currentLocation.value = next
-        setCurrentLocation(next)
+        currentLocation.value = setCurrentLocation(next)
         selectedAddressId.value = ''
         resolve()
       })
@@ -293,7 +290,7 @@ function applyFilterDialog() {
   selectedAddressId.value = draftAddressId.value
   currentLocation.value = cloneLocation(draftLocation.value)
   if (currentLocation.value) {
-    setCurrentLocation(currentLocation.value)
+    currentLocation.value = setCurrentLocation(currentLocation.value)
   }
   filterDialogVisible.value = false
   load()
@@ -378,9 +375,16 @@ watch(
 )
 
 onMounted(async () => {
+  unsubscribeLocation = subscribeCurrentLocation((location) => {
+    currentLocation.value = cloneLocation(location)
+  })
   await loadAddresses()
   await autoLocate()
   await Promise.all([load(), loadActiveOrders()])
+})
+
+onUnmounted(() => {
+  unsubscribeLocation?.()
 })
 </script>
 

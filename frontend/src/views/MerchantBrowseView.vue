@@ -8,7 +8,7 @@ import LocationSelector from '../components/LocationSelector.vue'
 import { loadAmap } from '../utils/amap'
 import { formatDistance } from '../utils/formatters'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
-import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
+import { getCurrentLocation, locationFromAddress, setCurrentLocation, subscribeCurrentLocation } from '../utils/locationStore'
 
 defineOptions({
   name: 'MerchantBrowseView'
@@ -30,6 +30,7 @@ const productsLoading = ref(false)
 const locating = ref(false)
 const locationDialogVisible = ref(false)
 let productSlideTimer = null
+let unsubscribeLocation = null
 
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
 const sortOptions = [
@@ -183,16 +184,14 @@ async function syncFiltersToRoute() {
 async function loadAddresses() {
   try {
     addresses.value = await listAddresses({ silent: true })
-    if (!currentLocation.value) {
+    const storedLocation = getCurrentLocation()
+    if (storedLocation) {
+      currentLocation.value = storedLocation
+    } else {
       const defaultAddress = addresses.value.find((item) => item.isDefault) || addresses.value[0]
-      if (defaultAddress?.longitude && defaultAddress?.latitude) {
-        currentLocation.value = {
-          address: defaultAddress.address,
-          longitude: Number(defaultAddress.longitude),
-          latitude: Number(defaultAddress.latitude),
-          source: 'manual'
-        }
-        setCurrentLocation(currentLocation.value)
+      const defaultLocation = locationFromAddress(defaultAddress)
+      if (defaultLocation) {
+        currentLocation.value = setCurrentLocation(defaultLocation)
       }
     }
   } catch {
@@ -218,8 +217,7 @@ async function autoLocate() {
         resolve(await resolveAutoLocationFromAmap(AMap, result))
       })
     })
-    currentLocation.value = nextLocation
-    setCurrentLocation(nextLocation)
+    currentLocation.value = setCurrentLocation(nextLocation)
     ElMessage.success('已更新当前位置')
     await load()
   } catch {
@@ -230,8 +228,7 @@ async function autoLocate() {
 }
 
 async function confirmLocation(location) {
-  currentLocation.value = location
-  setCurrentLocation(location)
+  currentLocation.value = setCurrentLocation(location)
   locationDialogVisible.value = false
   if (!sort.value) {
     sort.value = 'distance'
@@ -302,6 +299,9 @@ function resetFilters() {
 }
 
 onMounted(async () => {
+  unsubscribeLocation = subscribeCurrentLocation((location) => {
+    currentLocation.value = location ? { ...location } : null
+  })
   restoreFiltersFromRoute()
   await loadAddresses()
   await load()
@@ -310,6 +310,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopProductSlideTimer()
+  unsubscribeLocation?.()
 })
 </script>
 

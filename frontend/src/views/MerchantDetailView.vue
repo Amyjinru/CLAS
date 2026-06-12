@@ -1,6 +1,6 @@
 ﻿<script setup>
 import BackButton from '../components/BackButton.vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listGroupedProducts, listProducts, removeFavorite } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
@@ -10,7 +10,7 @@ import { useChatStore } from '../composables/useChatStore'
 import { useCartActions } from '../composables/useCartActions'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
-import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
+import { getCurrentLocation, locationFromAddress, setCurrentLocation, subscribeCurrentLocation } from '../utils/locationStore'
 import { formatFen, formatDistance } from '../utils/formatters'
 
 const route = useRoute()
@@ -35,6 +35,7 @@ const selectedProduct = ref(null)
 const chatStore = useChatStore()
 const { cartMessage, increaseItem, decreaseItem, removeAll } = useCartActions()
 const message = cartMessage
+let unsubscribeLocation = null
 
 const merchantCartItems = computed(() =>
   cartItems.value.filter((item) => item.merchantId === merchantId.value)
@@ -200,24 +201,17 @@ async function load() {
 }
 
 async function ensureLocation() {
-  if (currentLocation.value?.longitude && currentLocation.value?.latitude) {
+  const storedLocation = getCurrentLocation()
+  if (storedLocation) {
+    currentLocation.value = storedLocation
     return
   }
   try {
     const addresses = await listAddresses({ silent: true })
     const address = addresses.find((item) => item.isDefault) || addresses[0]
-    if (address?.longitude && address?.latitude) {
-      currentLocation.value = {
-        province: '',
-        city: '',
-        district: '',
-        street: address.address,
-        address: address.address,
-        longitude: Number(address.longitude),
-        latitude: Number(address.latitude),
-        source: 'manual'
-      }
-      setCurrentLocation(currentLocation.value)
+    const defaultLocation = locationFromAddress(address)
+    if (defaultLocation) {
+      currentLocation.value = setCurrentLocation(defaultLocation)
     }
   } catch {
     currentLocation.value = null
@@ -237,8 +231,7 @@ async function autoLocate() {
         message.value = '自动定位失败，请手动选择位置'
         return
       }
-      currentLocation.value = await resolveAutoLocationFromAmap(AMap, result)
-      setCurrentLocation(currentLocation.value)
+      currentLocation.value = setCurrentLocation(await resolveAutoLocationFromAmap(AMap, result))
       await loadDeliveryEstimate()
     })
   } catch {
@@ -322,8 +315,7 @@ async function submitOrder() {
 }
 
 function confirmLocation(location) {
-  currentLocation.value = location
-  setCurrentLocation(location)
+  currentLocation.value = setCurrentLocation(location)
   locationDialogVisible.value = false
   loadDeliveryEstimate()
 }
@@ -355,7 +347,17 @@ async function toggleFavorite() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  unsubscribeLocation = subscribeCurrentLocation((location) => {
+    currentLocation.value = location ? { ...location } : null
+    loadDeliveryEstimate()
+  })
+  load()
+})
+
+onUnmounted(() => {
+  unsubscribeLocation?.()
+})
 
 watch(
   () => route.fullPath,
