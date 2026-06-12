@@ -771,14 +771,17 @@ watch(
   align-items: center;
   aspect-ratio: 1;
   background-position: center;
+  background-repeat: no-repeat;
   background-size: cover;
   border-radius: 8px;
   color: #9a3412;
   display: flex;
+  height: 112px;
   font-size: 30px;
   font-weight: 800;
   justify-content: center;
   overflow: hidden;
+  width: 112px;
 }
 
 .product-thumb.placeholder {
@@ -806,9 +809,13 @@ watch(
 }
 
 .product-desc {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--text-secondary);
+  display: -webkit-box;
   line-height: 1.6;
   margin: 0;
+  overflow: hidden;
 }
 
 .product-bottom {
@@ -1034,11 +1041,14 @@ button:disabled {
   }
 
   .product-card {
-    grid-template-columns: 1fr;
+    gap: 12px;
+    grid-template-columns: 96px 1fr;
+    padding: 12px;
   }
 
   .product-thumb {
-    max-height: 180px;
+    height: 96px;
+    width: 96px;
   }
 }
 </style>
