@@ -97,6 +97,30 @@ public class DealService {
         return deal;
     }
 
+    public GroupDeal updateMerchantDeal(Long dealId, com.clas.dto.DealRequest request) {
+        GroupDeal deal = groupDealMapper.selectById(dealId);
+        if (deal == null) {
+            throw new BusinessException("团购券不存在");
+        }
+        Long merchantId = merchantService.getCurrentMerchantId();
+        if (!merchantId.equals(deal.getMerchantId())) {
+            throw new BusinessException("只能修改自己店铺的团购");
+        }
+        String status = request.status() == null || request.status().isBlank() ? "ON_SALE" : request.status();
+        if (!"ON_SALE".equals(status) && !"OFF_SALE".equals(status)) {
+            throw new BusinessException("团购状态只能是 ON_SALE 或 OFF_SALE");
+        }
+        deal.setTitle(request.title());
+        deal.setDescription(request.description());
+        deal.setOriginalPrice(request.originalPrice());
+        deal.setDealPrice(request.dealPrice());
+        deal.setStock(request.stock());
+        deal.setValidDays(request.validDays());
+        deal.setStatus(status);
+        groupDealMapper.updateById(deal);
+        return deal;
+    }
+
     @Transactional
     public DealOrder buy(Long dealId) {
         penaltyService.assertCanUsePlatform(UserContext.getUserId());

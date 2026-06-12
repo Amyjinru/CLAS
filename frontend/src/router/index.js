@@ -25,6 +25,7 @@ const MerchantAnalyticsView = () => import('../views/MerchantAnalyticsView.vue')
 const MerchantProductsView = () => import('../views/MerchantProductsView.vue')
 const MerchantMessagesView = () => import('../views/MerchantMessagesView.vue')
 const MerchantDealsView = () => import('../views/MerchantDealsView.vue')
+const MerchantDealDetailView = () => import('../views/MerchantDealDetailView.vue')
 const MerchantBookingsView = () => import('../views/MerchantBookingsView.vue')
 const UserAnnouncementsView = () => import('../views/user/UserAnnouncementsView.vue')
 const NotificationsView = () => import('../views/user/NotificationsView.vue')
@@ -104,6 +105,7 @@ const routes = [
   { path: '/merchant/info', component: MerchantInfoView, meta: { roles: ['MERCHANT'], title: '商家信息' } },
   { path: '/merchant/audit-status', component: MerchantAuditStatusView, meta: { roles: ['MERCHANT'], title: '审核状态' } },
   { path: '/merchant/deals', component: MerchantDealsView, meta: { roles: ['MERCHANT'], title: '团购管理' } },
+  { path: '/merchant/deals/:id', component: MerchantDealDetailView, meta: { roles: ['MERCHANT'], title: '团购详情' } },
   { path: '/merchant/bookings', component: MerchantBookingsView, meta: { roles: ['MERCHANT'], title: '预约管理' } },
 
   { path: '/merchant-console', component: MerchantConsoleView, meta: { roles: ['MERCHANT'], title: '商家工作台' } },

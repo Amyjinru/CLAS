@@ -11,6 +11,10 @@ const emit = defineEmits(['reload'])
 
 const categoryForm = ref({ name: '', sortOrder: 0 })
 
+function normalizeSortOrder(value) {
+  return Math.max(0, Math.trunc(Number(value || 0)))
+}
+
 async function handleCreate() {
   if (!categoryForm.value.name.trim()) {
     ElMessage.warning('请填写分类名称')
@@ -18,7 +22,7 @@ async function handleCreate() {
   }
   await createProductCategory({
     name: categoryForm.value.name.trim(),
-    sortOrder: categoryForm.value.sortOrder
+    sortOrder: normalizeSortOrder(categoryForm.value.sortOrder)
   })
   ElMessage.success('分类已创建')
   categoryForm.value = { name: '', sortOrder: 0 }
@@ -29,7 +33,7 @@ async function handleUpdate(category) {
   await updateProductCategory({
     id: category.id,
     name: category.name,
-    sortOrder: category.sortOrder
+    sortOrder: normalizeSortOrder(category.sortOrder)
   })
   ElMessage.success('分类已保存')
   emit('reload')
@@ -57,7 +61,7 @@ async function handleDelete(category) {
 
     <div class="category-create-row">
       <el-input v-model="categoryForm.name" placeholder="分类名称，如 主食、饮品、小食" maxlength="50" />
-      <el-input-number v-model="categoryForm.sortOrder" :min="0" :step="1" />
+      <el-input-number v-model="categoryForm.sortOrder" :min="0" :precision="0" :step="1" step-strictly />
       <el-button type="primary" @click="handleCreate">添加分类</el-button>
     </div>
 
@@ -69,7 +73,7 @@ async function handleDelete(category) {
     >
       <div v-for="category in categories" :key="category.id" class="category-item">
         <el-input v-model="category.name" maxlength="50" />
-        <el-input-number v-model="category.sortOrder" :min="0" :step="1" />
+        <el-input-number v-model="category.sortOrder" :min="0" :precision="0" :step="1" step-strictly />
         <el-button type="primary" @click="handleUpdate(category)">保存</el-button>
         <el-button type="danger" @click="handleDelete(category)">删除</el-button>
       </div>

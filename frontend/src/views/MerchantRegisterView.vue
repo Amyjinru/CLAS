@@ -150,6 +150,10 @@ async function sendMerchantCode() {
 const cooldownText = computed(() => codeCooldown.value ? `${codeCooldown.value}秒后重发` : '发送验证码')
 const accountPhoneReady = computed(() => validPhone(form.accountPhone))
 
+function normalizeInteger(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
+  return Math.min(max, Math.max(min, Math.trunc(Number(value || 0))))
+}
+
 watch(() => form.accountPhone, (phone) => {
   if (phone.trim() !== lastSentAccountPhone.value) {
     form.code = ''
@@ -182,6 +186,10 @@ async function submitForm() {
     submitting.value = true
     try {
       const payload = { ...form }
+      payload.deliveryRadiusM = normalizeInteger(payload.deliveryRadiusM, 500, 10000)
+      if (payload.settlementCycle) {
+        payload.settlementCycle = normalizeInteger(payload.settlementCycle, 1, 90)
+      }
       if (!payload.bankAccount?.trim()) {
         delete payload.bankAccount
       }
@@ -366,7 +374,7 @@ onUnmounted(() => {
           </el-form-item>
 
           <el-form-item label="配送范围(米)" prop="deliveryRadiusM">
-            <el-input-number v-model="form.deliveryRadiusM" :min="500" :max="10000" :step="500" style="width: 100%" />
+            <el-input-number v-model="form.deliveryRadiusM" :min="500" :max="10000" :precision="0" :step="500" step-strictly style="width: 100%" />
           </el-form-item>
 
           <!-- 银行信息移至审核通过后补充 -->
@@ -383,7 +391,7 @@ onUnmounted(() => {
           </el-form-item>
 
           <el-form-item label="结算周期(天)" prop="settlementCycle">
-            <el-input-number v-model="form.settlementCycle" :min="1" :max="90" placeholder="选填" style="width: 100%" />
+            <el-input-number v-model="form.settlementCycle" :min="1" :max="90" :precision="0" :step="1" step-strictly placeholder="选填" style="width: 100%" />
           </el-form-item>
         </template>
 

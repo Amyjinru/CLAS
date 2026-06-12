@@ -1555,6 +1555,66 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void merchantCanUpdateOwnGroupDealOnly() throws Exception {
+        MvcResult createResult = mockMvc.perform(post("/api/deals/merchant")
+                .header("Authorization", auth(MERCHANT_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "title", "双人下午茶",
+                    "description", "含两杯饮品和甜点",
+                    "originalPrice", 8800,
+                    "dealPrice", 5200,
+                    "stock", 20,
+                    "validDays", 30,
+                    "status", "ON_SALE"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.title").value("双人下午茶"))
+            .andReturn();
+
+        Long dealId = objectMapper.readTree(createResult.getResponse().getContentAsString())
+            .path("data").path("id").asLong();
+
+        mockMvc.perform(put("/api/deals/merchant/" + dealId)
+                .header("Authorization", auth(MERCHANT_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "title", "双人下午茶升级版",
+                    "description", "含两杯饮品、甜点和小食",
+                    "originalPrice", 9800,
+                    "dealPrice", 5900,
+                    "stock", 12,
+                    "validDays", 45,
+                    "status", "OFF_SALE"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(dealId))
+            .andExpect(jsonPath("$.data.title").value("双人下午茶升级版"))
+            .andExpect(jsonPath("$.data.dealPrice").value(5900))
+            .andExpect(jsonPath("$.data.stock").value(12))
+            .andExpect(jsonPath("$.data.validDays").value(45))
+            .andExpect(jsonPath("$.data.status").value("OFF_SALE"));
+
+        String otherMerchantPhone = "13900007771";
+        registerMerchant(otherMerchantPhone, "deal_update_other", "团购修改测试商家", "13900007772");
+
+        mockMvc.perform(put("/api/deals/merchant/" + dealId)
+                .header("Authorization", auth(otherMerchantPhone))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "title", "越权修改",
+                    "description", "不应成功",
+                    "originalPrice", 1000,
+                    "dealPrice", 900,
+                    "stock", 1,
+                    "validDays", 1,
+                    "status", "ON_SALE"
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("只能修改自己店铺的团购"));
+    }
+
+    @Test
     void buyingGroupDealCreatesClickableDealOrderNotification() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/deals/1/buy")
                 .header("Authorization", auth(USER_PHONE)))

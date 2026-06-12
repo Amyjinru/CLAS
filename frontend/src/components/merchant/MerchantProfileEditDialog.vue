@@ -550,7 +550,9 @@ onUnmounted(() => {
             v-model="form.deliveryRadiusM"
             :min="500"
             :max="10000"
+            :precision="0"
             :step="500"
+            step-strictly
             style="width: 100%"
           />
         </el-form-item>
