@@ -322,7 +322,11 @@ public class OrderService {
 
     public Orders deliver(Long orderId, Long merchantId) {
         Orders order = requireMerchantOrder(orderId, merchantId);
-        requireStatus(order, STATUS_ACCEPTED);
+        requireStatusIn(order, STATUS_PAID, STATUS_ACCEPTED);
+        if (STATUS_PAID.equals(order.getStatus())) {
+            order.setStatus(STATUS_ACCEPTED);
+            order.setAcceptedAt(LocalDateTime.now());
+        }
         order.setDeliveryStatus("DELIVERING");
         order.setEstimatedMinutes(15);
         order.setDeliveredAt(LocalDateTime.now());

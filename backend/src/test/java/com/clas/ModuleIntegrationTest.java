@@ -1004,7 +1004,7 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
-            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
+            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
 
         mockMvc.perform(get("/api/product/list/1"))
             .andExpect(jsonPath("$.data[0].stock").value(29));
@@ -1022,10 +1022,6 @@ class ModuleIntegrationTest {
 
         mockMvc.perform(get("/api/product/list/1"))
             .andExpect(jsonPath("$.data[0].stock").value(29));
-
-        mockMvc.perform(post("/api/order/accept/" + orderId)
-                .header("Authorization", auth(MERCHANT_PHONE)))
-            .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
 
         mockMvc.perform(post("/api/order/complete/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
@@ -1088,12 +1084,7 @@ class ModuleIntegrationTest {
         mockMvc.perform(post("/api/order/pay/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
-
-        mockMvc.perform(post("/api/order/accept/" + orderId)
-                .header("Authorization", auth(MERCHANT_PHONE)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.acceptedAt").isString());
+            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
 
         mockMvc.perform(post("/api/order/deliver/" + orderId)
                 .header("Authorization", auth(MERCHANT_PHONE)))
@@ -1130,7 +1121,7 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
-            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"))
             .andExpect(jsonPath("$.data.idempotencyKey").value(key))
             .andReturn();
 
@@ -1148,7 +1139,7 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
-            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"))
             .andExpect(jsonPath("$.data.idempotencyKey").value(key))
             .andReturn();
 
@@ -1376,7 +1367,7 @@ class ModuleIntegrationTest {
                     "payMethod", "MOCK"
                 ))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
+            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
 
         UserCoupon used = userCouponMapper.selectById(userCouponId);
         assertEquals("USED", used.getStatus());
@@ -1722,9 +1713,6 @@ class ModuleIntegrationTest {
                     "userId", USER_PHONE,
                     "payMethod", "MOCK"
                 ))))
-            .andExpect(status().isOk());
-        mockMvc.perform(post("/api/order/accept/" + orderId)
-                .header("Authorization", auth(MERCHANT_PHONE)))
             .andExpect(status().isOk());
         mockMvc.perform(post("/api/order/complete/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))

@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -34,7 +34,7 @@ const statusMap = {
 // ===== version_314: 订单状态映射 =====
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
-  PAID: '已支付',
+  PAID: '已支付（自动接单中）',
   ACCEPTED: '商家已接单',
   COMPLETED: '已完成',
   CANCELED: '已取消',
@@ -108,24 +108,6 @@ async function load() {
   }
 }
 
-// ===== test1: 原有接单操作 =====
-async function handleAccept(orderId) {
-  try {
-    await acceptOrder(orderId)
-    ElMessage.success('已接单')
-    if (merchant.value) {
-      const [orderList, products] = await Promise.all([
-        listMerchantOrders(),
-        listProducts(merchant.value.id)
-      ])
-      orders.value = orderList
-      productNames.value = Object.fromEntries(products.map((p) => [p.id, p.name]))
-    }
-  } catch (error) {
-    // API client handles errors
-  }
-}
-
 async function handleReject(orderId) {
   try {
     const { value } = await ElMessageBox.prompt('请输入拒单理由', '拒单', {
@@ -188,7 +170,6 @@ async function handleRedeem() {
 
 // ===== version_314: 通用订单操作方法 =====
 async function operate(action, order) {
-  if (action === 'accept') await acceptOrder(order.order.id)
   if (action === 'reject') {
     await handleReject(order.order.id)
     return
@@ -289,7 +270,7 @@ onMounted(() => {
         <el-card v-if="merchant.status === 'OPEN'" class="box-card work-card">
           <template #header>
           <div class="card-header">
-            <h3>待接单管理 (营业中)</h3>
+            <h3>自动接单管理 (营业中)</h3>
           </div>
           </template>
 
@@ -348,18 +329,11 @@ onMounted(() => {
             <el-table-column label="操作" width="180" fixed="right">
               <template #default="scope">
                 <el-button
+                  type="primary"
                   size="small"
                   @click="openDetail(scope.row)"
                 >
                   查看详情
-                </el-button>
-                <el-button
-                  v-if="scope.row.order.status === 'PAID'"
-                  type="primary"
-                  size="small"
-                  @click="handleAccept(scope.row.order.id)"
-                >
-                  确认接单
                 </el-button>
                 <el-button
                   v-if="scope.row.order.status === 'PAID'"
@@ -370,7 +344,7 @@ onMounted(() => {
                   拒单
                 </el-button>
                 <el-button
-                  v-if="scope.row.order.status === 'ACCEPTED' && scope.row.order.deliveryStatus !== 'DELIVERING'"
+                  v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status) && scope.row.order.deliveryStatus !== 'DELIVERING'"
                   type="warning"
                   size="small"
                   @click="handleDeliver(scope.row.order.id)"
@@ -455,13 +429,6 @@ onMounted(() => {
             @click="openChat(selectedOrder)"
           >
             联系用户
-          </button>
-          <button
-            v-if="selectedOrder.order.status === 'PAID'"
-            type="button"
-            @click="operate('accept', selectedOrder)"
-          >
-            接单
           </button>
           <button
             v-if="selectedOrder.order.status === 'PAID'"
