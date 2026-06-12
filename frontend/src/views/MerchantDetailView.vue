@@ -65,6 +65,13 @@ const deliveryStatus = computed(() => {
     ? { type: 'success', label: '可配送' }
     : { type: 'danger', label: '超出配送范围' }
 })
+const browseBackTarget = computed(() => {
+  const from = Array.isArray(route.query.from) ? route.query.from[0] : route.query.from
+  return typeof from === 'string' && from.startsWith('/merchants') ? from : '/home'
+})
+const browseBackLabel = computed(() => (
+  browseBackTarget.value.startsWith('/merchants') ? '返回店铺列表' : '返回首页'
+))
 
 function moneyText(amount, fallback = '未设置') {
   if (amount === null || amount === undefined) return fallback
@@ -365,7 +372,7 @@ watch(
 
 <template>
   <div class="merchant-page">
-    <BackButton to="/home" label="返回首页" />
+    <BackButton :to="browseBackTarget" :label="browseBackLabel" />
 
     <section class="panel loading-panel" v-if="loading">
       <el-skeleton :rows="5" animated />

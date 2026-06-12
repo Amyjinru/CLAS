@@ -50,6 +50,13 @@ const resultText = computed(() => {
   return `共 ${merchants.value.length} 家店铺`
 })
 
+function merchantDetailTarget(merchantId) {
+  return {
+    path: `/merchant/${merchantId}`,
+    query: { from: route.fullPath }
+  }
+}
+
 function distanceText(distance) {
   if (distance === null || distance === undefined) return '距离未知'
   return formatDistance(distance)
@@ -87,18 +94,28 @@ function productPrice(product) {
   return `¥${((product?.price || 0) / 100).toFixed(2)}`
 }
 
-function activeProduct(merchantId) {
+function activeProducts(merchantId) {
   const products = merchantProducts.value[merchantId] || []
-  if (!products.length) return null
+  if (!products.length) return []
   const index = productSlideIndexes.value[merchantId] || 0
-  return products[index % products.length]
+  const visibleCount = Math.min(3, products.length)
+  return Array.from({ length: visibleCount }, (_, offset) => products[(index + offset) % products.length])
+}
+
+function activeProductGroupKey(merchantId) {
+  return activeProducts(merchantId).map((product) => product.id).join('-')
 }
 
 function activeProductPosition(merchantId) {
   const products = merchantProducts.value[merchantId] || []
   if (!products.length) return ''
-  const index = (productSlideIndexes.value[merchantId] || 0) % products.length
-  return `${index + 1} / ${products.length}`
+  const startIndex = (productSlideIndexes.value[merchantId] || 0) % products.length
+  const visibleCount = Math.min(3, products.length)
+  const endIndex = (startIndex + visibleCount - 1) % products.length
+  const rangeText = startIndex <= endIndex
+    ? `${startIndex + 1}-${endIndex + 1}`
+    : `${startIndex + 1}-${products.length}, 1-${endIndex + 1}`
+  return `${rangeText} / ${products.length}`
 }
 
 function resetProductSlideIndexes(items) {
@@ -110,8 +127,8 @@ function startProductSlideTimer() {
   productSlideTimer = window.setInterval(() => {
     const nextIndexes = { ...productSlideIndexes.value }
     Object.entries(merchantProducts.value).forEach(([merchantId, products]) => {
-      if (!Array.isArray(products) || products.length <= 1) return
-      nextIndexes[merchantId] = ((nextIndexes[merchantId] || 0) + 1) % products.length
+      if (!Array.isArray(products) || products.length <= 3) return
+      nextIndexes[merchantId] = ((nextIndexes[merchantId] || 0) + 3) % products.length
     })
     productSlideIndexes.value = nextIndexes
   }, 3000)
@@ -372,13 +389,19 @@ onUnmounted(() => {
           <div class="product-strip" :class="{ loading: productsLoading }">
             <Transition name="product-rotate" mode="out-in">
               <div
-                v-if="activeProduct(merchant.id)"
-                :key="activeProduct(merchant.id)?.id"
-                class="product-chip product-feature"
+                v-if="activeProducts(merchant.id).length"
+                :key="activeProductGroupKey(merchant.id)"
+                class="product-group"
               >
-                <span class="product-label">主售</span>
-                <span class="product-name">{{ activeProduct(merchant.id).name }}</span>
-                <strong>{{ productPrice(activeProduct(merchant.id)) }}</strong>
+                <div
+                  v-for="(product, productIndex) in activeProducts(merchant.id)"
+                  :key="product.id"
+                  class="product-chip product-feature"
+                >
+                  <span v-if="productIndex === 0" class="product-label">主售</span>
+                  <span class="product-name">{{ product.name }}</span>
+                  <strong>{{ productPrice(product) }}</strong>
+                </div>
                 <span class="product-position">{{ activeProductPosition(merchant.id) }}</span>
               </div>
             </Transition>
@@ -389,7 +412,7 @@ onUnmounted(() => {
         </div>
 
         <div class="merchant-action">
-          <RouterLink class="button enter-button" :to="`/merchant/${merchant.id}`">进入商家</RouterLink>
+          <RouterLink class="button enter-button" :to="merchantDetailTarget(merchant.id)">进入商家</RouterLink>
         </div>
       </article>
     </section>
@@ -586,9 +609,19 @@ onUnmounted(() => {
   display: flex;
   gap: 8px;
   margin-top: 12px;
-  min-height: 44px;
+  min-height: 46px;
   overflow: hidden;
   position: relative;
+}
+
+.product-group {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  max-width: 100%;
+  min-height: 38px;
+  width: min(100%, 720px);
 }
 
 .product-chip {
@@ -597,17 +630,14 @@ onUnmounted(() => {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   display: inline-flex;
-  flex: 0 0 auto;
   gap: 8px;
-  max-width: 220px;
   min-height: 36px;
+  min-width: 0;
   padding: 7px 10px;
 }
 
 .product-feature {
   box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.08);
-  max-width: min(100%, 420px);
-  min-width: min(100%, 300px);
 }
 
 .product-label,
@@ -629,12 +659,12 @@ onUnmounted(() => {
   background: #fff;
   border: 1px solid var(--border-light);
   color: var(--text-muted);
-  margin-left: auto;
+  white-space: nowrap;
 }
 
 .product-name {
   color: var(--text-main);
-  max-width: 180px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -712,6 +742,10 @@ onUnmounted(() => {
     grid-column: 2;
     justify-content: flex-start;
   }
+
+  .product-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  }
 }
 
 @media (max-width: 640px) {
@@ -745,12 +779,13 @@ onUnmounted(() => {
     flex-direction: column;
   }
 
-  .product-feature {
-    min-width: 100%;
+  .product-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .product-name {
-    max-width: 120px;
+  .product-position {
+    grid-column: 1 / -1;
+    justify-self: flex-start;
   }
 
   .merchant-tags {
