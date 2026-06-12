@@ -16,11 +16,11 @@ export const getMerchantMessages = (merchantId) =>
 export const consultMerchant = (merchantId, content) =>
   api.post(`/chat/consult/${merchantId}`, { content }).then(unwrap)
 
-export const getMessagesWithMerchant = (merchantId, userId) =>
-  api.get(`/chat/with/${merchantId}`, { params: userId ? { userId } : undefined }).then(unwrap)
+export const getMessagesWithMerchant = (merchantId, userId, config = {}) =>
+  api.get(`/chat/with/${merchantId}`, { ...config, params: userId ? { userId } : undefined }).then(unwrap)
 
-export const getConversations = () =>
-  api.get('/chat/conversations').then(unwrap)
+export const getConversations = (config = {}) =>
+  api.get('/chat/conversations', config).then(unwrap)
 
 export const getAdminChatMerchants = () =>
   api.get('/chat/admin/merchants').then(unwrap)

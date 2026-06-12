@@ -14,9 +14,9 @@ const polling = ref(null)
 const loading = ref(false)
 
 export function useChatStore() {
-  async function loadConversations() {
+  async function loadConversations(options = {}) {
     try {
-      conversations.value = await getConversations()
+      conversations.value = await getConversations({ silent: options.silent })
     } catch {
       conversations.value = []
     }
@@ -75,18 +75,24 @@ export function useChatStore() {
     startPolling()
   }
 
-  async function loadMessages() {
+  async function loadMessages(options = {}) {
     if (!activeMerchantId.value) {
       activeMessages.value = []
       return
     }
-    loading.value = true
+    if (options.showLoading !== false) {
+      loading.value = true
+    }
     try {
-      activeMessages.value = await getMessagesWithMerchant(activeMerchantId.value, activeUserId.value)
+      activeMessages.value = await getMessagesWithMerchant(activeMerchantId.value, activeUserId.value, { silent: options.silent })
     } catch {
-      activeMessages.value = []
+      if (options.showLoading !== false) {
+        activeMessages.value = []
+      }
     } finally {
-      loading.value = false
+      if (options.showLoading !== false) {
+        loading.value = false
+      }
     }
   }
 
@@ -115,8 +121,8 @@ export function useChatStore() {
   function startPolling() {
     stopPolling()
     polling.value = window.setInterval(() => {
-      loadMessages()
-      loadConversations()
+      loadMessages({ showLoading: false, silent: true })
+      loadConversations({ silent: true })
     }, 3000)
   }
 

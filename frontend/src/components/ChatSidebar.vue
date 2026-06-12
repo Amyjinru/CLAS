@@ -270,7 +270,9 @@ watch(
   border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   min-width: 0;
+  overflow-y: auto;
   padding: 14px 8px;
 }
 
@@ -384,6 +386,7 @@ watch(
 .chat-main {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -440,6 +443,7 @@ watch(
 .chat-message-body {
   background: #fff;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 14px;
 }
@@ -492,7 +496,9 @@ watch(
   border-top: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
+  flex: 0 1 45%;
   max-height: 45%;
+  min-height: 120px;
   overflow: hidden;
 }
 
@@ -512,6 +518,7 @@ watch(
 
 .user-orders-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 10px 14px;
 }
@@ -557,6 +564,7 @@ watch(
   align-items: flex-end;
   border-top: 1px solid #e5e7eb;
   display: flex;
+  flex: 0 0 auto;
   gap: 8px;
   padding: 10px;
 }

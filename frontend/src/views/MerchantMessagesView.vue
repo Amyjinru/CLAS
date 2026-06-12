@@ -50,26 +50,32 @@ onMounted(async () => {
 onUnmounted(() => stopPolling())
 
 // ── Data loading ──
-async function loadConversations() {
+async function loadConversations(options = {}) {
   try {
-    conversations.value = await getConversations()
+    conversations.value = await getConversations({ silent: options.silent })
   } catch {
     conversations.value = []
   }
 }
 
-async function loadMessages() {
+async function loadMessages(options = {}) {
   if (!merchant.value?.id || !activeUserId.value) {
     messages.value = []
     return
   }
-  loading.value = true
+  if (options.showLoading !== false) {
+    loading.value = true
+  }
   try {
-    messages.value = await getMessagesWithMerchant(merchant.value.id, activeUserId.value)
+    messages.value = await getMessagesWithMerchant(merchant.value.id, activeUserId.value, { silent: options.silent })
   } catch {
-    messages.value = []
+    if (options.showLoading !== false) {
+      messages.value = []
+    }
   } finally {
-    loading.value = false
+    if (options.showLoading !== false) {
+      loading.value = false
+    }
   }
 }
 
@@ -93,8 +99,8 @@ function onMerchantProfileSaved(nextMerchant) {
 function startPolling() {
   stopPolling()
   polling.value = window.setInterval(() => {
-    loadMessages()
-    loadConversations()
+    loadMessages({ showLoading: false, silent: true })
+    loadConversations({ silent: true })
   }, 3000)
 }
 
@@ -417,6 +423,7 @@ watch(() => messages.value.length, () => scrollToBottom())
 .chat-pane {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -458,6 +465,7 @@ watch(() => messages.value.length, () => scrollToBottom())
 
 .chat-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 14px;
 }
@@ -516,7 +524,9 @@ watch(() => messages.value.length, () => scrollToBottom())
   border-top: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
+  flex: 0 1 45%;
   max-height: 45%;
+  min-height: 120px;
   overflow: hidden;
 }
 
@@ -549,6 +559,7 @@ watch(() => messages.value.length, () => scrollToBottom())
 
 .orders-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 10px 14px;
 }
@@ -591,6 +602,7 @@ watch(() => messages.value.length, () => scrollToBottom())
   align-items: flex-end;
   border-top: 1px solid #e5e7eb;
   display: flex;
+  flex: 0 0 auto;
   gap: 8px;
   padding: 10px;
 }
