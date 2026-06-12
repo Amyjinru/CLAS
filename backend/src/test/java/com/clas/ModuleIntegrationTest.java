@@ -295,6 +295,40 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void existingUserCanRegisterMerchantByVerifyingAccountPhone() throws Exception {
+        String phone = "13900000036";
+        registerUser(phone, "existing_merchant_applicant", STRONG_PASSWORD);
+
+        mockMvc.perform(post("/api/merchant/register/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", phone))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(post("/api/merchant/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.ofEntries(
+                    Map.entry("accountPhone", phone),
+                    Map.entry("code", TEST_CODE),
+                    Map.entry("password", STRONG_PASSWORD),
+                    Map.entry("merchantName", "已注册用户入驻商家"),
+                    Map.entry("contactPhone", "13900000037"),
+                    Map.entry("category", "美食"),
+                    Map.entry("address", "测试地址 4 号"),
+                    Map.entry("longitude", 116.390000),
+                    Map.entry("latitude", 39.910000),
+                    Map.entry("deliveryRadiusM", 3000),
+                    Map.entry("bankAccount", "123456782"),
+                    Map.entry("settlementCycle", 7)
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.userId").value(phone))
+            .andExpect(jsonPath("$.data.phone").value("13900000037"))
+            .andExpect(jsonPath("$.data.status").value("PENDING"));
+    }
+
+    @Test
     void merchantCanChangeBoundLoginPhoneAndKeepMerchantProfile() throws Exception {
         String oldPhone = "13900000032";
         String newPhone = "13900000033";
