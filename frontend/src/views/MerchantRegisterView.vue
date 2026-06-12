@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { registerMerchant, currentUser, sendRegisterCode, setSessionUser } from '../api/clas'
 import { ElMessage } from 'element-plus'
 import LocationSelector from '../components/LocationSelector.vue'
+import { passwordChecks } from '../utils/passwordRules'
 
 const router = useRouter()
 const user = ref(null)
@@ -70,13 +71,6 @@ const phonePattern = /^1[3-9]\d{9}$/
 
 function validPhone(phone) {
   return phonePattern.test((phone || '').trim())
-}
-
-function passwordChecks(password) {
-  const value = password || ''
-  return [
-    { key: 'length', label: '不少于8位', ok: value.length >= 8 }
-  ]
 }
 
 const merchantPasswordChecks = computed(() => passwordChecks(form.password))
@@ -309,7 +303,7 @@ onUnmounted(() => {
           </el-form-item>
 
           <el-form-item label="登录密码" prop="password">
-            <el-input v-model="form.password" type="password" show-password placeholder="至少8位" />
+            <el-input v-model="form.password" type="password" show-password placeholder="至少6位" />
             <ul class="password-checks">
               <li
                 v-for="item in merchantPasswordChecks"

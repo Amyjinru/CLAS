@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { login, register, sendRegisterCode, setSessionUser, currentRole } from '../api/clas'
+import { passwordChecks, passwordRuleMessage, passwordStrength as calculatePasswordStrength } from '../utils/passwordRules'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,14 +38,6 @@ function validPhone(phone) {
   return phonePattern.test((phone || '').trim())
 }
 
-function passwordChecks(password) {
-  const value = password || ''
-  // 根据 NIST 800-63 最新指南，B2C 场景只需长度限制，降低注册摩擦
-  return [
-    { key: 'length', label: '不少于8位', ok: value.length >= 8 }
-  ]
-}
-
 async function submitLogin() {
   if (!validPhone(loginForm.phone)) {
     showMessage('请输入正确的手机号', 'error')
@@ -78,16 +71,8 @@ const showRegPassword = ref(false)
 const showRegConfirmPassword = ref(false)
 const registerPasswordChecks = computed(() => passwordChecks(registerForm.password))
 const registerPasswordOk = computed(() => registerPasswordChecks.value.every((item) => item.ok))
-// 密码强度等级（0-3）：长度 → 含数字 → 含大小写 → 含特殊符号
-const passwordStrength = computed(() => {
-  const pwd = registerForm.password || ''
-  let score = 0
-  if (pwd.length >= 8) score++
-  if (/\d/.test(pwd)) score++
-  if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++
-  if (/[\W_]/.test(pwd) && !/\s/.test(pwd)) score++
-  return score
-})
+// 密码强度等级（0-4）：长度 → 含数字 → 含大小写 → 含特殊符号且无空白
+const passwordStrength = computed(() => calculatePasswordStrength(registerForm.password))
 const strengthLabel = computed(() => {
   const labels = ['', '较弱', '中等', '良好', '强']
   return labels[passwordStrength.value] || '强'
@@ -273,7 +258,7 @@ function switchTab(tab) {
               id="reg-password"
               v-model="registerForm.password"
               :type="showRegPassword ? 'text' : 'password'"
-              placeholder="至少8位"
+              placeholder="至少6位"
               autocomplete="new-password"
             />
             <button
@@ -306,7 +291,7 @@ function switchTab(tab) {
             </div>
             <span class="strength-label" :style="{ color: strengthColor }">{{ strengthLabel }}</span>
           </div>
-          <p v-else class="password-hint-text">至少8位，建议包含数字、大小写字母和符号</p>
+          <p v-else class="password-hint-text">{{ passwordRuleMessage }}</p>
         </div>
 
         <div class="form-group">

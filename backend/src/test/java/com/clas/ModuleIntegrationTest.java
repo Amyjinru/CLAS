@@ -1206,6 +1206,32 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void mineBackfillsLegacyOrderNotificationTarget() throws Exception {
+        Long orderId = createCompletedOrder();
+
+        Notification legacy = new Notification();
+        legacy.setUserId(USER_PHONE);
+        legacy.setTitle("订单已完成");
+        legacy.setContent("订单 " + orderId + " 已完成，欢迎评价本次体验。");
+        legacy.setReadFlag(false);
+        legacy.setCreatedAt(LocalDateTime.now());
+        notificationMapper.insert(legacy);
+
+        mockMvc.perform(get("/api/notifications/mine")
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].targetType").value("ORDER"))
+            .andExpect(jsonPath("$.data[0].orderId").value(orderId))
+            .andExpect(jsonPath("$.data[0].targetPath").value("/order/" + orderId));
+
+        Notification updated = notificationMapper.selectById(legacy.getId());
+        assertEquals("ORDER_STATUS", updated.getType());
+        assertEquals("ORDER", updated.getTargetType());
+        assertEquals(orderId, updated.getOrderId());
+        assertEquals("/order/" + orderId, updated.getTargetPath());
+    }
+
+    @Test
     void couponIsReservedReleasedAndUsedAcrossOrderLifecycle() throws Exception {
         MvcResult claimResult = mockMvc.perform(post("/api/coupon/claim/1")
                 .header("Authorization", auth(USER_PHONE)))
