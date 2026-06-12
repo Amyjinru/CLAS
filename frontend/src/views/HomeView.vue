@@ -477,7 +477,10 @@ onMounted(async () => {
         <section class="panel result-panel">
           <div class="section-head">
             <h2>附近商家</h2>
-            <span>{{ resultSummary }}</span>
+            <div class="nearby-actions">
+              <span>{{ resultSummary }}</span>
+              <RouterLink class="button secondary view-shops-btn" to="/merchants">查看店铺</RouterLink>
+            </div>
           </div>
           <div class="filter-tags" v-if="activeFilters.length">
             <el-tag v-for="filter in activeFilters" :key="filter.key" effect="plain">
@@ -762,6 +765,19 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.nearby-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.view-shops-btn {
+  min-height: 32px;
+  padding: 6px 12px;
 }
 
 .hero-actions {

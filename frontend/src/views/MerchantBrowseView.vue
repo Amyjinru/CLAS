@@ -1,0 +1,506 @@
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { listAddresses, listMerchants, listProducts } from '../api/clas'
+import { formatDistance } from '../utils/formatters'
+import { getCurrentLocation } from '../utils/locationStore'
+
+defineOptions({
+  name: 'MerchantBrowseView'
+})
+
+const merchants = ref([])
+const merchantProducts = ref({})
+const addresses = ref([])
+const currentLocation = ref(getCurrentLocation())
+const keyword = ref('')
+const category = ref('')
+const sort = ref('recommend')
+const onlyDeliverable = ref(false)
+const loading = ref(false)
+const productsLoading = ref(false)
+
+const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
+const sortOptions = [
+  { label: '智能推荐', value: 'recommend' },
+  { label: '距离最近', value: 'distance' },
+  { label: '评分优先', value: 'score' },
+  { label: '人均低价', value: 'price' },
+  { label: '最新入驻', value: 'latest' }
+]
+
+const hasSearchLocation = computed(() => Boolean(
+  currentLocation.value?.longitude && currentLocation.value?.latitude
+))
+
+const resultText = computed(() => {
+  if (loading.value) return '正在加载店铺'
+  return `共 ${merchants.value.length} 家店铺`
+})
+
+function distanceText(distance) {
+  if (distance === null || distance === undefined) return '距离未知'
+  return formatDistance(distance)
+}
+
+function merchantInitial(merchant) {
+  return (merchant?.merchantName || merchant?.category || '店').slice(0, 1)
+}
+
+function merchantOpenStatus(merchant) {
+  if (!merchant || merchant.status !== 'OPEN') return { label: '未营业', type: 'info' }
+  if (merchant.manualClosed) return { label: '已打烊', type: 'info' }
+  const hoursText = merchant.businessHours
+  if (!hoursText || !hoursText.includes('-')) return { label: '营业中', type: 'success' }
+  const [startText, endText] = hoursText.split('-').map((item) => item.trim())
+  const start = parseBusinessMinutes(startText)
+  const end = parseBusinessMinutes(endText)
+  if (start === null || end === null || start === end) return { label: '营业中', type: 'success' }
+  const nowDate = new Date()
+  const now = nowDate.getHours() * 60 + nowDate.getMinutes()
+  const open = start < end ? now >= start && now < end : now >= start || now < end
+  return { label: open ? '营业中' : '已打烊', type: open ? 'success' : 'info' }
+}
+
+function parseBusinessMinutes(value) {
+  const match = /^(\d{2}):(\d{2})$/.exec((value || '').trim())
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+function productPrice(product) {
+  return `¥${((product?.price || 0) / 100).toFixed(2)}`
+}
+
+async function loadAddresses() {
+  try {
+    addresses.value = await listAddresses({ silent: true })
+    if (!currentLocation.value) {
+      const defaultAddress = addresses.value.find((item) => item.isDefault) || addresses.value[0]
+      if (defaultAddress?.longitude && defaultAddress?.latitude) {
+        currentLocation.value = {
+          address: defaultAddress.address,
+          longitude: Number(defaultAddress.longitude),
+          latitude: Number(defaultAddress.latitude),
+          source: 'manual'
+        }
+      }
+    }
+  } catch {
+    addresses.value = []
+  }
+}
+
+function queryParams() {
+  const params = {
+    keyword: keyword.value.trim() || undefined,
+    category: category.value || undefined,
+    sort: sort.value || 'recommend'
+  }
+  if ((sort.value === 'distance' || onlyDeliverable.value) && hasSearchLocation.value) {
+    params.lng = currentLocation.value.longitude
+    params.lat = currentLocation.value.latitude
+  }
+  if (onlyDeliverable.value && hasSearchLocation.value) {
+    params.onlyDeliverable = true
+  }
+  return params
+}
+
+async function loadMerchantProducts(items) {
+  productsLoading.value = true
+  const next = {}
+  try {
+    await Promise.all(items.map(async (merchant) => {
+      try {
+        const products = await listProducts(merchant.id)
+        next[merchant.id] = products
+          .filter((product) => product.status !== 'OFF_SALE')
+          .slice(0, 8)
+      } catch {
+        next[merchant.id] = []
+      }
+    }))
+    merchantProducts.value = next
+  } finally {
+    productsLoading.value = false
+  }
+}
+
+async function load() {
+  if (onlyDeliverable.value && !hasSearchLocation.value) {
+    onlyDeliverable.value = false
+    ElMessage.warning('请先选择带坐标的位置后再筛选可配送')
+  }
+  loading.value = true
+  try {
+    const data = await listMerchants(queryParams())
+    merchants.value = data
+    await loadMerchantProducts(data)
+  } finally {
+    loading.value = false
+  }
+}
+
+function resetFilters() {
+  keyword.value = ''
+  category.value = ''
+  sort.value = 'recommend'
+  onlyDeliverable.value = false
+  load()
+}
+
+onMounted(async () => {
+  await loadAddresses()
+  await load()
+})
+</script>
+
+<template>
+  <div class="merchant-browser">
+    <section class="browse-toolbar">
+      <div class="toolbar-copy">
+        <p>{{ resultText }}</p>
+        <h1>查看店铺</h1>
+      </div>
+      <div class="toolbar-controls">
+        <el-input
+          v-model="keyword"
+          class="toolbar-search"
+          placeholder="搜索店铺名称"
+          clearable
+          @clear="load"
+          @keyup.enter="load"
+        />
+        <el-select v-model="category" class="toolbar-select" placeholder="分类" clearable @change="load">
+          <el-option v-for="item in categories" :key="item" :label="item" :value="item" />
+        </el-select>
+        <el-select v-model="sort" class="toolbar-select" placeholder="排序" @change="load">
+          <el-option v-for="item in sortOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+        <el-checkbox v-model="onlyDeliverable" :disabled="!hasSearchLocation" @change="load">可配送</el-checkbox>
+        <el-button type="primary" @click="load">搜索</el-button>
+        <el-button @click="resetFilters">重置</el-button>
+      </div>
+      <p class="location-line">
+        参考位置：{{ currentLocation?.address || '未定位' }}
+      </p>
+    </section>
+
+    <section class="merchant-list" v-loading="loading">
+      <article v-for="merchant in merchants" :key="merchant.id" class="merchant-row">
+        <div class="merchant-avatar">
+          <img v-if="merchant.logo" :src="merchant.logo" :alt="merchant.merchantName" />
+          <span v-else>{{ merchantInitial(merchant) }}</span>
+        </div>
+
+        <div class="merchant-main">
+          <div class="merchant-head">
+            <div>
+              <h2>{{ merchant.merchantName }}</h2>
+              <p>{{ merchant.address }}</p>
+            </div>
+            <div class="merchant-tags">
+              <el-tag :type="merchantOpenStatus(merchant).type" effect="plain">
+                {{ merchantOpenStatus(merchant).label }}
+              </el-tag>
+              <el-tag v-if="merchant.deliveryAvailable === true" type="success" effect="plain">可配送</el-tag>
+              <el-tag v-else-if="merchant.deliveryAvailable === false" type="danger" effect="plain">超出范围</el-tag>
+            </div>
+          </div>
+
+          <div class="merchant-meta">
+            <span>评分 {{ Number(merchant.score || 0).toFixed(1) }}</span>
+            <span>人均 ¥{{ ((merchant.averagePrice || 0) / 100).toFixed(0) }}</span>
+            <span>{{ distanceText(merchant.routeDistanceMeters || merchant.distanceMeters) }}</span>
+            <span v-if="merchant.estimatedMinutes">约 {{ merchant.estimatedMinutes }} 分钟</span>
+          </div>
+
+          <div class="product-strip" :class="{ loading: productsLoading }">
+            <div
+              v-for="product in merchantProducts[merchant.id] || []"
+              :key="product.id"
+              class="product-chip"
+            >
+              <span class="product-name">{{ product.name }}</span>
+              <strong>{{ productPrice(product) }}</strong>
+            </div>
+            <div v-if="!productsLoading && !(merchantProducts[merchant.id] || []).length" class="product-empty">
+              暂无上架商品
+            </div>
+          </div>
+        </div>
+
+        <div class="merchant-action">
+          <RouterLink class="button enter-button" :to="`/merchant/${merchant.id}`">进入商家</RouterLink>
+        </div>
+      </article>
+    </section>
+
+    <section v-if="!loading && !merchants.length" class="empty-panel">
+      <el-empty description="没有找到符合条件的店铺">
+        <el-button type="primary" @click="resetFilters">清空条件</el-button>
+      </el-empty>
+    </section>
+  </div>
+</template>
+
+<style scoped>
+.merchant-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.browse-toolbar {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 250, 242, 0.92)),
+    radial-gradient(circle at top right, rgba(57, 159, 125, 0.15), transparent 38%);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.toolbar-copy p {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.toolbar-copy h1 {
+  color: var(--text-main);
+  font-size: 28px;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.toolbar-controls {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) 150px 150px auto auto auto;
+}
+
+.toolbar-search,
+.toolbar-select {
+  width: 100%;
+}
+
+.location-line {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.merchant-list {
+  display: grid;
+  gap: 12px;
+  min-height: 240px;
+}
+
+.merchant-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 92px minmax(0, 1fr) 120px;
+  min-height: 144px;
+  padding: 16px;
+}
+
+.merchant-avatar {
+  align-items: center;
+  background: linear-gradient(135deg, #f86f45, #36a57f);
+  border-radius: 18px;
+  color: #fff;
+  display: flex;
+  font-size: 30px;
+  font-weight: 800;
+  height: 92px;
+  justify-content: center;
+  overflow: hidden;
+  width: 92px;
+}
+
+.merchant-avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.merchant-main {
+  min-width: 0;
+}
+
+.merchant-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.merchant-head h2 {
+  color: var(--text-main);
+  font-size: 20px;
+  letter-spacing: 0;
+  margin: 0 0 4px;
+}
+
+.merchant-head p {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.merchant-tags {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.merchant-meta {
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.product-strip {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  min-height: 42px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.product-chip {
+  align-items: center;
+  background: var(--clas-warm-50);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  max-width: 220px;
+  min-height: 36px;
+  padding: 7px 10px;
+}
+
+.product-name {
+  color: var(--text-main);
+  max-width: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-chip strong {
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.product-empty {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  font-size: 13px;
+  min-height: 36px;
+}
+
+.merchant-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.enter-button {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 42px;
+  min-width: 100px;
+}
+
+.empty-panel {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 34px;
+}
+
+@media (max-width: 980px) {
+  .toolbar-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .merchant-row {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .merchant-avatar {
+    border-radius: 14px;
+    height: 72px;
+    width: 72px;
+  }
+
+  .merchant-action {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .browse-toolbar {
+    padding: 14px;
+  }
+
+  .toolbar-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .merchant-row {
+    align-items: flex-start;
+    grid-template-columns: 58px minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .merchant-avatar {
+    border-radius: 12px;
+    font-size: 22px;
+    height: 58px;
+    width: 58px;
+  }
+
+  .merchant-head {
+    flex-direction: column;
+  }
+
+  .merchant-tags {
+    justify-content: flex-start;
+  }
+
+  .merchant-action {
+    grid-column: 1 / -1;
+  }
+
+  .enter-button {
+    width: 100%;
+  }
+}
+</style>

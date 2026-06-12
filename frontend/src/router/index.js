@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 const LoginView = () => import('../views/LoginView.vue')
 const ForgotPasswordView = () => import('../views/ForgotPasswordView.vue')
 const HomeView = () => import('../views/HomeView.vue')
+const MerchantBrowseView = () => import('../views/MerchantBrowseView.vue')
 const MerchantDetailView = () => import('../views/MerchantDetailView.vue')
 const CartView = () => import('../views/CartView.vue')
 const OrdersView = () => import('../views/OrdersView.vue')
@@ -60,6 +61,7 @@ const routes = [
   { path: '/login', component: LoginView, meta: { public: true, title: '登录' } },
   { path: '/forgot-password', component: ForgotPasswordView, meta: { public: true, title: '忘记密码' } },
   { path: '/home', component: HomeView, meta: { roles: ['USER'], userPortal: true, title: '浏览商家' } },
+  { path: '/merchants', component: MerchantBrowseView, meta: { roles: ['USER'], userPortal: true, title: '查看店铺' } },
   { path: '/merchant/:id', component: MerchantDetailView, meta: { roles: ['USER'], userPortal: true, title: '商家详情' } },
 
   { path: '/cart', component: CartView, meta: { roles: ['USER'], title: '购物车' } },
