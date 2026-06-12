@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, rejectOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -127,12 +127,6 @@ async function handleReject(orderId) {
       ElMessage.error('拒单失败')
     }
   }
-}
-
-async function handleDeliver(orderId) {
-  await deliverOrder(orderId)
-  ElMessage.success('订单已标记为配送中')
-  await load()
 }
 
 async function handleRefund(orderId, approved) {
@@ -342,14 +336,6 @@ onMounted(() => {
                   @click="handleReject(scope.row.order.id)"
                 >
                   拒单
-                </el-button>
-                <el-button
-                  v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status) && scope.row.order.deliveryStatus !== 'DELIVERING'"
-                  type="warning"
-                  size="small"
-                  @click="handleDeliver(scope.row.order.id)"
-                >
-                  配送中
                 </el-button>
                 <el-button
                   v-if="scope.row.order.status === 'REFUND_PENDING'"
