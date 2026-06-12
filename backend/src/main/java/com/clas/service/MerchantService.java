@@ -17,8 +17,12 @@ import com.clas.entity.Merchant;
 import com.clas.entity.MerchantAuditLog;
 import com.clas.entity.User;
 import com.clas.entity.UserAddress;
+import com.clas.entity.Orders;
+import com.clas.entity.Product;
 import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.MerchantAuditLogMapper;
+import com.clas.mapper.OrdersMapper;
+import com.clas.mapper.ProductMapper;
 import com.clas.mapper.UserAddressMapper;
 import com.clas.mapper.UserMapper;
 import com.clas.config.UserContext;
@@ -28,18 +32,27 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 public class MerchantService {
+    private static final int COMPLETED_ORDER_THRESHOLD = 10;
+    private static final String ORDER_STATUS_COMPLETED = "COMPLETED";
+    private static final String PRODUCT_STATUS_DELETED = "DELETED";
+
     private final MerchantMapper merchantMapper;
     private final MerchantAuditLogMapper merchantAuditLogMapper;
     private final UserMapper userMapper;
     private final UserAddressMapper userAddressMapper;
+    private final OrdersMapper ordersMapper;
+    private final ProductMapper productMapper;
     private final VerificationCodeStore verificationCodeStore;
     private final AmapRouteService amapRouteService;
     private final RecommendService recommendService;
@@ -50,6 +63,8 @@ public class MerchantService {
         MerchantAuditLogMapper merchantAuditLogMapper,
         UserMapper userMapper,
         UserAddressMapper userAddressMapper,
+        OrdersMapper ordersMapper,
+        ProductMapper productMapper,
         VerificationCodeStore verificationCodeStore,
         AmapRouteService amapRouteService,
         RecommendService recommendService,
@@ -59,6 +74,8 @@ public class MerchantService {
         this.merchantAuditLogMapper = merchantAuditLogMapper;
         this.userMapper = userMapper;
         this.userAddressMapper = userAddressMapper;
+        this.ordersMapper = ordersMapper;
+        this.productMapper = productMapper;
         this.verificationCodeStore = verificationCodeStore;
         this.amapRouteService = amapRouteService;
         this.recommendService = recommendService;
@@ -107,6 +124,8 @@ public class MerchantService {
             wrapper.orderByDesc(Merchant::getScore);
         }
         List<Merchant> merchants = merchantMapper.selectList(wrapper);
+        refreshAveragePrices(merchants.stream().map(Merchant::getId).toList());
+        merchants = merchantMapper.selectList(wrapper);
         if (recommendSort && !distanceSort) {
             merchants = recommendService.sortByRecommend(merchants, UserContext.getUserId());
         }
@@ -144,6 +163,8 @@ public class MerchantService {
         if (merchant == null || merchant.getStatus() != MerchantStatusEnum.OPEN) {
             throw new BusinessException("商家不存在或未营业");
         }
+        refreshAveragePrice(id);
+        merchant = merchantMapper.selectById(id);
         return convertToResponse(merchant);
     }
 
@@ -600,5 +621,114 @@ public class MerchantService {
             throw new BusinessException("当前用户未入驻为商家");
         }
         return merchant.getId();
+    }
+
+    public void refreshAveragePrice(Long merchantId) {
+        if (merchantId == null) {
+            return;
+        }
+        Merchant merchant = merchantMapper.selectById(merchantId);
+        if (merchant == null) {
+            return;
+        }
+        int averagePrice = computeAveragePrice(merchantId);
+        if (!Objects.equals(merchant.getAveragePrice(), averagePrice)) {
+            merchant.setAveragePrice(averagePrice);
+            merchantMapper.updateById(merchant);
+        }
+    }
+
+    public void refreshAveragePrices(Collection<Long> merchantIds) {
+        if (merchantIds == null || merchantIds.isEmpty()) {
+            return;
+        }
+        List<Long> ids = merchantIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        Map<Long, CompletedOrderStats> completedStats = loadCompletedOrderStats(ids);
+        Map<Long, Integer> productAverages = loadProductAveragePrices(ids);
+        for (Long merchantId : ids) {
+            Merchant merchant = merchantMapper.selectById(merchantId);
+            if (merchant == null) {
+                continue;
+            }
+            CompletedOrderStats stats = completedStats.getOrDefault(merchantId, CompletedOrderStats.EMPTY);
+            int averagePrice = stats.count() < COMPLETED_ORDER_THRESHOLD
+                ? productAverages.getOrDefault(merchantId, 0)
+                : stats.averagePrice();
+            if (!Objects.equals(merchant.getAveragePrice(), averagePrice)) {
+                merchant.setAveragePrice(averagePrice);
+                merchantMapper.updateById(merchant);
+            }
+        }
+    }
+
+    private int computeAveragePrice(Long merchantId) {
+        CompletedOrderStats stats = loadCompletedOrderStats(List.of(merchantId))
+            .getOrDefault(merchantId, CompletedOrderStats.EMPTY);
+        if (stats.count() < COMPLETED_ORDER_THRESHOLD) {
+            return loadProductAveragePrices(List.of(merchantId)).getOrDefault(merchantId, 0);
+        }
+        return stats.averagePrice();
+    }
+
+    private Map<Long, CompletedOrderStats> loadCompletedOrderStats(Collection<Long> merchantIds) {
+        List<Orders> completedOrders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
+            .in(Orders::getMerchantId, merchantIds)
+            .eq(Orders::getStatus, ORDER_STATUS_COMPLETED));
+        Map<Long, CompletedOrderStats> stats = new HashMap<>();
+        for (Orders order : completedOrders) {
+            CompletedOrderStats current = stats.getOrDefault(order.getMerchantId(), CompletedOrderStats.EMPTY);
+            stats.put(order.getMerchantId(), current.add(order.getTotalPrice()));
+        }
+        return stats;
+    }
+
+    private Map<Long, Integer> loadProductAveragePrices(Collection<Long> merchantIds) {
+        List<Product> products = productMapper.selectList(new LambdaQueryWrapper<Product>()
+            .in(Product::getMerchantId, merchantIds)
+            .ne(Product::getStatus, PRODUCT_STATUS_DELETED));
+        Map<Long, List<Integer>> pricesByMerchant = new HashMap<>();
+        for (Product product : products) {
+            if (product.getPrice() == null) {
+                continue;
+            }
+            pricesByMerchant
+                .computeIfAbsent(product.getMerchantId(), key -> new java.util.ArrayList<>())
+                .add(product.getPrice());
+        }
+        Map<Long, Integer> averages = new HashMap<>();
+        for (Map.Entry<Long, List<Integer>> entry : pricesByMerchant.entrySet()) {
+            averages.put(entry.getKey(), averageInt(entry.getValue()));
+        }
+        return averages;
+    }
+
+    private int averageInt(List<Integer> values) {
+        if (values == null || values.isEmpty()) {
+            return 0;
+        }
+        long total = 0;
+        for (Integer value : values) {
+            total += value == null ? 0 : value;
+        }
+        return (int) Math.round((double) total / values.size());
+    }
+
+    private record CompletedOrderStats(long count, long totalPrice) {
+        private static final CompletedOrderStats EMPTY = new CompletedOrderStats(0, 0);
+
+        private CompletedOrderStats add(Integer totalPrice) {
+            int price = totalPrice == null ? 0 : totalPrice;
+            return new CompletedOrderStats(count + 1, this.totalPrice + price);
+        }
+
+        private int averagePrice() {
+            if (count <= 0) {
+                return 0;
+            }
+            return (int) Math.round((double) totalPrice / count);
+        }
     }
 }

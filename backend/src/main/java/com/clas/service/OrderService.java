@@ -51,6 +51,7 @@ public class OrderService {
     private final AmapRouteService amapRouteService;
     private final PenaltyService penaltyService;
     private final CouponService couponService;
+    private final MerchantService merchantService;
 
     public OrderService(
         OrdersMapper ordersMapper,
@@ -62,7 +63,8 @@ public class OrderService {
         UserAddressMapper userAddressMapper,
         AmapRouteService amapRouteService,
         PenaltyService penaltyService,
-        CouponService couponService
+        CouponService couponService,
+        MerchantService merchantService
     ) {
         this.ordersMapper = ordersMapper;
         this.orderItemMapper = orderItemMapper;
@@ -74,6 +76,7 @@ public class OrderService {
         this.amapRouteService = amapRouteService;
         this.penaltyService = penaltyService;
         this.couponService = couponService;
+        this.merchantService = merchantService;
     }
 
     @Transactional
@@ -346,6 +349,7 @@ public class OrderService {
         order.setStatus(STATUS_COMPLETED);
         order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        merchantService.refreshAveragePrice(order.getMerchantId());
         return order;
     }
 
@@ -356,6 +360,7 @@ public class OrderService {
         order.setDeliveryStatus("DELIVERED");
         order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        merchantService.refreshAveragePrice(order.getMerchantId());
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
             "订单已完成",

@@ -22,10 +22,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductService {
     private final ProductMapper productMapper;
     private final ProductCategoryMapper productCategoryMapper;
+    private final MerchantService merchantService;
 
-    public ProductService(ProductMapper productMapper, ProductCategoryMapper productCategoryMapper) {
+    public ProductService(
+        ProductMapper productMapper,
+        ProductCategoryMapper productCategoryMapper,
+        MerchantService merchantService
+    ) {
         this.productMapper = productMapper;
         this.productCategoryMapper = productCategoryMapper;
+        this.merchantService = merchantService;
     }
 
     public List<Product> listByMerchant(Long merchantId) {
@@ -98,6 +104,7 @@ public class ProductService {
         product.setImage(request.imageUrl());
         product.setStatus("ON_SALE");
         productMapper.insert(product);
+        merchantService.refreshAveragePrice(merchantId);
         return product;
     }
 
@@ -128,6 +135,7 @@ public class ProductService {
         }
 
         productMapper.updateById(product);
+        merchantService.refreshAveragePrice(merchantId);
         return product;
     }
 
@@ -144,6 +152,7 @@ public class ProductService {
         }
         product.setStatus(newStatus);
         productMapper.updateById(product);
+        merchantService.refreshAveragePrice(merchantId);
     }
 
     public void deleteProduct(Long productId, Long merchantId) {
@@ -156,6 +165,7 @@ public class ProductService {
         }
         product.setStatus("DELETED");
         productMapper.updateById(product);
+        merchantService.refreshAveragePrice(merchantId);
     }
 
     public List<ProductCategory> listCategories(Long merchantId) {
