@@ -481,27 +481,41 @@ onMounted(async () => {
   <section class="grid" v-loading="loading" v-if="loading || merchants.length">
     <article class="card" v-for="merchant in merchants" :key="merchant.id">
       <div
-        class="thumb merchant-logo-thumb"
+        class="merchant-visual"
         :class="{ 'has-logo': merchant.logo }"
-        :style="merchant.logo ? { backgroundImage: `url(${merchant.logo})` } : null"
       >
-        {{ merchant.logo ? '' : merchant.category }}
+        <div
+          class="merchant-visual-frame"
+          :class="{ 'has-logo': merchant.logo }"
+          :style="merchant.logo ? { backgroundImage: `url(${merchant.logo})` } : null"
+        ></div>
+        <div class="merchant-logo-badge">
+          <img v-if="merchant.logo" :src="merchant.logo" alt="商铺图标" class="merchant-logo-img" />
+          <span v-else>{{ merchant.category }}</span>
+        </div>
       </div>
-      <h2>{{ merchant.merchantName }}</h2>
-      <p>{{ merchant.address }}</p>
-      <p>评分 {{ merchant.score }} · 人均 ¥{{ ((merchant.averagePrice || 0) / 100).toFixed(0) }} · {{ merchant.businessHours || '营业中' }}</p>
-      <p>起送 ¥{{ ((merchant.minOrderPrice || 0) / 100).toFixed(0) }} · 配送费 ¥{{ ((merchant.deliveryFee || 0) / 100).toFixed(0) }}</p>
-      <p>
-        {{ distanceText(merchant.routeDistanceMeters || merchant.distanceMeters) }}
-        <span v-if="merchant.estimatedMinutes"> · 约 {{ merchant.estimatedMinutes }} 分钟</span>
-        <span v-if="merchant.deliveryRadiusM"> · {{ distanceText(merchant.deliveryRadiusM) }} 内配送</span>
-      </p>
-      <p class="delivery-status">
+      <div class="merchant-card-body">
+        <h2 class="merchant-name">{{ merchant.merchantName }}</h2>
+        <p class="merchant-address">{{ merchant.address }}</p>
+        <div class="merchant-meta">
+          <span class="merchant-rating">★ {{ Number(merchant.score || 0).toFixed(1) }}</span>
+          <span>人均 ¥{{ ((merchant.averagePrice || 0) / 100).toFixed(0) }}</span>
+          <span>{{ merchant.businessHours || '营业中' }}</span>
+        </div>
+        <div class="merchant-info-pills">
+          <span>起送 ¥{{ ((merchant.minOrderPrice || 0) / 100).toFixed(0) }}</span>
+          <span>配送 ¥{{ ((merchant.deliveryFee || 0) / 100).toFixed(0) }}</span>
+          <span>{{ distanceText(merchant.routeDistanceMeters || merchant.distanceMeters) }}</span>
+          <span v-if="merchant.estimatedMinutes">约 {{ merchant.estimatedMinutes }} 分钟</span>
+          <span v-if="merchant.deliveryRadiusM">{{ distanceText(merchant.deliveryRadiusM) }} 内配送</span>
+        </div>
+      </div>
+      <div class="delivery-status">
         <el-tag :type="merchantOpenStatus(merchant).type" effect="plain">{{ merchantOpenStatus(merchant).label }}</el-tag>
         <el-tag v-if="merchant.deliveryAvailable === true" type="success" effect="plain">可配送</el-tag>
         <el-tag v-else-if="merchant.deliveryAvailable === false" type="danger" effect="plain">超出配送范围</el-tag>
         <el-tag v-else effect="plain">选择位置查看配送</el-tag>
-      </p>
+      </div>
       <div class="card-actions">
         <RouterLink class="button secondary merchant-card-btn" :to="`/merchant/${merchant.id}`">进入店铺</RouterLink>
         <button class="button secondary merchant-card-btn" type="button" @click="chatStore.openMerchantChat(merchant.id)">咨询客服</button>
@@ -938,15 +952,87 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.delivery-status {
-  margin-bottom: 0;
-  min-height: 28px;
-}
-
 .grid .card {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+.merchant-card-body {
+  display: grid;
+  gap: 8px;
+}
+
+.merchant-name {
+  color: var(--text-primary);
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.merchant-address {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merchant-meta {
+  align-items: center;
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px 0;
+  line-height: 1.3;
+}
+
+.merchant-meta span {
+  align-items: center;
+  display: inline-flex;
+}
+
+.merchant-meta span + span::before {
+  color: var(--text-muted);
+  content: "·";
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+.merchant-rating {
+  color: var(--color-warning);
+  font-weight: 800;
+}
+
+.merchant-info-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.merchant-info-pills span {
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.1);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 6px 9px;
+}
+
+.delivery-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  min-height: 28px;
 }
 
 .card-actions {
@@ -969,13 +1055,76 @@ onMounted(async () => {
   text-align: center;
 }
 
-.merchant-logo-thumb {
-  background-position: center;
-  background-size: cover;
+.merchant-visual {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  margin-bottom: 26px;
+  min-height: 150px;
+  overflow: visible;
+  position: relative;
 }
 
-.merchant-logo-thumb.has-logo {
-  color: transparent;
+.merchant-visual-frame {
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(13, 148, 136, 0.14)),
+    var(--bg-subtle);
+  background-position: center;
+  background-size: cover;
+  border-radius: var(--radius-md);
+  inset: 0;
+  overflow: hidden;
+  position: absolute;
+}
+
+.merchant-visual-frame.has-logo::before {
+  background: inherit;
+  content: "";
+  filter: blur(10px) saturate(1.08);
+  inset: -14px;
+  opacity: 0.68;
+  position: absolute;
+  transform: scale(1.04);
+}
+
+.merchant-visual-frame::after {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.18));
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+.merchant-logo-badge {
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 50%;
+  box-shadow: var(--shadow-md);
+  color: var(--color-primary);
+  display: flex;
+  font-size: 15px;
+  font-weight: 700;
+  height: 86px;
+  justify-content: center;
+  left: 18px;
+  line-height: 1.2;
+  overflow: hidden;
+  padding: 8px;
+  position: absolute;
+  text-align: center;
+  top: calc(100% - 58px);
+  width: 86px;
+  z-index: 1;
+}
+
+.merchant-logo-img {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: center;
+  width: 100%;
 }
 
 .empty-panel {
