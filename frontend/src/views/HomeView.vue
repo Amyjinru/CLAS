@@ -1081,11 +1081,11 @@ onMounted(async () => {
 .merchant-visual-frame.has-logo::before {
   background: inherit;
   content: "";
-  filter: blur(10px) saturate(1.08);
-  inset: -14px;
-  opacity: 0.68;
+  filter: blur(2px) saturate(1.02);
+  inset: -4px;
+  opacity: 0.35;
   position: absolute;
-  transform: scale(1.04);
+  transform: scale(1.01);
 }
 
 .merchant-visual-frame::after {
@@ -1110,7 +1110,6 @@ onMounted(async () => {
   left: 18px;
   line-height: 1.2;
   overflow: hidden;
-  padding: 8px;
   position: absolute;
   text-align: center;
   top: calc(100% - 58px);
@@ -1119,12 +1118,12 @@ onMounted(async () => {
 }
 
 .merchant-logo-img {
+  border-radius: 50%;
   display: block;
   height: 100%;
-  max-width: 100%;
-  object-fit: contain;
-  object-position: center;
   width: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 .empty-panel {
