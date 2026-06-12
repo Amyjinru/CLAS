@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { resetForgotPassword, sendForgotPasswordCode, setSessionUser, currentRole } from '../api/clas'
+import { passwordChecks, passwordRuleMessage, passwordStrength as calculatePasswordStrength } from '../utils/passwordRules'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,24 +33,9 @@ function validPhone(phone) {
   return phonePattern.test((phone || '').trim())
 }
 
-function passwordChecks(password) {
-  const value = password || ''
-  return [
-    { key: 'length', label: '不少于8位', ok: value.length >= 8 }
-  ]
-}
-
 const passwordState = computed(() => passwordChecks(form.newPassword))
 const passwordOk = computed(() => passwordState.value.every((item) => item.ok))
-const passwordStrength = computed(() => {
-  const pwd = form.newPassword || ''
-  let score = 0
-  if (pwd.length >= 8) score++
-  if (/\d/.test(pwd)) score++
-  if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++
-  if (/[\W_]/.test(pwd) && !/\s/.test(pwd)) score++
-  return score
-})
+const passwordStrength = computed(() => calculatePasswordStrength(form.newPassword))
 const strengthLabel = computed(() => ['', '较弱', '中等', '良好', '强'][passwordStrength.value] || '强')
 const strengthColor = computed(() => ['', '#ef4444', '#f59e0b', '#f97316', '#16a34a'][passwordStrength.value] || '#16a34a')
 const passwordMatches = computed(() => form.confirmPassword && form.newPassword === form.confirmPassword)
@@ -162,7 +148,7 @@ async function submitReset() {
             id="forgot-new-password"
             v-model="form.newPassword"
             :type="showPassword ? 'text' : 'password'"
-            placeholder="至少8位"
+            placeholder="至少6位"
             autocomplete="new-password"
           />
           <button
@@ -195,7 +181,7 @@ async function submitReset() {
           </div>
           <span class="strength-label" :style="{ color: strengthColor }">{{ strengthLabel }}</span>
         </div>
-        <p v-else class="password-hint-text">至少8位，建议包含数字、大小写字母和符号</p>
+        <p v-else class="password-hint-text">{{ passwordRuleMessage }}</p>
       </div>
 
       <div class="form-group">
