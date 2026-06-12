@@ -71,7 +71,7 @@ function submit() {
         ElMessage.success('商品修改成功')
       } else {
         await createProduct(payload)
-        ElMessage.success('商品添加成功，默认为下架状态')
+        ElMessage.success('商品添加成功，默认为上架状态')
       }
       emit('update:visible', false)
       emit('saved')
