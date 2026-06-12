@@ -776,8 +776,17 @@ onMounted(async () => {
 }
 
 .view-shops-btn {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
   min-height: 32px;
   padding: 6px 12px;
+}
+
+.view-shops-btn:visited,
+.view-shops-btn:hover,
+.view-shops-btn:focus {
+  color: #fff;
 }
 
 .hero-actions {

@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listAddresses, listMerchants, listProducts } from '../api/clas'
+import BackButton from '../components/BackButton.vue'
 import { formatDistance } from '../utils/formatters'
 import { getCurrentLocation } from '../utils/locationStore'
 
@@ -14,6 +15,8 @@ const merchants = ref([])
 const merchantProducts = ref({})
 const addresses = ref([])
 const currentLocation = ref(getCurrentLocation())
+const route = useRoute()
+const router = useRouter()
 const keyword = ref('')
 const category = ref('')
 const sort = ref('recommend')
@@ -29,6 +32,7 @@ const sortOptions = [
   { label: '人均低价', value: 'price' },
   { label: '最新入驻', value: 'latest' }
 ]
+const sortValues = new Set(sortOptions.map((item) => item.value))
 
 const hasSearchLocation = computed(() => Boolean(
   currentLocation.value?.longitude && currentLocation.value?.latitude
@@ -74,6 +78,46 @@ function parseBusinessMinutes(value) {
 
 function productPrice(product) {
   return `¥${((product?.price || 0) / 100).toFixed(2)}`
+}
+
+function firstQueryValue(value) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function restoreFiltersFromRoute() {
+  const queryKeyword = firstQueryValue(route.query.keyword)
+  const queryCategory = firstQueryValue(route.query.category)
+  const querySort = firstQueryValue(route.query.sort)
+  const queryOnlyDeliverable = firstQueryValue(route.query.onlyDeliverable)
+
+  keyword.value = typeof queryKeyword === 'string' ? queryKeyword : ''
+  category.value = typeof queryCategory === 'string' && categories.includes(queryCategory) ? queryCategory : ''
+  sort.value = typeof querySort === 'string' && sortValues.has(querySort) ? querySort : 'recommend'
+  onlyDeliverable.value = queryOnlyDeliverable === '1' || queryOnlyDeliverable === 'true'
+}
+
+function filterRouteQuery() {
+  const query = {}
+  const trimmedKeyword = keyword.value.trim()
+  if (trimmedKeyword) query.keyword = trimmedKeyword
+  if (category.value) query.category = category.value
+  if (sort.value && sort.value !== 'recommend') query.sort = sort.value
+  if (onlyDeliverable.value) query.onlyDeliverable = '1'
+  return query
+}
+
+function queryMatchesCurrentRoute(nextQuery) {
+  const keys = ['keyword', 'category', 'sort', 'onlyDeliverable']
+  return keys.every((key) => {
+    const current = firstQueryValue(route.query[key])
+    return (current || '') === (nextQuery[key] || '')
+  })
+}
+
+async function syncFiltersToRoute() {
+  const query = filterRouteQuery()
+  if (queryMatchesCurrentRoute(query)) return
+  await router.replace({ path: '/merchants', query })
 }
 
 async function loadAddresses() {
@@ -136,6 +180,7 @@ async function load() {
     onlyDeliverable.value = false
     ElMessage.warning('请先选择带坐标的位置后再筛选可配送')
   }
+  await syncFiltersToRoute()
   loading.value = true
   try {
     const data = await listMerchants(queryParams())
@@ -155,6 +200,7 @@ function resetFilters() {
 }
 
 onMounted(async () => {
+  restoreFiltersFromRoute()
   await loadAddresses()
   await load()
 })
@@ -162,6 +208,8 @@ onMounted(async () => {
 
 <template>
   <div class="merchant-browser">
+    <BackButton to="/home" label="返回首页" />
+
     <section class="browse-toolbar">
       <div class="toolbar-copy">
         <p>{{ resultText }}</p>
