@@ -348,7 +348,7 @@ public class MerchantService {
         merchant.setScore(BigDecimal.valueOf(0.00));
         merchant.setStatus(MerchantStatusEnum.PENDING); // Default pending
         merchant.setManualClosed(false);
-        merchant.setBankAccount(request.bankAccount());
+        merchant.setBankAccount(normalizeOptional(request.bankAccount()));
         merchant.setSettlementCycle(request.settlementCycle());
         
         merchantMapper.insert(merchant);

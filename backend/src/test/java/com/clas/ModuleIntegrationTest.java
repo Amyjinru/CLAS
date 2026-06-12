@@ -329,6 +329,39 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void merchantRegisterAllowsSkippingSettlementInfo() throws Exception {
+        String phone = "13900000038";
+        mockMvc.perform(post("/api/merchant/register/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", phone))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(post("/api/merchant/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.ofEntries(
+                    Map.entry("accountPhone", phone),
+                    Map.entry("code", TEST_CODE),
+                    Map.entry("username", "merchant_without_bank"),
+                    Map.entry("password", STRONG_PASSWORD),
+                    Map.entry("confirmPassword", STRONG_PASSWORD),
+                    Map.entry("merchantName", "免结算信息商家"),
+                    Map.entry("contactPhone", "13900000039"),
+                    Map.entry("category", "美食"),
+                    Map.entry("address", "测试地址 5 号"),
+                    Map.entry("longitude", 116.390000),
+                    Map.entry("latitude", 39.910000),
+                    Map.entry("deliveryRadiusM", 3000)
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.userId").value(phone))
+            .andExpect(jsonPath("$.data.bankAccount").value(""))
+            .andExpect(jsonPath("$.data.settlementCycle").doesNotExist())
+            .andExpect(jsonPath("$.data.status").value("PENDING"));
+    }
+
+    @Test
     void merchantCanChangeBoundLoginPhoneAndKeepMerchantProfile() throws Exception {
         String oldPhone = "13900000032";
         String newPhone = "13900000033";
