@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listAddresses, listMerchants, listProducts } from '../api/clas'
@@ -16,6 +16,7 @@ defineOptions({
 
 const merchants = ref([])
 const merchantProducts = ref({})
+const productSlideIndexes = ref({})
 const addresses = ref([])
 const currentLocation = ref(getCurrentLocation())
 const route = useRoute()
@@ -28,6 +29,7 @@ const loading = ref(false)
 const productsLoading = ref(false)
 const locating = ref(false)
 const locationDialogVisible = ref(false)
+let productSlideTimer = null
 
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
 const sortOptions = [
@@ -83,6 +85,42 @@ function parseBusinessMinutes(value) {
 
 function productPrice(product) {
   return `¥${((product?.price || 0) / 100).toFixed(2)}`
+}
+
+function activeProduct(merchantId) {
+  const products = merchantProducts.value[merchantId] || []
+  if (!products.length) return null
+  const index = productSlideIndexes.value[merchantId] || 0
+  return products[index % products.length]
+}
+
+function activeProductPosition(merchantId) {
+  const products = merchantProducts.value[merchantId] || []
+  if (!products.length) return ''
+  const index = (productSlideIndexes.value[merchantId] || 0) % products.length
+  return `${index + 1} / ${products.length}`
+}
+
+function resetProductSlideIndexes(items) {
+  productSlideIndexes.value = Object.fromEntries(items.map((merchant) => [merchant.id, 0]))
+}
+
+function startProductSlideTimer() {
+  stopProductSlideTimer()
+  productSlideTimer = window.setInterval(() => {
+    const nextIndexes = { ...productSlideIndexes.value }
+    Object.entries(merchantProducts.value).forEach(([merchantId, products]) => {
+      if (!Array.isArray(products) || products.length <= 1) return
+      nextIndexes[merchantId] = ((nextIndexes[merchantId] || 0) + 1) % products.length
+    })
+    productSlideIndexes.value = nextIndexes
+  }, 3000)
+}
+
+function stopProductSlideTimer() {
+  if (!productSlideTimer) return
+  window.clearInterval(productSlideTimer)
+  productSlideTimer = null
 }
 
 function firstQueryValue(value) {
@@ -216,6 +254,7 @@ async function loadMerchantProducts(items) {
       }
     }))
     merchantProducts.value = next
+    resetProductSlideIndexes(items)
   } finally {
     productsLoading.value = false
   }
@@ -249,6 +288,11 @@ onMounted(async () => {
   restoreFiltersFromRoute()
   await loadAddresses()
   await load()
+  startProductSlideTimer()
+})
+
+onUnmounted(() => {
+  stopProductSlideTimer()
 })
 </script>
 
@@ -326,14 +370,18 @@ onMounted(async () => {
           </div>
 
           <div class="product-strip" :class="{ loading: productsLoading }">
-            <div
-              v-for="product in merchantProducts[merchant.id] || []"
-              :key="product.id"
-              class="product-chip"
-            >
-              <span class="product-name">{{ product.name }}</span>
-              <strong>{{ productPrice(product) }}</strong>
-            </div>
+            <Transition name="product-rotate" mode="out-in">
+              <div
+                v-if="activeProduct(merchant.id)"
+                :key="activeProduct(merchant.id)?.id"
+                class="product-chip product-feature"
+              >
+                <span class="product-label">主售</span>
+                <span class="product-name">{{ activeProduct(merchant.id).name }}</span>
+                <strong>{{ productPrice(activeProduct(merchant.id)) }}</strong>
+                <span class="product-position">{{ activeProductPosition(merchant.id) }}</span>
+              </div>
+            </Transition>
             <div v-if="!productsLoading && !(merchantProducts[merchant.id] || []).length" class="product-empty">
               暂无上架商品
             </div>
@@ -538,10 +586,9 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   margin-top: 12px;
-  min-height: 42px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
+  min-height: 44px;
+  overflow: hidden;
+  position: relative;
 }
 
 .product-chip {
@@ -557,9 +604,37 @@ onMounted(async () => {
   padding: 7px 10px;
 }
 
+.product-feature {
+  box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.08);
+  max-width: min(100%, 420px);
+  min-width: min(100%, 300px);
+}
+
+.product-label,
+.product-position {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 7px;
+}
+
+.product-label {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.product-position {
+  background: #fff;
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
 .product-name {
   color: var(--text-main);
-  max-width: 128px;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -576,6 +651,21 @@ onMounted(async () => {
   display: flex;
   font-size: 13px;
   min-height: 36px;
+}
+
+.product-rotate-enter-active,
+.product-rotate-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.product-rotate-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.product-rotate-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .merchant-action {
@@ -653,6 +743,14 @@ onMounted(async () => {
 
   .merchant-head {
     flex-direction: column;
+  }
+
+  .product-feature {
+    min-width: 100%;
+  }
+
+  .product-name {
+    max-width: 120px;
   }
 
   .merchant-tags {
