@@ -61,14 +61,19 @@ async function handleDelete(category) {
       <el-button type="primary" @click="handleCreate">添加分类</el-button>
     </div>
 
-    <div class="category-list" v-if="categories.length">
+    <TransitionGroup
+      v-if="categories.length"
+      name="category-swap"
+      tag="div"
+      class="category-list"
+    >
       <div v-for="category in categories" :key="category.id" class="category-item">
         <el-input v-model="category.name" maxlength="50" />
         <el-input-number v-model="category.sortOrder" :min="0" :step="1" />
         <el-button type="primary" @click="handleUpdate(category)">保存</el-button>
         <el-button type="danger" @click="handleDelete(category)">删除</el-button>
       </div>
-    </div>
+    </TransitionGroup>
     <el-empty v-else description="暂无商品分类" />
 
     <p class="sort-order-hint">数字为分类权重</p>
@@ -86,6 +91,7 @@ async function handleDelete(category) {
   grid-template-columns: minmax(160px, 1fr) 140px auto auto;
   gap: 10px;
   margin-bottom: 10px;
+  transition: none;
 }
 .sort-order-hint {
   color: var(--text-muted, #909399);
@@ -94,4 +100,21 @@ async function handleDelete(category) {
   margin: 8px 0 0;
 }
 .category-list { display: grid; gap: 8px; margin-top: 14px; }
+
+/* TransitionGroup — 分类位置交换动画 */
+.category-swap-move {
+  transition: transform 0.45s ease;
+}
+.category-swap-enter-active,
+.category-swap-leave-active {
+  transition: all 0.35s ease;
+}
+.category-swap-enter-from {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+.category-swap-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
 </style>
