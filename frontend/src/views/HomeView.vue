@@ -450,40 +450,42 @@ onMounted(async () => {
 
     <!-- ═══ 右侧滚动内容 ═══ -->
     <div class="home-main">
-      <section class="panel search-panel">
-        <div class="search-row">
-          <el-input
-            v-model="keyword"
-            class="search-input"
-            placeholder="搜索商家名称"
-            clearable
-            @clear="load"
-            @keyup.enter="load"
-          />
-          <el-button type="primary" @click="load">搜索</el-button>
-          <el-button @click="openFilterDialog">
-            筛选<span v-if="appliedFilterCount" class="filter-count">({{ appliedFilterCount }})</span>
-          </el-button>
-        </div>
-      </section>
+      <div class="home-main-sticky">
+        <section class="panel search-panel">
+          <div class="search-row">
+            <el-input
+              v-model="keyword"
+              class="search-input"
+              placeholder="搜索商家名称"
+              clearable
+              @clear="load"
+              @keyup.enter="load"
+            />
+            <el-button type="primary" @click="load">搜索</el-button>
+            <el-button @click="openFilterDialog">
+              筛选<span v-if="appliedFilterCount" class="filter-count">({{ appliedFilterCount }})</span>
+            </el-button>
+          </div>
+        </section>
 
-      <section class="panel location-panel">
-        <strong>当前定位</strong>
-        <span>{{ currentLocation?.address || '未定位，请选择位置' }}</span>
-        <small v-if="!hasSearchLocation">选择位置后可筛选可配送商家</small>
-      </section>
+        <section class="panel location-panel">
+          <strong>当前定位</strong>
+          <span>{{ currentLocation?.address || '未定位，请选择位置' }}</span>
+          <small v-if="!hasSearchLocation">选择位置后可筛选可配送商家</small>
+        </section>
 
-      <section class="panel result-panel">
-        <div class="section-head">
-          <h2>附近商家</h2>
-          <span>{{ resultSummary }}</span>
-        </div>
-        <div class="filter-tags" v-if="activeFilters.length">
-          <el-tag v-for="filter in activeFilters" :key="filter.key" effect="plain">
-            {{ filter.label }}
-          </el-tag>
-        </div>
-      </section>
+        <section class="panel result-panel">
+          <div class="section-head">
+            <h2>附近商家</h2>
+            <span>{{ resultSummary }}</span>
+          </div>
+          <div class="filter-tags" v-if="activeFilters.length">
+            <el-tag v-for="filter in activeFilters" :key="filter.key" effect="plain">
+              {{ filter.label }}
+            </el-tag>
+          </div>
+        </section>
+      </div>
 
       <section class="grid" v-loading="loading" v-if="loading || merchants.length">
         <article class="card" v-for="merchant in merchants" :key="merchant.id">
@@ -663,6 +665,8 @@ onMounted(async () => {
   position: sticky;
   top: 84px;
   max-height: calc(100vh - 104px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .home-side-hero {
@@ -695,13 +699,14 @@ onMounted(async () => {
 }
 
 .announcements-panel .sidebar-panel-body {
-  max-height: none;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 260px;
   transition: max-height 0.3s ease;
 }
 
 .announcements-panel .sidebar-panel-body.collapsed {
   max-height: 0;
+  overflow: hidden;
 }
 
 .collapse-toggle {
@@ -741,6 +746,15 @@ onMounted(async () => {
 /* ─── 右侧主内容 ─── */
 .home-main {
   min-width: 0;
+}
+
+.home-main-sticky {
+  position: sticky;
+  top: 64px;
+  z-index: 3;
+  background: #faf7f2;
+  padding-bottom: 4px;
+  border-bottom: 1px solid transparent;
 }
 
 .section-head {
