@@ -35,6 +35,7 @@ const draftLocation = ref(null)
 const activeOrders = ref([])
 const chatOrder = ref(null)
 const ordersLoading = ref(false)
+const announcementsExpanded = ref(false)
 const chatStore = useChatStore()
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
 const DEFAULT_SORT = 'recommend'
@@ -398,19 +399,6 @@ onMounted(async () => {
         </div>
       </section>
 
-      <section v-if="showAnnouncementsPanel" class="panel sidebar-panel announcements-panel">
-        <div class="section-head">
-          <h2>平台公告</h2>
-          <RouterLink to="/user/announcements">查看全部</RouterLink>
-        </div>
-        <div class="sidebar-panel-body">
-          <article class="announcement-preview" v-for="item in announcements" :key="item.id">
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.content }}</p>
-          </article>
-        </div>
-      </section>
-
       <section
         v-if="showActiveOrdersPanel"
         class="panel sidebar-panel active-orders-panel"
@@ -435,6 +423,26 @@ onMounted(async () => {
               <button class="button secondary ao-action-btn" type="button" @click="openChat(order)">联系商家</button>
               <RouterLink class="button secondary ao-action-btn" :to="`/orders`">查看详情</RouterLink>
             </div>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="showAnnouncementsPanel" class="panel sidebar-panel announcements-panel">
+        <div class="section-head">
+          <h2>平台公告</h2>
+          <button
+            class="collapse-toggle"
+            type="button"
+            :title="announcementsExpanded ? '收起' : '展开'"
+            @click="announcementsExpanded = !announcementsExpanded"
+          >
+            {{ announcementsExpanded ? '收起 ▲' : '展开 ▼' }}
+          </button>
+        </div>
+        <div class="sidebar-panel-body" :class="{ collapsed: !announcementsExpanded }">
+          <article class="announcement-preview" v-for="item in announcements" :key="item.id">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.content }}</p>
           </article>
         </div>
       </section>
@@ -651,11 +659,10 @@ onMounted(async () => {
 .home-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   position: sticky;
-  top: 84px; /* topbar 64px + 20px gap */
+  top: 84px;
   max-height: calc(100vh - 104px);
-  overflow-y: auto;
 }
 
 .home-side-hero {
@@ -664,8 +671,9 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 18px;
+  gap: 12px;
   margin-bottom: 0;
+  flex-shrink: 0;
   min-height: auto;
 }
 
@@ -678,20 +686,56 @@ onMounted(async () => {
   flex-direction: column;
   margin-bottom: 0;
   min-height: 0;
-  overflow: hidden;
+  flex-shrink: 1;
 }
 
 .announcements-panel {
   flex-shrink: 0;
+  flex: 0 0 auto;
+}
+
+.announcements-panel .sidebar-panel-body {
+  max-height: none;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.announcements-panel .sidebar-panel-body.collapsed {
+  max-height: 0;
+}
+
+.collapse-toggle {
+  background: none;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  min-height: 28px;
+  padding: 4px 10px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.collapse-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .active-orders-panel {
   flex-shrink: 0;
+  flex: 0 0 auto;
 }
 
 .sidebar-panel-body {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.active-orders-panel .sidebar-panel-body {
+  display: flex;
 }
 
 /* ─── 右侧主内容 ─── */
