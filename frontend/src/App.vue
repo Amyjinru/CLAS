@@ -244,11 +244,13 @@ async function handleLogout() {
 /* 所有交互元素置于遮罩之上 */
 .topbar,
 .main-content,
-.app-footer,
-.chat-sidebar,
-.skip-link {
+.chat-sidebar {
   position: relative;
-  z-index: 1;
+  z-index: 2;
+}
+.app-footer {
+  position: relative;
+  z-index: 0;
 }
 
 .topbar {

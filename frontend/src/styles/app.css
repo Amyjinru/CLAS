@@ -530,9 +530,11 @@ body {
   width: 100%;
   min-height: 160px;
   position: relative;
+  z-index: 0;
   background: transparent;
   border-top: 1px solid rgba(255, 181, 167, 0.25);
   margin-top: auto;
+  pointer-events: none;
 }
 
 .footer-overlay {
@@ -541,6 +543,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
 }
 
 .footer-content {
