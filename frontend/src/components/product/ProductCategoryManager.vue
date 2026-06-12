@@ -70,6 +70,8 @@ async function handleDelete(category) {
       </div>
     </div>
     <el-empty v-else description="暂无商品分类" />
+
+    <p class="sort-order-hint">数字为分类权重</p>
   </el-card>
 </template>
 
@@ -84,6 +86,12 @@ async function handleDelete(category) {
   grid-template-columns: minmax(160px, 1fr) 140px auto auto;
   gap: 10px;
   margin-bottom: 10px;
+}
+.sort-order-hint {
+  color: var(--text-muted, #909399);
+  font-size: 12px;
+  text-align: right;
+  margin: 8px 0 0;
 }
 .category-list { display: grid; gap: 8px; margin-top: 14px; }
 </style>
