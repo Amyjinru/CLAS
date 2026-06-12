@@ -330,6 +330,22 @@ public class StatisticsService {
               AND create_time >= ?
               AND create_time <= ?
             """, merchantId, todayStart, todayEnd);
+        long monthSales = queryMerchantSales(
+            merchantId,
+            today.withDayOfMonth(1).atStartOfDay(),
+            todayEnd
+        );
+        long yearSales = queryMerchantSales(
+            merchantId,
+            today.withDayOfYear(1).atStartOfDay(),
+            todayEnd
+        );
+        long totalSales = queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE merchant_id = ?
+              AND status <> 'PENDING_PAYMENT'
+            """, merchantId);
 
         List<MerchantStatsDTO.DailySale> dailySales = new ArrayList<>();
         for (int i = 6; i >= 0; i--) {
@@ -378,7 +394,18 @@ public class StatisticsService {
             merchantId
         );
 
-        return new MerchantStatsDTO(todayOrders, todaySales, dailySales, topProducts);
+        return new MerchantStatsDTO(todayOrders, todaySales, monthSales, yearSales, totalSales, dailySales, topProducts);
+    }
+
+    private long queryMerchantSales(Long merchantId, LocalDateTime start, LocalDateTime end) {
+        return queryLong("""
+            SELECT COALESCE(SUM(total_price), 0)
+            FROM orders
+            WHERE merchant_id = ?
+              AND status <> 'PENDING_PAYMENT'
+              AND create_time >= ?
+              AND create_time <= ?
+            """, merchantId, start, end);
     }
 
     private DateRange resolveRange(LocalDate startDate, LocalDate endDate) {

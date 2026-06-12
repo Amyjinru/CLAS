@@ -192,6 +192,14 @@ function closeChat() {
   chatOrder.value = null
 }
 
+function callUser(order) {
+  if (!order?.customerCallUrl) {
+    ElMessage.warning('暂无可拨打的用户电话')
+    return
+  }
+  window.location.href = order.customerCallUrl
+}
+
 function onMerchantProfileSaved(nextMerchant) {
   merchant.value = nextMerchant
 }
@@ -302,22 +310,33 @@ onMounted(() => {
             </el-table-column>
             <el-table-column label="联系" width="100">
               <template #default="scope">
-                <el-button
-                  v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status)"
-                  type="primary"
-                  size="small"
-                  plain
-                  @click="openChat(scope.row)"
-                >
-                  联系用户
-                </el-button>
-                <el-button
-                  v-else
-                  size="small"
-                  @click="openChat(scope.row)"
-                >
-                  查看聊天
-                </el-button>
+                <div class="contact-actions">
+                  <el-button
+                    v-if="scope.row.customerCallUrl"
+                    type="success"
+                    size="small"
+                    plain
+                    @click="callUser(scope.row)"
+                  >
+                    拨打电话
+                  </el-button>
+                  <el-button
+                    v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status)"
+                    type="primary"
+                    size="small"
+                    plain
+                    @click="openChat(scope.row)"
+                  >
+                    联系用户
+                  </el-button>
+                  <el-button
+                    v-else
+                    size="small"
+                    @click="openChat(scope.row)"
+                  >
+                    查看聊天
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="180" fixed="right">
@@ -408,6 +427,14 @@ onMounted(() => {
         </div>
 
         <footer class="order-panel-foot">
+          <button
+            v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
+            type="button"
+            class="secondary"
+            @click="callUser(selectedOrder)"
+          >
+            拨打电话
+          </button>
           <button
             v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
             type="button"
@@ -595,6 +622,16 @@ onMounted(() => {
   font-weight: bold;
 }
 
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.contact-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
 .order-item-list {
   font-size: 13px;
   color: #606266;
@@ -676,7 +713,7 @@ onMounted(() => {
 
 .order-overlay {
   align-items: center;
-  background: rgba(15, 23, 42, 0.28);
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
   inset: 0;
   justify-content: center;
@@ -686,7 +723,7 @@ onMounted(() => {
 }
 
 .order-panel {
-  background: var(--bg-card);
+  background: #fff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xl);
@@ -723,13 +760,14 @@ onMounted(() => {
 }
 
 .order-panel-body {
+  background: #fff;
   overflow: auto;
   padding: 18px;
 }
 
 .order-panel-body :deep(.order-detail) {
-  background: transparent;
-  padding: 0;
+  background: #fff7ed;
+  border: 1px solid var(--border-light);
 }
 
 .order-panel-foot {

@@ -5,6 +5,9 @@ import java.util.List;
 public record MerchantStatsDTO(
     Long todayOrders,
     Long todaySales,
+    Long monthSales,
+    Long yearSales,
+    Long totalSales,
     List<DailySale> dailySales,
     List<ProductRank> topProducts
 ) {
