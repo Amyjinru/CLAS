@@ -39,7 +39,7 @@ const form = reactive({
   contactPhone: '',
   code: '',
   bankAccount: '',
-  settlementCycle: 7,
+  settlementCycle: null,
   username: '',
   password: '',
   confirmPassword: ''
@@ -103,7 +103,7 @@ const rules = reactive({
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
   ],
   bankAccount: [
-    { pattern: /^\d{9,25}$/, message: '请输入9到25位数字账号', trigger: 'blur' }
+    { pattern: /^$|^\d{9,25}$/, message: '请输入9到25位数字账号', trigger: 'blur' }
   ],
   settlementCycle: [],
   username: [],
@@ -182,6 +182,12 @@ async function submitForm() {
     submitting.value = true
     try {
       const payload = { ...form }
+      if (!payload.bankAccount?.trim()) {
+        delete payload.bankAccount
+      }
+      if (!payload.settlementCycle) {
+        delete payload.settlementCycle
+      }
       if (user.value) {
         delete payload.accountPhone
         delete payload.code
@@ -377,7 +383,7 @@ onUnmounted(() => {
           </el-form-item>
 
           <el-form-item label="结算周期(天)" prop="settlementCycle">
-            <el-input-number v-model="form.settlementCycle" :min="1" :max="90" style="width: 100%" />
+            <el-input-number v-model="form.settlementCycle" :min="1" :max="90" placeholder="选填" style="width: 100%" />
           </el-form-item>
         </template>
 

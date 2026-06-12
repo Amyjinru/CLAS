@@ -1,7 +1,6 @@
 package com.clas.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 
@@ -21,11 +20,9 @@ public record MerchantRegisterRequest(
     BigDecimal latitude,
     Integer deliveryRadiusM,
 
-    @NotBlank(message = "银行账号不能为空")
-    @Pattern(regexp = "^\\d{9,25}$", message = "银行账号必须是9到25位数字")
+    @Pattern(regexp = "^$|^\\d{9,25}$", message = "银行账号必须是9到25位数字")
     String bankAccount,
 
-    @NotNull(message = "结算周期不能为空")
     Integer settlementCycle,
 
     // Optional fields for visitor merchant account registration.
