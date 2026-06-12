@@ -30,6 +30,8 @@ const favoriteMerchantIds = ref(new Set())
 const currentLocation = ref(getCurrentLocation())
 const deliveryEstimate = ref(null)
 const locationDialogVisible = ref(false)
+const productDetailVisible = ref(false)
+const selectedProduct = ref(null)
 const chatStore = useChatStore()
 const { cartMessage, increaseItem, decreaseItem, removeAll } = useCartActions()
 const message = cartMessage
@@ -123,9 +125,22 @@ function resolveBusinessStatus(merchantInfo) {
 }
 
 function productImageStyle(product) {
-  const image = product.image || product.imageUrl
+  const image = productImage(product)
   if (!image) return {}
   return { backgroundImage: `url("${image}")` }
+}
+
+function productImage(product) {
+  return product?.image || product?.imageUrl || ''
+}
+
+function openProductDetail(product) {
+  selectedProduct.value = product
+  productDetailVisible.value = true
+}
+
+function closeProductDetail() {
+  selectedProduct.value = null
 }
 
 async function loadProducts() {
@@ -160,6 +175,8 @@ async function load() {
   loadError.value = ''
   message.value = ''
   merchant.value = null
+  productDetailVisible.value = false
+  selectedProduct.value = null
   products.value = []
   productGroups.value = {}
   activeProductCategory.value = ''
@@ -338,6 +355,8 @@ watch(
   (newPath, oldPath) => {
     if (newPath !== oldPath && newPath.startsWith('/merchant/')) {
       cartOpen.value = false
+      productDetailVisible.value = false
+      selectedProduct.value = null
       load()
     }
   }
@@ -472,7 +491,15 @@ watch(
       </div>
 
       <div class="product-grid" v-if="visibleProducts.length">
-        <article class="product-card" v-for="product in visibleProducts" :key="product.id">
+        <article
+          class="product-card"
+          v-for="product in visibleProducts"
+          :key="product.id"
+          role="button"
+          tabindex="0"
+          @click="openProductDetail(product)"
+          @keyup.enter="openProductDetail(product)"
+        >
           <div class="product-thumb" :class="{ placeholder: !(product.image || product.imageUrl) }" :style="productImageStyle(product)">
             <span v-if="!(product.image || product.imageUrl)">{{ product.name?.slice(0, 1) || '品' }}</span>
           </div>
@@ -488,7 +515,7 @@ watch(
               <button
                 :disabled="isSoldOut(product) || !businessStatus.open"
                 :class="{ 'btn-sold-out': isSoldOut(product) || !businessStatus.open }"
-                @click="add(product)"
+                @click.stop="add(product)"
               >
                 {{ isSoldOut(product) ? '已售罄' : (businessStatus.open ? '加入购物车' : businessStatus.nextOpenText) }}
               </button>
@@ -503,6 +530,43 @@ watch(
     </section>
 
     <MerchantReviewSection v-if="merchant" :merchant-id="merchantId" />
+
+    <el-dialog
+      v-model="productDetailVisible"
+      width="680px"
+      class="product-detail-dialog"
+      :title="selectedProduct?.name || '商品详情'"
+      @closed="closeProductDetail"
+    >
+      <div v-if="selectedProduct" class="product-detail">
+        <div
+          class="product-detail-image"
+          :class="{ placeholder: !productImage(selectedProduct) }"
+          :style="productImageStyle(selectedProduct)"
+        >
+          <span v-if="!productImage(selectedProduct)">{{ selectedProduct.name?.slice(0, 1) || '品' }}</span>
+        </div>
+        <div class="product-detail-body">
+          <div class="product-detail-title">
+            <h2>{{ selectedProduct.name }}</h2>
+            <el-tag v-if="isSoldOut(selectedProduct)" type="danger" effect="plain">已售罄</el-tag>
+            <el-tag v-else type="success" effect="plain">库存 {{ selectedProduct.stock }}</el-tag>
+          </div>
+          <p class="product-detail-desc">{{ selectedProduct.description || '暂无商品介绍' }}</p>
+          <div class="product-detail-foot">
+            <strong>{{ priceText(selectedProduct.price) }}</strong>
+            <button
+              type="button"
+              :disabled="isSoldOut(selectedProduct) || !businessStatus.open"
+              :class="{ 'btn-sold-out': isSoldOut(selectedProduct) || !businessStatus.open }"
+              @click="add(selectedProduct)"
+            >
+              {{ isSoldOut(selectedProduct) ? '已售罄' : (businessStatus.open ? '加入购物车' : businessStatus.nextOpenText) }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
 
     <div class="cart-dock" v-if="merchant && !loadError">
       <button class="cart-dock-toggle" type="button" @click="toggleCart">
@@ -761,10 +825,20 @@ watch(
   background: #fff;
   border: 1px solid #efe4d5;
   border-radius: 8px;
+  cursor: pointer;
   display: grid;
   gap: 14px;
   grid-template-columns: 112px 1fr;
   padding: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.product-card:hover,
+.product-card:focus-visible {
+  border-color: #bfdbfe;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .product-thumb {
@@ -831,6 +905,81 @@ watch(
 }
 
 .product-bottom button {
+  white-space: nowrap;
+}
+
+.product-detail {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+}
+
+.product-detail-image {
+  align-items: center;
+  aspect-ratio: 1;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border: 1px solid #efe4d5;
+  border-radius: 8px;
+  color: #9a3412;
+  display: flex;
+  font-size: 40px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 220px;
+  overflow: hidden;
+}
+
+.product-detail-image.placeholder {
+  background: linear-gradient(135deg, #fff7ed, #fde68a);
+}
+
+.product-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.product-detail-title {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.product-detail-title h2 {
+  color: var(--text-primary);
+  font-size: 24px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.product-detail-desc {
+  color: var(--text-secondary);
+  line-height: 1.8;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.product-detail-foot {
+  align-items: center;
+  border-top: 1px solid #eef2f7;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.product-detail-foot strong {
+  color: #ea580c;
+  font-size: 26px;
+}
+
+.product-detail-foot button {
+  min-width: 128px;
   white-space: nowrap;
 }
 
@@ -1049,6 +1198,24 @@ button:disabled {
   .product-thumb {
     height: 96px;
     width: 96px;
+  }
+
+  .product-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .product-detail-image {
+    min-height: 0;
+  }
+
+  .product-detail-title,
+  .product-detail-foot {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .product-detail-foot button {
+    width: 100%;
   }
 }
 </style>
