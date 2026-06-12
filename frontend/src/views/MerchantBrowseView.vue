@@ -4,8 +4,11 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listAddresses, listMerchants, listProducts } from '../api/clas'
 import BackButton from '../components/BackButton.vue'
+import LocationSelector from '../components/LocationSelector.vue'
+import { loadAmap } from '../utils/amap'
 import { formatDistance } from '../utils/formatters'
-import { getCurrentLocation } from '../utils/locationStore'
+import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
+import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
 
 defineOptions({
   name: 'MerchantBrowseView'
@@ -23,6 +26,8 @@ const sort = ref('recommend')
 const onlyDeliverable = ref(false)
 const loading = ref(false)
 const productsLoading = ref(false)
+const locating = ref(false)
+const locationDialogVisible = ref(false)
 
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
 const sortOptions = [
@@ -132,11 +137,52 @@ async function loadAddresses() {
           latitude: Number(defaultAddress.latitude),
           source: 'manual'
         }
+        setCurrentLocation(currentLocation.value)
       }
     }
   } catch {
     addresses.value = []
   }
+}
+
+async function autoLocate() {
+  locating.value = true
+  try {
+    const AMap = await loadAmap()
+    const geolocation = new AMap.Geolocation({
+      enableHighAccuracy: true,
+      timeout: 3000,
+      showButton: false
+    })
+    const nextLocation = await new Promise((resolve, reject) => {
+      geolocation.getCurrentPosition(async (status, result) => {
+        if (status !== 'complete') {
+          reject(new Error('locate failed'))
+          return
+        }
+        resolve(await resolveAutoLocationFromAmap(AMap, result))
+      })
+    })
+    currentLocation.value = nextLocation
+    setCurrentLocation(nextLocation)
+    ElMessage.success('已更新当前位置')
+    await load()
+  } catch {
+    ElMessage.warning('自动定位失败，请手动选择位置')
+  } finally {
+    locating.value = false
+  }
+}
+
+async function confirmLocation(location) {
+  currentLocation.value = location
+  setCurrentLocation(location)
+  locationDialogVisible.value = false
+  if (!sort.value) {
+    sort.value = 'distance'
+  }
+  ElMessage.success('位置已更新')
+  await load()
 }
 
 function queryParams() {
@@ -214,6 +260,17 @@ onMounted(async () => {
       <div class="toolbar-copy">
         <p>{{ resultText }}</p>
         <h1>查看店铺</h1>
+      </div>
+      <div class="browse-location-panel">
+        <div class="location-copy">
+          <strong>当前定位</strong>
+          <span>{{ currentLocation?.address || '未定位，请选择位置' }}</span>
+          <small v-if="!hasSearchLocation">定位后可按距离排序并筛选可配送商家</small>
+        </div>
+        <div class="location-actions">
+          <el-button :loading="locating" @click="autoLocate">自动定位</el-button>
+          <el-button @click="locationDialogVisible = true">选择位置</el-button>
+        </div>
       </div>
       <div class="toolbar-controls">
         <el-input
@@ -294,6 +351,14 @@ onMounted(async () => {
         <el-button type="primary" @click="resetFilters">清空条件</el-button>
       </el-empty>
     </section>
+
+    <el-dialog v-model="locationDialogVisible" title="选择当前位置" width="760px" append-to-body>
+      <LocationSelector
+        v-model="currentLocation"
+        save-enabled
+        @confirm="confirmLocation"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -328,6 +393,47 @@ onMounted(async () => {
   font-size: 28px;
   letter-spacing: 0;
   margin: 0;
+}
+
+.browse-location-panel {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.location-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.location-copy strong {
+  color: var(--text-main);
+  font-size: 14px;
+}
+
+.location-copy span {
+  color: var(--text-secondary);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.location-copy small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.location-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .toolbar-controls {
@@ -497,6 +603,11 @@ onMounted(async () => {
     grid-template-columns: 1fr 1fr;
   }
 
+  .browse-location-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .merchant-row {
     grid-template-columns: 72px minmax(0, 1fr);
   }
@@ -520,6 +631,11 @@ onMounted(async () => {
 
   .toolbar-controls {
     grid-template-columns: 1fr;
+  }
+
+  .location-actions {
+    flex-wrap: wrap;
+    width: 100%;
   }
 
   .merchant-row {
