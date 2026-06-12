@@ -384,28 +384,26 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section
-    class="home-top-grid"
-    :class="{ 'home-top-grid--hero-only': !hasTopSidePanels }"
-  >
-    <section class="hero home-top-hero">
-      <div class="home-top-hero-copy">
-        <h1>CLAS 综合生活助手平台</h1>
-        <p>搜索附近商家、购买外卖与团购券，让吃喝玩乐一键触达。</p>
-      </div>
-      <div class="hero-actions" v-if="currentRole() === 'USER'">
-        <RouterLink class="button" to="/deals">团购到店</RouterLink>
-        <RouterLink class="button secondary" to="/orders">我的订单</RouterLink>
-      </div>
-    </section>
+  <div class="home-layout">
+    <!-- ═══ 左侧固定栏 ═══ -->
+    <aside class="home-sidebar">
+      <section class="hero home-side-hero">
+        <div class="home-top-hero-copy">
+          <h1>CLAS 综合生活助手平台</h1>
+          <p>搜索附近商家、购买外卖与团购券，让吃喝玩乐一键触达。</p>
+        </div>
+        <div class="hero-actions" v-if="currentRole() === 'USER'">
+          <RouterLink class="button" to="/deals">团购到店</RouterLink>
+          <RouterLink class="button secondary" to="/orders">我的订单</RouterLink>
+        </div>
+      </section>
 
-    <div v-if="hasTopSidePanels" class="home-top-side">
-      <section v-if="showAnnouncementsPanel" class="panel home-top-panel announcements-panel">
+      <section v-if="showAnnouncementsPanel" class="panel sidebar-panel announcements-panel">
         <div class="section-head">
           <h2>平台公告</h2>
           <RouterLink to="/user/announcements">查看全部</RouterLink>
         </div>
-        <div class="home-top-panel-body">
+        <div class="sidebar-panel-body">
           <article class="announcement-preview" v-for="item in announcements" :key="item.id">
             <h3>{{ item.title }}</h3>
             <p>{{ item.content }}</p>
@@ -415,14 +413,14 @@ onMounted(async () => {
 
       <section
         v-if="showActiveOrdersPanel"
-        class="panel home-top-panel active-orders-panel"
+        class="panel sidebar-panel active-orders-panel"
         v-loading="ordersLoading"
       >
         <div class="section-head">
           <h2>进行中的订单</h2>
           <RouterLink to="/orders">查看全部订单</RouterLink>
         </div>
-        <div v-if="hasActiveOrders()" class="home-top-panel-body active-order-list">
+        <div v-if="hasActiveOrders()" class="sidebar-panel-body">
           <article class="active-order-card" v-for="order in activeOrders.slice(0, 1)" :key="order.order.id">
             <div class="ao-info">
               <span class="ao-id">订单 #{{ order.order.id }}</span>
@@ -440,97 +438,100 @@ onMounted(async () => {
           </article>
         </div>
       </section>
-    </div>
-  </section>
+    </aside>
 
-  <section class="panel search-panel">
-    <div class="search-row">
-      <el-input
-        v-model="keyword"
-        class="search-input"
-        placeholder="搜索商家名称"
-        clearable
-        @clear="load"
-        @keyup.enter="load"
-      />
-      <el-button type="primary" @click="load">搜索</el-button>
-      <el-button @click="openFilterDialog">
-        筛选<span v-if="appliedFilterCount" class="filter-count">({{ appliedFilterCount }})</span>
-      </el-button>
-    </div>
-  </section>
-
-  <section class="panel location-panel">
-    <strong>当前定位</strong>
-    <span>{{ currentLocation?.address || '未定位，请选择位置' }}</span>
-    <small v-if="!hasSearchLocation">选择位置后可筛选可配送商家</small>
-  </section>
-
-  <section class="panel result-panel">
-    <div class="section-head">
-      <h2>附近商家</h2>
-      <span>{{ resultSummary }}</span>
-    </div>
-    <div class="filter-tags" v-if="activeFilters.length">
-      <el-tag v-for="filter in activeFilters" :key="filter.key" effect="plain">
-        {{ filter.label }}
-      </el-tag>
-    </div>
-  </section>
-
-  <section class="grid" v-loading="loading" v-if="loading || merchants.length">
-    <article class="card" v-for="merchant in merchants" :key="merchant.id">
-      <div
-        class="merchant-visual"
-        :class="{ 'has-logo': merchant.logo }"
-      >
-        <div
-          class="merchant-visual-frame"
-          :class="{ 'has-logo': merchant.logo }"
-          :style="merchant.logo ? { backgroundImage: `url(${merchant.logo})` } : null"
-        ></div>
-        <div class="merchant-logo-badge">
-          <img v-if="merchant.logo" :src="merchant.logo" alt="商铺图标" class="merchant-logo-img" />
-          <span v-else>{{ merchant.category }}</span>
+    <!-- ═══ 右侧滚动内容 ═══ -->
+    <div class="home-main">
+      <section class="panel search-panel">
+        <div class="search-row">
+          <el-input
+            v-model="keyword"
+            class="search-input"
+            placeholder="搜索商家名称"
+            clearable
+            @clear="load"
+            @keyup.enter="load"
+          />
+          <el-button type="primary" @click="load">搜索</el-button>
+          <el-button @click="openFilterDialog">
+            筛选<span v-if="appliedFilterCount" class="filter-count">({{ appliedFilterCount }})</span>
+          </el-button>
         </div>
-      </div>
-      <div class="merchant-card-body">
-        <h2 class="merchant-name">{{ merchant.merchantName }}</h2>
-        <p class="merchant-address">{{ merchant.address }}</p>
-        <div class="merchant-meta">
-          <span class="merchant-rating">★ {{ Number(merchant.score || 0).toFixed(1) }}</span>
-          <span>人均 ¥{{ ((merchant.averagePrice || 0) / 100).toFixed(0) }}</span>
-          <span>{{ merchant.businessHours || '营业中' }}</span>
-        </div>
-        <div class="merchant-info-pills">
-          <span>起送 ¥{{ ((merchant.minOrderPrice || 0) / 100).toFixed(0) }}</span>
-          <span>配送 ¥{{ ((merchant.deliveryFee || 0) / 100).toFixed(0) }}</span>
-          <span>{{ distanceText(merchant.routeDistanceMeters || merchant.distanceMeters) }}</span>
-          <span v-if="merchant.estimatedMinutes">约 {{ merchant.estimatedMinutes }} 分钟</span>
-          <span v-if="merchant.deliveryRadiusM">{{ distanceText(merchant.deliveryRadiusM) }} 内配送</span>
-        </div>
-      </div>
-      <div class="delivery-status">
-        <el-tag :type="merchantOpenStatus(merchant).type" effect="plain">{{ merchantOpenStatus(merchant).label }}</el-tag>
-        <el-tag v-if="merchant.deliveryAvailable === true" type="success" effect="plain">可配送</el-tag>
-        <el-tag v-else-if="merchant.deliveryAvailable === false" type="danger" effect="plain">超出配送范围</el-tag>
-        <el-tag v-else effect="plain">选择位置查看配送</el-tag>
-      </div>
-      <div class="card-actions">
-        <RouterLink class="button secondary merchant-card-btn" :to="`/merchant/${merchant.id}`">进入店铺</RouterLink>
-        <button class="button secondary merchant-card-btn" type="button" @click="chatStore.openMerchantChat(merchant.id)">咨询客服</button>
-      </div>
-    </article>
-  </section>
+      </section>
 
-  <section class="panel empty-panel" v-else>
-    <el-empty description="没有找到符合条件的商家">
-      <div class="empty-actions">
-        <el-button type="primary" @click="openFilterDialog">调整筛选</el-button>
-        <el-button @click="resetAllFilters">清空条件</el-button>
-      </div>
-    </el-empty>
-  </section>
+      <section class="panel location-panel">
+        <strong>当前定位</strong>
+        <span>{{ currentLocation?.address || '未定位，请选择位置' }}</span>
+        <small v-if="!hasSearchLocation">选择位置后可筛选可配送商家</small>
+      </section>
+
+      <section class="panel result-panel">
+        <div class="section-head">
+          <h2>附近商家</h2>
+          <span>{{ resultSummary }}</span>
+        </div>
+        <div class="filter-tags" v-if="activeFilters.length">
+          <el-tag v-for="filter in activeFilters" :key="filter.key" effect="plain">
+            {{ filter.label }}
+          </el-tag>
+        </div>
+      </section>
+
+      <section class="grid" v-loading="loading" v-if="loading || merchants.length">
+        <article class="card" v-for="merchant in merchants" :key="merchant.id">
+          <div
+            class="merchant-visual"
+            :class="{ 'has-logo': merchant.logo }"
+          >
+            <div
+              class="merchant-visual-frame"
+              :class="{ 'has-logo': merchant.logo }"
+              :style="merchant.logo ? { backgroundImage: `url(${merchant.logo})` } : null"
+            ></div>
+            <div class="merchant-logo-badge">
+              <img v-if="merchant.logo" :src="merchant.logo" alt="商铺图标" class="merchant-logo-img" />
+              <span v-else>{{ merchant.category }}</span>
+            </div>
+          </div>
+          <div class="merchant-card-body">
+            <h2 class="merchant-name">{{ merchant.merchantName }}</h2>
+            <p class="merchant-address">{{ merchant.address }}</p>
+            <div class="merchant-meta">
+              <span class="merchant-rating">★ {{ Number(merchant.score || 0).toFixed(1) }}</span>
+              <span>人均 ¥{{ ((merchant.averagePrice || 0) / 100).toFixed(0) }}</span>
+              <span>{{ merchant.businessHours || '营业中' }}</span>
+            </div>
+            <div class="merchant-info-pills">
+              <span>起送 ¥{{ ((merchant.minOrderPrice || 0) / 100).toFixed(0) }}</span>
+              <span>配送 ¥{{ ((merchant.deliveryFee || 0) / 100).toFixed(0) }}</span>
+              <span>{{ distanceText(merchant.routeDistanceMeters || merchant.distanceMeters) }}</span>
+              <span v-if="merchant.estimatedMinutes">约 {{ merchant.estimatedMinutes }} 分钟</span>
+              <span v-if="merchant.deliveryRadiusM">{{ distanceText(merchant.deliveryRadiusM) }} 内配送</span>
+            </div>
+          </div>
+          <div class="delivery-status">
+            <el-tag :type="merchantOpenStatus(merchant).type" effect="plain">{{ merchantOpenStatus(merchant).label }}</el-tag>
+            <el-tag v-if="merchant.deliveryAvailable === true" type="success" effect="plain">可配送</el-tag>
+            <el-tag v-else-if="merchant.deliveryAvailable === false" type="danger" effect="plain">超出配送范围</el-tag>
+            <el-tag v-else effect="plain">选择位置查看配送</el-tag>
+          </div>
+          <div class="card-actions">
+            <RouterLink class="button secondary merchant-card-btn" :to="`/merchant/${merchant.id}`">进入店铺</RouterLink>
+            <button class="button secondary merchant-card-btn" type="button" @click="chatStore.openMerchantChat(merchant.id)">咨询客服</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel empty-panel" v-else>
+        <el-empty description="没有找到符合条件的商家">
+          <div class="empty-actions">
+            <el-button type="primary" @click="openFilterDialog">调整筛选</el-button>
+            <el-button @click="resetAllFilters">清空条件</el-button>
+          </div>
+        </el-empty>
+      </section>
+    </div>
+  </div>
 
   <el-dialog v-model="filterDialogVisible" title="筛选商家" width="640px" class="filter-dialog">
     <div class="filter-section">
@@ -638,50 +639,42 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.home-top-grid {
-  align-items: stretch;
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  margin-bottom: 20px;
-  min-height: 360px;
-}
-
-.home-top-grid--hero-only {
-  grid-template-columns: minmax(0, 1fr);
-  min-height: 0;
-}
-
-.home-top-hero {
+/* ═══ 两栏布局 — 左侧固定侧栏 + 右侧滚动内容 ═══ */
+.home-layout {
   align-items: flex-start;
-  align-self: stretch;
-  border: 1px solid var(--border-color) !important;
-  box-sizing: border-box;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 360px minmax(0, 1fr);
+}
+
+/* ─── 左侧固定侧栏 ─── */
+.home-sidebar {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  gap: 14px;
+  position: sticky;
+  top: 84px; /* topbar 64px + 20px gap */
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+}
+
+.home-side-hero {
+  align-items: flex-start;
+  border: 1px solid var(--border-color) !important;
+  display: flex;
+  flex-direction: column;
   justify-content: space-between;
+  gap: 18px;
   margin-bottom: 0;
-  min-height: 360px;
+  min-height: auto;
 }
 
 .home-top-hero-copy {
   position: relative;
 }
 
-.home-top-side {
-  align-self: stretch;
+.sidebar-panel {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  min-height: 360px;
-  min-width: 0;
-}
-
-.home-top-panel {
-  display: flex;
-  flex: 1 1 0;
   flex-direction: column;
   margin-bottom: 0;
   min-height: 0;
@@ -689,92 +682,44 @@ onMounted(async () => {
 }
 
 .announcements-panel {
-  flex: 0.75 1 0;
+  flex-shrink: 0;
 }
 
 .active-orders-panel {
-  flex: 1.25 1 0;
-  min-height: 168px;
+  flex-shrink: 0;
 }
 
-.home-top-panel-body {
+.sidebar-panel-body {
   display: grid;
-  flex: 1 1 auto;
-  gap: 12px;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.active-orders-panel .home-top-panel-body {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.active-orders-panel .active-order-card {
-  align-items: stretch;
-  display: grid;
-  flex: 1 1 auto;
   gap: 10px;
-  grid-template-rows: minmax(0, 1fr) auto;
-  min-height: 0;
-  padding: 12px 14px;
 }
 
-.active-orders-panel .ao-info {
-  align-content: start;
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.active-orders-panel .ao-items {
-  display: none;
-}
-
-.active-orders-panel .ao-actions {
-  flex-shrink: 0;
-  justify-content: stretch;
-  width: 100%;
-}
-
-.active-orders-panel .ao-action-btn {
-  flex: 1 1 0;
-  font-size: 13px;
-  min-height: 36px;
+/* ─── 右侧主内容 ─── */
+.home-main {
   min-width: 0;
-  padding: 0 10px;
-}
-
-.home-top-panel .section-head {
-  flex-shrink: 0;
-  margin-bottom: 12px;
 }
 
 .section-head {
   align-items: center;
   display: flex;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
 }
 
 .search-panel {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .search-row {
   align-items: center;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
@@ -883,22 +828,21 @@ onMounted(async () => {
   align-self: center;
 }
 
-@media (max-width: 960px) {
-  .home-top-grid,
-  .home-top-grid--hero-only {
+/* ─── 响应式 ─── */
+@media (max-width: 1024px) {
+  .home-layout {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .home-layout {
     grid-template-columns: minmax(0, 1fr);
-    min-height: 0;
   }
 
-  .home-top-hero,
-  .home-top-side {
-    height: auto;
-    min-height: 0;
-  }
-
-  .home-top-panel {
-    flex: 0 0 auto;
-    max-height: 220px;
+  .home-sidebar {
+    position: static;
+    max-height: none;
   }
 }
 
