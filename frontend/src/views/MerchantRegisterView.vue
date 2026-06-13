@@ -422,11 +422,18 @@ onUnmounted(() => {
   max-width: 800px;
   margin: 40px auto;
   padding: 0 20px;
+  animation: merchantPageIn 0.58s ease-out both;
 }
 
 .box-card {
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  animation: merchantCardIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+  transform-origin: 50% 24px;
+}
+
+.box-card :deep(.el-card__header) {
+  animation: merchantSectionIn 0.52s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
 }
 
 .card-header h2 {
@@ -439,10 +446,12 @@ onUnmounted(() => {
   margin: 8px 0 0 0;
   color: var(--text-muted);
   font-size: 14px;
+  animation: merchantSectionIn 0.52s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
 }
 
 .alert-tip {
   margin-bottom: 24px;
+  animation: merchantSectionIn 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
 }
 
 .code-row {
@@ -485,12 +494,14 @@ onUnmounted(() => {
   margin-bottom: 20px;
   padding-left: 8px;
   border-left: 4px solid var(--color-primary);
+  animation: merchantSectionIn 0.46s cubic-bezier(0.16, 1, 0.3, 1) 0.34s both;
 }
 
 .form-actions {
   margin-top: 32px;
   display: flex;
   justify-content: flex-end;
+  animation: merchantSectionIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.64s both;
 }
 
 .submit-btn {
@@ -508,6 +519,7 @@ onUnmounted(() => {
   padding: 20px 40px;
   background: var(--bg-page, #f9fafb);
   border-radius: 12px;
+  animation: merchantSectionIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
 }
 
 .step {
@@ -534,6 +546,7 @@ onUnmounted(() => {
   background: var(--color-primary, #f97316);
   color: #fff;
   box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+  animation: merchantStepPulse 0.46s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .step.done .step-num {
@@ -582,10 +595,100 @@ onUnmounted(() => {
   margin-top: 4px;
 }
 
+.box-card :deep(.el-form-item) {
+  animation: merchantFieldIn 0.46s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.box-card :deep(.el-form-item:nth-of-type(1)) {
+  animation-delay: 0.38s;
+}
+
+.box-card :deep(.el-form-item:nth-of-type(2)) {
+  animation-delay: 0.44s;
+}
+
+.box-card :deep(.el-form-item:nth-of-type(3)) {
+  animation-delay: 0.5s;
+}
+
+.box-card :deep(.el-form-item:nth-of-type(4)) {
+  animation-delay: 0.56s;
+}
+
+.box-card :deep(.el-form-item:nth-of-type(5)) {
+  animation-delay: 0.62s;
+}
+
+.box-card :deep(.el-form-item:nth-of-type(6)) {
+  animation-delay: 0.68s;
+}
+
+.box-card :deep(.el-form-item:nth-of-type(7)) {
+  animation-delay: 0.74s;
+}
+
+@keyframes merchantPageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes merchantCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes merchantSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes merchantFieldIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes merchantStepPulse {
+  0% {
+    transform: scale(0.88);
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 /* WCAG 2.3.3 — 尊重用户减少动画偏好 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
   }
 }

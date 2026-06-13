@@ -195,24 +195,24 @@ function switchTab(tab) {
     <div class="auth-shell">
       <section class="auth-visual" :class="`visual-${visualContent.mode}`" aria-label="CLAS 校园生活服务">
         <div class="visual-pattern" aria-hidden="true"></div>
-        <div class="visual-copy">
+        <div class="visual-copy" :key="`${visualContent.mode}-copy`">
           <span class="visual-kicker">{{ visualContent.kicker }}</span>
           <h1>{{ visualContent.title }}</h1>
           <p>{{ visualContent.description }}</p>
         </div>
-        <div class="visual-steps" aria-hidden="true">
+        <div class="visual-steps" :key="`${visualContent.mode}-steps`" aria-hidden="true">
           <span
             v-for="step in visualContent.steps"
             :key="step"
           >{{ step }}</span>
         </div>
-        <figure class="visual-photo">
+        <figure class="visual-photo" :key="`${visualContent.mode}-photo`">
           <img
             :src="visualContent.image"
             :alt="visualContent.alt"
           />
         </figure>
-        <div class="visual-note">
+        <div class="visual-note" :key="`${visualContent.mode}-note`">
           <span class="note-icon">✓</span>
           <div>
             <strong>{{ visualContent.noteTitle }}</strong>
@@ -455,6 +455,7 @@ function switchTab(tab) {
     radial-gradient(circle at 15% 20%, rgba(255, 209, 0, 0.22), transparent 32%),
     radial-gradient(circle at 88% 82%, rgba(21, 128, 61, 0.09), transparent 28%),
     linear-gradient(135deg, #fffaf0 0%, #f8f6ef 48%, #fffdf7 100%);
+  animation: authPageWash 0.7s ease-out both;
 }
 
 .auth-wrapper::before,
@@ -489,6 +490,7 @@ function switchTab(tab) {
   box-shadow: 0 28px 80px rgba(69, 47, 15, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.24);
   isolation: isolate;
+  animation: authVisualRise 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
 }
 
 .auth-visual.visual-login {
@@ -506,16 +508,17 @@ function switchTab(tab) {
   position: absolute;
   inset: 0;
   z-index: -1;
-  opacity: 0.38;
+  opacity: var(--visual-pattern-opacity, 0.38);
   background:
     linear-gradient(45deg, rgba(255, 209, 0, 0.16) 25%, transparent 25%) 0 0 / 28px 28px,
     linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 25%, transparent 25%) 0 14px / 28px 28px,
     radial-gradient(circle at 78% 16%, rgba(255, 209, 0, 0.4), transparent 24%),
     radial-gradient(circle at 12% 86%, rgba(255, 255, 255, 0.18), transparent 22%);
+  animation: authPatternDrift 1.1s ease-out 0.16s both;
 }
 
 .visual-register .visual-pattern {
-  opacity: 0.46;
+  --visual-pattern-opacity: 0.46;
   background:
     linear-gradient(45deg, rgba(255, 209, 0, 0.18) 25%, transparent 25%) 0 0 / 24px 24px,
     linear-gradient(-45deg, rgba(255, 255, 255, 0.14) 25%, transparent 25%) 0 12px / 24px 24px,
@@ -528,6 +531,7 @@ function switchTab(tab) {
   max-width: 520px;
   position: relative;
   z-index: 2;
+  animation: authCopyIn 0.56s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
 }
 
 .visual-kicker {
@@ -582,6 +586,7 @@ function switchTab(tab) {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  animation: authCopyIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.26s both;
 }
 
 .visual-steps span {
@@ -616,6 +621,7 @@ function switchTab(tab) {
   border: 6px solid rgba(255, 250, 240, 0.78);
   transform: none;
   z-index: 1;
+  animation: authPhotoIn 0.64s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
 }
 
 .visual-login .visual-photo {
@@ -649,6 +655,7 @@ function switchTab(tab) {
   color: #2a2015;
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
   z-index: 2;
+  animation: authNoteIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.42s both;
 }
 
 .visual-login .visual-note {
@@ -697,6 +704,7 @@ function switchTab(tab) {
   position: relative;
   z-index: 1;
   overflow: hidden;
+  animation: authPanelIn 0.68s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
 }
 
 .auth-panel::before {
@@ -721,6 +729,52 @@ function switchTab(tab) {
   background: rgba(255, 209, 0, 0.12);
   border-radius: var(--radius-md, 10px);
   padding: 4px;
+  animation: authFieldIn 0.5s ease-out 0.28s both;
+}
+
+.auth-panel h1,
+.auth-panel .section-heading,
+.auth-panel .hint,
+.auth-panel .trust-banner,
+.auth-panel .form-group,
+.auth-panel .submit-btn,
+.auth-panel .auth-message {
+  animation: authFieldIn 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.auth-panel h1,
+.auth-panel .section-heading {
+  animation-delay: 0.34s;
+}
+
+.auth-panel .hint,
+.auth-panel .trust-banner {
+  animation-delay: 0.38s;
+}
+
+.auth-panel .form-group:nth-of-type(1) {
+  animation-delay: 0.42s;
+}
+
+.auth-panel .form-group:nth-of-type(2) {
+  animation-delay: 0.48s;
+}
+
+.auth-panel .form-group:nth-of-type(3) {
+  animation-delay: 0.54s;
+}
+
+.auth-panel .form-group:nth-of-type(4) {
+  animation-delay: 0.6s;
+}
+
+.auth-panel .form-group:nth-of-type(5) {
+  animation-delay: 0.66s;
+}
+
+.auth-panel .submit-btn,
+.auth-panel .auth-message {
+  animation-delay: 0.72s;
 }
 
 .auth-tabs button {
@@ -1102,10 +1156,102 @@ input:focus-visible,
   to { transform: rotate(360deg); }
 }
 
+@keyframes authPageWash {
+  from {
+    background-position: -40px -24px, 40px 32px, 0 0;
+  }
+  to {
+    background-position: 0 0, 0 0, 0 0;
+  }
+}
+
+@keyframes authVisualRise {
+  from {
+    opacity: 0;
+    transform: translateX(-22px) translateY(18px) scale(0.985);
+    filter: saturate(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+    filter: saturate(1);
+  }
+}
+
+@keyframes authPanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px) translateY(18px);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.04);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes authCopyIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes authPhotoIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes authNoteIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes authPatternDrift {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+    background-position: -28px -28px, 28px 28px, 76% 16%, 12% 86%;
+  }
+  to {
+    opacity: var(--visual-pattern-opacity, 0.38);
+    transform: scale(1);
+    background-position: 0 0, 0 14px, 78% 16%, 12% 86%;
+  }
+}
+
+@keyframes authFieldIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* WCAG 2.3.3 — 尊重用户减少动画偏好 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
   }
 }
