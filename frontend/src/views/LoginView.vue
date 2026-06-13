@@ -164,7 +164,30 @@ function switchTab(tab) {
 
 <template>
   <div class="auth-wrapper">
-    <section class="auth-panel">
+    <div class="auth-shell">
+      <section class="auth-visual" aria-label="CLAS 校园生活服务">
+        <div class="visual-pattern" aria-hidden="true"></div>
+        <div class="visual-copy">
+          <span class="visual-kicker">CLAS CAMPUS LIFE</span>
+          <h1>把校园里的每一餐，都安排得刚刚好。</h1>
+          <p>登录后继续浏览附近商家、领取团购优惠，预约到店或把热乎的一餐送到楼下。</p>
+        </div>
+        <figure class="visual-photo">
+          <img
+            src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=82"
+            alt="摆盘丰富的校园餐食"
+          />
+        </figure>
+        <div class="visual-note">
+          <span class="note-icon">✓</span>
+          <div>
+            <strong>校园服务中枢</strong>
+            <span>外卖配送 · 团购优惠 · 到店预约</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="auth-panel">
       <!-- ===== 标签切换 ===== -->
       <div class="auth-tabs">
         <button
@@ -379,7 +402,8 @@ function switchTab(tab) {
         role="alert"
         aria-live="assertive"
       >{{ message }}</p>
-    </section>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -390,9 +414,13 @@ function switchTab(tab) {
 .auth-wrapper {
   min-height: calc(100vh - 60px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
+  padding: clamp(20px, 4vw, 48px);
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 209, 0, 0.22), transparent 32%),
+    radial-gradient(circle at 88% 82%, rgba(21, 128, 61, 0.09), transparent 28%),
+    linear-gradient(135deg, #fffaf0 0%, #f8f6ef 48%, #fffdf7 100%);
 }
 
 .auth-wrapper::before,
@@ -400,9 +428,145 @@ function switchTab(tab) {
   display: none;
 }
 
+.auth-shell {
+  width: min(1120px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 420px);
+  align-items: start;
+  gap: clamp(20px, 3vw, 34px);
+}
+
+.auth-visual {
+  min-height: clamp(500px, calc(100vh - 156px), 620px);
+  position: relative;
+  align-self: start;
+  position: sticky;
+  top: 84px;
+  overflow: hidden;
+  border-radius: 24px;
+  padding: clamp(28px, 4vw, 46px);
+  color: #fffaf0;
+  background:
+    linear-gradient(135deg, rgba(28, 22, 13, 0.88), rgba(92, 63, 19, 0.68)),
+    #2f2114;
+  box-shadow: 0 28px 80px rgba(69, 47, 15, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  isolation: isolate;
+}
+
+.visual-pattern {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.38;
+  background:
+    linear-gradient(45deg, rgba(255, 209, 0, 0.16) 25%, transparent 25%) 0 0 / 28px 28px,
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 25%, transparent 25%) 0 14px / 28px 28px,
+    radial-gradient(circle at 78% 16%, rgba(255, 209, 0, 0.4), transparent 24%),
+    radial-gradient(circle at 12% 86%, rgba(255, 255, 255, 0.18), transparent 22%);
+}
+
+.visual-copy {
+  max-width: 560px;
+  position: relative;
+  z-index: 2;
+}
+
+.visual-kicker {
+  display: inline-flex;
+  margin-bottom: 18px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 209, 0, 0.42);
+  border-radius: 999px;
+  background: rgba(255, 209, 0, 0.14);
+  color: #ffe680;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.visual-copy h1 {
+  margin: 0;
+  color: #fffaf0;
+  font-size: clamp(42px, 5vw, 68px);
+  line-height: 1.02;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.visual-copy p {
+  max-width: 500px;
+  margin: 20px 0 0;
+  color: rgba(255, 250, 240, 0.82);
+  font-size: clamp(17px, 1.55vw, 21px);
+  line-height: 1.75;
+}
+
+.visual-photo {
+  position: absolute;
+  right: clamp(24px, 4vw, 48px);
+  bottom: clamp(86px, 11vh, 118px);
+  width: min(430px, 56%);
+  aspect-ratio: 1 / 0.72;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 22px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  border: 6px solid rgba(255, 250, 240, 0.78);
+  transform: rotate(-2deg);
+}
+
+.visual-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.visual-note {
+  position: absolute;
+  left: clamp(24px, 4vw, 48px);
+  right: clamp(24px, 4vw, 48px);
+  bottom: clamp(24px, 4vw, 42px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 250, 240, 0.94);
+  color: #2a2015;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+}
+
+.note-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #FFD100;
+  color: #1a1510;
+  font-weight: 900;
+}
+
+.visual-note strong,
+.visual-note span {
+  display: block;
+}
+
+.visual-note strong {
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.visual-note span {
+  color: #6b5a32;
+  font-size: 13px;
+}
+
 .auth-panel {
   width: 100%;
-  max-width: 420px;
   padding: 40px;
   background: var(--bg-card, #fff);
   border-radius: var(--radius-xl, 16px);
@@ -878,6 +1042,79 @@ input:focus-visible,
 
   .resend-btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 920px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-visual {
+    min-height: 320px;
+    position: relative;
+    top: auto;
+  }
+
+  .visual-copy h1 {
+    font-size: clamp(34px, 8vw, 48px);
+  }
+
+  .visual-photo {
+    width: min(300px, 46%);
+    bottom: 76px;
+  }
+
+  .auth-panel {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-visual {
+    min-height: 260px;
+    padding: 24px;
+    border-radius: 18px;
+  }
+
+  .visual-copy {
+    max-width: 100%;
+  }
+
+  .visual-copy h1 {
+    font-size: 30px;
+  }
+
+  .visual-copy p {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-top: 12px;
+    max-width: 78%;
+  }
+
+  .visual-kicker {
+    margin-bottom: 12px;
+    font-size: 10px;
+  }
+
+  .visual-photo {
+    width: 128px;
+    right: 16px;
+    bottom: 62px;
+    border-width: 4px;
+    border-radius: 16px;
+  }
+
+  .visual-note {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .visual-note span {
+    font-size: 12px;
   }
 }
 </style>
