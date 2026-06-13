@@ -82,14 +82,19 @@ function selectReplyTarget(review, reply = null) {
   const displayName = reply
     ? reply.displayName || reply.userId
     : review.displayName || review.userId
-  replyTargets.value[review.id] = {
-    parentReplyId: reply?.id ?? null,
-    displayName
+  replyTargets.value = {
+    [review.id]: {
+      parentReplyId: reply?.id ?? null,
+      displayName
+    }
   }
 }
 
 function clearReplyTarget(reviewId) {
-  delete replyTargets.value[reviewId]
+  if (replyTargets.value[reviewId]) {
+    delete replyTargets.value[reviewId]
+    commentDrafts.value[reviewId] = ''
+  }
 }
 
 function replyTargetName(review, reply) {
@@ -208,8 +213,8 @@ onMounted(load)
         </div>
       </div>
 
-      <div v-if="currentRole()" class="reply-box">
-        <div v-if="replyTargets[review.id]" class="reply-target">
+      <div v-if="replyTargets[review.id]" class="reply-box">
+        <div class="reply-target">
           <span>回复 {{ replyTargets[review.id].displayName }}</span>
           <el-button text @click="clearReplyTarget(review.id)">取消</el-button>
         </div>
