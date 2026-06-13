@@ -170,7 +170,7 @@ function switchTab(tab) {
         <div class="visual-copy">
           <span class="visual-kicker">CLAS CAMPUS LIFE</span>
           <h1>把校园里的每一餐，都安排得刚刚好。</h1>
-          <p>登录后继续浏览附近商家、领取团购优惠，预约到店或把热乎的一餐送到楼下。</p>
+          <p>登录后回到你的校园生活台，继续处理订单、收藏和预约。</p>
         </div>
         <figure class="visual-photo">
           <img
@@ -181,8 +181,8 @@ function switchTab(tab) {
         <div class="visual-note">
           <span class="note-icon">✓</span>
           <div>
-            <strong>校园服务中枢</strong>
-            <span>外卖配送 · 团购优惠 · 到店预约</span>
+            <strong>今日推荐已备好</strong>
+            <span>附近商家、优惠套餐和预约提醒会同步更新</span>
           </div>
         </div>
       </section>
@@ -438,10 +438,13 @@ function switchTab(tab) {
 
 .auth-visual {
   min-height: clamp(500px, calc(100vh - 156px), 620px);
-  position: relative;
   align-self: start;
   position: sticky;
   top: 84px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
   overflow: hidden;
   border-radius: 24px;
   padding: clamp(28px, 4vw, 46px);
@@ -467,7 +470,7 @@ function switchTab(tab) {
 }
 
 .visual-copy {
-  max-width: 560px;
+  max-width: 520px;
   position: relative;
   z-index: 2;
 }
@@ -488,32 +491,31 @@ function switchTab(tab) {
 .visual-copy h1 {
   margin: 0;
   color: #fffaf0;
-  font-size: clamp(42px, 5vw, 68px);
-  line-height: 1.02;
+  font-size: clamp(36px, 4.2vw, 58px);
+  line-height: 1.08;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
 .visual-copy p {
-  max-width: 500px;
-  margin: 20px 0 0;
+  max-width: 440px;
+  margin: 18px 0 0;
   color: rgba(255, 250, 240, 0.82);
-  font-size: clamp(17px, 1.55vw, 21px);
-  line-height: 1.75;
+  font-size: clamp(16px, 1.3vw, 19px);
+  line-height: 1.65;
 }
 
 .visual-photo {
-  position: absolute;
-  right: clamp(24px, 4vw, 48px);
-  bottom: clamp(86px, 11vh, 118px);
-  width: min(430px, 56%);
-  aspect-ratio: 1 / 0.72;
-  margin: 0;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: auto 0 0;
   overflow: hidden;
   border-radius: 22px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
   border: 6px solid rgba(255, 250, 240, 0.78);
-  transform: rotate(-2deg);
+  transform: none;
+  z-index: 1;
 }
 
 .visual-photo img {
@@ -524,10 +526,9 @@ function switchTab(tab) {
 }
 
 .visual-note {
-  position: absolute;
-  left: clamp(24px, 4vw, 48px);
-  right: clamp(24px, 4vw, 48px);
-  bottom: clamp(24px, 4vw, 42px);
+  position: relative;
+  width: calc(100% - 28px);
+  margin: 14px auto 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -536,6 +537,7 @@ function switchTab(tab) {
   background: rgba(255, 250, 240, 0.94);
   color: #2a2015;
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+  z-index: 2;
 }
 
 .note-icon {
@@ -1061,8 +1063,7 @@ input:focus-visible,
   }
 
   .visual-photo {
-    width: min(300px, 46%);
-    bottom: 76px;
+    width: 100%;
   }
 
   .auth-panel {
@@ -1089,7 +1090,7 @@ input:focus-visible,
     font-size: 14px;
     line-height: 1.6;
     margin-top: 12px;
-    max-width: 78%;
+    max-width: 100%;
   }
 
   .visual-kicker {
@@ -1098,17 +1099,14 @@ input:focus-visible,
   }
 
   .visual-photo {
-    width: 128px;
-    right: 16px;
-    bottom: 62px;
+    width: 100%;
     border-width: 4px;
     border-radius: 16px;
   }
 
   .visual-note {
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
+    width: 100%;
+    margin-top: 12px;
     padding: 12px;
     border-radius: 14px;
   }
