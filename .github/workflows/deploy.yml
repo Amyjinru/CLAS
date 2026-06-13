@@ -31,6 +31,7 @@ jobs:
       - name: Cleanup zombie Java processes & Deploy
         run: |
           sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@8.141.112.182 "
+            set -e
             echo '>>> 清理残留的非 systemd Java 进程...'
             old_pids=\$(ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | awk '{print \$2}')
             if [ -n \"\$old_pids\" ]; then
@@ -42,13 +43,18 @@ jobs:
             fi
 
             cd /opt/clas
-            echo '>>> 拉取代码...'
-            git pull upstream dev
+            echo '>>> 同步代码到 upstream/dev...'
+            git fetch upstream dev
+            git reset --hard upstream/dev
+            git clean -fd
 
             echo '>>> 构建并部署...'
             clas deploy
 
             echo '>>> 健康检查...'
             sleep 2
-            curl -s http://127.0.0.1:8080/api/health
+            curl -sf http://127.0.0.1:8080/api/health
+            echo
+            echo '>>> 当前部署版本:'
+            git log -1 --oneline
           "
