@@ -439,7 +439,7 @@ watch(
           <div>
             <span>营业时间</span>
             <strong class="business-hours">
-              <span class="business-hours-time">{{ fieldText(merchant.businessHours, '暂无') }}</span>
+              {{ fieldText(merchant.businessHours, '暂无') }}
               <el-tag class="business-status-tag" :type="businessStatus.type" size="small" effect="plain">
                 {{ businessStatus.label }}
               </el-tag>
@@ -795,14 +795,9 @@ watch(
 
 .business-hours {
   align-items: center;
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  line-height: 1;
-}
-
-.business-hours-time {
-  line-height: 22px;
 }
 
 .business-hours :deep(.business-status-tag) {
@@ -812,7 +807,6 @@ watch(
   justify-content: center;
   margin: 0;
   padding: 0 8px;
-  vertical-align: middle;
 }
 
 .business-hours :deep(.business-status-tag .el-tag__content) {
