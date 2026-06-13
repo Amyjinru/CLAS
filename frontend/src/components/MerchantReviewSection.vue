@@ -185,7 +185,7 @@ onMounted(load)
         <el-button text @click="vote('REVIEW', review.id, 'LIKE')">赞 {{ review.likeCount || 0 }}</el-button>
         <el-button text @click="vote('REVIEW', review.id, 'DISLIKE')">踩 {{ review.dislikeCount || 0 }}</el-button>
         <el-button text type="danger" @click="hideOrDelete(review)">{{ review.mine ? '删除' : '隐藏' }}</el-button>
-        <el-button v-if="currentRole() && !review.mine && !showMerchantActions" text type="warning" @click="reportComment(review)">举报</el-button>
+        <el-button v-if="currentRole() && !review.mine && !showMerchantActions" text type="warning" class="report-action" @click="reportComment(review)">举报</el-button>
         <el-button v-if="showMerchantActions" text type="warning" @click="requestDelete(review)">申请删评</el-button>
         <el-button text class="reply-action" @click="selectReplyTarget(review)">回复</el-button>
       </div>
@@ -203,7 +203,7 @@ onMounted(load)
           <el-button text @click="vote('REPLY', reply.id, 'LIKE')">赞 {{ reply.likeCount || 0 }}</el-button>
           <el-button text @click="vote('REPLY', reply.id, 'DISLIKE')">踩 {{ reply.dislikeCount || 0 }}</el-button>
           <el-button v-if="reply.mine" text type="danger" @click="removeReply(reply)">删除</el-button>
-          <el-button v-else-if="currentRole() && !showMerchantActions" text type="warning" @click="reportReplyComment(reply)">举报</el-button>
+          <el-button v-else-if="currentRole() && !showMerchantActions" text type="warning" class="report-action" @click="reportReplyComment(reply)">举报</el-button>
           <el-button text class="reply-action" @click="selectReplyTarget(review, reply)">回复</el-button>
         </div>
       </div>
@@ -235,6 +235,10 @@ onMounted(load)
 .images { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .images img { border-radius: var(--radius-sm); height: 88px; object-fit: cover; width: 88px; }
 .actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.actions :deep(.el-button.is-text.el-button--danger),
+.actions :deep(.report-action.el-button.is-text) {
+  font-weight: 700;
+}
 .reply-action { margin-left: auto; }
 .reply-prefix { color: var(--text-secondary); font-weight: 600; margin-right: 4px; }
 .nested-reply, .reply-box {
