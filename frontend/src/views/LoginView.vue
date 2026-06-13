@@ -118,6 +118,34 @@ const cooldownText = computed(() => {
   return `${codeCooldown.value}秒后重发`
 })
 
+const visualContent = computed(() => {
+  if (activeTab.value === 'register') {
+    return {
+      mode: 'register',
+      kicker: 'NEW CAMPUS ACCOUNT',
+      title: '先建立你的校园生活账号。',
+      description: '完成手机号验证后，收藏、下单和预约提醒都会跟着账号同步。',
+      image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=82',
+      alt: '色彩丰富的健康餐食',
+      noteTitle: '注册流程更清晰',
+      noteText: '昵称、密码、手机号和验证码分步完成，信息会安全加密',
+      steps: ['填写昵称', '设置密码', '手机验证']
+    }
+  }
+
+  return {
+    mode: 'login',
+    kicker: 'WELCOME BACK',
+    title: '回到你的校园生活台。',
+    description: '继续查看订单、收藏商家和今日推荐。',
+    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=82',
+    alt: '摆盘丰富的校园餐食',
+    noteTitle: '今日推荐已备好',
+    noteText: '附近商家、优惠套餐和预约提醒已更新',
+    steps: ['输入手机号', '确认密码']
+  }
+})
+
 async function submitRegister() {
   if (!validPhone(registerForm.phone)) {
     showMessage('请输入正确的手机号', 'error')
@@ -165,24 +193,30 @@ function switchTab(tab) {
 <template>
   <div class="auth-wrapper">
     <div class="auth-shell">
-      <section class="auth-visual" aria-label="CLAS 校园生活服务">
+      <section class="auth-visual" :class="`visual-${visualContent.mode}`" aria-label="CLAS 校园生活服务">
         <div class="visual-pattern" aria-hidden="true"></div>
         <div class="visual-copy">
-          <span class="visual-kicker">CLAS CAMPUS LIFE</span>
-          <h1>把校园里的每一餐，都安排得刚刚好。</h1>
-          <p>登录后回到你的校园生活台，继续处理订单、收藏和预约。</p>
+          <span class="visual-kicker">{{ visualContent.kicker }}</span>
+          <h1>{{ visualContent.title }}</h1>
+          <p>{{ visualContent.description }}</p>
+        </div>
+        <div class="visual-steps" aria-hidden="true">
+          <span
+            v-for="step in visualContent.steps"
+            :key="step"
+          >{{ step }}</span>
         </div>
         <figure class="visual-photo">
           <img
-            src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=82"
-            alt="摆盘丰富的校园餐食"
+            :src="visualContent.image"
+            :alt="visualContent.alt"
           />
         </figure>
         <div class="visual-note">
           <span class="note-icon">✓</span>
           <div>
-            <strong>今日推荐已备好</strong>
-            <span>附近商家、优惠套餐和预约提醒会同步更新</span>
+            <strong>{{ visualContent.noteTitle }}</strong>
+            <span>{{ visualContent.noteText }}</span>
           </div>
         </div>
       </section>
@@ -457,6 +491,17 @@ function switchTab(tab) {
   isolation: isolate;
 }
 
+.auth-visual.visual-login {
+  min-height: clamp(470px, calc(100vh - 180px), 560px);
+  justify-content: center;
+  gap: 14px;
+  padding: clamp(24px, 3vw, 32px);
+}
+
+.auth-visual.visual-register {
+  min-height: clamp(640px, calc(100vh - 120px), 740px);
+}
+
 .visual-pattern {
   position: absolute;
   inset: 0;
@@ -467,6 +512,16 @@ function switchTab(tab) {
     linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 25%, transparent 25%) 0 14px / 28px 28px,
     radial-gradient(circle at 78% 16%, rgba(255, 209, 0, 0.4), transparent 24%),
     radial-gradient(circle at 12% 86%, rgba(255, 255, 255, 0.18), transparent 22%);
+}
+
+.visual-register .visual-pattern {
+  opacity: 0.46;
+  background:
+    linear-gradient(45deg, rgba(255, 209, 0, 0.18) 25%, transparent 25%) 0 0 / 24px 24px,
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.14) 25%, transparent 25%) 0 12px / 24px 24px,
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(255, 255, 255, 0.1) 34px 35px),
+    radial-gradient(circle at 76% 18%, rgba(255, 209, 0, 0.42), transparent 24%),
+    radial-gradient(circle at 10% 84%, rgba(255, 255, 255, 0.2), transparent 22%);
 }
 
 .visual-copy {
@@ -505,6 +560,51 @@ function switchTab(tab) {
   line-height: 1.65;
 }
 
+.visual-login .visual-kicker {
+  margin-bottom: 12px;
+}
+
+.visual-login .visual-copy h1 {
+  font-size: clamp(32px, 3.3vw, 44px);
+  line-height: 1.1;
+}
+
+.visual-login .visual-copy p {
+  max-width: 360px;
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.visual-steps {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.visual-steps span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.13);
+  border: 1px solid rgba(255, 250, 240, 0.2);
+  color: rgba(255, 250, 240, 0.84);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.visual-login .visual-steps {
+  margin-top: -2px;
+}
+
+.visual-register .visual-steps {
+  margin: -4px 0 2px;
+}
+
 .visual-photo {
   position: relative;
   width: 100%;
@@ -516,6 +616,17 @@ function switchTab(tab) {
   border: 6px solid rgba(255, 250, 240, 0.78);
   transform: none;
   z-index: 1;
+}
+
+.visual-login .visual-photo {
+  aspect-ratio: 16 / 5.6;
+  border-width: 5px;
+  border-radius: 18px;
+}
+
+.visual-register .visual-photo {
+  aspect-ratio: 16 / 9;
+  margin-top: 4px;
 }
 
 .visual-photo img {
@@ -538,6 +649,15 @@ function switchTab(tab) {
   color: #2a2015;
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
   z-index: 2;
+}
+
+.visual-login .visual-note {
+  margin-top: 12px;
+}
+
+.visual-register .visual-note {
+  margin-top: 18px;
+  padding: 18px 20px;
 }
 
 .note-icon {
@@ -1058,12 +1178,21 @@ input:focus-visible,
     top: auto;
   }
 
+  .auth-visual.visual-login,
+  .auth-visual.visual-register {
+    min-height: auto;
+  }
+
   .visual-copy h1 {
     font-size: clamp(34px, 8vw, 48px);
   }
 
   .visual-photo {
     width: 100%;
+  }
+
+  .visual-register .visual-photo {
+    aspect-ratio: 16 / 9;
   }
 
   .auth-panel {
@@ -1091,6 +1220,16 @@ input:focus-visible,
     line-height: 1.6;
     margin-top: 12px;
     max-width: 100%;
+  }
+
+  .visual-steps {
+    gap: 8px;
+  }
+
+  .visual-steps span {
+    min-height: 30px;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
   .visual-kicker {
