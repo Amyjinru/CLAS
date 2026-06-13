@@ -17,8 +17,10 @@ import com.clas.entity.Merchant;
 import com.clas.entity.MerchantAuditLog;
 import com.clas.entity.User;
 import com.clas.entity.UserAddress;
+import com.clas.entity.Favorite;
 import com.clas.entity.Orders;
 import com.clas.entity.Product;
+import com.clas.mapper.FavoriteMapper;
 import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.MerchantAuditLogMapper;
 import com.clas.mapper.OrdersMapper;
@@ -53,6 +55,7 @@ public class MerchantService {
     private final UserAddressMapper userAddressMapper;
     private final OrdersMapper ordersMapper;
     private final ProductMapper productMapper;
+    private final FavoriteMapper favoriteMapper;
     private final VerificationCodeStore verificationCodeStore;
     private final AmapRouteService amapRouteService;
     private final RecommendService recommendService;
@@ -65,6 +68,7 @@ public class MerchantService {
         UserAddressMapper userAddressMapper,
         OrdersMapper ordersMapper,
         ProductMapper productMapper,
+        FavoriteMapper favoriteMapper,
         VerificationCodeStore verificationCodeStore,
         AmapRouteService amapRouteService,
         RecommendService recommendService,
@@ -76,6 +80,7 @@ public class MerchantService {
         this.userAddressMapper = userAddressMapper;
         this.ordersMapper = ordersMapper;
         this.productMapper = productMapper;
+        this.favoriteMapper = favoriteMapper;
         this.verificationCodeStore = verificationCodeStore;
         this.amapRouteService = amapRouteService;
         this.recommendService = recommendService;
@@ -165,7 +170,9 @@ public class MerchantService {
         }
         refreshAveragePrice(id);
         merchant = merchantMapper.selectById(id);
-        return convertToResponse(merchant);
+        Long favoriteCount = favoriteMapper.selectCount(new LambdaQueryWrapper<Favorite>()
+            .eq(Favorite::getMerchantId, id));
+        return convertToResponse(merchant, null, false, favoriteCount);
     }
 
     public DeliveryEstimateResponse deliveryEstimate(Long id, BigDecimal latitude, BigDecimal longitude) {
@@ -443,14 +450,23 @@ public class MerchantService {
     }
 
     private MerchantResponse convertToResponse(Merchant merchant) {
-        return convertToResponse(merchant, null, false);
+        return convertToResponse(merchant, null, false, null);
     }
 
     private MerchantResponse convertToResponse(Merchant merchant, Coordinate coordinate) {
-        return convertToResponse(merchant, coordinate, true);
+        return convertToResponse(merchant, coordinate, true, null);
     }
 
     private MerchantResponse convertToResponse(Merchant merchant, Coordinate coordinate, boolean includeRouteEstimate) {
+        return convertToResponse(merchant, coordinate, includeRouteEstimate, null);
+    }
+
+    private MerchantResponse convertToResponse(
+        Merchant merchant,
+        Coordinate coordinate,
+        boolean includeRouteEstimate,
+        Long favoriteCount
+    ) {
         Estimate estimate = estimateDelivery(merchant, coordinate, includeRouteEstimate);
         return new MerchantResponse(
             merchant.getId(),
@@ -478,7 +494,8 @@ public class MerchantService {
             estimate.distanceMeters(),
             estimate.routeDistanceMeters(),
             estimate.estimatedMinutes(),
-            estimate.deliveryAvailable()
+            estimate.deliveryAvailable(),
+            favoriteCount
         );
     }
 

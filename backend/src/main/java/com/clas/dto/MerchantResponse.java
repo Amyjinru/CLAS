@@ -30,6 +30,7 @@ public record MerchantResponse(
     Integer distanceMeters,
     Integer routeDistanceMeters,
     Integer estimatedMinutes,
-    Boolean deliveryAvailable
+    Boolean deliveryAvailable,
+    Long favoriteCount
 ) {
 }

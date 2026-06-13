@@ -514,7 +514,7 @@ onUnmounted(() => {
             <h2 class="merchant-name">{{ merchant.merchantName }}</h2>
             <p class="merchant-address">{{ merchant.address }}</p>
             <div class="merchant-meta">
-              <span class="merchant-rating">★ {{ Number(merchant.score || 0).toFixed(1) }}</span>
+              <span class="merchant-rating">★ {{ Math.min(5, Number(merchant.score || 0)).toFixed(1) }}</span>
               <span>人均 ¥{{ ((merchant.averagePrice || 0) / 100).toFixed(0) }}</span>
               <span>{{ merchant.businessHours || '营业中' }}</span>
             </div>

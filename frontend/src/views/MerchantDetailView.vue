@@ -93,6 +93,19 @@ function fieldText(value, fallback = '暂无信息') {
   return value || fallback
 }
 
+function scoreText(value) {
+  if (value === null || value === undefined || value === '') return '暂无'
+  const normalized = Math.min(5, Math.max(0, Number(value)))
+  if (Number.isNaN(normalized)) return '暂无'
+  return normalized.toFixed(1)
+}
+
+const favoriteCountText = computed(() => {
+  const count = merchant.value?.favoriteCount
+  if (count === null || count === undefined) return ''
+  return `${count} 人收藏`
+})
+
 const businessStatus = computed(() => resolveBusinessStatus(merchant.value))
 
 function parseTimeToMinutes(value) {
@@ -399,24 +412,27 @@ watch(
             <div>
             <div class="merchant-tags">
               <el-tag effect="plain">{{ fieldText(merchant.category, '生活服务') }}</el-tag>
-              <el-tag type="warning" effect="plain">评分 {{ merchant.score ?? '暂无' }}</el-tag>
+              <el-tag type="warning" effect="plain">评分 {{ scoreText(merchant.score) }}</el-tag>
               <el-tag :type="deliveryStatus.type" effect="plain">{{ deliveryStatus.label }}</el-tag>
             </div>
             <h1>{{ merchant.merchantName }}</h1>
             <p class="merchant-address">{{ fieldText(merchant.address, '暂无地址') }}</p>
             </div>
           </div>
-          <button
-            class="favorite-button secondary"
-            :class="{ active: isFavorite }"
-            :disabled="favoriteLoading"
-            @click="toggleFavorite"
-          >
-            {{ favoriteLoading ? '处理中...' : (isFavorite ? '已收藏' : '收藏商家') }}
-          </button>
-          <button class="button consult-button" type="button" @click="chatStore.openMerchantChat(merchantId)">
-            咨询客服
-          </button>
+          <div class="merchant-hero-actions">
+            <span v-if="favoriteCountText" class="favorite-count-label">{{ favoriteCountText }}</span>
+            <button
+              class="favorite-button secondary"
+              :class="{ active: isFavorite }"
+              :disabled="favoriteLoading"
+              @click="toggleFavorite"
+            >
+              {{ favoriteLoading ? '处理中...' : (isFavorite ? '已收藏' : '收藏商家') }}
+            </button>
+            <button class="button secondary consult-button" type="button" @click="chatStore.openMerchantChat(merchantId)">
+              咨询客服
+            </button>
+          </div>
         </div>
 
         <div class="merchant-stats">
@@ -641,6 +657,9 @@ watch(
 
 <style scoped>
 .merchant-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   padding-bottom: 88px;
 }
 
@@ -662,8 +681,15 @@ watch(
 .merchant-title-row {
   align-items: flex-start;
   display: flex;
-  gap: 18px;
-  justify-content: space-between;
+  gap: 16px;
+}
+
+.merchant-title-main {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  min-width: 0;
 }
 
 .merchant-title-row h1 {
@@ -673,11 +699,26 @@ watch(
   margin: 12px 0 8px;
 }
 
-.merchant-title-main {
+.merchant-hero-actions {
   align-items: center;
   display: flex;
-  gap: 16px;
-  min-width: 0;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.favorite-count-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.consult-button,
+.favorite-button {
+  min-height: 40px;
+  min-width: 96px;
 }
 
 .merchant-logo {
@@ -1187,14 +1228,18 @@ button:disabled {
     padding: 14px;
   }
 
-  .merchant-title-row,
-  .product-bottom {
+  .merchant-title-row {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .merchant-hero-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
   .favorite-button,
-  .product-bottom button {
+  .consult-button {
     width: 100%;
   }
 
