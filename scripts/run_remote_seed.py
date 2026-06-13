@@ -10,6 +10,7 @@ PASSWORD = sys.argv[1] if len(sys.argv) > 1 else ""
 SQL_FILES = [
     Path(__file__).resolve().parents[1] / "database" / "seed-demo-fix-and-boost.sql",
     Path(__file__).resolve().parents[1] / "database" / "seed-demo-favorites-reviews.sql",
+    Path(__file__).resolve().parents[1] / "database" / "seed-demo-extra-reviews.sql",
 ]
 
 if not PASSWORD:

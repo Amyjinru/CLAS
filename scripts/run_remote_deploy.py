@@ -11,7 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = [
     "backend/src/main/java/com/clas/dto/MerchantResponse.java",
     "backend/src/main/java/com/clas/service/MerchantService.java",
+    "backend/src/main/java/com/clas/service/RecommendService.java",
     "backend/src/test/java/com/clas/service/MerchantAveragePriceTest.java",
+    "backend/src/test/java/com/clas/service/RecommendServiceTest.java",
     "frontend/src/views/HomeView.vue",
     "frontend/src/views/MerchantDetailView.vue",
 ]

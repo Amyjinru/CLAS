@@ -25,6 +25,7 @@ const onlyDeliverable = ref(false)
 const addresses = ref([])
 const selectedAddressId = ref('')
 const currentLocation = ref(getCurrentLocation())
+const locating = ref(false)
 const filterDialogVisible = ref(false)
 const locationPickerVisible = ref(false)
 const draftCategory = ref('')
@@ -191,6 +192,7 @@ async function autoLocate(force = false) {
   if (!force && currentLocation.value?.longitude && currentLocation.value?.latitude) {
     return
   }
+  locating.value = true
   try {
     const AMap = await loadAmap()
     const geolocation = new AMap.Geolocation({
@@ -198,20 +200,29 @@ async function autoLocate(force = false) {
       timeout: 3000,
       showButton: false
     })
-    await new Promise((resolve) => {
+    const nextLocation = await new Promise((resolve, reject) => {
       geolocation.getCurrentPosition(async (status, result) => {
         if (status !== 'complete') {
-          resolve()
+          reject(new Error('locate failed'))
           return
         }
-        const next = await resolveAutoLocationFromAmap(AMap, result)
-        currentLocation.value = setCurrentLocation(next)
-        selectedAddressId.value = ''
-        resolve()
+        resolve(await resolveAutoLocationFromAmap(AMap, result))
       })
     })
+    currentLocation.value = setCurrentLocation(nextLocation)
+    selectedAddressId.value = ''
+    if (force) {
+      ElMessage.success('已更新当前位置')
+      if (shouldQueryByLocation()) {
+        await load()
+      }
+    }
   } catch {
-    // Browser permission or key problems should not block the home page.
+    if (force) {
+      ElMessage.warning('自动定位失败，请手动选择位置')
+    }
+  } finally {
+    locating.value = false
   }
 }
 
@@ -473,9 +484,21 @@ onUnmounted(() => {
         </section>
 
         <section class="panel location-panel">
-          <strong>当前定位</strong>
-          <span>{{ currentLocation?.address || '未定位，请选择位置' }}</span>
-          <small v-if="!hasSearchLocation">选择位置后可筛选可配送商家</small>
+          <div class="location-bar">
+            <div class="location-bar-copy">
+              <strong>当前定位</strong>
+              <span class="location-bar-address">{{ currentLocation?.address || '未定位，请选择位置' }}</span>
+            </div>
+            <button
+              type="button"
+              class="button secondary location-bar-action"
+              :disabled="locating"
+              @click="autoLocate(true)"
+            >
+              {{ locating ? '定位中...' : '重新定位' }}
+            </button>
+          </div>
+          <small v-if="!hasSearchLocation" class="location-bar-hint">选择位置后可筛选可配送商家</small>
         </section>
 
         <section class="panel result-panel">
@@ -948,18 +971,56 @@ onUnmounted(() => {
 }
 
 .location-panel {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+}
+
+.location-bar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 12px;
+}
+
+.location-bar-copy {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
+  flex: 1;
   gap: 10px;
+  min-width: 0;
 }
 
-.location-panel span {
+.location-bar-copy strong {
+  color: var(--text-main);
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.location-bar-address {
   color: var(--text-secondary);
+  flex: 1;
+  font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.location-panel small {
+.location-bar-action {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.location-bar-hint {
   color: var(--text-muted);
+  font-size: 12px;
 }
 
 .result-panel {
