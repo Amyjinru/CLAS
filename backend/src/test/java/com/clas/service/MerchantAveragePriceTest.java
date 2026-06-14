@@ -9,6 +9,7 @@ import com.clas.entity.Merchant;
 import com.clas.entity.Orders;
 import com.clas.entity.Product;
 import com.clas.mapper.MerchantAuditLogMapper;
+import com.clas.mapper.FavoriteMapper;
 import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.ProductMapper;
@@ -41,6 +42,8 @@ class MerchantAveragePriceTest {
     @Mock
     private ProductMapper productMapper;
     @Mock
+    private FavoriteMapper favoriteMapper;
+    @Mock
     private VerificationCodeStore verificationCodeStore;
     @Mock
     private AmapRouteService amapRouteService;
@@ -58,6 +61,7 @@ class MerchantAveragePriceTest {
             userAddressMapper,
             ordersMapper,
             productMapper,
+            favoriteMapper,
             verificationCodeStore,
             amapRouteService,
             recommendService,

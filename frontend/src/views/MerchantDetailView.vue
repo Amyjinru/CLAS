@@ -1,6 +1,6 @@
 ﻿<script setup>
 import BackButton from '../components/BackButton.vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listGroupedProducts, listProducts, removeFavorite } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
@@ -10,7 +10,7 @@ import { useChatStore } from '../composables/useChatStore'
 import { useCartActions } from '../composables/useCartActions'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
-import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
+import { getCurrentLocation, locationFromAddress, setCurrentLocation, subscribeCurrentLocation } from '../utils/locationStore'
 import { formatFen, formatDistance } from '../utils/formatters'
 
 const route = useRoute()
@@ -35,6 +35,7 @@ const selectedProduct = ref(null)
 const chatStore = useChatStore()
 const { cartMessage, increaseItem, decreaseItem, removeAll } = useCartActions()
 const message = cartMessage
+let unsubscribeLocation = null
 
 const merchantCartItems = computed(() =>
   cartItems.value.filter((item) => item.merchantId === merchantId.value)
@@ -65,6 +66,13 @@ const deliveryStatus = computed(() => {
     ? { type: 'success', label: '可配送' }
     : { type: 'danger', label: '超出配送范围' }
 })
+const browseBackTarget = computed(() => {
+  const from = Array.isArray(route.query.from) ? route.query.from[0] : route.query.from
+  return typeof from === 'string' && from.startsWith('/merchants') ? from : '/home'
+})
+const browseBackLabel = computed(() => (
+  browseBackTarget.value.startsWith('/merchants') ? '返回店铺列表' : '返回首页'
+))
 
 function moneyText(amount, fallback = '未设置') {
   if (amount === null || amount === undefined) return fallback
@@ -84,6 +92,19 @@ function distanceText(distance) {
 function fieldText(value, fallback = '暂无信息') {
   return value || fallback
 }
+
+function scoreText(value) {
+  if (value === null || value === undefined || value === '') return '暂无'
+  const normalized = Math.min(5, Math.max(0, Number(value)))
+  if (Number.isNaN(normalized)) return '暂无'
+  return normalized.toFixed(1)
+}
+
+const favoriteCountText = computed(() => {
+  const count = merchant.value?.favoriteCount
+  if (count === null || count === undefined) return ''
+  return `${count} 人收藏`
+})
 
 const businessStatus = computed(() => resolveBusinessStatus(merchant.value))
 
@@ -193,24 +214,17 @@ async function load() {
 }
 
 async function ensureLocation() {
-  if (currentLocation.value?.longitude && currentLocation.value?.latitude) {
+  const storedLocation = getCurrentLocation()
+  if (storedLocation) {
+    currentLocation.value = storedLocation
     return
   }
   try {
     const addresses = await listAddresses({ silent: true })
     const address = addresses.find((item) => item.isDefault) || addresses[0]
-    if (address?.longitude && address?.latitude) {
-      currentLocation.value = {
-        province: '',
-        city: '',
-        district: '',
-        street: address.address,
-        address: address.address,
-        longitude: Number(address.longitude),
-        latitude: Number(address.latitude),
-        source: 'manual'
-      }
-      setCurrentLocation(currentLocation.value)
+    const defaultLocation = locationFromAddress(address)
+    if (defaultLocation) {
+      currentLocation.value = setCurrentLocation(defaultLocation)
     }
   } catch {
     currentLocation.value = null
@@ -230,8 +244,7 @@ async function autoLocate() {
         message.value = '自动定位失败，请手动选择位置'
         return
       }
-      currentLocation.value = await resolveAutoLocationFromAmap(AMap, result)
-      setCurrentLocation(currentLocation.value)
+      currentLocation.value = setCurrentLocation(await resolveAutoLocationFromAmap(AMap, result))
       await loadDeliveryEstimate()
     })
   } catch {
@@ -315,8 +328,7 @@ async function submitOrder() {
 }
 
 function confirmLocation(location) {
-  currentLocation.value = location
-  setCurrentLocation(location)
+  currentLocation.value = setCurrentLocation(location)
   locationDialogVisible.value = false
   loadDeliveryEstimate()
 }
@@ -348,7 +360,17 @@ async function toggleFavorite() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  unsubscribeLocation = subscribeCurrentLocation((location) => {
+    currentLocation.value = location ? { ...location } : null
+    loadDeliveryEstimate()
+  })
+  load()
+})
+
+onUnmounted(() => {
+  unsubscribeLocation?.()
+})
 
 watch(
   () => route.fullPath,
@@ -365,7 +387,7 @@ watch(
 
 <template>
   <div class="merchant-page">
-    <BackButton to="/home" label="返回首页" />
+    <BackButton :to="browseBackTarget" :label="browseBackLabel" />
 
     <section class="panel loading-panel" v-if="loading">
       <el-skeleton :rows="5" animated />
@@ -390,24 +412,27 @@ watch(
             <div>
             <div class="merchant-tags">
               <el-tag effect="plain">{{ fieldText(merchant.category, '生活服务') }}</el-tag>
-              <el-tag type="warning" effect="plain">评分 {{ merchant.score ?? '暂无' }}</el-tag>
+              <el-tag type="warning" effect="plain">评分 {{ scoreText(merchant.score) }}</el-tag>
               <el-tag :type="deliveryStatus.type" effect="plain">{{ deliveryStatus.label }}</el-tag>
             </div>
             <h1>{{ merchant.merchantName }}</h1>
             <p class="merchant-address">{{ fieldText(merchant.address, '暂无地址') }}</p>
             </div>
           </div>
-          <button
-            class="favorite-button secondary"
-            :class="{ active: isFavorite }"
-            :disabled="favoriteLoading"
-            @click="toggleFavorite"
-          >
-            {{ favoriteLoading ? '处理中...' : (isFavorite ? '已收藏' : '收藏商家') }}
-          </button>
-          <button class="button consult-button" type="button" @click="chatStore.openMerchantChat(merchantId)">
-            咨询客服
-          </button>
+          <div class="merchant-hero-actions">
+            <span v-if="favoriteCountText" class="favorite-count-label">{{ favoriteCountText }}</span>
+            <button
+              class="favorite-button secondary"
+              :class="{ active: isFavorite }"
+              :disabled="favoriteLoading"
+              @click="toggleFavorite"
+            >
+              {{ favoriteLoading ? '处理中...' : (isFavorite ? '已收藏' : '收藏商家') }}
+            </button>
+            <button class="button secondary consult-button" type="button" @click="chatStore.openMerchantChat(merchantId)">
+              咨询客服
+            </button>
+          </div>
         </div>
 
         <div class="merchant-stats">
@@ -415,7 +440,7 @@ watch(
             <span>营业时间</span>
             <strong class="business-hours">
               {{ fieldText(merchant.businessHours, '暂无') }}
-              <el-tag :type="businessStatus.type" size="small" effect="plain">
+              <el-tag class="business-status-tag" :type="businessStatus.type" size="small" effect="plain">
                 {{ businessStatus.label }}
               </el-tag>
             </strong>
@@ -632,6 +657,9 @@ watch(
 
 <style scoped>
 .merchant-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   padding-bottom: 88px;
 }
 
@@ -653,8 +681,15 @@ watch(
 .merchant-title-row {
   align-items: flex-start;
   display: flex;
-  gap: 18px;
-  justify-content: space-between;
+  gap: 16px;
+}
+
+.merchant-title-main {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  min-width: 0;
 }
 
 .merchant-title-row h1 {
@@ -664,11 +699,26 @@ watch(
   margin: 12px 0 8px;
 }
 
-.merchant-title-main {
+.merchant-hero-actions {
   align-items: center;
   display: flex;
-  gap: 16px;
-  min-width: 0;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.favorite-count-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.consult-button,
+.favorite-button {
+  min-height: 40px;
+  min-width: 96px;
 }
 
 .merchant-logo {
@@ -748,6 +798,21 @@ watch(
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.business-hours :deep(.business-status-tag) {
+  align-items: center;
+  display: inline-flex;
+  height: 22px;
+  justify-content: center;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.business-hours :deep(.business-status-tag .el-tag__content) {
+  align-items: center;
+  display: inline-flex;
+  line-height: 1;
 }
 
 .delivery-actions {
@@ -1178,14 +1243,18 @@ button:disabled {
     padding: 14px;
   }
 
-  .merchant-title-row,
-  .product-bottom {
+  .merchant-title-row {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .merchant-hero-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
   .favorite-button,
-  .product-bottom button {
+  .consult-button {
     width: 100%;
   }
 

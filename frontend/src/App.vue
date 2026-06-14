@@ -114,7 +114,20 @@ async function handleLogout() {
       </nav>
     </header>
     <main id="main-content" class="main-content">
-      <RouterView :key="route.fullPath" />
+      <RouterView v-slot="{ Component }">
+        <Transition
+          :name="route.meta.motion || 'page-lift'"
+          mode="out-in"
+          appear
+        >
+          <div
+            :key="route.fullPath"
+            class="route-stage"
+          >
+            <component :is="Component" />
+          </div>
+        </Transition>
+      </RouterView>
     </main>
     <footer
       class="app-footer"

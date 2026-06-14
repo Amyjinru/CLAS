@@ -21,7 +21,7 @@ const error = ref('')
 const actionMessage = ref('')
 
 const deliveryLabel = {
-  WAITING: '等待商家接单',
+  WAITING: '等待自动接单',
   PREPARING: '商家备餐中',
   DELIVERING: '配送中',
   DELIVERED: '已送达'
@@ -39,7 +39,7 @@ const orderTimeline = computed(() => {
   return [
     { label: '订单创建', time: order.createTime },
     { label: '支付成功', time: order.paidAt },
-    { label: '商家接单', time: order.acceptedAt },
+    { label: '自动接单', time: order.acceptedAt },
     { label: '配送开始', time: order.deliveredAt },
     { label: '订单完成', time: order.completedAt },
     { label: '订单取消', time: order.canceledAt },

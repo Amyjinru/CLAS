@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { currentRole, listAddresses, listAnnouncements, listMerchants, currentUser, listOrders } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
@@ -7,7 +7,7 @@ import ChatWindow from '../components/ChatWindow.vue'
 import { useChatStore } from '../composables/useChatStore'
 import { loadAmap } from '../utils/amap'
 import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
-import { getCurrentLocation, setCurrentLocation } from '../utils/locationStore'
+import { getCurrentLocation, locationFromAddress, setCurrentLocation, subscribeCurrentLocation } from '../utils/locationStore'
 import { formatDistance } from '../utils/formatters'
 import { ElMessage } from 'element-plus'
 
@@ -25,6 +25,7 @@ const onlyDeliverable = ref(false)
 const addresses = ref([])
 const selectedAddressId = ref('')
 const currentLocation = ref(getCurrentLocation())
+const locating = ref(false)
 const filterDialogVisible = ref(false)
 const locationPickerVisible = ref(false)
 const draftCategory = ref('')
@@ -37,6 +38,7 @@ const chatOrder = ref(null)
 const ordersLoading = ref(false)
 const announcementsExpanded = ref(false)
 const chatStore = useChatStore()
+let unsubscribeLocation = null
 const categories = ['美食', '饮品', '休闲娱乐', '生活服务']
 const DEFAULT_SORT = 'recommend'
 const sortOptions = [
@@ -172,27 +174,25 @@ async function loadAddresses() {
     addresses.value = await listAddresses({ silent: true })
     const defaultAddress = addresses.value.find((item) => item.isDefault) || addresses.value[0]
     selectedAddressId.value = defaultAddress?.id || ''
-    if (!currentLocation.value && defaultAddress?.longitude && defaultAddress?.latitude) {
-      currentLocation.value = {
-        province: '',
-        city: '',
-        district: '',
-        street: defaultAddress.address,
-        address: defaultAddress.address,
-        longitude: Number(defaultAddress.longitude),
-        latitude: Number(defaultAddress.latitude),
-        source: 'manual'
-      }
+    const storedLocation = getCurrentLocation()
+    if (storedLocation) {
+      currentLocation.value = storedLocation
+      return
+    }
+    const defaultLocation = locationFromAddress(defaultAddress)
+    if (defaultLocation) {
+      currentLocation.value = setCurrentLocation(defaultLocation)
     }
   } catch {
     addresses.value = []
   }
 }
 
-async function autoLocate() {
-  if (currentLocation.value?.longitude && currentLocation.value?.latitude) {
+async function autoLocate(force = false) {
+  if (!force && currentLocation.value?.longitude && currentLocation.value?.latitude) {
     return
   }
+  locating.value = true
   try {
     const AMap = await loadAmap()
     const geolocation = new AMap.Geolocation({
@@ -200,21 +200,29 @@ async function autoLocate() {
       timeout: 3000,
       showButton: false
     })
-    await new Promise((resolve) => {
+    const nextLocation = await new Promise((resolve, reject) => {
       geolocation.getCurrentPosition(async (status, result) => {
         if (status !== 'complete') {
-          resolve()
+          reject(new Error('locate failed'))
           return
         }
-        const next = await resolveAutoLocationFromAmap(AMap, result)
-        currentLocation.value = next
-        setCurrentLocation(next)
-        selectedAddressId.value = ''
-        resolve()
+        resolve(await resolveAutoLocationFromAmap(AMap, result))
       })
     })
+    currentLocation.value = setCurrentLocation(nextLocation)
+    selectedAddressId.value = ''
+    if (force) {
+      ElMessage.success('已更新当前位置')
+      if (shouldQueryByLocation()) {
+        await load()
+      }
+    }
   } catch {
-    // Browser permission or key problems should not block the home page.
+    if (force) {
+      ElMessage.warning('自动定位失败，请手动选择位置')
+    }
+  } finally {
+    locating.value = false
   }
 }
 
@@ -293,7 +301,7 @@ function applyFilterDialog() {
   selectedAddressId.value = draftAddressId.value
   currentLocation.value = cloneLocation(draftLocation.value)
   if (currentLocation.value) {
-    setCurrentLocation(currentLocation.value)
+    currentLocation.value = setCurrentLocation(currentLocation.value)
   }
   filterDialogVisible.value = false
   load()
@@ -318,7 +326,7 @@ function resetAllFilters() {
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
   PAID: '已支付',
-  ACCEPTED: '商家已接单',
+  ACCEPTED: '已支付(自动接单中)',
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
@@ -327,7 +335,7 @@ const orderStatusLabel = {
 }
 
 const deliveryLabel = {
-  WAITING: '等待商家接单',
+  WAITING: '等待自动接单',
   PREPARING: '商家备餐中',
   DELIVERING: '配送中',
   DELIVERED: '已送达'
@@ -378,9 +386,16 @@ watch(
 )
 
 onMounted(async () => {
+  unsubscribeLocation = subscribeCurrentLocation((location) => {
+    currentLocation.value = cloneLocation(location)
+  })
   await loadAddresses()
   await autoLocate()
   await Promise.all([load(), loadActiveOrders()])
+})
+
+onUnmounted(() => {
+  unsubscribeLocation?.()
 })
 </script>
 
@@ -469,15 +484,30 @@ onMounted(async () => {
         </section>
 
         <section class="panel location-panel">
-          <strong>当前定位</strong>
-          <span>{{ currentLocation?.address || '未定位，请选择位置' }}</span>
-          <small v-if="!hasSearchLocation">选择位置后可筛选可配送商家</small>
+          <div class="location-bar">
+            <div class="location-bar-copy">
+              <strong>当前定位</strong>
+              <span class="location-bar-address">{{ currentLocation?.address || '未定位，请选择位置' }}</span>
+            </div>
+            <button
+              type="button"
+              class="button secondary location-bar-action"
+              :disabled="locating"
+              @click="autoLocate(true)"
+            >
+              {{ locating ? '定位中...' : '重新定位' }}
+            </button>
+          </div>
+          <small v-if="!hasSearchLocation" class="location-bar-hint">选择位置后可筛选可配送商家</small>
         </section>
 
         <section class="panel result-panel">
           <div class="section-head">
             <h2>附近商家</h2>
-            <span>{{ resultSummary }}</span>
+            <div class="nearby-actions">
+              <span>{{ resultSummary }}</span>
+              <RouterLink class="button secondary view-shops-btn" to="/merchants">查看店铺</RouterLink>
+            </div>
           </div>
           <div class="filter-tags" v-if="activeFilters.length">
             <el-tag v-for="filter in activeFilters" :key="filter.key" effect="plain">
@@ -507,7 +537,7 @@ onMounted(async () => {
             <h2 class="merchant-name">{{ merchant.merchantName }}</h2>
             <p class="merchant-address">{{ merchant.address }}</p>
             <div class="merchant-meta">
-              <span class="merchant-rating">★ {{ Number(merchant.score || 0).toFixed(1) }}</span>
+              <span class="merchant-rating">★ {{ Math.min(5, Number(merchant.score || 0)).toFixed(1) }}</span>
               <span>人均 ¥{{ ((merchant.averagePrice || 0) / 100).toFixed(0) }}</span>
               <span>{{ merchant.businessHours || '营业中' }}</span>
             </div>
@@ -764,6 +794,28 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 
+.nearby-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.view-shops-btn {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  min-height: 32px;
+  padding: 6px 12px;
+}
+
+.view-shops-btn:visited,
+.view-shops-btn:hover,
+.view-shops-btn:focus {
+  color: #fff;
+}
+
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -919,18 +971,56 @@ onMounted(async () => {
 }
 
 .location-panel {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+}
+
+.location-bar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 12px;
+}
+
+.location-bar-copy {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
+  flex: 1;
   gap: 10px;
+  min-width: 0;
 }
 
-.location-panel span {
+.location-bar-copy strong {
+  color: var(--text-main);
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.location-bar-address {
   color: var(--text-secondary);
+  flex: 1;
+  font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.location-panel small {
+.location-bar-action {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.location-bar-hint {
   color: var(--text-muted);
+  font-size: 12px;
 }
 
 .result-panel {

@@ -131,7 +131,11 @@ async function removeInvalidItems() {
 }
 
 async function changeQuantity(item, quantity) {
-  const result = await updateQuantity(item.productId, quantity)
+  const nextQuantity = Math.min(
+    Number(item.stock || 1),
+    Math.max(1, Math.trunc(Number(quantity || 1)))
+  )
+  const result = await updateQuantity(item.productId, nextQuantity)
   if (result) {
     items.value = result
     await loadPreview()
@@ -227,7 +231,10 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
                 数量
                 <input
                   type="number"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
                   min="1"
+                  step="1"
                   :max="item.stock"
                   :value="item.quantity"
                   :disabled="actionProductId === item.productId"

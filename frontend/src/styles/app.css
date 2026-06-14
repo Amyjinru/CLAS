@@ -36,12 +36,13 @@ button:active,
 }
 button.secondary,
 .button.secondary {
-  background: var(--color-primary-soft);
-  color: #B8970E;
+  background: #FFD100;
+  color: #ffffff;
 }
 button.secondary:hover,
 .button.secondary:hover {
-  background: #FFE566;
+  background: #E6BC00;
+  color: #ffffff;
 }
 button:disabled {
   background: var(--clas-warm-100);
@@ -419,6 +420,279 @@ nav a.router-link-active {
 .stagger-3 { animation-delay: 0.15s; }
 .stagger-4 { animation-delay: 0.2s; }
 
+/* ─── 路由级入场动画：按页面类型差异化 ─── */
+.route-stage {
+  display: block;
+  width: 100%;
+  transform-origin: 50% 24px;
+}
+
+.page-none-enter-active,
+.page-none-leave-active {
+  transition: none;
+}
+
+.page-lift-enter-active,
+.page-market-enter-active,
+.page-slide-enter-active,
+.page-focus-enter-active,
+.page-workbench-enter-active,
+.page-admin-enter-active,
+.page-pop-enter-active {
+  animation-duration: 0.52s;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.page-lift-leave-active,
+.page-market-leave-active,
+.page-slide-leave-active,
+.page-focus-leave-active,
+.page-workbench-leave-active,
+.page-admin-leave-active,
+.page-pop-leave-active {
+  animation: pageFadeAway 0.16s ease-in both;
+}
+
+.page-lift-enter-active {
+  animation-name: routeLiftIn;
+}
+
+.page-market-enter-active {
+  animation-name: routeMarketIn;
+}
+
+.page-slide-enter-active {
+  animation-name: routeSlideIn;
+}
+
+.page-focus-enter-active {
+  animation-name: routeFocusIn;
+}
+
+.page-workbench-enter-active {
+  animation-name: routeWorkbenchIn;
+}
+
+.page-admin-enter-active {
+  animation-name: routeAdminIn;
+}
+
+.page-pop-enter-active {
+  animation-name: routePopIn;
+  animation-duration: 0.42s;
+  animation-timing-function: cubic-bezier(0.34, 1.36, 0.64, 1);
+}
+
+.page-market-enter-active :where(.hero, .toolbar, .panel),
+.page-market-enter-active :where(.card, .row, .el-card) {
+  animation: marketItemIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.page-market-enter-active :where(.card, .row, .el-card):nth-of-type(2n) {
+  animation-delay: 0.05s;
+}
+
+.page-market-enter-active :where(.card, .row, .el-card):nth-of-type(3n) {
+  animation-delay: 0.1s;
+}
+
+.page-slide-enter-active :where(.toolbar, .panel, .checkout, .el-table, .el-card) {
+  animation: slidePanelIn 0.48s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+
+.page-focus-enter-active :where(.hero, .panel, .el-card, .detail-card, .merchant-detail) {
+  animation: focusSurfaceIn 0.56s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+
+.page-workbench-enter-active :where(.stat-card, .chart-card, .el-card, .panel) {
+  animation: workbenchTileIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.page-workbench-enter-active :where(.stat-card, .chart-card, .el-card, .panel):nth-of-type(2n) {
+  animation-delay: 0.06s;
+}
+
+.page-workbench-enter-active :where(.stat-card, .chart-card, .el-card, .panel):nth-of-type(3n) {
+  animation-delay: 0.12s;
+}
+
+.page-admin-enter-active :where(.admin-page, .el-card, .el-table, .toolbar) {
+  animation: adminScanSurface 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both;
+}
+
+.page-pop-enter-active :where(.panel, .el-card, .el-form, .review-card) {
+  animation: popSurfaceIn 0.42s cubic-bezier(0.34, 1.36, 0.64, 1) 0.08s both;
+}
+
+@keyframes routeLiftIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: saturate(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: saturate(1);
+  }
+}
+
+@keyframes routeMarketIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.992);
+    clip-path: inset(16px 0 0 0 round 18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    clip-path: inset(0 0 0 0 round 0);
+  }
+}
+
+@keyframes routeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes routeFocusIn {
+  from {
+    opacity: 0;
+    transform: scale(0.975);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes routeWorkbenchIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) rotateX(4deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0);
+  }
+}
+
+@keyframes routeAdminIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes routePopIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.004);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pageFadeAway {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes marketItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slidePanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes focusSurfaceIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes workbenchTileIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes adminScanSurface {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes popSurfaceIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* ─── 无障碍 — Skip Link ─── */
 .skip-link {
   position: absolute;
@@ -450,6 +724,7 @@ nav a.router-link-active {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }

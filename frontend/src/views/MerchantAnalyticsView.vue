@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { getMyMerchant, getMyMerchantStats } from '../api/clas'
 import { formatFen } from '../utils/formatters'
 import MerchantWorkspaceShell from '../components/merchant/MerchantWorkspaceShell.vue'
@@ -9,11 +9,28 @@ const merchant = ref(null)
 const stats = ref({
   todayOrders: 0,
   todaySales: 0,
+  monthSales: 0,
+  yearSales: 0,
+  totalSales: 0,
   dailySales: [],
   topProducts: []
 })
+const revenueScope = ref('day')
 let salesChart = null
 let echartsModule = null
+
+const revenueOptions = [
+  { label: '日', value: 'day', field: 'todaySales', hint: '今日营业额' },
+  { label: '月', value: 'month', field: 'monthSales', hint: '本月营业额' },
+  { label: '年', value: 'year', field: 'yearSales', hint: '本年营业额' },
+  { label: '总', value: 'total', field: 'totalSales', hint: '累计营业额' }
+]
+
+const activeRevenue = computed(() =>
+  revenueOptions.find((item) => item.value === revenueScope.value) || revenueOptions[0]
+)
+
+const activeRevenueAmount = computed(() => stats.value?.[activeRevenue.value.field] || 0)
 
 async function loadStats() {
   loading.value = true
@@ -99,6 +116,32 @@ function onMerchantProfileSaved(nextMerchant) {
         </el-card>
       </div>
 
+      <el-card class="revenue-card" shadow="hover">
+        <div class="revenue-head">
+          <div>
+            <span>营业额查看</span>
+            <strong>¥{{ formatFen(activeRevenueAmount) }}</strong>
+            <p>{{ activeRevenue.hint }}</p>
+          </div>
+          <el-segmented
+            v-model="revenueScope"
+            :options="revenueOptions.map((item) => ({ label: item.label, value: item.value }))"
+          />
+        </div>
+        <div class="revenue-breakdown">
+          <button
+            v-for="item in revenueOptions"
+            :key="item.value"
+            type="button"
+            :class="{ active: revenueScope === item.value }"
+            @click="revenueScope = item.value"
+          >
+            <span>{{ item.hint }}</span>
+            <strong>¥{{ formatFen(stats[item.field]) }}</strong>
+          </button>
+        </div>
+      </el-card>
+
       <el-card class="chart-card" shadow="hover">
         <template #header>近 7 天销售额趋势</template>
         <div id="merchantSalesChart" class="chart"></div>
@@ -137,6 +180,71 @@ function onMerchantProfileSaved(nextMerchant) {
   margin-bottom: 18px;
 }
 
+.revenue-card {
+  margin-bottom: 18px;
+}
+
+.revenue-head {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.revenue-head span {
+  color: var(--text-secondary);
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.revenue-head strong {
+  color: var(--color-primary);
+  display: block;
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.revenue-head p {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+
+.revenue-breakdown {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.revenue-breakdown button {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 12px;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.revenue-breakdown button.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.revenue-breakdown span {
+  color: var(--text-secondary);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.revenue-breakdown strong {
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
 .stat-value {
   color: var(--color-accent);
   font-size: 32px;
@@ -160,6 +268,15 @@ function onMerchantProfileSaved(nextMerchant) {
 
 @media (max-width: 640px) {
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .revenue-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .revenue-breakdown {
     grid-template-columns: 1fr;
   }
 }

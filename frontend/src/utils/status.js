@@ -1,7 +1,7 @@
 export const orderStatusMap = {
   PENDING_PAYMENT: { text: '待支付', type: 'warning' },
-  PAID: { text: '待接单', type: 'primary' },
-  ACCEPTED: { text: '已接单', type: 'info' },
+  PAID: { text: '已支付(自动接单中)', type: 'primary' },
+  ACCEPTED: { text: '已支付(自动接单中)', type: 'primary' },
   COMPLETED: { text: '已完成', type: 'success' },
   REFUND_PENDING: { text: '退款中', type: 'warning' },
   REFUNDED: { text: '已退款', type: 'danger' },

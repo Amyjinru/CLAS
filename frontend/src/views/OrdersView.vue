@@ -34,7 +34,7 @@ const refundReasonOptions = [
 ]
 
 const deliveryLabel = {
-  WAITING: '等待商家接单',
+  WAITING: '等待自动接单',
   PREPARING: '商家备餐中',
   DELIVERING: '配送中',
   DELIVERED: '已送达'
@@ -54,7 +54,7 @@ const filteredOrders = computed(() => {
       // 明确排除退款、取消和拒单订单
       if (['REFUNDED', 'REFUND_PENDING', 'CANCELED', 'REJECTED'].includes(status)) return false
       if (refundStatus && refundStatus !== 'NONE') return false
-      // 已接单且已配送/已送达（未确认收货）
+      // 自动接单且已配送/已送达（未确认收货）
       if (status === 'ACCEPTED' && ['DELIVERING', 'DELIVERED'].includes(deliveryStatus)) return true
       return false
     })

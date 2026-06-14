@@ -265,7 +265,7 @@ public class OrderService {
         List<Orders> orders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
             .eq(Orders::getMerchantId, merchantId)
             .orderByDesc(Orders::getCreateTime));
-        return withItems(orders);
+        return withItemsForMerchant(orders);
     }
 
     public List<OrderResponse> listForMerchantAndUser(Long merchantId, String userId) {
@@ -273,7 +273,7 @@ public class OrderService {
             .eq(Orders::getMerchantId, merchantId)
             .eq(Orders::getUserId, userId)
             .orderByDesc(Orders::getCreateTime));
-        return withItems(orders);
+        return withItemsForMerchant(orders);
     }
 
     public OrderResponse getForUser(Long orderId, String userId) {
@@ -281,7 +281,7 @@ public class OrderService {
     }
 
     public OrderResponse getForMerchant(Long orderId, Long merchantId) {
-        return withItems(requireMerchantOrder(orderId, merchantId));
+        return withItemsForMerchant(requireMerchantOrder(orderId, merchantId));
     }
 
     public OrderResponse getForAdmin(Long orderId) {
@@ -306,7 +306,7 @@ public class OrderService {
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
-            "商家已接单",
+            "已支付(自动接单中)",
             "订单 " + order.getId() + " 正在备餐。",
             "ORDER_STATUS",
             "ORDER",
@@ -408,7 +408,7 @@ public class OrderService {
     @Transactional
     public Orders reject(Long orderId, Long merchantId, String reason) {
         Orders order = requireMerchantOrder(orderId, merchantId);
-        requireStatus(order, STATUS_PAID);
+        requireStatusIn(order, STATUS_PAID, STATUS_ACCEPTED);
         restoreOrderStock(orderId);
         order.setStatus(STATUS_REJECTED);
         order.setRejectReason(trimToNull(reason));
@@ -566,6 +566,35 @@ public class OrderService {
         List<OrderItem> orderItems = orderItemMapper.selectList(
             new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId()));
         return new OrderResponse(order, orderItems);
+    }
+
+    private List<OrderResponse> withItemsForMerchant(List<Orders> orders) {
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        List<Long> orderIds = orders.stream().map(Orders::getId).toList();
+        Map<Long, List<OrderItem>> itemsByOrderId = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().in(OrderItem::getOrderId, orderIds))
+            .stream()
+            .collect(Collectors.groupingBy(OrderItem::getOrderId));
+        return orders.stream()
+            .map(order -> new OrderResponse(
+                order,
+                itemsByOrderId.getOrDefault(order.getId(), List.of()),
+                customerCallUrl(order)
+            ))
+            .toList();
+    }
+
+    private OrderResponse withItemsForMerchant(Orders order) {
+        List<OrderItem> orderItems = orderItemMapper.selectList(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId()));
+        return new OrderResponse(order, orderItems, customerCallUrl(order));
+    }
+
+    private String customerCallUrl(Orders order) {
+        String phone = order.getUserId();
+        return phone == null || phone.isBlank() ? null : "tel:" + phone.trim();
     }
 
     private void requireStatus(Orders order, String status) {

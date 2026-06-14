@@ -63,9 +63,8 @@ public class PaymentService {
 
         return paymentRepository.findSuccessfulByOrderId(order.getId())
             .map(payment -> {
-                if (!OrderService.STATUS_PAID.equals(order.getStatus())) {
-                    order.setStatus(OrderService.STATUS_PAID);
-                    ordersMapper.updateById(order);
+                if (OrderService.STATUS_PENDING_PAYMENT.equals(order.getStatus())) {
+                    markOrderAutoAccepted(order);
                 }
                 return PaymentResponse.from(payment, order.getStatus());
             })
@@ -136,10 +135,8 @@ public class PaymentService {
             orderService.markCouponUsed(order.getId());
             payment.setStatus(STATUS_SUCCESS);
             paymentRepository.save(payment);
-            ordersMapper.updateStatusIfCurrent(order.getId(), ORDER_STATUS_PAYING, OrderService.STATUS_PAID);
-            order.setStatus(OrderService.STATUS_PAID);
-            order.setPaidAt(LocalDateTime.now());
-            ordersMapper.updateById(order);
+            ordersMapper.updateStatusIfCurrent(order.getId(), ORDER_STATUS_PAYING, OrderService.STATUS_ACCEPTED);
+            markOrderAutoAccepted(order);
             return new PaymentOutcome(PaymentResponse.from(payment, order.getStatus()), null);
         } catch (RuntimeException exception) {
             payment.setStatus(STATUS_FAILED);
@@ -156,6 +153,17 @@ public class PaymentService {
         payment.setStatus(STATUS_FAILED);
         paymentRepository.save(payment);
         return PaymentResponse.from(payment, order.getStatus());
+    }
+
+    private void markOrderAutoAccepted(Orders order) {
+        LocalDateTime now = LocalDateTime.now();
+        order.setStatus(OrderService.STATUS_ACCEPTED);
+        order.setDeliveryStatus("PREPARING");
+        order.setPaidAt(now);
+        if (order.getAcceptedAt() == null) {
+            order.setAcceptedAt(now);
+        }
+        ordersMapper.updateById(order);
     }
 
     private PaymentResponse paymentStatusForOrder(Long orderId, Orders order) {

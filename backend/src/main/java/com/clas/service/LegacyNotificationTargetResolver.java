@@ -12,7 +12,7 @@ final class LegacyNotificationTargetResolver {
 
     private static final Set<String> ORDER_TITLES = Set.of(
         "订单已创建",
-        "商家已接单",
+        "已支付(自动接单中)",
         "订单配送中",
         "订单已完成",
         "商家已拒单",

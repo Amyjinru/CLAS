@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, acceptOrder, currentUser, currentRole, listProducts, rejectOrder, deliverOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
+import { getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, rejectOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -34,8 +34,8 @@ const statusMap = {
 // ===== version_314: 订单状态映射 =====
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
-  PAID: '已支付',
-  ACCEPTED: '商家已接单',
+  PAID: '已支付(自动接单中)',
+  ACCEPTED: '已支付(自动接单中)',
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
@@ -108,24 +108,6 @@ async function load() {
   }
 }
 
-// ===== test1: 原有接单操作 =====
-async function handleAccept(orderId) {
-  try {
-    await acceptOrder(orderId)
-    ElMessage.success('已接单')
-    if (merchant.value) {
-      const [orderList, products] = await Promise.all([
-        listMerchantOrders(),
-        listProducts(merchant.value.id)
-      ])
-      orders.value = orderList
-      productNames.value = Object.fromEntries(products.map((p) => [p.id, p.name]))
-    }
-  } catch (error) {
-    // API client handles errors
-  }
-}
-
 async function handleReject(orderId) {
   try {
     const { value } = await ElMessageBox.prompt('请输入拒单理由', '拒单', {
@@ -145,12 +127,6 @@ async function handleReject(orderId) {
       ElMessage.error('拒单失败')
     }
   }
-}
-
-async function handleDeliver(orderId) {
-  await deliverOrder(orderId)
-  ElMessage.success('订单已标记为配送中')
-  await load()
 }
 
 async function handleRefund(orderId, approved) {
@@ -188,7 +164,6 @@ async function handleRedeem() {
 
 // ===== version_314: 通用订单操作方法 =====
 async function operate(action, order) {
-  if (action === 'accept') await acceptOrder(order.order.id)
   if (action === 'reject') {
     await handleReject(order.order.id)
     return
@@ -215,6 +190,14 @@ function openChat(order) {
 
 function closeChat() {
   chatOrder.value = null
+}
+
+function callUser(order) {
+  if (!order?.customerCallUrl) {
+    ElMessage.warning('暂无可拨打的用户电话')
+    return
+  }
+  window.location.href = order.customerCallUrl
 }
 
 function onMerchantProfileSaved(nextMerchant) {
@@ -289,7 +272,7 @@ onMounted(() => {
         <el-card v-if="merchant.status === 'OPEN'" class="box-card work-card">
           <template #header>
           <div class="card-header">
-            <h3>待接单管理 (营业中)</h3>
+            <h3>自动接单管理 (营业中)</h3>
           </div>
           </template>
 
@@ -307,7 +290,7 @@ onMounted(() => {
             </el-table-column>
             <el-table-column prop="order.status" label="订单状态" width="140">
               <template #default="scope">
-                <el-tag :type="scope.row.order.status === 'PAID' ? 'success' : 'info'">
+                <el-tag :type="['PAID', 'ACCEPTED'].includes(scope.row.order.status) ? 'success' : 'info'">
                   {{ orderStatusLabel[scope.row.order.status] || scope.row.order.status }}
                 </el-tag>
               </template>
@@ -327,55 +310,51 @@ onMounted(() => {
             </el-table-column>
             <el-table-column label="联系" width="100">
               <template #default="scope">
-                <el-button
-                  v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status)"
-                  type="primary"
-                  size="small"
-                  plain
-                  @click="openChat(scope.row)"
-                >
-                  联系用户
-                </el-button>
-                <el-button
-                  v-else
-                  size="small"
-                  @click="openChat(scope.row)"
-                >
-                  查看聊天
-                </el-button>
+                <div class="contact-actions">
+                  <el-button
+                    v-if="scope.row.customerCallUrl"
+                    type="success"
+                    size="small"
+                    plain
+                    @click="callUser(scope.row)"
+                  >
+                    拨打电话
+                  </el-button>
+                  <el-button
+                    v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status)"
+                    type="primary"
+                    size="small"
+                    plain
+                    @click="openChat(scope.row)"
+                  >
+                    联系用户
+                  </el-button>
+                  <el-button
+                    v-else
+                    size="small"
+                    @click="openChat(scope.row)"
+                  >
+                    查看聊天
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="180" fixed="right">
               <template #default="scope">
                 <el-button
+                  type="primary"
                   size="small"
                   @click="openDetail(scope.row)"
                 >
                   查看详情
                 </el-button>
                 <el-button
-                  v-if="scope.row.order.status === 'PAID'"
-                  type="primary"
-                  size="small"
-                  @click="handleAccept(scope.row.order.id)"
-                >
-                  确认接单
-                </el-button>
-                <el-button
-                  v-if="scope.row.order.status === 'PAID'"
+                  v-if="['PAID', 'ACCEPTED'].includes(scope.row.order.status)"
                   type="danger"
                   size="small"
                   @click="handleReject(scope.row.order.id)"
                 >
                   拒单
-                </el-button>
-                <el-button
-                  v-if="scope.row.order.status === 'ACCEPTED' && scope.row.order.deliveryStatus !== 'DELIVERING'"
-                  type="warning"
-                  size="small"
-                  @click="handleDeliver(scope.row.order.id)"
-                >
-                  配送中
                 </el-button>
                 <el-button
                   v-if="scope.row.order.status === 'REFUND_PENDING'"
@@ -452,19 +431,20 @@ onMounted(() => {
             v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
             type="button"
             class="secondary"
+            @click="callUser(selectedOrder)"
+          >
+            拨打电话
+          </button>
+          <button
+            v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
+            type="button"
+            class="secondary"
             @click="openChat(selectedOrder)"
           >
             联系用户
           </button>
           <button
-            v-if="selectedOrder.order.status === 'PAID'"
-            type="button"
-            @click="operate('accept', selectedOrder)"
-          >
-            接单
-          </button>
-          <button
-            v-if="selectedOrder.order.status === 'PAID'"
+            v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
             class="secondary"
             type="button"
             @click="operate('reject', selectedOrder)"
@@ -642,6 +622,16 @@ onMounted(() => {
   font-weight: bold;
 }
 
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.contact-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
 .order-item-list {
   font-size: 13px;
   color: #606266;
@@ -723,7 +713,7 @@ onMounted(() => {
 
 .order-overlay {
   align-items: center;
-  background: rgba(15, 23, 42, 0.28);
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
   inset: 0;
   justify-content: center;
@@ -733,7 +723,7 @@ onMounted(() => {
 }
 
 .order-panel {
-  background: var(--bg-card);
+  background: #fff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xl);
@@ -770,13 +760,14 @@ onMounted(() => {
 }
 
 .order-panel-body {
+  background: #fff;
   overflow: auto;
   padding: 18px;
 }
 
 .order-panel-body :deep(.order-detail) {
-  background: transparent;
-  padding: 0;
+  background: #fff7ed;
+  border: 1px solid var(--border-light);
 }
 
 .order-panel-foot {

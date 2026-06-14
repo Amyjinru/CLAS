@@ -106,15 +106,18 @@ fi
 set -e
 cd /opt/clas
 echo '>>> [1/3] 拉取最新代码...'
-git pull upstream dev
+git fetch upstream dev
+git reset --hard upstream/dev
+git clean -fd
 echo ''
 echo '>>> [2/3] 构建并部署（前端 npm + vite，后端 mvn，数据库迁移）...'
 clas deploy 2>&1
 echo ''
 echo '>>> [3/3] 最终验证...'
 sleep 2
-curl -s http://127.0.0.1:8080/api/health
+curl -sf http://127.0.0.1:8080/api/health
 echo ''
+git log -1 --oneline
 echo '>>> 部署完成!'
 '@
 } else {
@@ -125,16 +128,18 @@ echo '>>> 部署完成!'
 set -e
 cd /opt/clas
 echo '>>> [1/3] Connected'
-git stash 2>/dev/null || true
-git pull upstream dev
+git fetch upstream dev
+git reset --hard upstream/dev
+git clean -fd
 echo ''
 echo '>>> [2/3] Building and deploying...'
 clas deploy 2>&1
 echo ''
 echo '>>> [3/3] Verifying...'
 sleep 2
-curl -s http://127.0.0.1:8080/api/health
+curl -sf http://127.0.0.1:8080/api/health
 echo ''
+git log -1 --oneline
 echo '>>> Done!'
 '@
 }

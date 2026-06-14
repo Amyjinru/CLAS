@@ -14,6 +14,7 @@ import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -48,6 +49,12 @@ public class DealController {
     @RequireRole("MERCHANT")
     public Result<GroupDeal> create(@Valid @RequestBody DealRequest request) {
         return Result.ok(dealService.create(request));
+    }
+
+    @PutMapping("/merchant/{dealId}")
+    @RequireRole("MERCHANT")
+    public Result<GroupDeal> update(@PathVariable Long dealId, @Valid @RequestBody DealRequest request) {
+        return Result.ok(dealService.updateMerchantDeal(dealId, request));
     }
 
     @GetMapping("/orders/{dealOrderId}/payment-status")

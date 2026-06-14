@@ -118,6 +118,34 @@ const cooldownText = computed(() => {
   return `${codeCooldown.value}秒后重发`
 })
 
+const visualContent = computed(() => {
+  if (activeTab.value === 'register') {
+    return {
+      mode: 'register',
+      kicker: 'NEW CAMPUS ACCOUNT',
+      title: '先建立你的校园生活账号。',
+      description: '完成手机号验证后，收藏、下单和预约提醒都会跟着账号同步。',
+      image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=82',
+      alt: '色彩丰富的健康餐食',
+      noteTitle: '注册流程更清晰',
+      noteText: '昵称、密码、手机号和验证码分步完成，信息会安全加密',
+      steps: ['填写昵称', '设置密码', '手机验证']
+    }
+  }
+
+  return {
+    mode: 'login',
+    kicker: 'WELCOME BACK',
+    title: '回到你的校园生活台。',
+    description: '继续查看订单、收藏商家和今日推荐。',
+    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=82',
+    alt: '摆盘丰富的校园餐食',
+    noteTitle: '今日推荐已备好',
+    noteText: '附近商家、优惠套餐和预约提醒已更新',
+    steps: ['输入手机号', '确认密码']
+  }
+})
+
 async function submitRegister() {
   if (!validPhone(registerForm.phone)) {
     showMessage('请输入正确的手机号', 'error')
@@ -164,7 +192,36 @@ function switchTab(tab) {
 
 <template>
   <div class="auth-wrapper">
-    <section class="auth-panel">
+    <div class="auth-shell">
+      <section class="auth-visual" :class="`visual-${visualContent.mode}`" aria-label="CLAS 校园生活服务">
+        <div class="visual-pattern" aria-hidden="true"></div>
+        <div class="visual-copy" :key="`${visualContent.mode}-copy`">
+          <span class="visual-kicker">{{ visualContent.kicker }}</span>
+          <h1>{{ visualContent.title }}</h1>
+          <p>{{ visualContent.description }}</p>
+        </div>
+        <div class="visual-steps" :key="`${visualContent.mode}-steps`" aria-hidden="true">
+          <span
+            v-for="step in visualContent.steps"
+            :key="step"
+          >{{ step }}</span>
+        </div>
+        <figure class="visual-photo" :key="`${visualContent.mode}-photo`">
+          <img
+            :src="visualContent.image"
+            :alt="visualContent.alt"
+          />
+        </figure>
+        <div class="visual-note" :key="`${visualContent.mode}-note`">
+          <span class="note-icon">✓</span>
+          <div>
+            <strong>{{ visualContent.noteTitle }}</strong>
+            <span>{{ visualContent.noteText }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="auth-panel">
       <!-- ===== 标签切换 ===== -->
       <div class="auth-tabs">
         <button
@@ -379,7 +436,8 @@ function switchTab(tab) {
         role="alert"
         aria-live="assertive"
       >{{ message }}</p>
-    </section>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -390,9 +448,14 @@ function switchTab(tab) {
 .auth-wrapper {
   min-height: calc(100vh - 60px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
+  padding: clamp(20px, 4vw, 48px);
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 209, 0, 0.22), transparent 32%),
+    radial-gradient(circle at 88% 82%, rgba(21, 128, 61, 0.09), transparent 28%),
+    linear-gradient(135deg, #fffaf0 0%, #f8f6ef 48%, #fffdf7 100%);
+  animation: authPageWash 0.7s ease-out both;
 }
 
 .auth-wrapper::before,
@@ -400,9 +463,239 @@ function switchTab(tab) {
   display: none;
 }
 
+.auth-shell {
+  width: min(1120px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 420px);
+  align-items: start;
+  gap: clamp(20px, 3vw, 34px);
+}
+
+.auth-visual {
+  min-height: clamp(500px, calc(100vh - 156px), 620px);
+  align-self: start;
+  position: sticky;
+  top: 84px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  overflow: hidden;
+  border-radius: 24px;
+  padding: clamp(28px, 4vw, 46px);
+  color: #fffaf0;
+  background:
+    linear-gradient(135deg, rgba(28, 22, 13, 0.88), rgba(92, 63, 19, 0.68)),
+    #2f2114;
+  box-shadow: 0 28px 80px rgba(69, 47, 15, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  isolation: isolate;
+  animation: authVisualRise 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+
+.auth-visual.visual-login {
+  min-height: clamp(470px, calc(100vh - 180px), 560px);
+  justify-content: center;
+  gap: 14px;
+  padding: clamp(24px, 3vw, 32px);
+}
+
+.auth-visual.visual-register {
+  min-height: clamp(640px, calc(100vh - 120px), 740px);
+}
+
+.visual-pattern {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: var(--visual-pattern-opacity, 0.38);
+  background:
+    linear-gradient(45deg, rgba(255, 209, 0, 0.16) 25%, transparent 25%) 0 0 / 28px 28px,
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 25%, transparent 25%) 0 14px / 28px 28px,
+    radial-gradient(circle at 78% 16%, rgba(255, 209, 0, 0.4), transparent 24%),
+    radial-gradient(circle at 12% 86%, rgba(255, 255, 255, 0.18), transparent 22%);
+  animation: authPatternDrift 1.1s ease-out 0.16s both;
+}
+
+.visual-register .visual-pattern {
+  --visual-pattern-opacity: 0.46;
+  background:
+    linear-gradient(45deg, rgba(255, 209, 0, 0.18) 25%, transparent 25%) 0 0 / 24px 24px,
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.14) 25%, transparent 25%) 0 12px / 24px 24px,
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(255, 255, 255, 0.1) 34px 35px),
+    radial-gradient(circle at 76% 18%, rgba(255, 209, 0, 0.42), transparent 24%),
+    radial-gradient(circle at 10% 84%, rgba(255, 255, 255, 0.2), transparent 22%);
+}
+
+.visual-copy {
+  max-width: 520px;
+  position: relative;
+  z-index: 2;
+  animation: authCopyIn 0.56s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+}
+
+.visual-kicker {
+  display: inline-flex;
+  margin-bottom: 18px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 209, 0, 0.42);
+  border-radius: 999px;
+  background: rgba(255, 209, 0, 0.14);
+  color: #ffe680;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.visual-copy h1 {
+  margin: 0;
+  color: #fffaf0;
+  font-size: clamp(36px, 4.2vw, 58px);
+  line-height: 1.08;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.visual-copy p {
+  max-width: 440px;
+  margin: 18px 0 0;
+  color: rgba(255, 250, 240, 0.82);
+  font-size: clamp(16px, 1.3vw, 19px);
+  line-height: 1.65;
+}
+
+.visual-login .visual-kicker {
+  margin-bottom: 12px;
+}
+
+.visual-login .visual-copy h1 {
+  font-size: clamp(32px, 3.3vw, 44px);
+  line-height: 1.1;
+}
+
+.visual-login .visual-copy p {
+  max-width: 360px;
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.visual-steps {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  animation: authCopyIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.26s both;
+}
+
+.visual-steps span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.13);
+  border: 1px solid rgba(255, 250, 240, 0.2);
+  color: rgba(255, 250, 240, 0.84);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.visual-login .visual-steps {
+  margin-top: -2px;
+}
+
+.visual-register .visual-steps {
+  margin: -4px 0 2px;
+}
+
+.visual-photo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: auto 0 0;
+  overflow: hidden;
+  border-radius: 22px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  border: 6px solid rgba(255, 250, 240, 0.78);
+  transform: none;
+  z-index: 1;
+  animation: authPhotoIn 0.64s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+.visual-login .visual-photo {
+  aspect-ratio: 16 / 5.6;
+  border-width: 5px;
+  border-radius: 18px;
+}
+
+.visual-register .visual-photo {
+  aspect-ratio: 16 / 9;
+  margin-top: 4px;
+}
+
+.visual-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.visual-note {
+  position: relative;
+  width: calc(100% - 28px);
+  margin: 14px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 250, 240, 0.94);
+  color: #2a2015;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+  z-index: 2;
+  animation: authNoteIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.42s both;
+}
+
+.visual-login .visual-note {
+  margin-top: 12px;
+}
+
+.visual-register .visual-note {
+  margin-top: 18px;
+  padding: 18px 20px;
+}
+
+.note-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #FFD100;
+  color: #1a1510;
+  font-weight: 900;
+}
+
+.visual-note strong,
+.visual-note span {
+  display: block;
+}
+
+.visual-note strong {
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.visual-note span {
+  color: #6b5a32;
+  font-size: 13px;
+}
+
 .auth-panel {
   width: 100%;
-  max-width: 420px;
   padding: 40px;
   background: var(--bg-card, #fff);
   border-radius: var(--radius-xl, 16px);
@@ -411,6 +704,7 @@ function switchTab(tab) {
   position: relative;
   z-index: 1;
   overflow: hidden;
+  animation: authPanelIn 0.68s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
 }
 
 .auth-panel::before {
@@ -435,6 +729,52 @@ function switchTab(tab) {
   background: rgba(255, 209, 0, 0.12);
   border-radius: var(--radius-md, 10px);
   padding: 4px;
+  animation: authFieldIn 0.5s ease-out 0.28s both;
+}
+
+.auth-panel h1,
+.auth-panel .section-heading,
+.auth-panel .hint,
+.auth-panel .trust-banner,
+.auth-panel .form-group,
+.auth-panel .submit-btn,
+.auth-panel .auth-message {
+  animation: authFieldIn 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.auth-panel h1,
+.auth-panel .section-heading {
+  animation-delay: 0.34s;
+}
+
+.auth-panel .hint,
+.auth-panel .trust-banner {
+  animation-delay: 0.38s;
+}
+
+.auth-panel .form-group:nth-of-type(1) {
+  animation-delay: 0.42s;
+}
+
+.auth-panel .form-group:nth-of-type(2) {
+  animation-delay: 0.48s;
+}
+
+.auth-panel .form-group:nth-of-type(3) {
+  animation-delay: 0.54s;
+}
+
+.auth-panel .form-group:nth-of-type(4) {
+  animation-delay: 0.6s;
+}
+
+.auth-panel .form-group:nth-of-type(5) {
+  animation-delay: 0.66s;
+}
+
+.auth-panel .submit-btn,
+.auth-panel .auth-message {
+  animation-delay: 0.72s;
 }
 
 .auth-tabs button {
@@ -816,10 +1156,102 @@ input:focus-visible,
   to { transform: rotate(360deg); }
 }
 
+@keyframes authPageWash {
+  from {
+    background-position: -40px -24px, 40px 32px, 0 0;
+  }
+  to {
+    background-position: 0 0, 0 0, 0 0;
+  }
+}
+
+@keyframes authVisualRise {
+  from {
+    opacity: 0;
+    transform: translateX(-22px) translateY(18px) scale(0.985);
+    filter: saturate(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+    filter: saturate(1);
+  }
+}
+
+@keyframes authPanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px) translateY(18px);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.04);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes authCopyIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes authPhotoIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes authNoteIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes authPatternDrift {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+    background-position: -28px -28px, 28px 28px, 76% 16%, 12% 86%;
+  }
+  to {
+    opacity: var(--visual-pattern-opacity, 0.38);
+    transform: scale(1);
+    background-position: 0 0, 0 14px, 78% 16%, 12% 86%;
+  }
+}
+
+@keyframes authFieldIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* WCAG 2.3.3 — 尊重用户减少动画偏好 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
   }
 }
@@ -878,6 +1310,94 @@ input:focus-visible,
 
   .resend-btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 920px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-visual {
+    min-height: 320px;
+    position: relative;
+    top: auto;
+  }
+
+  .auth-visual.visual-login,
+  .auth-visual.visual-register {
+    min-height: auto;
+  }
+
+  .visual-copy h1 {
+    font-size: clamp(34px, 8vw, 48px);
+  }
+
+  .visual-photo {
+    width: 100%;
+  }
+
+  .visual-register .visual-photo {
+    aspect-ratio: 16 / 9;
+  }
+
+  .auth-panel {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-visual {
+    min-height: 260px;
+    padding: 24px;
+    border-radius: 18px;
+  }
+
+  .visual-copy {
+    max-width: 100%;
+  }
+
+  .visual-copy h1 {
+    font-size: 30px;
+  }
+
+  .visual-copy p {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-top: 12px;
+    max-width: 100%;
+  }
+
+  .visual-steps {
+    gap: 8px;
+  }
+
+  .visual-steps span {
+    min-height: 30px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .visual-kicker {
+    margin-bottom: 12px;
+    font-size: 10px;
+  }
+
+  .visual-photo {
+    width: 100%;
+    border-width: 4px;
+    border-radius: 16px;
+  }
+
+  .visual-note {
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .visual-note span {
+    font-size: 12px;
   }
 }
 </style>

@@ -82,14 +82,19 @@ function selectReplyTarget(review, reply = null) {
   const displayName = reply
     ? reply.displayName || reply.userId
     : review.displayName || review.userId
-  replyTargets.value[review.id] = {
-    parentReplyId: reply?.id ?? null,
-    displayName
+  replyTargets.value = {
+    [review.id]: {
+      parentReplyId: reply?.id ?? null,
+      displayName
+    }
   }
 }
 
 function clearReplyTarget(reviewId) {
-  delete replyTargets.value[reviewId]
+  if (replyTargets.value[reviewId]) {
+    delete replyTargets.value[reviewId]
+    commentDrafts.value[reviewId] = ''
+  }
 }
 
 function replyTargetName(review, reply) {
@@ -182,11 +187,11 @@ onMounted(load)
         <img v-for="(img, idx) in review.images" :key="idx" :src="img" alt="评价图片" loading="lazy" />
       </div>
       <div class="actions">
-        <el-button text @click="vote('REVIEW', review.id, 'LIKE')">赞 {{ review.likeCount || 0 }}</el-button>
-        <el-button text @click="vote('REVIEW', review.id, 'DISLIKE')">踩 {{ review.dislikeCount || 0 }}</el-button>
-        <el-button text type="danger" @click="hideOrDelete(review)">{{ review.mine ? '删除' : '隐藏' }}</el-button>
-        <el-button v-if="currentRole() && !review.mine && !showMerchantActions" text type="warning" @click="reportComment(review)">举报</el-button>
-        <el-button v-if="showMerchantActions" text type="warning" @click="requestDelete(review)">申请删评</el-button>
+        <el-button text class="vote-action" @click="vote('REVIEW', review.id, 'LIKE')">👍 赞 {{ review.likeCount || 0 }}</el-button>
+        <el-button text class="vote-action" @click="vote('REVIEW', review.id, 'DISLIKE')">👎 踩 {{ review.dislikeCount || 0 }}</el-button>
+        <el-button text class="danger-action" @click="hideOrDelete(review)">{{ review.mine ? '删除' : '隐藏' }}</el-button>
+        <el-button v-if="currentRole() && !review.mine && !showMerchantActions" text class="report-action" @click="reportComment(review)">举报</el-button>
+        <el-button v-if="showMerchantActions" text class="report-action" @click="requestDelete(review)">申请删评</el-button>
         <el-button text class="reply-action" @click="selectReplyTarget(review)">回复</el-button>
       </div>
 
@@ -200,16 +205,16 @@ onMounted(load)
           {{ reply.content }}
         </p>
         <div class="actions">
-          <el-button text @click="vote('REPLY', reply.id, 'LIKE')">赞 {{ reply.likeCount || 0 }}</el-button>
-          <el-button text @click="vote('REPLY', reply.id, 'DISLIKE')">踩 {{ reply.dislikeCount || 0 }}</el-button>
-          <el-button v-if="reply.mine" text type="danger" @click="removeReply(reply)">删除</el-button>
-          <el-button v-else-if="currentRole() && !showMerchantActions" text type="warning" @click="reportReplyComment(reply)">举报</el-button>
+          <el-button text class="vote-action" @click="vote('REPLY', reply.id, 'LIKE')">👍 赞 {{ reply.likeCount || 0 }}</el-button>
+          <el-button text class="vote-action" @click="vote('REPLY', reply.id, 'DISLIKE')">👎 踩 {{ reply.dislikeCount || 0 }}</el-button>
+          <el-button v-if="reply.mine" text class="danger-action" @click="removeReply(reply)">删除</el-button>
+          <el-button v-else-if="currentRole() && !showMerchantActions" text class="report-action" @click="reportReplyComment(reply)">举报</el-button>
           <el-button text class="reply-action" @click="selectReplyTarget(review, reply)">回复</el-button>
         </div>
       </div>
 
-      <div v-if="currentRole()" class="reply-box">
-        <div v-if="replyTargets[review.id]" class="reply-target">
+      <div v-if="replyTargets[review.id]" class="reply-box">
+        <div class="reply-target">
           <span>回复 {{ replyTargets[review.id].displayName }}</span>
           <el-button text @click="clearReplyTarget(review.id)">取消</el-button>
         </div>
@@ -234,7 +239,71 @@ onMounted(load)
 .content { margin: 8px 0; }
 .images { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .images img { border-radius: var(--radius-sm); height: 88px; object-fit: cover; width: 88px; }
-.actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions :deep(.el-button.is-text) {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  margin: 0;
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.actions :deep(.vote-action.el-button.is-text) {
+  background: #fffaf4;
+  border: 1px solid #f4dfc5;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.actions :deep(.vote-action.el-button.is-text:hover),
+.actions :deep(.vote-action.el-button.is-text:focus) {
+  background: #fff3e0;
+  color: var(--text-primary);
+}
+
+.actions :deep(.danger-action.el-button.is-text) {
+  background: #ef4444;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-weight: 700;
+}
+
+.actions :deep(.danger-action.el-button.is-text:hover),
+.actions :deep(.danger-action.el-button.is-text:focus) {
+  background: #dc2626;
+  color: #fff;
+}
+
+.actions :deep(.report-action.el-button.is-text) {
+  background: #f59e0b;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-weight: 700;
+}
+
+.actions :deep(.report-action.el-button.is-text:hover),
+.actions :deep(.report-action.el-button.is-text:focus) {
+  background: #d97706;
+  color: #fff;
+}
+
+.actions :deep(.reply-action.el-button.is-text) {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+  min-height: 32px;
+  padding: 0 12px;
+}
 .reply-action { margin-left: auto; }
 .reply-prefix { color: var(--text-secondary); font-weight: 600; margin-right: 4px; }
 .nested-reply, .reply-box {

@@ -16,11 +16,12 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class RecommendService {
-    private static final double W_PURCHASE = 0.35;
-    private static final double W_SCORE = 0.25;
-    private static final double W_REVIEW = 0.15;
-    private static final double W_FAVORITE = 0.15;
-    private static final double W_PRICE = 0.10;
+    private static final double W_PURCHASE = 0.32;
+    private static final double W_SCORE = 0.23;
+    private static final double W_REVIEW = 0.14;
+    private static final double W_FAVORITE = 0.14;
+    private static final double W_PRICE = 0.09;
+    private static final double W_LOGO = 0.08;
 
     private final OrdersMapper ordersMapper;
     private final FavoriteMapper favoriteMapper;
@@ -69,17 +70,28 @@ public class RecommendService {
         double scoreNorm = merchant.getScore() == null ? 0 : merchant.getScore().doubleValue() / 5.0;
         double reviewNorm = normalize(reviewCounts.getOrDefault(merchant.getId(), 0L).intValue(), maxReview);
         double favoriteNorm = normalize(favoriteCounts.getOrDefault(merchant.getId(), 0L).intValue(), maxFavorite);
+        double logoNorm = hasCustomLogo(merchant) ? 1.0 : 0.0;
         int price = merchant.getAveragePrice() == null ? maxPrice : merchant.getAveragePrice();
         double priceNorm = maxPrice <= 0 ? 0.5 : 1.0 - ((double) price / maxPrice);
 
         if (userId == null || userId.isBlank()) {
-            return W_SCORE * scoreNorm + W_REVIEW * reviewNorm + W_FAVORITE * favoriteNorm + W_PRICE * priceNorm;
+            return W_SCORE * scoreNorm
+                + W_REVIEW * reviewNorm
+                + W_FAVORITE * favoriteNorm
+                + W_PRICE * priceNorm
+                + W_LOGO * logoNorm;
         }
         return W_PURCHASE * purchaseNorm
             + W_SCORE * scoreNorm
             + W_REVIEW * reviewNorm
             + W_FAVORITE * favoriteNorm
-            + W_PRICE * priceNorm;
+            + W_PRICE * priceNorm
+            + W_LOGO * logoNorm;
+    }
+
+    private boolean hasCustomLogo(Merchant merchant) {
+        String logo = merchant.getLogo();
+        return logo != null && !logo.isBlank();
     }
 
     private Map<Long, Integer> purchaseCounts(String userId) {

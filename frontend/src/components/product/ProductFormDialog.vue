@@ -60,6 +60,8 @@ function submit() {
   if (!formRef.value) return
   formRef.value.validate(async (valid) => {
     if (!valid) return
+    form.price = Math.round(Number(form.price || 0) * 100) / 100
+    form.stock = Math.max(0, Math.trunc(Number(form.stock || 0)))
     const payload = {
       ...form,
       categoryId: form.categoryId || null,
@@ -114,12 +116,12 @@ watch(() => props.visible, (v) => {
       </el-form-item>
 
       <el-form-item label="商品价格" prop="price">
-        <el-input-number v-model="form.price" :precision="2" :step="0.5" :min="0" placeholder="单位：元" style="width: 180px;" />
+        <el-input-number v-model="form.price" :precision="2" :step="0.01" :min="0.01" placeholder="单位：元" style="width: 180px;" />
         <span style="margin-left: 10px; color: var(--text-muted); font-size: 13px;">单位：元</span>
       </el-form-item>
 
       <el-form-item label="商品库存" prop="stock">
-        <el-input-number v-model="form.stock" :min="0" :step="1" placeholder="库存量" style="width: 180px;" />
+        <el-input-number v-model="form.stock" :min="0" :precision="0" :step="1" step-strictly placeholder="库存量" style="width: 180px;" />
       </el-form-item>
 
       <el-form-item label="所属分类" prop="categoryId">

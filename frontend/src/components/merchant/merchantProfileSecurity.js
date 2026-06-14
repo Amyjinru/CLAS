@@ -16,6 +16,10 @@ export function isBankAccountReadyForSave(bankAccount, bankChanged) {
   return /^\d{9,25}$/.test(trimValue(bankAccount))
 }
 
+function normalizeInteger(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
+  return Math.min(max, Math.max(min, Math.trunc(Number(value || 0))))
+}
+
 export function buildMerchantProfilePayload(form, { phoneChanged, bankChanged }) {
   const payload = {
     merchantName: trimValue(form.merchantName),
@@ -24,7 +28,7 @@ export function buildMerchantProfilePayload(form, { phoneChanged, bankChanged })
     address: trimValue(form.address),
     longitude: form.longitude,
     latitude: form.latitude,
-    deliveryRadiusM: form.deliveryRadiusM,
+    deliveryRadiusM: normalizeInteger(form.deliveryRadiusM, 500, 10000),
     businessHours: trimValue(form.businessHours)
   }
 
