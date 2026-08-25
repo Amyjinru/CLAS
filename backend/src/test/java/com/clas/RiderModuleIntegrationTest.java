@@ -109,6 +109,11 @@ class RiderModuleIntegrationTest {
         String riderAuth = "Bearer " + switchRole(loginToken(phone), "RIDER");
         mockMvc.perform(get("/api/rider/orders/me").header("Authorization", riderAuth))
             .andExpect(status().isOk());
+        mockMvc.perform(get("/api/role-applications/mine").header("Authorization", riderAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].id").value("rider-" + applicationId))
+            .andExpect(jsonPath("$.data[0].targetRole").value("RIDER"))
+            .andExpect(jsonPath("$.data[0].status").value("APPROVED"));
     }
 
     private String switchRole(String token, String role) throws Exception {

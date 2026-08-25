@@ -5,6 +5,7 @@ import com.clas.config.RequireRole;
 import com.clas.config.UserContext;
 import com.clas.dto.RoleApplicationAuditRequest;
 import com.clas.dto.RoleApplicationCreateRequest;
+import com.clas.dto.RoleApplicationRecordResponse;
 import com.clas.entity.RoleApplication;
 import com.clas.service.RoleApplicationService;
 import jakarta.validation.Valid;
@@ -33,9 +34,9 @@ public class RoleApplicationController {
     }
 
     @GetMapping("/mine")
-    @RequireRole({"USER", "RIDER"})
-    public Result<List<RoleApplication>> listMine() {
-        return Result.ok(roleApplicationService.listMine(UserContext.getUserId()));
+    @RequireRole({"USER", "RIDER", "MERCHANT"})
+    public Result<List<RoleApplicationRecordResponse>> listMine() {
+        return Result.ok(roleApplicationService.listMineRecords(UserContext.getUserId()));
     }
 
     @GetMapping("/admin")

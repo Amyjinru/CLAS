@@ -5,5 +5,6 @@ public enum MerchantStatusEnum {
     APPROVED,
     OPEN,
     CLOSED,
-    BLOCKED
+    BLOCKED,
+    DISABLED
 }

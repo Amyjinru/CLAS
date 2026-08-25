@@ -6,7 +6,7 @@ export const getDeliveryEstimate = (id, params) => api.get(`/merchant/${id}/deli
 export const registerMerchant = (payload) => api.post('/merchant/register', payload).then(unwrap)
 export const sendMerchantRegisterCode = (payload) => api.post('/merchant/register/send-code', payload).then(unwrap)
 export const getMyMerchant = () => api.get('/merchant/my').then(unwrap)
-export const getMyMerchantAuditStatus = () => api.get('/merchant/my/audit-status').then(unwrap)
+export const getMyMerchantAuditStatus = (config = {}) => api.get('/merchant/my/audit-status', config).then(unwrap)
 export const getMyMerchantStats = () => api.get('/merchant/my/stats').then(unwrap)
 export const sendMerchantProfileCode = (payload) => api.post('/merchant/my/profile/send-code', payload).then(unwrap)
 export const sendMerchantPhoneCode = (phone) => api.post('/merchant/my/profile/send-phone-code', { phone }).then(unwrap)

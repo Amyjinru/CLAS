@@ -5,6 +5,8 @@ export const updateProfile = (payload) => api.put('/user/profile', payload).then
 export const sendPhoneChangeCode = (payload) => api.post('/user/phone-change/send-code', payload).then(unwrap)
 export const updateBoundPhone = (payload) => api.put('/user/phone', payload).then(unwrap)
 export const changePassword = (payload) => api.put('/user/password', payload, { silent: true }).then(unwrap)
+export const cancelBusinessRole = (role) => api.post('/user/roles/cancel', { role }, { silent: true }).then(unwrap)
+export const cancelAccount = (payload) => api.post('/user/account/cancel', payload, { silent: true }).then(unwrap)
 export async function uploadAvatar(file) {
   const formData = new FormData()
   formData.append('file', file)

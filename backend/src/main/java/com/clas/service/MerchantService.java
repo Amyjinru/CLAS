@@ -25,6 +25,7 @@ import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.MerchantAuditLogMapper;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.ProductMapper;
+import com.clas.mapper.RoleApplicationMapper;
 import com.clas.mapper.UserAddressMapper;
 import com.clas.mapper.UserMapper;
 import com.clas.config.UserContext;
@@ -56,6 +57,7 @@ public class MerchantService {
     private final UserAddressMapper userAddressMapper;
     private final OrdersMapper ordersMapper;
     private final ProductMapper productMapper;
+    private final RoleApplicationMapper roleApplicationMapper;
     private final FavoriteMapper favoriteMapper;
     private final VerificationCodeStore verificationCodeStore;
     private final AmapRouteService amapRouteService;
@@ -70,6 +72,7 @@ public class MerchantService {
         UserAddressMapper userAddressMapper,
         OrdersMapper ordersMapper,
         ProductMapper productMapper,
+        RoleApplicationMapper roleApplicationMapper,
         FavoriteMapper favoriteMapper,
         VerificationCodeStore verificationCodeStore,
         AmapRouteService amapRouteService,
@@ -83,6 +86,7 @@ public class MerchantService {
         this.userAddressMapper = userAddressMapper;
         this.ordersMapper = ordersMapper;
         this.productMapper = productMapper;
+        this.roleApplicationMapper = roleApplicationMapper;
         this.favoriteMapper = favoriteMapper;
         this.verificationCodeStore = verificationCodeStore;
         this.amapRouteService = amapRouteService;
@@ -337,31 +341,42 @@ public class MerchantService {
         if (userService.rolesOf(finalUserId).stream().anyMatch(role -> "MERCHANT".equals(role) || "RIDER".equals(role))) {
             throw new BusinessException("已拥有商家或骑手身份，不能申请其他业务身份");
         }
+        boolean riderPending = roleApplicationMapper.exists(new LambdaQueryWrapper<com.clas.entity.RoleApplication>()
+            .eq(com.clas.entity.RoleApplication::getUserId, finalUserId)
+            .eq(com.clas.entity.RoleApplication::getTargetRole, "RIDER")
+            .eq(com.clas.entity.RoleApplication::getStatus, "PENDING"));
+        if (riderPending) {
+            throw new BusinessException("已有待审核的骑手申请，暂不能申请商家身份");
+        }
 
         // 2. Business rules validation
-        // One user -> one merchant
-        Long merchantCount = merchantMapper.selectCount(new LambdaQueryWrapper<Merchant>()
+        // 已注销的商家档案可作为新的申请重新提交，其他状态仍保持一人一店限制。
+        Merchant previousMerchant = merchantMapper.selectOne(new LambdaQueryWrapper<Merchant>()
             .eq(Merchant::getUserId, finalUserId));
-        if (merchantCount > 0) {
+        if (previousMerchant != null && previousMerchant.getStatus() != MerchantStatusEnum.DISABLED) {
             throw new BusinessException("每个用户只能入驻一个商家");
         }
 
         // Merchant name uniqueness
-        Long nameCount = merchantMapper.selectCount(new LambdaQueryWrapper<Merchant>()
-            .eq(Merchant::getMerchantName, request.merchantName()));
+        LambdaQueryWrapper<Merchant> nameQuery = new LambdaQueryWrapper<Merchant>()
+            .eq(Merchant::getMerchantName, request.merchantName());
+        if (previousMerchant != null) nameQuery.ne(Merchant::getId, previousMerchant.getId());
+        Long nameCount = merchantMapper.selectCount(nameQuery);
         if (nameCount > 0) {
             throw new BusinessException("商家名称已被占用");
         }
 
         // Phone uniqueness
-        Long phoneCount = merchantMapper.selectCount(new LambdaQueryWrapper<Merchant>()
-            .eq(Merchant::getPhone, contactPhone));
+        LambdaQueryWrapper<Merchant> phoneQuery = new LambdaQueryWrapper<Merchant>()
+            .eq(Merchant::getPhone, contactPhone);
+        if (previousMerchant != null) phoneQuery.ne(Merchant::getId, previousMerchant.getId());
+        Long phoneCount = merchantMapper.selectCount(phoneQuery);
         if (phoneCount > 0) {
             throw new BusinessException("联系电话已被其他商家占用");
         }
 
-        // 3. Create merchant
-        Merchant merchant = new Merchant();
+        // 3. Create merchant or reopen a cancelled application for review.
+        Merchant merchant = previousMerchant != null ? previousMerchant : new Merchant();
         merchant.setUserId(finalUserId);
         merchant.setMerchantName(request.merchantName());
         merchant.setPhone(contactPhone);
@@ -382,8 +397,13 @@ public class MerchantService {
         merchant.setManualClosed(false);
         merchant.setBankAccount(normalizeOptional(request.bankAccount()));
         merchant.setSettlementCycle(request.settlementCycle());
-        
-        merchantMapper.insert(merchant);
+
+        if (previousMerchant == null) {
+            merchantMapper.insert(merchant);
+        } else {
+            merchant.setAdminRemarks(null);
+            merchantMapper.updateById(merchant);
+        }
 
         return convertToResponse(merchant);
     }

@@ -76,7 +76,7 @@ const routes = [
   { path: '/profile', component: ProfileView, meta: { roles: ['USER'], title: '个人中心', motion: 'page-lift' } },
   { path: '/settings', component: UserSettingsView, meta: { roles: ['USER'], userPortal: true, title: '设置', motion: 'page-pop' } },
   { path: '/profile/notifications', component: NotificationsView, meta: { roles: ['USER'], title: '通知中心', motion: 'page-slide' } },
-  { path: '/role-applications', component: RoleApplicationView, meta: { roles: ['USER', 'RIDER'], title: '身份申请', motion: 'page-pop' } },
+  { path: '/role-applications', component: RoleApplicationView, meta: { roles: ['USER', 'RIDER', 'MERCHANT'], title: '身份申请', motion: 'page-pop' } },
 
   { path: '/orders', component: OrdersView, meta: { roles: ['USER'], title: '我的订单', motion: 'page-slide' } },
   { path: '/order/:orderId', component: OrderDetailView, meta: { roles: ['USER'], title: '订单详情', motion: 'page-focus' } },

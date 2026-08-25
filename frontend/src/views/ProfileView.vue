@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
+  cancelAccount,
+  cancelBusinessRole,
   deleteAllNotifications,
   deleteNotification,
   getCart,
@@ -32,6 +35,7 @@ import ProfileMessageBlock from '../components/profile/ProfileMessageBlock.vue'
 import { useChatStore } from '../composables/useChatStore'
 
 const activeProfileTab = ref('orders')
+const router = useRouter()
 const chatStore = useChatStore()
 const chatConversations = ref([])
 const merchantCache = ref({})
@@ -52,8 +56,11 @@ const deletingAllNotifications = ref(false)
 const profileForm = reactive({ nickname: '', avatar: '' })
 const avatarUploading = ref(false)
 const nicknameSaving = ref(false)
+const cancellingRole = ref('')
+const cancellingAccount = ref(false)
 
 const currentUser = computed(() => sessionUser.value || {})
+const cancellableRoles = computed(() => (currentUser.value.roles || []).filter((role) => role === 'MERCHANT' || role === 'RIDER'))
 const displayName = computed(() => profileForm.nickname || currentUser.value?.username || currentUser.value?.phone || '未命名用户')
 const unreadCount = computed(() => notifications.value.filter((item) => !item.readFlag).length)
 const pendingPaymentOrders = computed(() => orders.value.filter((item) => item.order.status === 'PENDING_PAYMENT'))
@@ -69,6 +76,7 @@ const pendingReviewOrders = computed(() => orders.value.filter((item) => item.or
 const afterSaleOrders = computed(() => orders.value.filter((item) => item.order.status === 'REFUND_PENDING' || item.order.status === 'REFUNDED' || (item.order.refundStatus && item.order.refundStatus !== 'NONE')))
 const unusedDealOrders = computed(() => dealOrders.value.filter((item) => item.status === 'UNUSED'))
 const voucherCount = computed(() => dealOrders.value.length + coupons.value.length)
+const roleNames = { MERCHANT: '商家', RIDER: '骑手' }
 
 const summaryCards = computed(() => [
   { label: '订单', value: orders.value.length, targetTab: 'orders' },
@@ -88,6 +96,74 @@ const orderModules = computed(() => [
 
 function getErrorMessage(error, fallback = '操作失败，请稍后重试') {
   return error?.response?.data?.message || error?.message || fallback
+}
+
+async function cancelRole(role) {
+  try {
+    await ElMessageBox.confirm(
+      `注销后将无法再进入${roleNames[role]}端；商家门店会停止营业，骑手的待接配送会退回配送池。`,
+      `注销${roleNames[role]}身份`,
+      { confirmButtonText: '确认注销身份', cancelButtonText: '保留身份', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  cancellingRole.value = role
+  try {
+    await cancelBusinessRole(role)
+    const roles = (currentUser.value.roles || []).filter((item) => item !== role)
+    if (currentUser.value.role === role) {
+      setSessionUser(null)
+      ElMessage.success(`${roleNames[role]}身份已注销，请重新登录`)
+      await router.replace('/login')
+      return
+    }
+    setSessionUser({ ...currentUser.value, roles })
+    ElMessage.success(`${roleNames[role]}身份已注销`)
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '身份注销失败'))
+  } finally {
+    cancellingRole.value = ''
+  }
+}
+
+async function cancelCurrentAccount() {
+  let currentPassword
+  try {
+    const result = await ElMessageBox.prompt('为保护账户安全，请输入当前密码。', '注销账户', {
+      confirmButtonText: '下一步',
+      cancelButtonText: '取消',
+      inputType: 'password',
+      inputPlaceholder: '当前密码',
+      inputValidator: (value) => Boolean(value?.trim()) || '请输入当前密码'
+    })
+    currentPassword = result.value
+  } catch {
+    return
+  }
+  try {
+    const { value: confirmation } = await ElMessageBox.prompt(
+      '此操作会移除账户资料、身份授权及个人订单记录。请输入“注销账户”继续。',
+      '确认注销账户',
+      {
+        confirmButtonText: '永久注销',
+        cancelButtonText: '返回',
+        inputPlaceholder: '注销账户',
+        inputValidator: (value) => value === '注销账户' || '请输入“注销账户”'
+      }
+    )
+    cancellingAccount.value = true
+    await cancelAccount({ currentPassword, confirmation })
+    setSessionUser(null)
+    ElMessage.success('账户已注销')
+    await router.replace('/login')
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(getErrorMessage(error, '账户注销失败'))
+    }
+  } finally {
+    cancellingAccount.value = false
+  }
 }
 
 function openSummaryCard(item) {
@@ -380,6 +456,35 @@ onMounted(async () => {
             @open-chat="handleOpenChat"
           />
         </el-tab-pane>
+
+        <el-tab-pane label="账户安全" name="account-security">
+          <section class="account-security">
+            <div class="account-security-head">
+              <div>
+                <h2>身份与账户注销</h2>
+                <p>身份注销仅关闭对应业务端；账户注销将移除账户资料、业务身份及关联个人数据。</p>
+              </div>
+            </div>
+
+            <div v-if="cancellableRoles.length" class="danger-actions">
+              <div v-for="role in cancellableRoles" :key="role" class="danger-action-item">
+                <div>
+                  <strong>注销{{ roleNames[role] }}身份</strong>
+                  <p>注销后不再保留{{ roleNames[role] }}端的访问权限。</p>
+                </div>
+                <el-button type="danger" plain :loading="cancellingRole === role" @click="cancelRole(role)">注销身份</el-button>
+              </div>
+            </div>
+
+            <div class="danger-action-item account-cancel">
+              <div>
+                <strong>注销账户</strong>
+                <p>该操作不可恢复，会移除账户与全部业务身份。</p>
+              </div>
+              <el-button type="danger" :loading="cancellingAccount" @click="cancelCurrentAccount">注销账户</el-button>
+            </div>
+          </section>
+        </el-tab-pane>
       </el-tabs>
     </section>
   </div>
@@ -400,4 +505,14 @@ onMounted(async () => {
 .profile-tabs :deep(.el-tabs__header) { margin-bottom: 18px; }
 .profile-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; }
 .state-panel { display: grid; gap: 16px; }
+.account-security { max-width: 760px; }
+.account-security-head { margin-bottom: 16px; }
+.account-security-head h2 { margin: 0; font-size: 18px; }
+.account-security-head p,
+.danger-action-item p { margin: 6px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
+.danger-actions { border-top: 1px solid var(--border-light); }
+.danger-action-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border-light); }
+.danger-action-item strong { color: var(--text-primary); }
+.account-cancel { border-bottom: 0; }
+@media (max-width: 640px) { .danger-action-item { align-items: flex-start; flex-direction: column; } }
 </style>
