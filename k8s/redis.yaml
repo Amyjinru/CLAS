@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: clas-redis
+  namespace: clas
+spec:
+  selector:
+    app: clas-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clas-redis
+  namespace: clas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clas-redis
+  template:
+    metadata:
+      labels:
+        app: clas-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            periodSeconds: 10

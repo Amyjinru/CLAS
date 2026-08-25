@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: clas-frontend
+  namespace: clas
+spec:
+  type: LoadBalancer
+  selector:
+    app: clas-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clas-frontend
+  namespace: clas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clas-frontend
+  template:
+    metadata:
+      labels:
+        app: clas-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/REPLACE_OWNER/clas-frontend:REPLACE_SHA
+          ports:
+            - containerPort: 80

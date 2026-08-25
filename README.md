@@ -74,6 +74,29 @@ npm run dev
 
 默认端口：`http://localhost:5173`
 
+## 使用 Docker Compose 启动完整系统
+
+Docker Compose 会启动 MySQL、Redis、Spring Boot 后端和 Nginx 前端。首次启动前复制环境变量模板并修改密码：
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build -d
+docker compose ps
+Invoke-WebRequest http://localhost/api/health
+```
+
+`database/schema.sql` 只会在新的 MySQL 数据卷首次初始化时执行；清空演示环境可运行 `docker compose down -v` 后重新启动。查看日志：
+
+```powershell
+docker compose logs -f backend
+```
+
+集成检查脚本为 `scripts/integration-test.sh`，可在 Linux/CI 中执行。Kubernetes 部署文件位于 `k8s/`，需要先创建名为 `clas-secrets` 的 Secret（参考 `k8s/secret.example.yaml`），再使用 `scripts/deploy-k8s.ps1` 或 GitHub Actions 部署。
+
+## CI/CD
+
+向 `dev` 分支推送会触发 `.github/workflows/ci-cd.yml`，按顺序执行后端单元测试、前端构建、Compose 集成测试、构建并推送 GHCR 镜像、Kubernetes 发布和健康检查。镜像标签使用 Git 提交 SHA，不使用 `latest`。部署前需在 GitHub 环境 `production` 配置 `KUBE_CONFIG`，并确保集群可拉取 GHCR 私有镜像（公开包无需额外配置）。每个阶段的测试报告、容器日志、Kubernetes 状态和健康检查证据都会作为 Actions Artifact 保留。
+
 ## 演示账号
 
 | 角色 | 手机号 | 展示名 | 密码 |
