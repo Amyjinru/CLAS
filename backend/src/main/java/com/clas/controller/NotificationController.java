@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/notifications")
-@RequireRole({"USER", "MERCHANT", "ADMIN"})
+@RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
 public class NotificationController {
     private final NotificationService notificationService;
 

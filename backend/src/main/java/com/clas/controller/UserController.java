@@ -1,11 +1,13 @@
 package com.clas.controller;
 
 import com.clas.common.Result;
+import com.clas.config.UserContext;
 import com.clas.dto.LoginRequest;
 import com.clas.dto.LoginResponse;
 import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
 import com.clas.dto.SendCodeRequest;
+import com.clas.dto.SwitchRoleRequest;
 import com.clas.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -57,5 +59,10 @@ public class UserController {
     @PostMapping("/forgot-password/reset")
     public Result<LoginResponse> resetForgotPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return Result.ok(userService.resetForgotPassword(request));
+    }
+
+    @PostMapping("/switch-role")
+    public Result<LoginResponse> switchRole(@Valid @RequestBody SwitchRoleRequest request) {
+        return Result.ok(userService.switchRole(UserContext.getUserId(), request));
     }
 }

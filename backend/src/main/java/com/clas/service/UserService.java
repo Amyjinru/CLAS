@@ -11,23 +11,25 @@ import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
 import com.clas.dto.SendCodeRequest;
 import com.clas.entity.User;
+import com.clas.entity.UserRole;
 import com.clas.mapper.UserMapper;
-import java.util.Set;
+import com.clas.mapper.UserRoleMapper;
+import com.clas.dto.SwitchRoleRequest;
+import java.util.List;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class UserService {
-    // 第一版只允许这三种演示角色，避免注册接口写入不一致的角色字符串。
-    private static final Set<String> ALLOWED_ROLES = Set.of("USER", "MERCHANT", "ADMIN");
-
     private final UserMapper userMapper;
+    private final UserRoleMapper userRoleMapper;
     private final VerificationCodeStore verificationCodeStore;
     private final BCryptPasswordEncoder passwordEncoder;
     private final com.clas.common.JwtUtil jwtUtil;
 
-    public UserService(UserMapper userMapper, VerificationCodeStore verificationCodeStore, BCryptPasswordEncoder passwordEncoder, com.clas.common.JwtUtil jwtUtil) {
+    public UserService(UserMapper userMapper, UserRoleMapper userRoleMapper, VerificationCodeStore verificationCodeStore, BCryptPasswordEncoder passwordEncoder, com.clas.common.JwtUtil jwtUtil) {
         this.userMapper = userMapper;
+        this.userRoleMapper = userRoleMapper;
         this.verificationCodeStore = verificationCodeStore;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
@@ -60,9 +62,7 @@ public class UserService {
         if (user.getEnabled() != null && !user.getEnabled()) {
             throw new BusinessException("账号已被禁用，请联系管理员");
         }
-        user.setPassword(null);
-        String token = jwtUtil.generateToken(user.getPhone(), user.getRole());
-        return new LoginResponse(user, token);
+        return loginResponse(user, defaultRole(user.getPhone()));
     }
 
     public LoginResponse register(RegisterRequest request) {
@@ -75,10 +75,11 @@ public class UserService {
         // 1. 验证码校验（失败会抛异常）
         verificationCodeStore.verify(phone, "register", request.code());
 
-        // 2. 空角色统一落到普通用户
-        String role = request.role() == null || request.role().isBlank() ? "USER" : request.role().trim().toUpperCase();
-        if (!ALLOWED_ROLES.contains(role)) {
-            throw new BusinessException("角色只能是 USER、MERCHANT 或 ADMIN");
+        // 2. 公开注册只能生成普通用户；商家、骑手、管理员均由受控流程授予。
+        if (request.role() != null
+            && !request.role().isBlank()
+            && !"USER".equalsIgnoreCase(request.role().trim())) {
+            throw new BusinessException("公开注册仅支持普通用户账号");
         }
 
         // 3. 手机号唯一性
@@ -90,11 +91,10 @@ public class UserService {
         user.setPhone(phone);
         user.setUsername(request.username());
         user.setPassword(passwordEncoder.encode(request.password()));
-        user.setRole(role);
+        user.setRole("USER");
         userMapper.insert(user);
-        user.setPassword(null);
-        String token = jwtUtil.generateToken(user.getPhone(), user.getRole());
-        return new LoginResponse(user, token);
+        grantRole(phone, "USER");
+        return loginResponse(user, defaultRole(user.getPhone()));
     }
 
     /**
@@ -161,9 +161,45 @@ public class UserService {
         // 4. 更新密码
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         userMapper.updateById(user);
+        return loginResponse(user, defaultRole(user.getPhone()));
+    }
+
+    public LoginResponse switchRole(String userId, SwitchRoleRequest request) {
+        String targetRole = request.role().trim().toUpperCase();
+        User user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException("用户不存在");
+        if (!rolesOf(userId).contains(targetRole)) throw new BusinessException("尚未获得该身份，无法切换");
+        return loginResponse(user, targetRole);
+    }
+
+    public List<String> rolesOf(String userId) {
+        List<String> roles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>()
+            .eq(UserRole::getUserId, userId)).stream().map(UserRole::getRole).toList();
+        User legacy = userMapper.selectById(userId);
+        if (roles.isEmpty() && legacy != null) {
+            return java.util.stream.Stream.of("USER", legacy.getRole()).distinct().toList();
+        }
+        return roles.contains("USER") ? roles : java.util.stream.Stream.concat(java.util.stream.Stream.of("USER"), roles.stream()).toList();
+    }
+
+    public void grantRole(String userId, String role) {
+        boolean exists = userRoleMapper.exists(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId).eq(UserRole::getRole, role));
+        if (!exists) { UserRole userRole = new UserRole(); userRole.setUserId(userId); userRole.setRole(role); userRoleMapper.insert(userRole); }
+    }
+
+    private LoginResponse loginResponse(User user, String activeRole) {
+        List<String> roles = rolesOf(user.getPhone());
+        user.setRole(roles.contains(activeRole) ? activeRole : "USER");
+        user.setRoles(roles);
         user.setPassword(null);
-        // 5. 返回登录信息（自动登录）
-        String token = jwtUtil.generateToken(user.getPhone(), user.getRole());
-        return new LoginResponse(user, token);
+        return new LoginResponse(user, jwtUtil.generateToken(user.getPhone(), user.getRole()), roles);
+    }
+
+    private String defaultRole(String userId) {
+        List<String> roles = rolesOf(userId);
+        if (roles.contains("ADMIN")) return "ADMIN";
+        if (roles.contains("MERCHANT")) return "MERCHANT";
+        if (roles.contains("RIDER")) return "RIDER";
+        return "USER";
     }
 }

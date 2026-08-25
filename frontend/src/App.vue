@@ -1,7 +1,7 @@
 ﻿<script setup>
-import { onMounted, watch, computed } from 'vue'
+import { onMounted, watch, computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { logout, sessionUser } from './api/clas'
+import { logout, sessionUser, setSessionUser, switchRole } from './api/clas'
 import { ElMessage } from 'element-plus'
 import ChatSidebar from './components/ChatSidebar.vue'
 import { preferenceState } from './utils/preferences'
@@ -15,11 +15,15 @@ const route = useRoute()
 const user = sessionUser
 const role = computed(() => user.value?.role || null)
 const welcomeName = computed(() => user.value?.nickname || user.value?.username || user.value?.phone || '')
+const availableRoles = computed(() => [...new Set(user.value?.roles || (role.value ? [role.value] : []))])
+const roleLabels = { USER: '普通用户端', MERCHANT: '商家端', RIDER: '骑手端', ADMIN: '管理端' }
+const portalSwitching = ref(false)
 
 // version_314: 按角色动态品牌链接
 const brandLink = computed(() => {
   if (!user.value) return '/login'
   if (role.value === 'MERCHANT') return '/merchant-console'
+  if (role.value === 'RIDER') return '/rider'
   if (role.value === 'ADMIN') return '/admin/dashboard'
   return '/home'
 })
@@ -35,6 +39,7 @@ const userPrimaryNav = computed(() => {
     { label: labels[2], to: '/bookings' },
     { label: labels[3], to: '/profile/notifications' },
     { label: labels[4], to: '/profile' },
+    { label: '身份申请', to: '/role-applications' },
     { label: labels[5], to: '/settings' }
   ]
 })
@@ -57,6 +62,23 @@ async function handleLogout() {
   }
   router.push('/login')
 }
+
+async function switchPortal(nextRole) {
+  // 仅响应用户真实改变的选项；组件因会话更新重渲染时不重复切换或提示。
+  if (portalSwitching.value || !nextRole || nextRole === sessionUser.value?.role) return
+  portalSwitching.value = true
+  try {
+    const data = await switchRole(nextRole)
+    setSessionUser({ ...data.user, roles: data.roles || data.user.roles || [data.user.role], token: data.token })
+    const target = nextRole === 'MERCHANT' ? '/merchant-console' : nextRole === 'RIDER' ? '/rider' : nextRole === 'ADMIN' ? '/admin/dashboard' : '/home'
+    ElMessage.success(`已切换至${roleLabels[nextRole]}`)
+    await router.push(target)
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || '端口切换失败')
+  } finally {
+    portalSwitching.value = false
+  }
+}
 </script>
 
 <template>
@@ -74,13 +96,26 @@ async function handleLogout() {
         <span v-if="user" class="user-welcome">
           欢迎, {{ welcomeName }}
           <el-tag size="small" type="info" class="role-tag">{{ user.role }}</el-tag>
+          <el-dropdown v-if="availableRoles.length > 1" class="portal-switcher" trigger="click" @command="switchPortal">
+            <button type="button" class="portal-switch-button" aria-label="切换使用端口">
+              <span class="portal-switch-caption">端口</span>
+              <strong>{{ roleLabels[role] || role }}</strong>
+              <span class="portal-switch-arrow">⌄</span>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu class="portal-switch-menu">
+                <el-dropdown-item v-for="item in availableRoles" :key="item" :command="item" :disabled="item === role" :class="{ 'is-current-portal': item === role }">
+                  <span>{{ roleLabels[item] || item }}</span>
+                  <small v-if="item === role">当前</small>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </span>
       </div>
       <nav>
         <!-- ===== 未登录访客 ===== -->
         <template v-if="!user">
-          <RouterLink to="/home">浏览商家</RouterLink>
-          <RouterLink to="/merchant-register">商家入驻</RouterLink>
           <RouterLink to="/login">登录</RouterLink>
         </template>
 
@@ -101,6 +136,12 @@ async function handleLogout() {
         <template v-else-if="role === 'MERCHANT'">
           <RouterLink to="/merchant-console">商家工作台</RouterLink>
           <RouterLink to="/merchant/info">商家信息</RouterLink>
+          <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
+        </template>
+
+        <!-- ===== RIDER 骑手（最小演示端） ===== -->
+        <template v-else-if="role === 'RIDER'">
+          <RouterLink to="/rider">骑手工作台</RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
 
@@ -141,7 +182,7 @@ async function handleLogout() {
         </div>
       </div>
     </footer>
-    <ChatSidebar v-if="sessionUser" />
+    <ChatSidebar v-if="['USER', 'MERCHANT'].includes(role)" />
   </div>
 </template>
 
@@ -313,6 +354,12 @@ async function handleLogout() {
   font-weight: 600;
   letter-spacing: 0.03em;
 }
+.portal-switcher { margin-left: 2px; }
+.portal-switch-button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 10px; border: 1px solid rgba(249, 115, 22, .28); border-radius: 999px; color: #9a3412; background: linear-gradient(135deg, #fff7ed, #fffbeb); box-shadow: 0 3px 10px rgba(234, 88, 12, .1); cursor: pointer; transition: .18s ease; }
+.portal-switch-button:hover { border-color: var(--color-primary); box-shadow: 0 5px 14px rgba(234, 88, 12, .18); transform: translateY(-1px); }
+.portal-switch-caption { color: #c2410c; font-size: 11px; font-weight: 700; letter-spacing: .06em; }.portal-switch-button strong { font-size: 12px; white-space: nowrap; }.portal-switch-arrow { font-size: 16px; line-height: 1; transition: transform .18s ease; }.portal-switch-button:hover .portal-switch-arrow { transform: translateY(2px); }
+:global(.portal-switch-menu .el-dropdown-menu__item) { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-width: 142px; border-radius: 8px; font-weight: 600; }
+:global(.portal-switch-menu .is-current-portal) { color: #9a3412 !important; background: #fff7ed !important; }:global(.portal-switch-menu small) { color: #c2410c; font-size: 11px; }
 
 nav {
   display: flex;

@@ -16,4 +16,16 @@ public interface OrdersMapper extends BaseMapper<Orders> {
         @Param("expectedStatus") String expectedStatus,
         @Param("nextStatus") String nextStatus
     );
+
+    @Update("""
+        UPDATE orders
+        SET rider_id = #{riderId},
+            rider_accepted_at = CURRENT_TIMESTAMP,
+            delivery_status = 'ASSIGNED'
+        WHERE id = #{orderId}
+          AND status = 'ACCEPTED'
+          AND delivery_status = 'PREPARING'
+          AND rider_id IS NULL
+        """)
+    int claimForRider(@Param("orderId") Long orderId, @Param("riderId") String riderId);
 }

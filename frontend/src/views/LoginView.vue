@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { login, register, sendRegisterCode, setSessionUser, currentRole } from '../api/clas'
+import { login, register, sendRegisterCode, setSessionUser, currentRole, switchRole } from '../api/clas'
 import { passwordChecks, passwordRuleMessage, passwordStrength as calculatePasswordStrength } from '../utils/passwordRules'
 
 const route = useRoute()
@@ -23,6 +23,7 @@ function showMessage(text, type = '') {
 const roleHome = {
   USER: '/home',
   MERCHANT: '/merchant-console',
+  RIDER: '/rider',
   ADMIN: '/admin/dashboard'
 }
 
@@ -33,6 +34,9 @@ const phonePattern = /^1[3-9]\d{9}$/
 const loginForm = reactive({ phone: '', password: '' })
 const loginLoading = ref(false)
 const showLoginPassword = ref(false)
+const portalPickerVisible = ref(false)
+const loginSession = ref(null)
+const portalLabels = { USER: '普通用户端', MERCHANT: '商家端', RIDER: '骑手端', ADMIN: '管理端' }
 
 function validPhone(phone) {
   return phonePattern.test((phone || '').trim())
@@ -48,9 +52,15 @@ async function submitLogin() {
   try {
     const data = await login(loginForm)
     // 将用户信息和 token 一并写入 session
-    const sessionData = { ...data.user, token: data.token }
+    const sessionData = { ...data.user, roles: data.roles || data.user.roles || [data.user.role], token: data.token }
     setSessionUser(sessionData)
     showMessage(`已登录：${sessionData.username}（${sessionData.role}）`, 'success')
+    if (sessionData.roles.length > 1) {
+      loginSession.value = sessionData
+      portalPickerVisible.value = true
+      loginLoading.value = false
+      return
+    }
     // 直接从 session 读取角色做跳转，避免 data.user.role 未定义
     const role = currentRole()
     const redirect = route.query.redirect
@@ -59,6 +69,23 @@ async function submitLogin() {
   } catch (error) {
     showMessage(error.response?.data?.message || '登录失败', 'error')
     loginLoading.value = false
+  }
+}
+
+async function enterPortal(nextRole) {
+  if (!loginSession.value) return
+  try {
+    let sessionData = loginSession.value
+    if (nextRole !== sessionData.role) {
+      const data = await switchRole(nextRole)
+      sessionData = { ...data.user, roles: data.roles || data.user.roles || [data.user.role], token: data.token }
+      setSessionUser(sessionData)
+    }
+    portalPickerVisible.value = false
+    loginSession.value = null
+    await router.push(roleHome[nextRole] || '/home')
+  } catch (error) {
+    showMessage(error.response?.data?.message || '端口进入失败', 'error')
   }
 }
 
@@ -125,6 +152,7 @@ const visualContent = computed(() => {
       kicker: 'NEW CAMPUS ACCOUNT',
       title: '先建立你的校园生活账号。',
       description: '完成手机号验证后，收藏、下单和预约提醒都会跟着账号同步。',
+      roleNote: '商家端、骑手端可在登录后的普通用户端「身份申请」页面提交申请，审核通过后即可切换进入。',
       image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=82',
       alt: '色彩丰富的健康餐食',
       noteTitle: '注册流程更清晰',
@@ -138,6 +166,7 @@ const visualContent = computed(() => {
     kicker: 'WELCOME BACK',
     title: '回到你的校园生活台。',
     description: '继续查看订单、收藏商家和今日推荐。',
+    roleNote: '',
     image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=82',
     alt: '摆盘丰富的校园餐食',
     noteTitle: '今日推荐已备好',
@@ -170,7 +199,7 @@ async function submitRegister() {
       code: registerForm.code
     }
     const data = await register(payload)
-    setSessionUser({ ...data.user, token: data.token })
+    setSessionUser({ ...data.user, roles: data.roles || data.user.roles || [data.user.role], token: data.token })
     showMessage(`注册成功：${data.user.username}`, 'success')
     await router.push('/home')
   } catch (error) {
@@ -199,6 +228,7 @@ function switchTab(tab) {
           <span class="visual-kicker">{{ visualContent.kicker }}</span>
           <h1>{{ visualContent.title }}</h1>
           <p>{{ visualContent.description }}</p>
+          <p v-if="visualContent.roleNote" class="visual-role-note">{{ visualContent.roleNote }}</p>
         </div>
         <div class="visual-steps" :key="`${visualContent.mode}-steps`" aria-hidden="true">
           <span
@@ -438,6 +468,15 @@ function switchTab(tab) {
       >{{ message }}</p>
       </section>
     </div>
+    <el-dialog v-model="portalPickerVisible" title="选择本次进入的端口" width="min(520px, calc(100% - 32px))" :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
+      <p class="portal-picker-copy">该账号已具备多个服务身份，请选择本次要进入的工作台。</p>
+      <div class="portal-choice-grid">
+        <button v-for="item in loginSession?.roles || []" :key="item" type="button" class="portal-choice" @click="enterPortal(item)">
+          <strong>{{ portalLabels[item] || item }}</strong>
+          <span>{{ item === 'USER' ? '浏览、下单与个人服务' : item === 'MERCHANT' ? '经营店铺与处理订单' : item === 'RIDER' ? '接单与配送工作台' : '平台管理功能' }}</span>
+        </button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -457,6 +496,11 @@ function switchTab(tab) {
     linear-gradient(135deg, #fffaf0 0%, #f8f6ef 48%, #fffdf7 100%);
   animation: authPageWash 0.7s ease-out both;
 }
+.portal-picker-copy { margin: 0 0 18px; color: var(--text-secondary); }
+.portal-choice-grid { display: grid; gap: 12px; }
+.portal-choice { text-align: left; padding: 16px 18px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-card); cursor: pointer; transition: .18s ease; }
+.portal-choice:hover { border-color: var(--color-primary); background: rgba(249, 115, 22, .06); transform: translateY(-1px); }
+.portal-choice strong, .portal-choice span { display: block; }.portal-choice strong { color: var(--text-primary); margin-bottom: 5px; }.portal-choice span { color: var(--text-secondary); font-size: 13px; }
 
 .auth-wrapper::before,
 .auth-wrapper::after {
@@ -561,6 +605,17 @@ function switchTab(tab) {
   margin: 18px 0 0;
   color: rgba(255, 250, 240, 0.82);
   font-size: clamp(16px, 1.3vw, 19px);
+  line-height: 1.65;
+}
+
+.visual-copy .visual-role-note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid #ffd100;
+  border-radius: 0 10px 10px 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 250, 240, 0.92);
+  font-size: 14px;
   line-height: 1.65;
 }
 

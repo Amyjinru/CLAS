@@ -28,11 +28,14 @@ const MerchantMessagesView = () => import('../views/MerchantMessagesView.vue')
 const MerchantDealsView = () => import('../views/MerchantDealsView.vue')
 const MerchantDealDetailView = () => import('../views/MerchantDealDetailView.vue')
 const MerchantBookingsView = () => import('../views/MerchantBookingsView.vue')
+const RiderWorkbenchView = () => import('../views/rider/RiderWorkbenchView.vue')
+const RoleApplicationView = () => import('../views/RoleApplicationView.vue')
 const UserAnnouncementsView = () => import('../views/user/UserAnnouncementsView.vue')
 const NotificationsView = () => import('../views/user/NotificationsView.vue')
 const MerchantAnnouncementsView = () => import('../views/merchant/MerchantAnnouncementsView.vue')
 const AdminLayout = () => import('../views/admin/AdminLayout.vue')
 const AdminAuditView = () => import('../views/AdminAuditView.vue')
+const AdminRoleApplicationsView = () => import('../views/admin/AdminRoleApplicationsView.vue')
 const AdminAnnouncementsView = () => import('../views/admin/AdminAnnouncementsView.vue')
 const AdminDashboardView = () => import('../views/admin/AdminDashboardView.vue')
 const AdminUsersView = () => import('../views/admin/AdminUsersView.vue')
@@ -50,6 +53,7 @@ function defaultPath() {
   }
   const role = currentRole()
   if (role === 'MERCHANT') return '/merchant-console'
+  if (role === 'RIDER') return '/rider'
   if (role === 'ADMIN') return '/admin/dashboard'
   if (role === 'USER') return '/home'
   return '/login'
@@ -72,6 +76,7 @@ const routes = [
   { path: '/profile', component: ProfileView, meta: { roles: ['USER'], title: '个人中心', motion: 'page-lift' } },
   { path: '/settings', component: UserSettingsView, meta: { roles: ['USER'], userPortal: true, title: '设置', motion: 'page-pop' } },
   { path: '/profile/notifications', component: NotificationsView, meta: { roles: ['USER'], title: '通知中心', motion: 'page-slide' } },
+  { path: '/role-applications', component: RoleApplicationView, meta: { roles: ['USER', 'RIDER'], title: '身份申请', motion: 'page-pop' } },
 
   { path: '/orders', component: OrdersView, meta: { roles: ['USER'], title: '我的订单', motion: 'page-slide' } },
   { path: '/order/:orderId', component: OrderDetailView, meta: { roles: ['USER'], title: '订单详情', motion: 'page-focus' } },
@@ -94,6 +99,7 @@ const routes = [
       { path: 'orders', component: AdminOrdersView, meta: { title: '订单管理', motion: 'page-admin' } },
       { path: 'users', component: AdminUsersView, meta: { title: '用户管理', motion: 'page-admin' } },
       { path: 'audit', component: AdminAuditView, meta: { title: '商家审核', motion: 'page-admin' } },
+      { path: 'role-applications', component: AdminRoleApplicationsView, meta: { title: '身份审核', motion: 'page-admin' } },
       { path: 'reviews', component: AdminReviewsView, meta: { title: '评价管理', motion: 'page-admin' } },
       { path: 'appeals', component: AdminAppealsView, meta: { title: '申诉处理', motion: 'page-admin' } },
       { path: 'announcements', component: AdminAnnouncementsView, meta: { title: '公告管理', motion: 'page-admin' } },
@@ -105,12 +111,14 @@ const routes = [
   { path: '/merchant/messages', component: MerchantMessagesView, meta: { roles: ['MERCHANT'], title: '客户信息', motion: 'page-slide' } },
   { path: '/merchant/analytics', component: MerchantAnalyticsView, meta: { roles: ['MERCHANT'], title: '数据分析', motion: 'page-workbench' } },
   { path: '/merchant/info', component: MerchantInfoView, meta: { roles: ['MERCHANT'], title: '商家信息', motion: 'page-pop' } },
-  { path: '/merchant/audit-status', component: MerchantAuditStatusView, meta: { roles: ['MERCHANT'], title: '审核状态', motion: 'page-pop' } },
+  { path: '/merchant/audit-status', component: MerchantAuditStatusView, meta: { roles: ['USER', 'MERCHANT'], title: '审核状态', motion: 'page-pop' } },
   { path: '/merchant/deals', component: MerchantDealsView, meta: { roles: ['MERCHANT'], title: '团购管理', motion: 'page-workbench' } },
   { path: '/merchant/deals/:id', component: MerchantDealDetailView, meta: { roles: ['MERCHANT'], title: '团购详情', motion: 'page-focus' } },
   { path: '/merchant/bookings', component: MerchantBookingsView, meta: { roles: ['MERCHANT'], title: '预约管理', motion: 'page-slide' } },
 
   { path: '/merchant-console', component: MerchantConsoleView, meta: { roles: ['MERCHANT'], title: '商家工作台', motion: 'page-workbench' } },
+
+  { path: '/rider', component: RiderWorkbenchView, meta: { roles: ['RIDER'], title: '骑手工作台', motion: 'page-workbench' } },
 
   { path: '/user/announcements', component: UserAnnouncementsView, meta: { roles: ['USER'], title: '平台公告', motion: 'page-lift' } },
   { path: '/merchant/announcements', component: MerchantAnnouncementsView, meta: { roles: ['MERCHANT'], title: '平台公告', motion: 'page-lift' } },

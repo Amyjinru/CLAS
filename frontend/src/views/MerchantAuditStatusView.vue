@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMyMerchantAuditStatus } from '../api/clas'
+import { currentRole, getMyMerchantAuditStatus } from '../api/clas'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -24,6 +24,8 @@ const currentStatus = computed(() => statusMap[auditStatus.value?.status] || {
 
 const timeline = computed(() => auditStatus.value?.auditTimeline || [])
 const hasRejectReason = computed(() => auditStatus.value?.status === 'APPROVED' && auditStatus.value?.adminRemarks)
+const canUseWorkbench = computed(() => ['APPROVED', 'OPEN', 'CLOSED'].includes(auditStatus.value?.status))
+const mustRelogin = computed(() => canUseWorkbench.value && currentRole() !== 'MERCHANT')
 
 function formatStatus(status) {
   return statusMap[status]?.text || status || '-'
@@ -43,6 +45,14 @@ async function loadAuditStatus() {
   } finally {
     loading.value = false
   }
+}
+
+function leaveAuditStatus() {
+  if (mustRelogin.value) {
+    router.push('/login')
+    return
+  }
+  router.push(canUseWorkbench.value ? '/merchant-console' : '/home')
 }
 
 onMounted(loadAuditStatus)
@@ -92,12 +102,21 @@ onMounted(loadAuditStatus)
         :closable="false"
         class="status-alert"
       />
+      <el-alert
+        v-if="mustRelogin"
+        title="审核已通过，请重新登录"
+        description="重新登录后将以商家身份进入工作台。"
+        type="success"
+        show-icon
+        :closable="false"
+        class="status-alert"
+      />
 
       <section class="timeline-section">
         <div class="section-head">
           <h2>审核时间线</h2>
-          <el-button type="primary" plain @click="router.push('/merchant-console')">
-            返回工作台
+          <el-button type="primary" plain @click="leaveAuditStatus">
+            {{ mustRelogin ? '重新登录' : canUseWorkbench ? '进入商家工作台' : '返回用户首页' }}
           </el-button>
         </div>
 
