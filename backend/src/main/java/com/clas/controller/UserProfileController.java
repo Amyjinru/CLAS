@@ -48,57 +48,57 @@ public class UserProfileController {
     }
 
     @GetMapping("/profile")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<User> profile() {
         return Result.ok(userProfileService.getProfile(UserContext.getUserId()));
     }
 
     @PutMapping("/profile")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<User> updateProfile(@Valid @RequestBody ProfileUpdateRequest request) {
         return Result.ok(userProfileService.updateProfile(UserContext.getUserId(), request));
     }
 
     @PostMapping("/phone-change/send-code")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<String> sendPhoneChangeCode(@Valid @RequestBody SendCodeRequest request) {
         userProfileService.sendPhoneChangeCode(UserContext.getUserId(), request);
         return Result.ok("验证码已发送");
     }
 
     @PutMapping("/phone")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<LoginResponse> changePhone(@Valid @RequestBody PhoneChangeRequest request) {
         return Result.ok(userProfileService.changePhone(UserContext.getUserId(), request));
     }
 
     @PutMapping("/password")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<Void> changePassword(@Valid @RequestBody PasswordChangeRequest request) {
         userProfileService.changePassword(UserContext.getUserId(), request);
         return Result.ok();
     }
 
     @PostMapping("/profile/avatar")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<User> uploadAvatar(@RequestParam("file") MultipartFile file) {
         return Result.ok(userAvatarUploadService.uploadAndUpdate(UserContext.getUserId(), file));
     }
 
     @GetMapping("/penalties/mine")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<List<UserPenalty>> myPenalties() {
         return Result.ok(penaltyService.listPenaltiesForUser(UserContext.getUserId()));
     }
 
     @PostMapping("/appeals")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<Appeal> submitAppeal(@Valid @RequestBody AppealRequest request) {
         return Result.ok(appealService.submit(UserContext.getUserId(), request));
     }
 
     @GetMapping("/appeals/mine")
-    @RequireRole({"USER", "MERCHANT", "ADMIN"})
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<List<Appeal>> myAppeals() {
         return Result.ok(appealService.listMine(UserContext.getUserId()));
     }

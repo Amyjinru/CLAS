@@ -19,6 +19,7 @@ const roleOptions = [
   { label: '全部角色', value: '' },
   { label: '用户', value: 'USER' },
   { label: '商家', value: 'MERCHANT' },
+  { label: '骑手', value: 'RIDER' },
   { label: '管理员', value: 'ADMIN' }
 ]
 

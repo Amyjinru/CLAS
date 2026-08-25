@@ -26,6 +26,8 @@ public class Orders {
     private Integer distanceMeters;
     private Integer routeDistanceMeters;
     private String deliveryStatus;
+    private String riderId;
+    private LocalDateTime riderAcceptedAt;
     private Integer estimatedMinutes;
     private String refundReason;
     private String refundStatus;

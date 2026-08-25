@@ -194,8 +194,8 @@ class ModuleIntegrationTest {
     }
 
     @Test
-    void userRegisterRejectsUnknownRole() throws Exception {
-        // 角色字段只允许项目约定的三种值，防止其他同学误造状态名。
+    void publicRegisterRejectsPrivilegedRole() throws Exception {
+        // 公开注册不得申请管理员、商家或骑手等特权身份。
         mockMvc.perform(post("/api/user/register/send-code")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("phone", "13900000012"))))
@@ -205,16 +205,16 @@ class ModuleIntegrationTest {
         mockMvc.perform(post("/api/user/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
-                    "username", "bad_role_user",
+                    "username", "privileged_role_user",
                     "password", STRONG_PASSWORD,
                     "confirmPassword", STRONG_PASSWORD,
                     "phone", "13900000012",
                     "code", TEST_CODE,
-                    "role", "ROOT"
+                    "role", "ADMIN"
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(400))
-            .andExpect(jsonPath("$.message").value("角色只能是 USER、MERCHANT 或 ADMIN"));
+            .andExpect(jsonPath("$.message").value("公开注册仅支持普通用户账号"));
     }
 
     @Test
@@ -269,7 +269,7 @@ class ModuleIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
-        mockMvc.perform(post("/api/merchant/register")
+        MvcResult applicationResult = mockMvc.perform(post("/api/merchant/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.ofEntries(
                     Map.entry("accountPhone", "13900000014"),
@@ -291,7 +291,31 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.userId").value("13900000014"))
             .andExpect(jsonPath("$.data.phone").value("13900000015"))
+            .andExpect(jsonPath("$.data.status").value("PENDING"))
+            .andReturn();
+
+        Long merchantId = objectMapper.readTree(applicationResult.getResponse().getContentAsString())
+            .path("data").path("id").asLong();
+        mockMvc.perform(get("/api/merchant/my/audit-status")
+                .header("Authorization", auth("13900000014")))
+            .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("PENDING"));
+
+        mockMvc.perform(post("/api/merchant/admin/audit/{id}", merchantId)
+                .header("Authorization", auth(ADMIN_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("status", "APPROVED"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("APPROVED"));
+
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", "13900000014",
+                    "password", STRONG_PASSWORD
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.user.role").value("MERCHANT"));
     }
 
     @Test
@@ -1836,7 +1860,7 @@ class ModuleIntegrationTest {
                 .content(objectMapper.writeValueAsString(Map.of("phone", accountPhone))))
             .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/merchant/register")
+        MvcResult applicationResult = mockMvc.perform(post("/api/merchant/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.ofEntries(
                     Map.entry("accountPhone", accountPhone),
@@ -1854,6 +1878,15 @@ class ModuleIntegrationTest {
                     Map.entry("bankAccount", "123456781"),
                     Map.entry("settlementCycle", 7)
                 ))))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        Long merchantId = objectMapper.readTree(applicationResult.getResponse().getContentAsString())
+            .path("data").path("id").asLong();
+        mockMvc.perform(post("/api/merchant/admin/audit/{id}", merchantId)
+                .header("Authorization", auth(ADMIN_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("status", "APPROVED"))))
             .andExpect(status().isOk());
     }
 

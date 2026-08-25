@@ -51,6 +51,7 @@ public class MerchantService {
 
     private final MerchantMapper merchantMapper;
     private final MerchantAuditLogMapper merchantAuditLogMapper;
+    private final UserService userService;
     private final UserMapper userMapper;
     private final UserAddressMapper userAddressMapper;
     private final OrdersMapper ordersMapper;
@@ -64,6 +65,7 @@ public class MerchantService {
     public MerchantService(
         MerchantMapper merchantMapper,
         MerchantAuditLogMapper merchantAuditLogMapper,
+        UserService userService,
         UserMapper userMapper,
         UserAddressMapper userAddressMapper,
         OrdersMapper ordersMapper,
@@ -76,6 +78,7 @@ public class MerchantService {
     ) {
         this.merchantMapper = merchantMapper;
         this.merchantAuditLogMapper = merchantAuditLogMapper;
+        this.userService = userService;
         this.userMapper = userMapper;
         this.userAddressMapper = userAddressMapper;
         this.ordersMapper = ordersMapper;
@@ -303,7 +306,7 @@ public class MerchantService {
                 user.setPhone(accountPhone);
                 user.setUsername(request.username());
                 user.setPassword(passwordEncoder.encode(request.password()));
-                user.setRole("MERCHANT");
+                user.setRole("USER");
                 userMapper.insert(user);
             } else {
                 if (user.getEnabled() != null && !user.getEnabled()) {
@@ -315,23 +318,24 @@ public class MerchantService {
                 if (!passwordMatches) {
                     throw new BusinessException("账号手机号或密码错误");
                 }
-                if ("USER".equals(user.getRole())) {
-                    user.setRole("MERCHANT");
-                    userMapper.updateById(user);
+                if (!"USER".equals(user.getRole())) {
+                    throw new BusinessException("当前账号不是普通用户，不能申请商家身份");
                 }
             }
             finalUserId = accountPhone;
         } else {
-            // If already logged in, check if user is already a merchant or has merchant role
+            // 单身份模型下，只有普通用户可以提交商家申请；审核通过后才授予商家身份。
             User user = userMapper.selectById(finalUserId);
             if (user == null) {
                 throw new BusinessException("登录用户不存在");
             }
-            // Update user role to MERCHANT if it's currently USER
-            if ("USER".equals(user.getRole())) {
-                user.setRole("MERCHANT");
-                userMapper.updateById(user);
+            if (!"USER".equals(user.getRole())) {
+                throw new BusinessException("当前账号不是普通用户，不能申请商家身份");
             }
+        }
+
+        if (userService.rolesOf(finalUserId).stream().anyMatch(role -> "MERCHANT".equals(role) || "RIDER".equals(role))) {
+            throw new BusinessException("已拥有商家或骑手身份，不能申请其他业务身份");
         }
 
         // 2. Business rules validation
@@ -396,6 +400,14 @@ public class MerchantService {
 
         // Validate state machine flow
         validateStatusTransition(oldStatus, newStatus);
+
+        if (newStatus == MerchantStatusEnum.APPROVED) {
+            User applicant = userMapper.selectById(merchant.getUserId());
+            if (applicant == null) {
+                throw new BusinessException("商家申请账号不存在");
+            }
+            userService.grantRole(applicant.getPhone(), "MERCHANT");
+        }
 
         // Update status and remarks
         merchant.setStatus(newStatus);
