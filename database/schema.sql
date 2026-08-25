@@ -197,6 +197,8 @@ CREATE TABLE orders (
     distance_meters INT,
     route_distance_meters INT,
     delivery_status VARCHAR(20) NOT NULL DEFAULT 'WAITING',
+    rider_id VARCHAR(20),
+    rider_accepted_at DATETIME,
     estimated_minutes INT NOT NULL DEFAULT 30,
     refund_reason VARCHAR(255),
     refund_status VARCHAR(20) NOT NULL DEFAULT 'NONE',
@@ -214,6 +216,7 @@ CREATE TABLE orders (
     rejected_at DATETIME,
     INDEX idx_orders_user (user_id, create_time DESC),
     INDEX idx_orders_merchant_status (merchant_id, status, create_time DESC),
+    INDEX idx_orders_rider (rider_id, rider_accepted_at DESC),
     INDEX idx_orders_status (status),
     INDEX idx_orders_create_status (create_time, status),
     INDEX idx_orders_merchant_create_status (merchant_id, create_time, status)
@@ -509,6 +512,7 @@ INSERT INTO `user` (phone, username, password, role, enabled) VALUES
     ('13800000001', 'user', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'USER', 1),
     ('13800000002', 'merchant', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'MERCHANT', 1),
     ('13800000003', 'admin', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'ADMIN', 1),
+    ('13800000004', 'rider', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'RIDER', 1),
     ('13800000012', 'merchant2', '$2b$10$KNBBNGHb7LzajDdlBAgdvuHQSn4QertbOpY7Y/lgT07RsZ4E545s.', 'MERCHANT', 1);
 
 INSERT INTO merchant (id, user_id, merchant_name, phone, category, address, longitude, latitude, delivery_radius_m, business_hours, delivery_fee, min_order_price, average_price, score, status, created_at, updated_at) VALUES

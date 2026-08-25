@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class UserService {
-    // 第一版只允许这三种演示角色，避免注册接口写入不一致的角色字符串。
+    // 公开注册暂不允许创建骑手；RIDER 只由种子数据提供演示账号。
     private static final Set<String> ALLOWED_ROLES = Set.of("USER", "MERCHANT", "ADMIN");
 
     private final UserMapper userMapper;

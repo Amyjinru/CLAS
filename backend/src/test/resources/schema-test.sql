@@ -172,6 +172,8 @@ CREATE TABLE orders (
     distance_meters INT,
     route_distance_meters INT,
     delivery_status VARCHAR(20) NOT NULL DEFAULT 'WAITING',
+    rider_id VARCHAR(20),
+    rider_accepted_at TIMESTAMP,
     estimated_minutes INT NOT NULL DEFAULT 30,
     refund_reason VARCHAR(255),
     refund_status VARCHAR(20) NOT NULL DEFAULT 'NONE',
@@ -429,7 +431,8 @@ CREATE TABLE appeal (
 INSERT INTO "user" (phone, username, password, role, enabled, avatar, nickname) VALUES
     ('13800000001', 'user', 'Abc123!', 'USER', TRUE, NULL, 'User One'),
     ('13800000002', 'merchant', 'Abc123!', 'MERCHANT', TRUE, NULL, 'Merchant One'),
-    ('13800000003', 'admin', 'Abc123!', 'ADMIN', TRUE, NULL, 'Admin One');
+    ('13800000003', 'admin', 'Abc123!', 'ADMIN', TRUE, NULL, 'Admin One'),
+    ('13800000004', 'rider', 'Abc123!', 'RIDER', TRUE, NULL, 'Rider One');
 
 INSERT INTO merchant (
     id, user_id, merchant_name, phone, category, address, longitude, latitude,

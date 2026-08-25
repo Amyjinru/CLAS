@@ -20,6 +20,7 @@ const welcomeName = computed(() => user.value?.nickname || user.value?.username 
 const brandLink = computed(() => {
   if (!user.value) return '/login'
   if (role.value === 'MERCHANT') return '/merchant-console'
+  if (role.value === 'RIDER') return '/rider'
   if (role.value === 'ADMIN') return '/admin/dashboard'
   return '/home'
 })
@@ -104,6 +105,12 @@ async function handleLogout() {
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
 
+        <!-- ===== RIDER 骑手（最小演示端） ===== -->
+        <template v-else-if="role === 'RIDER'">
+          <RouterLink to="/rider">骑手工作台</RouterLink>
+          <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
+        </template>
+
         <!-- ===== ADMIN 管理员 ===== -->
         <template v-else-if="role === 'ADMIN'">
           <RouterLink to="/admin/dashboard">管理后台</RouterLink>
@@ -141,7 +148,7 @@ async function handleLogout() {
         </div>
       </div>
     </footer>
-    <ChatSidebar v-if="sessionUser" />
+    <ChatSidebar v-if="['USER', 'MERCHANT'].includes(role)" />
   </div>
 </template>
 

@@ -23,6 +23,7 @@ function showMessage(text, type = '') {
 const roleHome = {
   USER: '/home',
   MERCHANT: '/merchant-console',
+  RIDER: '/rider',
   ADMIN: '/admin/dashboard'
 }
 

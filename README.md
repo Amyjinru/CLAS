@@ -81,6 +81,7 @@ npm run dev
 | 用户 | `13800000001` | `user` | `Abc123!` |
 | 商家 | `13800000002` | `merchant` | `Abc123!` |
 | 管理员 | `13800000003` | `admin` | `Abc123!` |
+| 骑手（MVP） | `13800000004` | `rider` | `Abc123!` |
 
 当前版本采用 JWT 鉴权：前端登录后存储 Token 到 `localStorage`，请求时携带 `Authorization: Bearer <token>` Header，后端解析 JWT 获取用户身份并做角色校验。密码使用 BCrypt 哈希存储，旧明文密码登录时自动升级。
 
@@ -140,7 +141,7 @@ npm run dev
 - 已接入 JWT（HMAC-SHA256 签名，24 小时过期），`Authorization: Bearer <token>` 标准格式。
 - 前端登录后将 Token 和用户信息写入 `localStorage` 的 `clas_token` / `clas_user`。
 - 后端 `AuthInterceptor` 解析 JWT 获取当前用户，购物车、订单、支付、评价等私有操作以服务端当前用户为准。
-- 角色统一使用字符串：`USER`、`MERCHANT`、`ADMIN`。
+- 角色统一使用字符串：`USER`、`MERCHANT`、`RIDER`、`ADMIN`。
 - 需要权限的接口使用 `@RequireRole` 注解控制。
 - HTTP 状态码规范化：401（未认证）、403（无权限）、400（业务错误）。
 - 密码使用 BCrypt 哈希存储，旧明文密码（非 `$2b$` 前缀）登录时自动升级为 BCrypt 哈希。
