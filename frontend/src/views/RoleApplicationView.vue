@@ -2,13 +2,21 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { applyForRider, getMyRoleApplications, sessionUser, setSessionUser, switchRole } from '../api/clas'
+import { getMyRoleApplications, sessionUser, setSessionUser, submitRiderApplication, switchRole } from '../api/clas'
+import { ensureAmapPlugins, loadAmap } from '../utils/amap'
+import { resolveAutoLocationFromAmap } from '../utils/locationFormat'
 
 const loading = ref(false)
 const router = useRouter()
 const submitting = ref(false)
+const locatingServiceArea = ref(false)
+const areaOptionsLoading = ref(false)
+const provinceOptions = ref([])
+const cityOptions = ref([])
+const districtOptions = ref([])
+const selectedArea = reactive({ province: '', city: '', district: '' })
 const applications = ref([])
-const form = reactive({ reason: '' })
+const form = reactive({ realName: '', idCardNo: '', vehicleType: '', serviceArea: '', emergencyContactName: '', emergencyContactPhone: '', credentialUrls: '' })
 const statusText = { PENDING: '审核中', APPROVED: '已通过', REJECTED: '未通过' }
 const statusType = { PENDING: 'warning', APPROVED: 'success', REJECTED: 'danger' }
 const businessRole = computed(() => (sessionUser.value?.roles || []).find((role) => role === 'RIDER' || role === 'MERCHANT'))
@@ -90,16 +98,117 @@ async function enterBusinessPortal(role) {
   }
 }
 
+function serviceAreaText(location) {
+  return [location?.province, location?.city, location?.district].filter(Boolean).join('')
+}
+
+function sortAreas(areas) {
+  return [...(areas || [])].sort((left, right) => (left.name || '').localeCompare(right.name || '', 'zh-Hans-CN-u-co-pinyin'))
+}
+
+async function searchDistrict(keyword, level) {
+  const AMap = await ensureAmapPlugins(['AMap.DistrictSearch'])
+  return new Promise((resolve) => {
+    const search = new AMap.DistrictSearch({ level, subdistrict: 1, extensions: 'base' })
+    search.search(keyword, (status, result) => {
+      resolve(status === 'complete' ? sortAreas(result?.districtList?.[0]?.districtList) : [])
+    })
+  })
+}
+
+async function openManualAreaPicker() {
+  if (provinceOptions.value.length) return
+  areaOptionsLoading.value = true
+  try {
+    provinceOptions.value = await searchDistrict('中国', 'country')
+  } catch {
+    ElMessage.warning('行政区数据加载失败，请检查高德地图配置后重试')
+  } finally {
+    areaOptionsLoading.value = false
+  }
+}
+
+async function selectProvince(value) {
+  selectedArea.province = value
+  selectedArea.city = ''
+  selectedArea.district = ''
+  cityOptions.value = []
+  districtOptions.value = []
+  form.serviceArea = ''
+  const province = provinceOptions.value.find((item) => item.name === value)
+  if (!province) return
+  areaOptionsLoading.value = true
+  try {
+    cityOptions.value = await searchDistrict(province.adcode, 'province')
+  } finally {
+    areaOptionsLoading.value = false
+  }
+}
+
+async function selectCity(value) {
+  selectedArea.city = value
+  selectedArea.district = ''
+  districtOptions.value = []
+  form.serviceArea = ''
+  const city = cityOptions.value.find((item) => item.name === value)
+  if (!city) return
+  areaOptionsLoading.value = true
+  try {
+    districtOptions.value = await searchDistrict(city.adcode, 'city')
+  } finally {
+    areaOptionsLoading.value = false
+  }
+}
+
+function selectDistrict(value) {
+  selectedArea.district = value
+  form.serviceArea = serviceAreaText(selectedArea)
+}
+
+async function locateServiceArea() {
+  locatingServiceArea.value = true
+  try {
+    const AMap = await loadAmap()
+    const result = await new Promise((resolve, reject) => {
+      const geolocation = new AMap.Geolocation({
+        enableHighAccuracy: true,
+        timeout: 8000,
+        showButton: false
+      })
+      geolocation.getCurrentPosition((status, locationResult) => {
+        if (status === 'complete') resolve(locationResult)
+        else reject(new Error('LOCATION_FAILED'))
+      })
+    })
+    const location = await resolveAutoLocationFromAmap(AMap, result)
+    const area = serviceAreaText(location)
+    if (!location?.province || !location?.city || !location?.district) {
+      throw new Error('AREA_INCOMPLETE')
+    }
+    form.serviceArea = area
+    Object.assign(selectedArea, { province: location.province, city: location.city, district: location.district })
+    ElMessage.success(`已获取服务区域：${area}`)
+  } catch (error) {
+    const message = error?.message === 'AMAP_KEY_MISSING'
+      ? '未配置高德地图，暂时无法获取服务区域'
+      : '定位失败，请允许浏览器定位权限后重试'
+    ElMessage.warning(message)
+    await openManualAreaPicker()
+  } finally {
+    locatingServiceArea.value = false
+  }
+}
+
 async function submit() {
-  if (!form.reason.trim()) {
-    ElMessage.warning('请说明申请骑手身份的原因或资质情况')
+  if (!form.realName || !form.idCardNo || !form.vehicleType || !form.serviceArea || !form.emergencyContactName || !form.emergencyContactPhone) {
+    ElMessage.warning('请完整填写骑手实名认证资料')
     return
   }
   submitting.value = true
   try {
-    await applyForRider({ reason: form.reason.trim() })
-    form.reason = ''
-    ElMessage.success('骑手身份申请已提交，请等待管理员审核')
+    await submitRiderApplication({ ...form })
+    Object.keys(form).forEach((key) => { form[key] = '' })
+    ElMessage.success('实名骑手申请已提交，请等待管理员审核')
     await load()
   } catch (error) {
     ElMessage.error(error?.message || '提交申请失败')
@@ -109,6 +218,7 @@ async function submit() {
 }
 
 onMounted(async () => {
+  void openManualAreaPicker()
   await load()
   hasLoadedInitialRecords.value = true
   refreshTimer = window.setInterval(() => {
@@ -174,7 +284,29 @@ onBeforeUnmount(() => {
       </el-alert>
       <el-form class="application-form" label-position="top">
         <el-form-item label="申请说明">
-          <el-input v-model="form.reason" type="textarea" :rows="4" maxlength="255" show-word-limit placeholder="例如：配送经验、可服务区域与可工作时段" />
+          <el-input v-model="form.realName" placeholder="真实姓名" />
+          <el-input v-model="form.idCardNo" placeholder="18 位身份证号" class="field" />
+          <el-input v-model="form.vehicleType" placeholder="交通工具，如电动车" class="field" />
+          <el-input :model-value="form.serviceArea" readonly placeholder="请点击右侧按钮获取省、市、区服务区域" class="field">
+            <template #append>
+              <el-button :loading="locatingServiceArea" @click="locateServiceArea">获取定位</el-button>
+            </template>
+          </el-input>
+          <p class="area-tip">服务区域仅保存省、市、区（县）。也可直接在下方选择，无需等待定位失败。</p>
+          <div v-loading="areaOptionsLoading" class="area-picker">
+            <el-select :model-value="selectedArea.province" placeholder="请选择省" filterable @update:model-value="selectProvince">
+              <el-option v-for="area in provinceOptions" :key="area.adcode" :label="area.name" :value="area.name" />
+            </el-select>
+            <el-select :model-value="selectedArea.city" placeholder="请选择市" filterable :disabled="!selectedArea.province" @update:model-value="selectCity">
+              <el-option v-for="area in cityOptions" :key="area.adcode" :label="area.name" :value="area.name" />
+            </el-select>
+            <el-select :model-value="selectedArea.district" placeholder="请选择区（县）" filterable :disabled="!selectedArea.city" @update:model-value="selectDistrict">
+              <el-option v-for="area in districtOptions" :key="area.adcode" :label="area.name" :value="area.name" />
+            </el-select>
+          </div>
+          <el-input v-model="form.emergencyContactName" placeholder="紧急联系人姓名" class="field" />
+          <el-input v-model="form.emergencyContactPhone" placeholder="紧急联系人手机号" class="field" />
+          <el-input v-model="form.credentialUrls" type="textarea" :rows="2" placeholder="资质证明链接（可选，多个链接用逗号分隔）" class="field" />
         </el-form-item>
         <el-button type="primary" :loading="submitting" @click="submit">提交骑手申请</el-button>
       </el-form>
@@ -204,6 +336,9 @@ onBeforeUnmount(() => {
 .eyebrow { font-size: 12px; letter-spacing: .12em; opacity: .8; }.hero h1 { margin: 8px 0; }.hero p { margin: 0; opacity: .88; }
 .application-card { margin-top: 18px; border-radius: 18px; }.application-card h2 { margin: 0; font-size: 18px; }
 .application-form { margin-top: 20px; }.status-tag { margin-left: 10px; }.remarks { color: #606266; }
+.area-tip { color: #909399; font-size: 12px; line-height: 1.5; margin: 8px 0 0; }
+.area-picker { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
+@media (max-width: 640px) { .area-picker { grid-template-columns: 1fr; } }
 .merchant-copy { margin: 0 0 18px; color: #606266; line-height: 1.7; }
 .approved-action { display: grid; gap: 10px; margin-top: 10px; justify-items: start; }
 </style>

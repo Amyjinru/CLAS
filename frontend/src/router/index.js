@@ -25,10 +25,10 @@ const MerchantInfoView = () => import('../views/MerchantInfoView.vue')
 const MerchantAnalyticsView = () => import('../views/MerchantAnalyticsView.vue')
 const MerchantProductsView = () => import('../views/MerchantProductsView.vue')
 const MerchantMessagesView = () => import('../views/MerchantMessagesView.vue')
+const RiderWorkbenchView = () => import('../views/RiderWorkbenchView.vue')
 const MerchantDealsView = () => import('../views/MerchantDealsView.vue')
 const MerchantDealDetailView = () => import('../views/MerchantDealDetailView.vue')
 const MerchantBookingsView = () => import('../views/MerchantBookingsView.vue')
-const RiderWorkbenchView = () => import('../views/rider/RiderWorkbenchView.vue')
 const RoleApplicationView = () => import('../views/RoleApplicationView.vue')
 const UserAnnouncementsView = () => import('../views/user/UserAnnouncementsView.vue')
 const NotificationsView = () => import('../views/user/NotificationsView.vue')
@@ -43,6 +43,7 @@ const AdminOrdersView = () => import('../views/admin/AdminOrdersView.vue')
 const AdminReviewsView = () => import('../views/admin/AdminReviewsView.vue')
 const AdminAppealsView = () => import('../views/admin/AdminAppealsView.vue')
 const AdminMessagesView = () => import('../views/admin/AdminMessagesView.vue')
+const AdminRidersView = () => import('../views/admin/AdminRidersView.vue')
 
 function defaultPath() {
   const user = currentUser()
@@ -104,6 +105,7 @@ const routes = [
       { path: 'appeals', component: AdminAppealsView, meta: { title: '申诉处理', motion: 'page-admin' } },
       { path: 'announcements', component: AdminAnnouncementsView, meta: { title: '公告管理', motion: 'page-admin' } },
       { path: 'messages', component: AdminMessagesView, meta: { title: '消息管理', motion: 'page-admin' } }
+      ,{ path: 'riders', component: AdminRidersView, meta: { title: '骑手运营', motion: 'page-admin' } }
     ]
   },
 
@@ -117,6 +119,7 @@ const routes = [
   { path: '/merchant/bookings', component: MerchantBookingsView, meta: { roles: ['MERCHANT'], title: '预约管理', motion: 'page-slide' } },
 
   { path: '/merchant-console', component: MerchantConsoleView, meta: { roles: ['MERCHANT'], title: '商家工作台', motion: 'page-workbench' } },
+  { path: '/rider-workbench', component: RiderWorkbenchView, meta: { roles: ['RIDER'], title: '骑手工作台', motion: 'page-workbench' } },
 
   { path: '/rider', component: RiderWorkbenchView, meta: { roles: ['RIDER'], title: '骑手工作台', motion: 'page-workbench' } },
 

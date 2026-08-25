@@ -12,8 +12,10 @@ public class ChatMessage {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long orderId;
+    private String conversationType;
     private Long merchantId;
     private String userId;
+    private String riderId;
     private String senderRole;
     private String content;
     private LocalDateTime createdAt;

@@ -52,6 +52,7 @@ public class OrderService {
     private final PenaltyService penaltyService;
     private final CouponService couponService;
     private final MerchantService merchantService;
+    private final RiderSettlementService riderSettlementService;
 
     public OrderService(
         OrdersMapper ordersMapper,
@@ -64,7 +65,8 @@ public class OrderService {
         AmapRouteService amapRouteService,
         PenaltyService penaltyService,
         CouponService couponService,
-        MerchantService merchantService
+        MerchantService merchantService,
+        RiderSettlementService riderSettlementService
     ) {
         this.ordersMapper = ordersMapper;
         this.orderItemMapper = orderItemMapper;
@@ -77,6 +79,7 @@ public class OrderService {
         this.penaltyService = penaltyService;
         this.couponService = couponService;
         this.merchantService = merchantService;
+        this.riderSettlementService = riderSettlementService;
     }
 
     @Transactional
@@ -299,15 +302,28 @@ public class OrderService {
 
     public Orders accept(Long orderId, Long merchantId) {
         Orders order = requireMerchantOrder(orderId, merchantId);
-        requireStatus(order, STATUS_PAID);
+        requireStatusIn(order, STATUS_PAID, STATUS_ACCEPTED);
+        if ("AVAILABLE".equals(order.getDeliveryStatus()) || "ASSIGNED_WAITING_MEAL".equals(order.getDeliveryStatus())
+            || "DELIVERING".equals(order.getDeliveryStatus()) || "DELIVERED".equals(order.getDeliveryStatus())) {
+            throw new BusinessException("订单已发布或已进入配送流程");
+        }
+        Merchant merchant = requireMerchant(merchantId);
+        LocalDateTime now = LocalDateTime.now();
+        int prepareMinutes = merchant.getDefaultPrepareMinutes() == null ? 15 : merchant.getDefaultPrepareMinutes();
+        int routeMinutes = order.getEstimatedMinutes() == null ? 20 : order.getEstimatedMinutes();
+        LocalDateTime estimatedArrival = now.plusMinutes(prepareMinutes + routeMinutes);
         order.setStatus(STATUS_ACCEPTED);
-        order.setDeliveryStatus("PREPARING");
-        order.setAcceptedAt(LocalDateTime.now());
+        order.setDeliveryStatus("AVAILABLE");
+        order.setPrepareMinutesSnapshot(prepareMinutes);
+        order.setPromiseStartAt(estimatedArrival.minusMinutes(10));
+        order.setPromiseEndAt(estimatedArrival.plusMinutes(10));
+        order.setPredictedArrivalAt(estimatedArrival);
+        order.setAcceptedAt(now);
         ordersMapper.updateById(order);
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
-            "已支付(自动接单中)",
-            "订单 " + order.getId() + " 正在备餐。",
+            "商家已接单",
+            "订单 " + order.getId() + " 已进入骑手配送池。",
             "ORDER_STATUS",
             "ORDER",
             order.getId(),
@@ -321,26 +337,8 @@ public class OrderService {
     }
 
     public Orders deliver(Long orderId, Long merchantId) {
-        Orders order = requireMerchantOrder(orderId, merchantId);
-        requireStatus(order, STATUS_ACCEPTED);
-        order.setDeliveryStatus("DELIVERING");
-        order.setEstimatedMinutes(15);
-        order.setDeliveredAt(LocalDateTime.now());
-        ordersMapper.updateById(order);
-        notificationService.send(new NotificationService.NotificationTarget(
-            order.getUserId(),
-            "订单配送中",
-            "订单 " + order.getId() + " 已进入配送流程。",
-            "ORDER_STATUS",
-            "ORDER",
-            order.getId(),
-            null,
-            null,
-            order.getId(),
-            merchantId,
-            "/order/" + order.getId()
-        ));
-        return order;
+        requireMerchantOrder(orderId, merchantId);
+        throw new BusinessException("商家不能完成物理配送，请由已指派骑手取餐并送达", DomainErrorCode.DELIVERY_FORBIDDEN);
     }
 
     public Orders complete(Long orderId) {
@@ -349,6 +347,7 @@ public class OrderService {
         order.setStatus(STATUS_COMPLETED);
         order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        riderSettlementService.makeCommissionWithdrawable(order);
         merchantService.refreshAveragePrice(order.getMerchantId());
         return order;
     }
@@ -356,6 +355,10 @@ public class OrderService {
     public Orders complete(Long orderId, String userId) {
         Orders order = requireUserOrder(orderId, userId);
         requireStatus(order, STATUS_ACCEPTED);
+        // PREPARING is retained only for paid legacy orders created before the rider task is published.
+        if (!"DELIVERED".equals(order.getDeliveryStatus()) && !"PREPARING".equals(order.getDeliveryStatus())) {
+            throw new BusinessException("订单尚未送达，暂不能确认收货", DomainErrorCode.DELIVERY_STATE_INVALID);
+        }
         order.setStatus(STATUS_COMPLETED);
         order.setDeliveryStatus("DELIVERED");
         order.setCompletedAt(LocalDateTime.now());
@@ -380,25 +383,25 @@ public class OrderService {
     @Transactional
     public Orders cancel(Long orderId) {
         Orders order = requireOrder(orderId);
-        requireStatusIn(order, STATUS_PENDING_PAYMENT, STATUS_PAID);
-        if (STATUS_PAID.equals(order.getStatus())) {
-            restoreOrderStock(orderId);
-        }
-        order.setStatus(STATUS_CANCELED);
-        order.setCanceledAt(LocalDateTime.now());
-        ordersMapper.updateById(order);
-        couponService.releaseForOrder(order.getUserCouponId());
-        return order;
+        return cancelBeforePickup(order);
     }
 
     @Transactional
     public Orders cancel(Long orderId, String userId) {
         Orders order = requireUserOrder(orderId, userId);
-        requireStatusIn(order, STATUS_PENDING_PAYMENT, STATUS_PAID);
-        if (STATUS_PAID.equals(order.getStatus())) {
-            restoreOrderStock(orderId);
+        return cancelBeforePickup(order);
+    }
+
+    private Orders cancelBeforePickup(Orders order) {
+        requireStatusIn(order, STATUS_PENDING_PAYMENT, STATUS_PAID, STATUS_ACCEPTED);
+        if (STATUS_ACCEPTED.equals(order.getStatus()) && ("DELIVERING".equals(order.getDeliveryStatus()) || "DELIVERED".equals(order.getDeliveryStatus()))) {
+            throw new BusinessException("骑手已取餐，订单不能取消，请通过售后申请退款", DomainErrorCode.DELIVERY_STATE_INVALID);
         }
+        if (!STATUS_PENDING_PAYMENT.equals(order.getStatus())) restoreOrderStock(order.getId());
         order.setStatus(STATUS_CANCELED);
+        order.setDeliveryStatus("CANCELED");
+        order.setRiderId(null);
+        order.setRiderAssignedAt(null);
         order.setCanceledAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         couponService.releaseForOrder(order.getUserCouponId());

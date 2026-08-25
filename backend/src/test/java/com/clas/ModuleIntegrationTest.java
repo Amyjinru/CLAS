@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -1110,8 +1111,32 @@ class ModuleIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
 
-        mockMvc.perform(post("/api/order/deliver/" + orderId)
+        mockMvc.perform(post("/api/order/accept/" + orderId)
                 .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk());
+
+        String riderToken = riderAuth("13800000004");
+        mockMvc.perform(patch("/api/rider/online")
+                .header("Authorization", riderToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"online\":true}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/api/rider/location")
+                .header("Authorization", riderToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"longitude\":116.397428,\"latitude\":39.909230}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/rider/work/start").header("Authorization", riderToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.acceptingOrders").value(true));
+        mockMvc.perform(post("/api/rider/tasks/" + orderId + "/claim").header("Authorization", riderToken))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/rider/deliveries/" + orderId + "/pickup").header("Authorization", riderToken))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/rider/work/end").header("Authorization", riderToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.acceptingOrders").value(false));
+        mockMvc.perform(post("/api/rider/deliveries/" + orderId + "/complete").header("Authorization", riderToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.deliveredAt").isString());
 
@@ -1119,6 +1144,7 @@ class ModuleIntegrationTest {
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.completedAt").isString());
+
 
         mockMvc.perform(get("/api/order/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
@@ -1829,6 +1855,17 @@ class ModuleIntegrationTest {
 
     private String auth(String phone) throws Exception {
         return "Bearer " + loginToken(phone);
+    }
+
+    private String riderAuth(String phone) throws Exception {
+        String token = loginToken(phone);
+        MvcResult result = mockMvc.perform(post("/api/user/switch-role")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"role\":\"RIDER\"}"))
+            .andExpect(status().isOk())
+            .andReturn();
+        return "Bearer " + objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("token").asText();
     }
 
     private void registerUser(String phone, String username, String password) throws Exception {

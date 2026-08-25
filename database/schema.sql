@@ -261,13 +261,26 @@ CREATE TABLE order_item (
 CREATE TABLE chat_message (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT,
-    merchant_id BIGINT NOT NULL,
+    conversation_type VARCHAR(30) NOT NULL DEFAULT 'USER_MERCHANT',
+    merchant_id BIGINT,
     user_id VARCHAR(11) NOT NULL,
+    rider_id VARCHAR(20),
     sender_role VARCHAR(10) NOT NULL COMMENT 'USER or MERCHANT',
     content TEXT NOT NULL,
     created_at DATETIME NOT NULL,
     INDEX idx_chat_order (order_id),
     INDEX idx_chat_merchant_user (merchant_id, user_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE chat_conversation (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    conversation_type VARCHAR(30) NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    peer_id VARCHAR(20) NOT NULL,
+    last_message_at DATETIME,
+    created_at DATETIME NOT NULL,
+    UNIQUE KEY uk_chat_conversation (order_id, conversation_type)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

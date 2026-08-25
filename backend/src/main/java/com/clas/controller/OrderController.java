@@ -11,10 +11,16 @@ import com.clas.dto.PaymentResponse;
 import com.clas.dto.RefundRequest;
 import com.clas.dto.RefundResolveRequest;
 import com.clas.dto.RejectOrderRequest;
+import com.clas.dto.RiderTipRequest;
+import com.clas.dto.RiderReviewRequest;
 import com.clas.entity.Orders;
+import com.clas.entity.RiderTip;
+import com.clas.entity.RiderReview;
 import com.clas.service.MerchantService;
 import com.clas.service.OrderService;
 import com.clas.service.PaymentService;
+import com.clas.service.RiderTipService;
+import com.clas.service.RiderReviewService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,11 +38,15 @@ public class OrderController {
     private final OrderService orderService;
     private final PaymentService paymentService;
     private final MerchantService merchantService;
+    private final RiderTipService riderTipService;
+    private final RiderReviewService riderReviewService;
 
-    public OrderController(OrderService orderService, PaymentService paymentService, MerchantService merchantService) {
+    public OrderController(OrderService orderService, PaymentService paymentService, MerchantService merchantService, RiderTipService riderTipService, RiderReviewService riderReviewService) {
         this.orderService = orderService;
         this.paymentService = paymentService;
         this.merchantService = merchantService;
+        this.riderTipService = riderTipService;
+        this.riderReviewService = riderReviewService;
     }
 
     @PostMapping("/create")
@@ -133,6 +143,9 @@ public class OrderController {
     public Result<Orders> complete(@PathVariable Long orderId) {
         return Result.ok(orderService.complete(orderId, currentUserId()));
     }
+    @PostMapping("/{orderId}/rider-tip") @RequireRole("USER")
+    public Result<RiderTip> tip(@PathVariable Long orderId, @Valid @RequestBody RiderTipRequest request) { return Result.ok(riderTipService.pay(orderService.requireUserOrder(orderId, currentUserId()), currentUserId(), request.amount(), request.idempotencyKey())); }
+    @PostMapping("/{orderId}/rider-review") @RequireRole("USER") public Result<RiderReview> riderReview(@PathVariable Long orderId,@Valid @RequestBody RiderReviewRequest request){return Result.ok(riderReviewService.create(orderService.requireUserOrder(orderId,currentUserId()),currentUserId(),request.score(),request.tags(),request.content()));}
 
     @PostMapping("/cancel/{orderId}")
     @RequireRole("USER")

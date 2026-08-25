@@ -7,6 +7,13 @@ import org.apache.ibatis.annotations.Update;
 
 public interface OrdersMapper extends BaseMapper<Orders> {
     @Update("""
+        UPDATE orders SET rider_id = #{riderId}, delivery_status = 'ASSIGNED_WAITING_MEAL',
+            rider_assigned_at = CURRENT_TIMESTAMP
+        WHERE id = #{orderId} AND status = 'ACCEPTED' AND delivery_status = 'AVAILABLE' AND rider_id IS NULL
+        """)
+    int claimAvailableTask(@Param("orderId") Long orderId, @Param("riderId") String riderId);
+
+    @Update("""
         UPDATE orders
         SET status = #{nextStatus}
         WHERE id = #{orderId} AND status = #{expectedStatus}

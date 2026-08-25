@@ -276,6 +276,7 @@ public class MerchantService {
         merchant.setLatitude(request.latitude());
         merchant.setDeliveryRadiusM(normalizeDeliveryRadius(request.deliveryRadiusM()));
         merchant.setBusinessHours(normalizeBusinessHours(request.businessHours(), merchant.getBusinessHours()));
+        merchant.setDefaultPrepareMinutes(normalizePrepareMinutes(request.defaultPrepareMinutes(), merchant.getDefaultPrepareMinutes()));
         merchant.setPhone(nextPhone);
         merchant.setBankAccount(bankChanged ? nextBankAccount : merchant.getBankAccount());
         merchantMapper.updateById(merchant);
@@ -397,7 +398,7 @@ public class MerchantService {
         merchant.setManualClosed(false);
         merchant.setBankAccount(normalizeOptional(request.bankAccount()));
         merchant.setSettlementCycle(request.settlementCycle());
-
+        merchant.setDefaultPrepareMinutes(normalizePrepareMinutes(request.defaultPrepareMinutes(), 15));
         if (previousMerchant == null) {
             merchantMapper.insert(merchant);
         } else {
@@ -521,6 +522,7 @@ public class MerchantService {
             merchant.getBankAccount(),
             merchant.getAdminRemarks(),
             merchant.getSettlementCycle(),
+            merchant.getDefaultPrepareMinutes(),
             merchant.getCreatedAt(),
             merchant.getUpdatedAt(),
             estimate.distanceMeters(),
@@ -589,6 +591,14 @@ public class MerchantService {
             throw new BusinessException("配送范围需在500到10000米之间");
         }
         return radius;
+    }
+
+    private int normalizePrepareMinutes(Integer minutes, Integer currentValue) {
+        int value = minutes == null ? (currentValue == null ? 15 : currentValue) : minutes;
+        if (value < 1 || value > 20) {
+            throw new BusinessException("默认备餐时长需在 1 到 20 分钟之间");
+        }
+        return value;
     }
 
     @Transactional

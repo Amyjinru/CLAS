@@ -35,6 +35,7 @@ public class Merchant {
     private String bankAccount;
     private String adminRemarks;
     private Integer settlementCycle;
+    private Integer defaultPrepareMinutes;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

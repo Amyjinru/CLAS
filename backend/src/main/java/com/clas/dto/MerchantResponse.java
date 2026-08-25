@@ -25,6 +25,7 @@ public record MerchantResponse(
     String bankAccount,
     String adminRemarks,
     Integer settlementCycle,
+    Integer defaultPrepareMinutes,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     Integer distanceMeters,

@@ -8,6 +8,9 @@ spring:
 jwt:
   secret: 在这里填写JWT签名密钥（至少32字符的随机字符串）
 
+rider:
+  identity-encryption-key: 在这里填写至少32字符的RIDER_IDENTITY_ENCRYPTION_KEY
+
 app:
   cors:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173

@@ -12,6 +12,7 @@ const menuItems = [
   { path: '/admin/users',      label: '用户管理', icon: 'User' },
   { path: '/admin/audit',      label: '商家审核', icon: 'Checked' },
   { path: '/admin/role-applications', label: '身份审核', icon: 'Postcard' },
+  { path: '/admin/riders',     label: '骑手运营', icon: 'Bicycle' },
   { path: '/admin/reviews',    label: '评价管理', icon: 'Star' },
   { path: '/admin/appeals',    label: '申诉管理', icon: 'ChatLineSquare' },
   { path: '/admin/announcements', label: '公告管理', icon: 'Notification' },

@@ -16,3 +16,7 @@ export const processReviewDeleteRequest = (id, payload) => api.post(`/admin/revi
 export const listDeletedReviewBackups = () => api.get('/admin/reviews/deleted-backups', { silent: true }).then(unwrap)
 export const listAppeals = () => api.get('/admin/appeals', { silent: true }).then(unwrap)
 export const processAppeal = (id, payload) => api.post(`/admin/appeals/${id}/process`, payload, { silent: true }).then(unwrap)
+export const listRiderApplications = () => api.get('/rider/admin/applications').then(unwrap)
+export const auditRiderApplication = (id, payload) => api.patch(`/rider/admin/applications/${id}`, payload).then(unwrap)
+export const listRiderWithdrawals = () => api.get('/rider/admin/withdrawals').then(unwrap)
+export const auditRiderWithdrawal = (id, payload) => api.patch(`/rider/admin/withdrawals/${id}`, payload).then(unwrap)

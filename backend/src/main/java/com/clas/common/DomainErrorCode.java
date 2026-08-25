@@ -13,6 +13,11 @@ public final class DomainErrorCode {
     public static final String ORDER_INVALID_STATE = "ORDER_INVALID_STATE";
     public static final String PAYMENT_IDEMPOTENCY_CONFLICT = "PAYMENT_IDEMPOTENCY_CONFLICT";
     public static final String STOCK_NOT_ENOUGH = "STOCK_NOT_ENOUGH";
+    public static final String DELIVERY_TASK_UNAVAILABLE = "DELIVERY_TASK_UNAVAILABLE";
+    public static final String RIDER_CAPACITY_REACHED = "RIDER_CAPACITY_REACHED";
+    public static final String DELIVERY_FORBIDDEN = "DELIVERY_FORBIDDEN";
+    public static final String DELIVERY_STATE_INVALID = "DELIVERY_STATE_INVALID";
+    public static final String RIDER_HAS_ACTIVE_DELIVERIES = "RIDER_HAS_ACTIVE_DELIVERIES";
 
     private DomainErrorCode() {
     }

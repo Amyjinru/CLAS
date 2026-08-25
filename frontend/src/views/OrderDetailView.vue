@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { cancelOrder, completeOrder, getMerchant, getOrderDetail, requestRefund } from '../api/clas'
+import { cancelOrder, completeOrder, getDeliveryTracking, getMerchant, getOrderDetail, requestRefund } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
+import RiderChatWindow from '../components/RiderChatWindow.vue'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
 import { orderStatusMap } from '../utils/status'
@@ -19,11 +20,16 @@ const merchant = ref(null)
 const loading = ref(true)
 const error = ref('')
 const actionMessage = ref('')
+const deliveryTracking = ref(null)
+const riderChatOpen = ref(false)
+let trackingTimer = null
 
 const deliveryLabel = {
   WAITING: '等待自动接单',
   PREPARING: '商家备餐中',
   DELIVERING: '配送中',
+  AVAILABLE: '等待骑手接单',
+  ASSIGNED_WAITING_MEAL: '骑手已接单，等待取餐',
   DELIVERED: '已送达'
 }
 
@@ -40,7 +46,9 @@ const orderTimeline = computed(() => {
     { label: '订单创建', time: order.createTime },
     { label: '支付成功', time: order.paidAt },
     { label: '自动接单', time: order.acceptedAt },
-    { label: '配送开始', time: order.deliveredAt },
+    { label: '骑手接单', time: order.riderAssignedAt },
+    { label: '骑手取餐', time: order.pickedUpAt },
+    { label: '订单送达', time: order.deliveryCompletedAt || order.deliveredAt },
     { label: '订单完成', time: order.completedAt },
     { label: '订单取消', time: order.canceledAt },
     { label: '商家拒单', time: order.rejectedAt },
@@ -78,6 +86,7 @@ async function loadDetail() {
       error.value = '订单不存在或无权查看'
       return
     }
+    await refreshTracking()
     const merchantId = orderEntry.value.order?.merchantId
     if (merchantId) {
       try {
@@ -91,10 +100,36 @@ async function loadDetail() {
   }
 }
 
+function hasLiveDelivery() {
+  return ['ASSIGNED_WAITING_MEAL', 'DELIVERING'].includes(orderEntry.value?.order?.deliveryStatus)
+}
+
+async function refreshTracking() {
+  if (!hasLiveDelivery()) {
+    deliveryTracking.value = null
+    return
+  }
+  try {
+    deliveryTracking.value = await getDeliveryTracking(orderId.value)
+  } catch {
+    deliveryTracking.value = null
+  }
+}
+
+function syncTrackingPolling() {
+  if (trackingTimer) {
+    window.clearInterval(trackingTimer)
+    trackingTimer = null
+  }
+  if (hasLiveDelivery()) trackingTimer = window.setInterval(refreshTracking, 5000)
+}
+
 async function cancelCurrentOrder() {
   await confirmAction('确认取消该订单？', async () => {
     await cancelOrder(orderEntry.value.order.id)
     await loadDetail()
+    syncTrackingPolling()
+    syncTrackingPolling()
     actionMessage.value = '订单已取消'
   })
 }
@@ -103,6 +138,7 @@ async function completeCurrentOrder() {
   await confirmAction('确认该订单已经完成？', async () => {
     await completeOrder(orderEntry.value.order.id)
     await loadDetail()
+    syncTrackingPolling()
     actionMessage.value = '订单已完成'
   }, { type: 'success' })
 }
@@ -112,6 +148,7 @@ async function refundCurrentOrder() {
   if (!reason) return
   await requestRefund(orderEntry.value.order.id, reason.trim())
   await loadDetail()
+  syncTrackingPolling()
   actionMessage.value = '退款申请已提交'
 }
 
@@ -122,6 +159,8 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+onBeforeUnmount(() => { if (trackingTimer) window.clearInterval(trackingTimer) })
 </script>
 
 <template>
@@ -144,6 +183,7 @@ onMounted(async () => {
         >
           去支付
         </RouterLink>
+        <button v-if="hasLiveDelivery()" class="secondary" type="button" @click="riderChatOpen = true">联系骑手</button>
         <button
           v-if="['PENDING_PAYMENT', 'PAID'].includes(currentStatus)"
           class="secondary"
@@ -233,6 +273,15 @@ onMounted(async () => {
           <p v-else-if="orderEntry.order.distanceMeters">直线距离：{{ distanceText(orderEntry.order.distanceMeters) }}</p>
         </div>
 
+        <div v-if="deliveryTracking" class="detail-block">
+          <h2>骑手配送追踪</h2>
+          <p>预计剩余：{{ deliveryTracking.remainingMinutes ?? '--' }} 分钟</p>
+          <p>承诺送达：{{ formatCompactDateTime(deliveryTracking.promiseStartAt).slice(0, 16) }} 至 {{ formatCompactDateTime(deliveryTracking.promiseEndAt).slice(0, 16) }}</p>
+          <p>路线：{{ deliveryTracking.routeSource === 'AMAP' ? '高德地图路线' : '直线估算' }}</p>
+          <p v-if="deliveryTracking.liveLocationAvailable">骑手位置已更新：{{ formatCompactDateTime(deliveryTracking.locationUpdatedAt).slice(0, 16) }}</p>
+          <p v-else>骑手位置暂不可用或已过期</p>
+        </div>
+
         <div v-if="orderEntry.order.remark" class="detail-block">
           <h2>备注</h2>
           <p>{{ orderEntry.order.remark }}</p>
@@ -261,6 +310,7 @@ onMounted(async () => {
         </div>
       </div>
     </section>
+    <el-dialog v-model="riderChatOpen" title="配送沟通" width="min(560px,92vw)"><RiderChatWindow v-if="riderChatOpen" :order-id="orderEntry.order.id" role="USER" :active="hasLiveDelivery()" /></el-dialog>
   </div>
 </template>
 
