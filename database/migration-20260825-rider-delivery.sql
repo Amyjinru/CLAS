@@ -14,6 +14,19 @@ BEGIN
         PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
     END IF;
 END //
+
+CREATE PROCEDURE IF NOT EXISTS add_index_if_missing(
+    IN p_table VARCHAR(64), IN p_index VARCHAR(64), IN p_definition TEXT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = p_table AND INDEX_NAME = p_index
+    ) THEN
+        SET @sql = CONCAT('ALTER TABLE ', p_table, ' ADD ', p_definition);
+        PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+    END IF;
+END //
 DELIMITER ;
 
 CREATE TABLE IF NOT EXISTS user_role (
@@ -26,6 +39,12 @@ CREATE TABLE IF NOT EXISTS user_role (
     UNIQUE KEY uk_user_role (user_id, role),
     INDEX idx_user_role_status (role, status)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Old multi-role deployments created only (user_id, role).  Upgrade that
+-- shape before inserting the rider-aware role records below.
+CALL add_column_if_missing('user_role', 'status', "status VARCHAR(20) NOT NULL DEFAULT 'APPROVED' AFTER role");
+CALL add_column_if_missing('user_role', 'created_at', 'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+CALL add_column_if_missing('user_role', 'updated_at', 'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
 
 INSERT INTO user_role (user_id, role, status, created_at, updated_at)
 SELECT phone, role, CASE WHEN enabled = 1 THEN 'APPROVED' ELSE 'DISABLED' END, NOW(), NOW()
@@ -111,7 +130,7 @@ CALL add_column_if_missing('orders', 'predicted_arrival_at', 'predicted_arrival_
 CALL add_column_if_missing('orders', 'rider_commission', 'rider_commission INT NOT NULL DEFAULT 0 AFTER delivery_fee');
 CALL add_column_if_missing('orders', 'reassign_count', 'reassign_count INT NOT NULL DEFAULT 0 AFTER rider_commission');
 CALL add_column_if_missing('orders', 'delivery_sequence', 'delivery_sequence INT NULL AFTER reassign_count');
-CREATE INDEX idx_orders_rider_delivery ON orders (rider_id, delivery_status, create_time);
+CALL add_index_if_missing('orders', 'idx_orders_rider_delivery', 'INDEX idx_orders_rider_delivery (rider_id, delivery_status, create_time)');
 
 CREATE TABLE IF NOT EXISTS delivery_exception (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -226,6 +245,7 @@ CREATE TABLE IF NOT EXISTS chat_conversation (
 CALL add_column_if_missing('chat_message', 'conversation_type', "conversation_type VARCHAR(30) NOT NULL DEFAULT 'USER_MERCHANT' AFTER order_id");
 CALL add_column_if_missing('chat_message', 'rider_id', 'rider_id VARCHAR(20) NULL AFTER user_id');
 ALTER TABLE chat_message MODIFY COLUMN merchant_id BIGINT NULL;
-CREATE INDEX idx_chat_message_rider_order ON chat_message (order_id, conversation_type, rider_id, created_at);
+CALL add_index_if_missing('chat_message', 'idx_chat_message_rider_order', 'INDEX idx_chat_message_rider_order (order_id, conversation_type, rider_id, created_at)');
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
+DROP PROCEDURE IF EXISTS add_index_if_missing;
