@@ -21,6 +21,7 @@ let cooldownTimer = null
 const roleHome = {
   USER: '/home',
   MERCHANT: '/merchant-console',
+  RIDER: '/rider',
   ADMIN: '/admin/dashboard'
 }
 
@@ -91,7 +92,7 @@ async function submitReset() {
       newPassword: form.newPassword,
       confirmPassword: form.confirmPassword
     })
-    setSessionUser({ ...data.user, token: data.token })
+    setSessionUser({ ...data.user, roles: data.roles || data.user.roles || [data.user.role], token: data.token })
     showMessage('密码已重置，已自动登录', 'success')
     const role = currentRole()
     const redirect = route.query.redirect

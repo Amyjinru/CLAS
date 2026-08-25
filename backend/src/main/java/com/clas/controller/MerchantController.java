@@ -156,7 +156,7 @@ public class MerchantController {
     }
 
     @GetMapping("/my/audit-status")
-    @RequireRole("MERCHANT")
+    @RequireRole({"USER", "MERCHANT"})
     public Result<Map<String, Object>> getMyAuditStatus() {
         String loggedInUserId = UserContext.getUserId();
         if (loggedInUserId == null) {

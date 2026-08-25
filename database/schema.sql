@@ -33,6 +33,8 @@ DROP TABLE IF EXISTS product;
 DROP TABLE IF EXISTS product_category;
 DROP TABLE IF EXISTS merchant_audit_log;
 DROP TABLE IF EXISTS merchant;
+DROP TABLE IF EXISTS role_application;
+DROP TABLE IF EXISTS user_role;
 DROP TABLE IF EXISTS `user`;
 
 -- ============================================================
@@ -47,6 +49,28 @@ CREATE TABLE `user` (
     enabled TINYINT(1) NOT NULL DEFAULT 1,
     avatar VARCHAR(512),
     nickname VARCHAR(50)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE role_application (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    target_role VARCHAR(20) NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    admin_remarks VARCHAR(255),
+    operator_id VARCHAR(20),
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    INDEX idx_role_application_user (user_id, created_at DESC),
+    INDEX idx_role_application_status (target_role, status, created_at DESC)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_role (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(20) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    UNIQUE KEY uk_user_role (user_id, role),
+    INDEX idx_user_role_role (role)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE merchant (

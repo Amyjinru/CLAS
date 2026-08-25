@@ -36,6 +36,8 @@ class MerchantAveragePriceTest {
     @Mock
     private UserMapper userMapper;
     @Mock
+    private UserService userService;
+    @Mock
     private UserAddressMapper userAddressMapper;
     @Mock
     private OrdersMapper ordersMapper;
@@ -57,6 +59,7 @@ class MerchantAveragePriceTest {
         merchantService = new MerchantService(
             merchantMapper,
             merchantAuditLogMapper,
+            userService,
             userMapper,
             userAddressMapper,
             ordersMapper,

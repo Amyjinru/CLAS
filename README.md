@@ -101,7 +101,7 @@ npm run dev
 - `username` 必填，仅作为展示名，允许重复。
 - `password` 必填，至少 6 位，必须包含大小写英文字母、数字和特殊符号。
 - `code` 必填，必须匹配 Redis 中保存的验证码。
-- `role` 可为空；填写时只能是 `USER`、`MERCHANT`、`ADMIN`。
+- 公开注册只创建 `USER`；`MERCHANT`、`RIDER`、`ADMIN` 均由受控流程授予。
 - 所有用户响应都会隐藏 `password` 字段。
 
 ### 统一返回格式
