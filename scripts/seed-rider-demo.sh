@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Seeds only the dedicated 139000090xx rider-demo records on a CLAS server.
+# Seeds only the dedicated 1334567890x rider-demo records on a CLAS server.
 # Run on the server after database/seed-rider-demo.sql has been imported.
 set -euo pipefail
 
@@ -38,7 +38,7 @@ login_as_user() {
 }
 
 login_as_admin() {
-  curl --fail --silent --show-error -X POST "$API_BASE_URL/user/login" -H 'Content-Type: application/json' --data '{"phone":"13900009003","password":"Abc123!"}' | json_field "['token']"
+  curl --fail --silent --show-error -X POST "$API_BASE_URL/user/login" -H 'Content-Type: application/json' --data '{"phone":"13345678902","password":"Abc123!"}' | json_field "['token']"
 }
 
 ensure_rider() {
@@ -50,15 +50,15 @@ ensure_rider() {
   fi
 
   rider_token="$(login_as_user "$phone")"
-  application_response="$(curl --fail --silent --show-error -X POST "$API_BASE_URL/rider/applications" -H 'Content-Type: application/json' -H "Authorization: Bearer $rider_token" --data "{\"realName\":\"$name\",\"idCardNo\":\"$id_card\",\"vehicleType\":\"电动车\",\"serviceArea\":\"北京市东城区\",\"emergencyContactName\":\"演示紧急联系人\",\"emergencyContactPhone\":\"13900009001\",\"credentialUrls\":\"https://example.invalid/rider-demo\"}")"
+  application_response="$(curl --fail --silent --show-error -X POST "$API_BASE_URL/rider/applications" -H 'Content-Type: application/json' -H "Authorization: Bearer $rider_token" --data "{\"realName\":\"$name\",\"idCardNo\":\"$id_card\",\"vehicleType\":\"电动车\",\"serviceArea\":\"北京市东城区\",\"emergencyContactName\":\"演示紧急联系人\",\"emergencyContactPhone\":\"13345678900\",\"credentialUrls\":\"https://example.invalid/rider-demo\"}")"
   application_id="$(printf '%s' "$application_response" | json_field "['id']")"
   admin_token="$(login_as_admin)"
   curl --fail --silent --show-error -X PATCH "$API_BASE_URL/rider/admin/applications/$application_id" -H 'Content-Type: application/json' -H "Authorization: Bearer $admin_token" --data '{"decision":"APPROVE","maxActiveOrders":3}' >/dev/null
   echo "Approved rider application: $phone"
 }
 
-ensure_rider '13900009004' '配送测试骑手一' '11010519491231002X'
-ensure_rider '13900009005' '配送测试骑手二' '11010519491231003X'
+ensure_rider '13345678903' '配送测试骑手一' '11010519491231002X'
+ensure_rider '13345678904' '配送测试骑手二' '11010519491231003X'
 
 # Keep both riders offline initially, but seed a nearby coordinate so browser location denial does not hide the demo task pool.
 mysql "${MYSQL_ARGS[@]}" -e "
@@ -66,7 +66,7 @@ mysql "${MYSQL_ARGS[@]}" -e "
   SET online_status = 0, accepting_orders = 0,
       current_longitude = 116.397428, current_latitude = 39.909230,
       location_updated_at = NOW(), updated_at = NOW()
-  WHERE user_id IN ('13900009004', '13900009005');
-  SELECT 'approved_demo_riders' AS metric, COUNT(*) AS value FROM rider_profile WHERE user_id IN ('13900009004', '13900009005') AND status = 'APPROVED';
-  SELECT 'demo_orders' AS metric, COUNT(*) AS value FROM orders WHERE remark LIKE 'RIDER_DEMO_%';
+  WHERE user_id IN ('13345678903', '13345678904');
+  SELECT 'approved_demo_riders' AS metric, COUNT(*) AS value FROM rider_profile WHERE user_id IN ('13345678903', '13345678904') AND status = 'APPROVED';
+  SELECT 'demo_orders' AS metric, COUNT(*) AS value FROM orders WHERE remark LIKE 'RIDER_DEMO_13345678900_%';
 "
