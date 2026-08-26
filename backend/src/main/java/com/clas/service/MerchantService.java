@@ -26,6 +26,7 @@ import com.clas.mapper.MerchantAuditLogMapper;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.ProductMapper;
 import com.clas.mapper.RiderApplicationMapper;
+import com.clas.mapper.RoleApplicationMapper;
 import com.clas.mapper.UserAddressMapper;
 import com.clas.mapper.UserMapper;
 import com.clas.config.UserContext;
@@ -58,6 +59,7 @@ public class MerchantService {
     private final OrdersMapper ordersMapper;
     private final ProductMapper productMapper;
     private final RiderApplicationMapper riderApplicationMapper;
+    private final RoleApplicationMapper roleApplicationMapper;
     private final FavoriteMapper favoriteMapper;
     private final VerificationCodeStore verificationCodeStore;
     private final AmapRouteService amapRouteService;
@@ -73,6 +75,7 @@ public class MerchantService {
         OrdersMapper ordersMapper,
         ProductMapper productMapper,
         RiderApplicationMapper riderApplicationMapper,
+        RoleApplicationMapper roleApplicationMapper,
         FavoriteMapper favoriteMapper,
         VerificationCodeStore verificationCodeStore,
         AmapRouteService amapRouteService,
@@ -87,6 +90,7 @@ public class MerchantService {
         this.ordersMapper = ordersMapper;
         this.productMapper = productMapper;
         this.riderApplicationMapper = riderApplicationMapper;
+        this.roleApplicationMapper = roleApplicationMapper;
         this.favoriteMapper = favoriteMapper;
         this.verificationCodeStore = verificationCodeStore;
         this.amapRouteService = amapRouteService;
@@ -345,7 +349,11 @@ public class MerchantService {
         boolean riderPending = riderApplicationMapper.exists(new LambdaQueryWrapper<com.clas.entity.RiderApplication>()
             .eq(com.clas.entity.RiderApplication::getUserId, finalUserId)
             .eq(com.clas.entity.RiderApplication::getStatus, "PENDING"));
-        if (riderPending) {
+        boolean legacyRiderPending = roleApplicationMapper.exists(new LambdaQueryWrapper<com.clas.entity.RoleApplication>()
+            .eq(com.clas.entity.RoleApplication::getUserId, finalUserId)
+            .eq(com.clas.entity.RoleApplication::getTargetRole, "RIDER")
+            .eq(com.clas.entity.RoleApplication::getStatus, "PENDING"));
+        if (riderPending || legacyRiderPending) {
             throw new BusinessException("已有待审核的骑手申请，暂不能申请商家身份");
         }
 

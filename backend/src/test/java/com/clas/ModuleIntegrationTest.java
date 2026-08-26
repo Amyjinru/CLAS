@@ -1048,6 +1048,7 @@ class ModuleIntegrationTest {
         mockMvc.perform(get("/api/product/list/1"))
             .andExpect(jsonPath("$.data[0].stock").value(29));
 
+        markOrderDeliveredForUserConfirmation(orderId);
         mockMvc.perform(post("/api/order/complete/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(jsonPath("$.data.status").value("COMPLETED"));
@@ -1791,10 +1792,18 @@ class ModuleIntegrationTest {
                     "payMethod", "MOCK"
                 ))))
             .andExpect(status().isOk());
+        markOrderDeliveredForUserConfirmation(orderId);
         mockMvc.perform(post("/api/order/complete/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk());
         return orderId;
+    }
+
+    private void markOrderDeliveredForUserConfirmation(Long orderId) {
+        jdbcTemplate.update(
+            "UPDATE orders SET delivery_status = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP WHERE id = ?",
+            orderId
+        );
     }
 
     private void insertReviewFixture(Long orderId, String content, int sortOrder) {

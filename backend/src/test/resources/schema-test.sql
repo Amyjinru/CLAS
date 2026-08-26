@@ -22,6 +22,7 @@ DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS chat_message;
 DROP TABLE IF EXISTS chat_conversation;
 DROP TABLE IF EXISTS delivery_call_session;
+DROP TABLE IF EXISTS order_lifecycle_event;
 DROP TABLE IF EXISTS rider_daily_metrics;
 DROP TABLE IF EXISTS rider_review;
 DROP TABLE IF EXISTS rider_tip;
