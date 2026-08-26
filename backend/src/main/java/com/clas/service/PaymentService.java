@@ -67,8 +67,8 @@ public class PaymentService {
         return paymentRepository.findSuccessfulByOrderId(order.getId())
             .map(payment -> {
                 if (OrderService.STATUS_PENDING_PAYMENT.equals(order.getStatus())) {
-                    Orders autoDispatched = markOrderAutoDispatched(order);
-                    return PaymentResponse.from(payment, autoDispatched.getStatus());
+                    Orders paidOrder = markOrderPaidAwaitingMerchant(order);
+                    return PaymentResponse.from(payment, paidOrder.getStatus());
                 }
                 return PaymentResponse.from(payment, order.getStatus());
             })
@@ -140,8 +140,8 @@ public class PaymentService {
             payment.setStatus(STATUS_SUCCESS);
             paymentRepository.save(payment);
             ordersMapper.updateStatusIfCurrent(order.getId(), ORDER_STATUS_PAYING, OrderService.STATUS_PAID);
-            Orders autoDispatched = markOrderAutoDispatched(order);
-            return new PaymentOutcome(PaymentResponse.from(payment, autoDispatched.getStatus()), null);
+            Orders paidOrder = markOrderPaidAwaitingMerchant(order);
+            return new PaymentOutcome(PaymentResponse.from(payment, paidOrder.getStatus()), null);
         } catch (RuntimeException exception) {
             payment.setStatus(STATUS_FAILED);
             paymentRepository.save(payment);
@@ -159,7 +159,7 @@ public class PaymentService {
         return PaymentResponse.from(payment, order.getStatus());
     }
 
-    private Orders markOrderAutoDispatched(Orders order) {
+    private Orders markOrderPaidAwaitingMerchant(Orders order) {
         LocalDateTime now = LocalDateTime.now();
         String fromStatus = order.getStatus();
         String fromDelivery = order.getDeliveryStatus();
@@ -168,7 +168,7 @@ public class PaymentService {
         order.setPaidAt(now);
         ordersMapper.updateById(order);
         lifecycleService.record(order, "PAYMENT_SUCCEEDED", fromStatus, fromDelivery, "USER", order.getUserId(), "支付成功，等待商家接单");
-        return orderService.autoAcceptAndDispatch(order.getId());
+        return order;
     }
 
     private PaymentResponse paymentStatusForOrder(Long orderId, Orders order) {

@@ -21,8 +21,8 @@ const statusLabel = {
 
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
-  PAID: '已支付(自动接单中)',
-  ACCEPTED: '已支付(自动接单中)',
+  PAID: '已支付',
+  ACCEPTED: '订单处理中',
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
