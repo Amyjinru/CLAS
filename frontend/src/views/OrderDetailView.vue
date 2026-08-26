@@ -26,7 +26,7 @@ const riderChatOpen = ref(false)
 let trackingTimer = null
 
 const deliveryLabel = {
-  WAITING: '等待自动接单',
+  WAITING: '等待配送',
   PREPARING: '商家备餐中',
   DELIVERING: '配送中',
   AVAILABLE: '等待骑手接单',
@@ -49,7 +49,7 @@ const orderTimeline = computed(() => {
   return [
     { label: '订单创建', time: order.createTime },
     { label: '支付成功', time: order.paidAt },
-    { label: '自动接单', time: order.acceptedAt },
+    { label: '订单已受理', time: order.acceptedAt },
     { label: '骑手接单', time: order.riderAssignedAt },
     { label: '骑手取餐', time: order.pickedUpAt },
     { label: '订单送达', time: order.deliveryCompletedAt || order.deliveredAt },

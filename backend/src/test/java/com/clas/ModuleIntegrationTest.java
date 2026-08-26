@@ -1029,7 +1029,7 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
-            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
 
         mockMvc.perform(get("/api/product/list/1"))
             .andExpect(jsonPath("$.data[0].stock").value(29));
@@ -1048,6 +1048,7 @@ class ModuleIntegrationTest {
         mockMvc.perform(get("/api/product/list/1"))
             .andExpect(jsonPath("$.data[0].stock").value(29));
 
+        merchantAcceptAndDispatch(orderId);
         markOrderDeliveredForUserConfirmation(orderId);
         mockMvc.perform(post("/api/order/complete/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
@@ -1110,12 +1111,14 @@ class ModuleIntegrationTest {
         mockMvc.perform(post("/api/order/pay/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
 
         mockMvc.perform(get("/api/order/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.order.deliveryStatus").value("AVAILABLE"));
+            .andExpect(jsonPath("$.data.order.deliveryStatus").value("WAITING"));
+
+        merchantAcceptAndDispatch(orderId);
 
         String riderToken = riderAuth("13800000004");
         mockMvc.perform(patch("/api/rider/online")
@@ -1170,7 +1173,7 @@ class ModuleIntegrationTest {
                     "payMethod", "MOCK"
                 ))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
 
         mockMvc.perform(post("/api/order/reject/" + orderId)
                 .header("Authorization", auth(MERCHANT_PHONE))
@@ -1199,7 +1202,7 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
-            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"))
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
             .andExpect(jsonPath("$.data.idempotencyKey").value(key))
             .andReturn();
 
@@ -1217,7 +1220,7 @@ class ModuleIntegrationTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
-            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"))
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"))
             .andExpect(jsonPath("$.data.idempotencyKey").value(key))
             .andReturn();
 
@@ -1445,7 +1448,7 @@ class ModuleIntegrationTest {
                     "payMethod", "MOCK"
                 ))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
+            .andExpect(jsonPath("$.data.orderStatus").value("PAID"));
 
         UserCoupon used = userCouponMapper.selectById(userCouponId);
         assertEquals("USED", used.getStatus());
@@ -1792,6 +1795,7 @@ class ModuleIntegrationTest {
                     "payMethod", "MOCK"
                 ))))
             .andExpect(status().isOk());
+        merchantAcceptAndDispatch(orderId);
         markOrderDeliveredForUserConfirmation(orderId);
         mockMvc.perform(post("/api/order/complete/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
@@ -1804,6 +1808,17 @@ class ModuleIntegrationTest {
             "UPDATE orders SET delivery_status = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP WHERE id = ?",
             orderId
         );
+    }
+
+    private void merchantAcceptAndDispatch(Long orderId) throws Exception {
+        mockMvc.perform(post("/api/order/accept/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.deliveryStatus").value("PREPARING"));
+        mockMvc.perform(post("/api/order/ready-for-dispatch/" + orderId)
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.deliveryStatus").value("AVAILABLE"));
     }
 
     private void insertReviewFixture(Long orderId, String content, int sortOrder) {

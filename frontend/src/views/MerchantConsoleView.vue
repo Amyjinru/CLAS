@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, rejectOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
+import { acceptOrder, getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, readyForDispatch, rejectOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -35,8 +35,8 @@ const statusMap = {
 // ===== version_314: 订单状态映射 =====
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
-  PAID: '支付处理中',
-  ACCEPTED: '配送履约中',
+  PAID: '待确认接单',
+  ACCEPTED: '履约中',
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
@@ -127,6 +127,24 @@ async function handleReject(orderId) {
     if (error !== 'cancel') {
       ElMessage.error('拒单失败')
     }
+  }
+}
+
+async function handleAccept(orderId) {
+  await acceptOrder(orderId)
+  ElMessage.success('已确认接单，订单进入备餐')
+  await load()
+  if (selectedOrder.value?.order.id === orderId) {
+    selectedOrder.value = orders.value.find((item) => item.order.id === orderId) || null
+  }
+}
+
+async function handleReadyForDispatch(orderId) {
+  await readyForDispatch(orderId)
+  ElMessage.success('餐品已出餐，已发布至骑手任务池')
+  await load()
+  if (selectedOrder.value?.order.id === orderId) {
+    selectedOrder.value = orders.value.find((item) => item.order.id === orderId) || null
   }
 }
 
@@ -370,6 +388,22 @@ onMounted(() => {
             <el-table-column label="操作" width="180" fixed="right">
               <template #default="scope">
                 <el-button
+                  v-if="scope.row.order.status === 'PAID'"
+                  type="primary"
+                  size="small"
+                  @click="handleAccept(scope.row.order.id)"
+                >
+                  确认接单
+                </el-button>
+                <el-button
+                  v-if="scope.row.order.status === 'ACCEPTED' && scope.row.order.deliveryStatus === 'PREPARING'"
+                  type="primary"
+                  size="small"
+                  @click="handleReadyForDispatch(scope.row.order.id)"
+                >
+                  出餐并派送
+                </el-button>
+                <el-button
                   type="primary"
                   size="small"
                   @click="openDetail(scope.row)"
@@ -464,6 +498,22 @@ onMounted(() => {
         </div>
 
         <footer class="order-panel-foot">
+          <button
+            v-if="selectedOrder.order.status === 'PAID'"
+            type="button"
+            class="secondary"
+            @click="handleAccept(selectedOrder.order.id)"
+          >
+            确认接单
+          </button>
+          <button
+            v-if="selectedOrder.order.status === 'ACCEPTED' && selectedOrder.order.deliveryStatus === 'PREPARING'"
+            type="button"
+            class="secondary"
+            @click="handleReadyForDispatch(selectedOrder.order.id)"
+          >
+            出餐并派送
+          </button>
           <button
             v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
             type="button"

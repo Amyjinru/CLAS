@@ -52,7 +52,7 @@ const todayCards = computed(() => [
   { label: '筛选区间订单', value: stats.value.todayOrders },
   { label: '筛选区间销售额', value: `¥${formatFen(stats.value.todaySales)}` },
   { label: '待支付订单', value: stats.value.pendingPaymentOrders },
-  { label: '自动接单订单', value: stats.value.paidOrders }
+  { label: '待商家接单订单', value: stats.value.paidOrders }
 ])
 
 async function load() {
@@ -135,8 +135,8 @@ function initOrderStatusChart(echarts) {
   orderChart = echarts.init(dom)
   const labels = {
     PENDING_PAYMENT: '待支付',
-    PAID: '已支付(自动接单中)',
-    ACCEPTED: '已支付(自动接单中)',
+    PAID: '已支付',
+    ACCEPTED: '订单处理中',
     COMPLETED: '已完成',
     REFUND_PENDING: '退款中',
     REFUNDED: '已退款'
