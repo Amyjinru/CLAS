@@ -13,7 +13,7 @@ import com.clas.mapper.FavoriteMapper;
 import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.ProductMapper;
-import com.clas.mapper.RoleApplicationMapper;
+import com.clas.mapper.RiderApplicationMapper;
 import com.clas.mapper.UserAddressMapper;
 import com.clas.mapper.UserMapper;
 import com.clas.common.VerificationCodeStore;
@@ -45,7 +45,7 @@ class MerchantAveragePriceTest {
     @Mock
     private ProductMapper productMapper;
     @Mock
-    private RoleApplicationMapper roleApplicationMapper;
+    private RiderApplicationMapper riderApplicationMapper;
     @Mock
     private FavoriteMapper favoriteMapper;
     @Mock
@@ -67,7 +67,7 @@ class MerchantAveragePriceTest {
             userAddressMapper,
             ordersMapper,
             productMapper,
-            roleApplicationMapper,
+            riderApplicationMapper,
             favoriteMapper,
             verificationCodeStore,
             amapRouteService,

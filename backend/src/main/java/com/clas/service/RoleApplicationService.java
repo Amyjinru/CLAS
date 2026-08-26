@@ -8,10 +8,12 @@ import com.clas.dto.RoleApplicationRecordResponse;
 import com.clas.entity.Merchant;
 import com.clas.entity.MerchantAuditLog;
 import com.clas.entity.RoleApplication;
+import com.clas.entity.RiderApplication;
 import com.clas.entity.User;
 import com.clas.mapper.MerchantAuditLogMapper;
 import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.RoleApplicationMapper;
+import com.clas.mapper.RiderApplicationMapper;
 import com.clas.mapper.UserMapper;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -27,6 +29,7 @@ public class RoleApplicationService {
     private static final String REJECTED = "REJECTED";
 
     private final RoleApplicationMapper roleApplicationMapper;
+    private final RiderApplicationMapper riderApplicationMapper;
     private final MerchantMapper merchantMapper;
     private final MerchantAuditLogMapper merchantAuditLogMapper;
     private final UserMapper userMapper;
@@ -35,6 +38,7 @@ public class RoleApplicationService {
 
     public RoleApplicationService(
         RoleApplicationMapper roleApplicationMapper,
+        RiderApplicationMapper riderApplicationMapper,
         MerchantMapper merchantMapper,
         MerchantAuditLogMapper merchantAuditLogMapper,
         UserMapper userMapper,
@@ -42,6 +46,7 @@ public class RoleApplicationService {
         UserService userService
     ) {
         this.roleApplicationMapper = roleApplicationMapper;
+        this.riderApplicationMapper = riderApplicationMapper;
         this.merchantMapper = merchantMapper;
         this.merchantAuditLogMapper = merchantAuditLogMapper;
         this.userMapper = userMapper;
@@ -94,7 +99,27 @@ public class RoleApplicationService {
      */
     public List<RoleApplicationRecordResponse> listMineRecords(String userId) {
         List<RoleApplicationRecordResponse> records = new ArrayList<>();
+        List<RiderApplication> riderApplications = riderApplicationMapper.selectList(new LambdaQueryWrapper<RiderApplication>()
+            .eq(RiderApplication::getUserId, userId)
+            .orderByDesc(RiderApplication::getCreatedAt));
+        for (RiderApplication application : riderApplications) {
+            String reason = "配送工具：" + application.getVehicleType() + "；服务区域：" + application.getServiceArea();
+            records.add(new RoleApplicationRecordResponse(
+                "rider-profile-" + application.getId(),
+                RIDER,
+                application.getStatus(),
+                reason,
+                application.getRejectReason(),
+                application.getReviewerId(),
+                application.getCreatedAt(),
+                application.getReviewedAt() == null ? application.getCreatedAt() : application.getReviewedAt()
+            ));
+        }
+        // 兼容历史通用身份记录；新骑手申请只以 rider_application 为唯一来源。
         for (RoleApplication application : listMine(userId)) {
+            if (RIDER.equals(application.getTargetRole()) && !riderApplications.isEmpty()) {
+                continue;
+            }
             records.add(new RoleApplicationRecordResponse(
                 "rider-" + application.getId(),
                 application.getTargetRole(),

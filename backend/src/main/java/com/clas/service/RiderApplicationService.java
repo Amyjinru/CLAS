@@ -18,6 +18,9 @@ import com.clas.dto.RiderAdminUpdateRequest;
 import com.clas.dto.RiderIdentityRevealResponse;
 import com.clas.dto.RiderProfileResponse;
 import com.clas.entity.Orders;
+import com.clas.entity.Merchant;
+import com.clas.common.MerchantStatusEnum;
+import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.OrdersMapper;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
@@ -29,12 +32,17 @@ public class RiderApplicationService {
     private final UserRoleMapper roles; private final RiderIdentityCrypto crypto; private final RiderAuditLogMapper audits;
     private final NotificationService notifications;
     private final OrdersMapper orders;
-    public RiderApplicationService(RiderApplicationMapper applications, RiderProfileMapper profiles, UserRoleMapper roles, RiderIdentityCrypto crypto, RiderAuditLogMapper audits, NotificationService notifications, OrdersMapper orders) {
-        this.applications = applications; this.profiles = profiles; this.roles = roles; this.crypto = crypto; this.audits = audits; this.notifications = notifications; this.orders = orders;
+    private final MerchantMapper merchants;
+    public RiderApplicationService(RiderApplicationMapper applications, RiderProfileMapper profiles, UserRoleMapper roles, RiderIdentityCrypto crypto, RiderAuditLogMapper audits, NotificationService notifications, OrdersMapper orders, MerchantMapper merchants) {
+        this.applications = applications; this.profiles = profiles; this.roles = roles; this.crypto = crypto; this.audits = audits; this.notifications = notifications; this.orders = orders; this.merchants = merchants;
     }
     @Transactional
     public RiderApplicationResponse apply(RiderApplicationRequest request) {
         String userId = UserContext.getUserId();
+        Merchant merchant = merchants.selectOne(new LambdaQueryWrapper<Merchant>().eq(Merchant::getUserId, userId));
+        if (merchant != null && merchant.getStatus() != MerchantStatusEnum.DISABLED) {
+            throw new BusinessException("已有商家业务身份或入驻申请，暂不能申请骑手身份");
+        }
         RiderApplication latest = applications.selectOne(new LambdaQueryWrapper<RiderApplication>().eq(RiderApplication::getUserId, userId).orderByDesc(RiderApplication::getId).last("LIMIT 1"));
         if (latest != null && "PENDING".equals(latest.getStatus())) throw new BusinessException("已有待审核骑手申请");
         // Preserve the approved identity while the rider's replacement data is reviewed.

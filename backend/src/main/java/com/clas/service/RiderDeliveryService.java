@@ -18,7 +18,8 @@ public class RiderDeliveryService {
     private final MerchantMapper merchants;
     private final NotificationService notifications;
     private final RiderSettlementService settlements;
-    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantMapper merchants, NotificationService notifications, RiderSettlementService settlements) { this.orders = orders; this.locations = locations; this.merchants = merchants; this.notifications = notifications; this.settlements = settlements; }
+    private final OrderLifecycleService lifecycleService;
+    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantMapper merchants, NotificationService notifications, RiderSettlementService settlements, OrderLifecycleService lifecycleService) { this.orders = orders; this.locations = locations; this.merchants = merchants; this.notifications = notifications; this.settlements = settlements; this.lifecycleService = lifecycleService; }
 
     @Transactional
     public Orders pickup(Long orderId) { return transition(orderId, "ASSIGNED_WAITING_MEAL", "DELIVERING", true); }
@@ -30,9 +31,11 @@ public class RiderDeliveryService {
         locations.approvedProfile();
         Orders order = owned(orderId);
         if (!"ASSIGNED_WAITING_MEAL".equals(order.getDeliveryStatus())) throw invalid();
+        String fromStatus = order.getStatus(); String fromDelivery = order.getDeliveryStatus();
         order.setRiderId(null); order.setRiderAssignedAt(null); order.setDeliveryStatus("AVAILABLE");
         order.setReassignCount((order.getReassignCount() == null ? 0 : order.getReassignCount()) + 1);
         orders.updateById(order);
+        lifecycleService.record(order, "RIDER_ABANDONED", fromStatus, fromDelivery, "RIDER", UserContext.getUserId(), reason);
         notifyOrder(order, "骑手已放弃配送", "骑手暂时无法配送，订单已回到骑手任务池。");
         return order;
     }
@@ -41,11 +44,13 @@ public class RiderDeliveryService {
         locations.approvedProfile();
         Orders order = owned(orderId);
         if (!expected.equals(order.getDeliveryStatus())) throw invalid();
+        String fromStatus = order.getStatus(); String fromDelivery = order.getDeliveryStatus();
         LocalDateTime now = LocalDateTime.now();
         order.setDeliveryStatus(target);
         if (pickup) order.setPickedUpAt(now);
         else { order.setDeliveryCompletedAt(now); order.setDeliveredAt(now); }
         orders.updateById(order);
+        lifecycleService.record(order, pickup ? "RIDER_PICKED_UP" : "RIDER_DELIVERED", fromStatus, fromDelivery, "RIDER", UserContext.getUserId(), pickup ? "骑手确认取餐" : "骑手确认送达");
         if (!pickup) settlements.createPendingCommission(order);
         notifyOrder(order, pickup ? "骑手已取餐" : "订单已送达", pickup ? "骑手已取餐，正在配送中。" : "骑手已送达，请确认收货。");
         return order;

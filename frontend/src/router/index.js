@@ -37,7 +37,6 @@ const NotificationsView = () => import('../views/user/NotificationsView.vue')
 const MerchantAnnouncementsView = () => import('../views/merchant/MerchantAnnouncementsView.vue')
 const AdminLayout = () => import('../views/admin/AdminLayout.vue')
 const AdminAuditView = () => import('../views/AdminAuditView.vue')
-const AdminRoleApplicationsView = () => import('../views/admin/AdminRoleApplicationsView.vue')
 const AdminAnnouncementsView = () => import('../views/admin/AdminAnnouncementsView.vue')
 const AdminDashboardView = () => import('../views/admin/AdminDashboardView.vue')
 const AdminUsersView = () => import('../views/admin/AdminUsersView.vue')
@@ -102,7 +101,7 @@ const routes = [
       { path: 'orders', component: AdminOrdersView, meta: { title: '订单管理', motion: 'page-admin' } },
       { path: 'users', component: AdminUsersView, meta: { title: '用户管理', motion: 'page-admin' } },
       { path: 'audit', component: AdminAuditView, meta: { title: '商家审核', motion: 'page-admin' } },
-      { path: 'role-applications', component: AdminRoleApplicationsView, meta: { title: '身份审核', motion: 'page-admin' } },
+      { path: 'role-applications', redirect: '/admin/riders' },
       { path: 'reviews', component: AdminReviewsView, meta: { title: '评价管理', motion: 'page-admin' } },
       { path: 'appeals', component: AdminAppealsView, meta: { title: '申诉处理', motion: 'page-admin' } },
       { path: 'announcements', component: AdminAnnouncementsView, meta: { title: '公告管理', motion: 'page-admin' } },

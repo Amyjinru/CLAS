@@ -66,6 +66,7 @@ public class ReviewService {
     private final ContentModerationService contentModerationService;
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
+    private final OrderLifecycleService lifecycleService;
 
     public ReviewService(
         ReviewMapper reviewMapper,
@@ -84,7 +85,8 @@ public class ReviewService {
         UserProfileService userProfileService,
         ContentModerationService contentModerationService,
         UserMapper userMapper,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        OrderLifecycleService lifecycleService
     ) {
         this.reviewMapper = reviewMapper;
         this.reviewImageMapper = reviewImageMapper;
@@ -103,6 +105,7 @@ public class ReviewService {
         this.contentModerationService = contentModerationService;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
+        this.lifecycleService = lifecycleService;
     }
 
     @Transactional
@@ -133,6 +136,7 @@ public class ReviewService {
         review.setReportStatus("NONE");
         review.setCreatedAt(LocalDateTime.now());
         reviewMapper.insert(review);
+        lifecycleService.record(order, "MERCHANT_REVIEWED", order.getStatus(), order.getDeliveryStatus(), "USER", request.userId(), "用户完成商家评价");
         saveImages(review.getId(), images);
         recalculateMerchantScore(order.getMerchantId());
         return review;

@@ -1,2 +1,45 @@
-package com.clas.service; import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper; import com.clas.common.BusinessException; import com.clas.entity.Orders; import com.clas.entity.RiderReview; import com.clas.mapper.RiderReviewMapper; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.time.LocalDateTime; import java.util.List;
-@Service public class RiderReviewService { private final RiderReviewMapper reviews; private final NotificationService notifications; public RiderReviewService(RiderReviewMapper reviews,NotificationService notifications){this.reviews=reviews;this.notifications=notifications;} @Transactional public RiderReview create(Orders o,String user,Integer score,String tags,String content){if(!"COMPLETED".equals(o.getStatus())||o.getRiderId()==null)throw new BusinessException("确认收货后才可评价骑手");if(reviews.selectOne(new LambdaQueryWrapper<RiderReview>().eq(RiderReview::getOrderId,o.getId()))!=null)throw new BusinessException("该订单已评价骑手");RiderReview r=new RiderReview();r.setOrderId(o.getId());r.setUserId(user);r.setRiderId(o.getRiderId());r.setScore(score);r.setTags(tags);r.setContent(content);r.setCreatedAt(LocalDateTime.now());reviews.insert(r);notifications.send(new NotificationService.NotificationTarget(o.getRiderId(),"收到骑手评价","订单 " + o.getId() + " 收到新的服务评价。","RIDER_REVIEW","ORDER",o.getId(),null,null,o.getId(),o.getMerchantId(),"/rider-workbench"));return r;} public List<RiderReview> mine(String rider){return reviews.selectList(new LambdaQueryWrapper<RiderReview>().eq(RiderReview::getRiderId,rider).orderByDesc(RiderReview::getCreatedAt));} }
+package com.clas.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.clas.common.BusinessException;
+import com.clas.entity.Orders;
+import com.clas.entity.RiderReview;
+import com.clas.mapper.RiderReviewMapper;
+import java.time.LocalDateTime;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class RiderReviewService {
+    private final RiderReviewMapper reviews;
+    private final NotificationService notifications;
+    private final OrderLifecycleService lifecycleService;
+
+    public RiderReviewService(RiderReviewMapper reviews, NotificationService notifications, OrderLifecycleService lifecycleService) {
+        this.reviews = reviews;
+        this.notifications = notifications;
+        this.lifecycleService = lifecycleService;
+    }
+
+    @Transactional
+    public RiderReview create(Orders order, String userId, Integer score, String tags, String content) {
+        if (!"COMPLETED".equals(order.getStatus()) || order.getRiderId() == null) throw new BusinessException("确认收货后才可评价骑手");
+        if (reviews.selectOne(new LambdaQueryWrapper<RiderReview>().eq(RiderReview::getOrderId, order.getId())) != null) throw new BusinessException("该订单已评价骑手");
+        RiderReview review = new RiderReview();
+        review.setOrderId(order.getId()); review.setUserId(userId); review.setRiderId(order.getRiderId());
+        review.setScore(score); review.setTags(tags); review.setContent(content); review.setCreatedAt(LocalDateTime.now());
+        reviews.insert(review);
+        lifecycleService.record(order, "RIDER_REVIEWED", order.getStatus(), order.getDeliveryStatus(), "USER", userId, "用户完成骑手评价");
+        notifications.send(new NotificationService.NotificationTarget(order.getRiderId(), "收到骑手评价", "订单 " + order.getId() + " 收到新的服务评价。", "RIDER_REVIEW", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/rider-workbench"));
+        return review;
+    }
+
+    public List<RiderReview> mine(String riderId) {
+        return reviews.selectList(new LambdaQueryWrapper<RiderReview>().eq(RiderReview::getRiderId, riderId).orderByDesc(RiderReview::getCreatedAt));
+    }
+
+    public RiderReview getForOrder(Orders order) {
+        return reviews.selectOne(new LambdaQueryWrapper<RiderReview>().eq(RiderReview::getOrderId, order.getId()));
+    }
+}

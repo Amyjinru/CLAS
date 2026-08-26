@@ -248,6 +248,20 @@ CREATE TABLE order_item (
     price INT NOT NULL
 );
 
+CREATE TABLE order_lifecycle_event (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    event_type VARCHAR(40) NOT NULL,
+    from_status VARCHAR(30),
+    to_status VARCHAR(30),
+    from_delivery_status VARCHAR(40),
+    to_delivery_status VARCHAR(40),
+    actor_role VARCHAR(20) NOT NULL,
+    actor_id VARCHAR(30),
+    remark VARCHAR(500),
+    created_at TIMESTAMP NOT NULL
+);
+
 CREATE TABLE chat_message (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT,

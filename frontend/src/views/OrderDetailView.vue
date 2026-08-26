@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { cancelOrder, completeOrder, getDeliveryTracking, getMerchant, getOrderDetail, requestRefund } from '../api/clas'
+import { cancelOrder, completeOrder, getDeliveryTracking, getMerchant, getOrderDetail, getOrderTimeline, requestRefund } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
 import RiderChatWindow from '../components/RiderChatWindow.vue'
@@ -21,6 +21,7 @@ const loading = ref(true)
 const error = ref('')
 const actionMessage = ref('')
 const deliveryTracking = ref(null)
+const lifecycleEvents = ref([])
 const riderChatOpen = ref(false)
 let trackingTimer = null
 
@@ -40,6 +41,9 @@ const refundStatusLabel = {
 }
 
 const orderTimeline = computed(() => {
+  if (lifecycleEvents.value.length) {
+    return lifecycleEvents.value.map((event) => ({ label: lifecycleLabel[event.eventType] || event.eventType, time: event.createdAt, remark: event.remark }))
+  }
   const order = orderEntry.value?.order
   if (!order) return []
   return [
@@ -56,6 +60,13 @@ const orderTimeline = computed(() => {
     { label: '退款处理', time: order.refundResolvedAt }
   ].filter((item) => item.time)
 })
+
+const lifecycleLabel = {
+  ORDER_CREATED: '订单创建', PAYMENT_SUCCEEDED: '支付成功', MERCHANT_ACCEPTED: '商家接单，开始制作',
+  MERCHANT_READY_FOR_DISPATCH: '餐品制作完成，发布配送', RIDER_CLAIMED: '骑手接单',
+  RIDER_PICKED_UP: '骑手取餐', RIDER_DELIVERED: '骑手送达', USER_CONFIRMED_RECEIPT: '确认收货',
+  MERCHANT_REVIEWED: '完成商家评价', RIDER_REVIEWED: '完成骑手评价', ORDER_CANCELED: '订单取消', MERCHANT_REJECTED: '商家拒单'
+}
 
 const currentStatus = computed(() => orderEntry.value?.order?.status)
 
@@ -86,6 +97,7 @@ async function loadDetail() {
       error.value = '订单不存在或无权查看'
       return
     }
+    try { lifecycleEvents.value = await getOrderTimeline(orderId.value) } catch { lifecycleEvents.value = [] }
     await refreshTracking()
     const merchantId = orderEntry.value.order?.merchantId
     if (merchantId) {
@@ -230,6 +242,7 @@ onBeforeUnmount(() => { if (trackingTimer) window.clearInterval(trackingTimer) }
               :timestamp="formatCompactDateTime(item.time).slice(0, 16)"
             >
               {{ item.label }}
+              <small v-if="item.remark" class="timeline-remark">{{ item.remark }}</small>
             </el-timeline-item>
           </el-timeline>
         </div>
@@ -408,6 +421,8 @@ onBeforeUnmount(() => { if (trackingTimer) window.clearInterval(trackingTimer) }
   margin-top: 14px;
   padding-left: 2px;
 }
+
+.timeline-remark { color: var(--text-tertiary); display: block; font-size: 12px; margin-top: 3px; }
 
 .item-list {
   list-style: none;

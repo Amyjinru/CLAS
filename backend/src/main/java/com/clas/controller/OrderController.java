@@ -6,6 +6,7 @@ import com.clas.config.UserContext;
 import com.clas.dto.CreateOrderRequest;
 import com.clas.dto.OrderPreviewResponse;
 import com.clas.dto.OrderResponse;
+import com.clas.dto.OrderLifecycleEventResponse;
 import com.clas.dto.PaymentRequest;
 import com.clas.dto.PaymentResponse;
 import com.clas.dto.RefundRequest;
@@ -21,6 +22,7 @@ import com.clas.service.OrderService;
 import com.clas.service.PaymentService;
 import com.clas.service.RiderTipService;
 import com.clas.service.RiderReviewService;
+import com.clas.service.OrderLifecycleService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,13 +42,15 @@ public class OrderController {
     private final MerchantService merchantService;
     private final RiderTipService riderTipService;
     private final RiderReviewService riderReviewService;
+    private final OrderLifecycleService lifecycleService;
 
-    public OrderController(OrderService orderService, PaymentService paymentService, MerchantService merchantService, RiderTipService riderTipService, RiderReviewService riderReviewService) {
+    public OrderController(OrderService orderService, PaymentService paymentService, MerchantService merchantService, RiderTipService riderTipService, RiderReviewService riderReviewService, OrderLifecycleService lifecycleService) {
         this.orderService = orderService;
         this.paymentService = paymentService;
         this.merchantService = merchantService;
         this.riderTipService = riderTipService;
         this.riderReviewService = riderReviewService;
+        this.lifecycleService = lifecycleService;
     }
 
     @PostMapping("/create")
@@ -138,6 +142,25 @@ public class OrderController {
         return Result.ok(orderService.accept(orderId, merchantService.getCurrentMerchantId()));
     }
 
+    @PostMapping("/ready-for-dispatch/{orderId}")
+    @RequireRole("MERCHANT")
+    public Result<Orders> readyForDispatch(@PathVariable Long orderId) {
+        return Result.ok(orderService.readyForDispatch(orderId, merchantService.getCurrentMerchantId()));
+    }
+
+    @GetMapping("/{orderId}/timeline")
+    @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
+    public Result<List<OrderLifecycleEventResponse>> timeline(@PathVariable Long orderId) {
+        Orders order = orderService.requireOrder(orderId);
+        String role = UserContext.getRole();
+        if ("USER".equals(role)) orderService.requireUserOrder(orderId, currentUserId());
+        else if ("MERCHANT".equals(role)) orderService.requireMerchantOrder(orderId, merchantService.getCurrentMerchantId());
+        else if ("RIDER".equals(role) && !currentUserId().equals(order.getRiderId())) {
+            throw new com.clas.common.BusinessException("只能查看本人配送订单的进度", com.clas.common.DomainErrorCode.AUTH_FORBIDDEN);
+        }
+        return Result.ok(lifecycleService.list(orderId));
+    }
+
     @PostMapping("/complete/{orderId}")
     @RequireRole("USER")
     public Result<Orders> complete(@PathVariable Long orderId) {
@@ -146,6 +169,7 @@ public class OrderController {
     @PostMapping("/{orderId}/rider-tip") @RequireRole("USER")
     public Result<RiderTip> tip(@PathVariable Long orderId, @Valid @RequestBody RiderTipRequest request) { return Result.ok(riderTipService.pay(orderService.requireUserOrder(orderId, currentUserId()), currentUserId(), request.amount(), request.idempotencyKey())); }
     @PostMapping("/{orderId}/rider-review") @RequireRole("USER") public Result<RiderReview> riderReview(@PathVariable Long orderId,@Valid @RequestBody RiderReviewRequest request){return Result.ok(riderReviewService.create(orderService.requireUserOrder(orderId,currentUserId()),currentUserId(),request.score(),request.tags(),request.content()));}
+    @GetMapping("/{orderId}/rider-review") @RequireRole("USER") public Result<RiderReview> riderReviewDetail(@PathVariable Long orderId) { return Result.ok(riderReviewService.getForOrder(orderService.requireUserOrder(orderId, currentUserId()))); }
 
     @PostMapping("/cancel/{orderId}")
     @RequireRole("USER")

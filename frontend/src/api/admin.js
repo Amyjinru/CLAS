@@ -6,6 +6,7 @@ export const getSalesOverview = (params) => api.get('/admin/stats/sales', { para
 export const getMerchantRanking = () => api.get('/admin/stats/merchants').then(unwrap)
 export const getTopProducts = () => api.get('/admin/stats/products').then(unwrap)
 export const listAdminOrders = (params) => api.get('/admin/orders', { params }).then(unwrap)
+export const getAdminOrderTimeline = (orderId) => api.get(`/order/${orderId}/timeline`).then(unwrap)
 export const listAdminUsers = (params) => api.get('/admin/users', { params }).then(unwrap)
 export const toggleUserStatus = (id, enabled) => api.put(`/admin/users/${id}/status`, { enabled }).then(unwrap)
 export const listAdminReviews = (params) => api.get('/admin/reviews', { params, silent: true }).then(unwrap)
