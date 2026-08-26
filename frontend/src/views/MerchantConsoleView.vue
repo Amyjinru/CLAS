@@ -8,6 +8,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 // ===== version_314: 订单详情组件 =====
 import OrderDetailContent from '../components/OrderDetailContent.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import RiderMerchantChatWindow from '../components/RiderMerchantChatWindow.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
 import MerchantWorkspaceShell from '../components/merchant/MerchantWorkspaceShell.vue'
 
@@ -179,6 +180,8 @@ function openDetail(order) {
 }
 
 const chatOrder = ref(null)
+const riderChatOrder = ref(null)
+const riderChatOpen = ref(false)
 
 function closeDetail() {
   selectedOrder.value = null
@@ -190,6 +193,20 @@ function openChat(order) {
 
 function closeChat() {
   chatOrder.value = null
+}
+
+function hasActiveRider(order) {
+  return ['ASSIGNED_WAITING_MEAL', 'DELIVERING'].includes(order?.deliveryStatus)
+}
+
+function openRiderChat(order) {
+  riderChatOrder.value = order
+  riderChatOpen.value = true
+}
+
+function closeRiderChat() {
+  riderChatOpen.value = false
+  riderChatOrder.value = null
 }
 
 function callUser(order) {
@@ -332,6 +349,15 @@ onMounted(() => {
                     联系用户
                   </el-button>
                   <el-button
+                    v-if="hasActiveRider(scope.row.order)"
+                    type="primary"
+                    size="small"
+                    plain
+                    @click="openRiderChat(scope.row)"
+                  >
+                    联系骑手
+                  </el-button>
+                  <el-button
                     v-else
                     size="small"
                     @click="openChat(scope.row)"
@@ -416,6 +442,15 @@ onMounted(() => {
       </aside>
     </div>
 
+    <el-dialog v-model="riderChatOpen" title="与骑手沟通" width="min(560px,92vw)" @closed="closeRiderChat">
+      <RiderMerchantChatWindow
+        v-if="riderChatOrder"
+        :order-id="riderChatOrder.order.id"
+        role="MERCHANT"
+        :active="hasActiveRider(riderChatOrder.order)"
+      />
+    </el-dialog>
+
     <!-- ===== version_314: 订单详情侧滑弹窗 ===== -->
     <div v-if="selectedOrder" class="order-overlay" @click.self="closeDetail">
       <aside class="order-panel">
@@ -444,6 +479,14 @@ onMounted(() => {
             @click="openChat(selectedOrder)"
           >
             联系用户
+          </button>
+          <button
+            v-if="hasActiveRider(selectedOrder.order)"
+            type="button"
+            class="secondary"
+            @click="openRiderChat(selectedOrder)"
+          >
+            联系骑手
           </button>
           <button
             v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"

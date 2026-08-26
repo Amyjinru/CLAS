@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS rider_profile_change_request;
 DROP TABLE IF EXISTS rider_profile;
 DROP TABLE IF EXISTS rider_application;
 DROP TABLE IF EXISTS user_role;
+DROP TABLE IF EXISTS order_lifecycle_event;
 DROP TABLE IF EXISTS order_item;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS cart;
