@@ -37,8 +37,10 @@ const refundReasonOptions = [
 ]
 
 const deliveryLabel = {
-  WAITING: '等待自动接单',
+  WAITING: '等待商家接单',
   PREPARING: '商家备餐中',
+  AVAILABLE: '等待骑手接单',
+  ASSIGNED_WAITING_MEAL: '骑手已接单，等待取餐',
   DELIVERING: '配送中',
   DELIVERED: '已送达'
 }

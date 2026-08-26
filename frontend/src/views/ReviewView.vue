@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
-import { addReview, getReviewByOrder, reportReview, uploadReviewImages } from '../api/clas'
+import { addReview, getRiderReview, getReviewByOrder, reportReview, submitRiderReview, uploadReviewImages } from '../api/clas'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()
@@ -19,6 +19,10 @@ const submitting = ref(false)
 const reportReason = ref('')
 const imageUrls = ref([])
 const uploadFiles = ref([])
+const riderScore = ref(5)
+const riderContent = ref('')
+const riderReview = ref(null)
+const riderSubmitting = ref(false)
 
 async function load() {
   try {
@@ -26,6 +30,17 @@ async function load() {
   } catch {
     existingReview.value = null
   }
+  try { riderReview.value = await getRiderReview(orderId.value) } catch { riderReview.value = null }
+}
+
+async function submitRiderRating() {
+  riderSubmitting.value = true
+  try {
+    riderReview.value = await submitRiderReview(orderId.value, { score: riderScore.value, content: riderContent.value || undefined, tags: '' })
+    message.value = '骑手评价已提交'
+  } catch (error) {
+    message.value = error.response?.data?.message || '骑手评价提交失败'
+  } finally { riderSubmitting.value = false }
 }
 
 async function handleUpload(option) {
@@ -129,6 +144,19 @@ onMounted(load)
         <button class="secondary" @click="goOrders">取消</button>
       </div>
     </template>
+
+    <section class="rider-review-block">
+      <h2>骑手服务评价</h2>
+      <template v-if="riderReview">
+        <p>您已为本次配送评分：{{ '★'.repeat(riderReview.score) }}{{ '☆'.repeat(5 - riderReview.score) }}</p>
+        <p v-if="riderReview.content">{{ riderReview.content }}</p>
+      </template>
+      <template v-else>
+        <label>配送评分（1-5 星）<input v-model.number="riderScore" type="range" min="1" max="5" step="1" /><span class="score-display">{{ riderScore }} 星</span></label>
+        <label>评价内容（可选）<textarea v-model="riderContent" placeholder="例如：送达及时、沟通友好..." /></label>
+        <button :disabled="riderSubmitting" @click="submitRiderRating">{{ riderSubmitting ? '提交中...' : '提交骑手评价' }}</button>
+      </template>
+    </section>
   </section>
 </template>
 
@@ -138,6 +166,8 @@ onMounted(load)
 .reply { background: var(--color-primary-light); border-radius: var(--radius-sm); padding: 10px 12px; }
 input[type='range'] { width: 100%; min-height: auto; padding: 0; border: 0; }
 .upload-block { margin: 16px 0; }
+.rider-review-block { border-top: 1px solid var(--border-light); margin-top: 24px; padding-top: 20px; }
+.rider-review-block h2 { font-size: 17px; margin: 0 0 12px; }
 .preview-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .preview-item { position: relative; }
 .preview-item img { border-radius: 8px; height: 88px; object-fit: cover; width: 88px; }

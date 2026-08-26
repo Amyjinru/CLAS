@@ -53,6 +53,7 @@ public class OrderService {
     private final CouponService couponService;
     private final MerchantService merchantService;
     private final RiderSettlementService riderSettlementService;
+    private final OrderLifecycleService lifecycleService;
 
     public OrderService(
         OrdersMapper ordersMapper,
@@ -66,7 +67,8 @@ public class OrderService {
         PenaltyService penaltyService,
         CouponService couponService,
         MerchantService merchantService,
-        RiderSettlementService riderSettlementService
+        RiderSettlementService riderSettlementService,
+        OrderLifecycleService lifecycleService
     ) {
         this.ordersMapper = ordersMapper;
         this.orderItemMapper = orderItemMapper;
@@ -80,6 +82,7 @@ public class OrderService {
         this.couponService = couponService;
         this.merchantService = merchantService;
         this.riderSettlementService = riderSettlementService;
+        this.lifecycleService = lifecycleService;
     }
 
     @Transactional
@@ -149,6 +152,7 @@ public class OrderService {
         order.setRefundStatus("NONE");
         order.setCreateTime(LocalDateTime.now());
         ordersMapper.insert(order);
+        lifecycleService.record(order, "ORDER_CREATED", null, null, "USER", request.userId(), "用户提交订单，等待支付");
         couponService.reserveForOrder(request.userCouponId(), request.userId(), order.getId());
 
         List<OrderItem> orderItems = merchantCartItems.stream().map(cart -> {
@@ -294,36 +298,43 @@ public class OrderService {
     public Orders accept(Long orderId) {
         Orders order = requireOrder(orderId);
         requireStatus(order, STATUS_PAID);
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
         order.setStatus(STATUS_ACCEPTED);
+        order.setDeliveryStatus("PREPARING");
         order.setAcceptedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        lifecycleService.record(order, "MERCHANT_ACCEPTED", fromStatus, fromDelivery, "SYSTEM", null, "订单进入制作中");
         return order;
     }
 
     public Orders accept(Long orderId, Long merchantId) {
         Orders order = requireMerchantOrder(orderId, merchantId);
-        requireStatusIn(order, STATUS_PAID, STATUS_ACCEPTED);
+        requireStatus(order, STATUS_PAID);
         if ("AVAILABLE".equals(order.getDeliveryStatus()) || "ASSIGNED_WAITING_MEAL".equals(order.getDeliveryStatus())
             || "DELIVERING".equals(order.getDeliveryStatus()) || "DELIVERED".equals(order.getDeliveryStatus())) {
             throw new BusinessException("订单已发布或已进入配送流程");
         }
         Merchant merchant = requireMerchant(merchantId);
         LocalDateTime now = LocalDateTime.now();
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
         int prepareMinutes = merchant.getDefaultPrepareMinutes() == null ? 15 : merchant.getDefaultPrepareMinutes();
         int routeMinutes = order.getEstimatedMinutes() == null ? 20 : order.getEstimatedMinutes();
         LocalDateTime estimatedArrival = now.plusMinutes(prepareMinutes + routeMinutes);
         order.setStatus(STATUS_ACCEPTED);
-        order.setDeliveryStatus("AVAILABLE");
+        order.setDeliveryStatus("PREPARING");
         order.setPrepareMinutesSnapshot(prepareMinutes);
         order.setPromiseStartAt(estimatedArrival.minusMinutes(10));
         order.setPromiseEndAt(estimatedArrival.plusMinutes(10));
         order.setPredictedArrivalAt(estimatedArrival);
         order.setAcceptedAt(now);
         ordersMapper.updateById(order);
+        lifecycleService.record(order, "MERCHANT_ACCEPTED", fromStatus, fromDelivery, "MERCHANT", String.valueOf(merchantId), "商家已接单，开始制作");
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
             "商家已接单",
-            "订单 " + order.getId() + " 已进入骑手配送池。",
+            "订单 " + order.getId() + " 正在制作中。",
             "ORDER_STATUS",
             "ORDER",
             order.getId(),
@@ -336,6 +347,57 @@ public class OrderService {
         return order;
     }
 
+    /**
+     * Default fulfilment path for delivery orders: a successful payment immediately
+     * enters the rider task pool. Merchant workstations only observe the order and
+     * handle exceptions, rather than confirming routine steps one by one.
+     */
+    @Transactional
+    public Orders autoAcceptAndDispatch(Long orderId) {
+        Orders order = requireOrder(orderId);
+        requireStatus(order, STATUS_PAID);
+        Merchant merchant = requireMerchant(order.getMerchantId());
+        LocalDateTime now = LocalDateTime.now();
+        int prepareMinutes = merchant.getDefaultPrepareMinutes() == null ? 15 : merchant.getDefaultPrepareMinutes();
+        int routeMinutes = order.getEstimatedMinutes() == null ? 20 : order.getEstimatedMinutes();
+        LocalDateTime estimatedArrival = now.plusMinutes(prepareMinutes + routeMinutes);
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
+        order.setStatus(STATUS_ACCEPTED);
+        order.setDeliveryStatus("AVAILABLE");
+        order.setPrepareMinutesSnapshot(prepareMinutes);
+        order.setPromiseStartAt(estimatedArrival.minusMinutes(10));
+        order.setPromiseEndAt(estimatedArrival.plusMinutes(10));
+        order.setPredictedArrivalAt(estimatedArrival);
+        order.setAcceptedAt(now);
+        ordersMapper.updateById(order);
+        lifecycleService.record(order, "ORDER_AUTO_DISPATCHED", fromStatus, fromDelivery, "SYSTEM", null, "订单已自动接单并发布至骑手任务池");
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(), "订单已进入配送", "订单 " + order.getId() + " 已自动接单，正在等待骑手接单。",
+            "DELIVERY_STATUS", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/order/" + order.getId()
+        ));
+        return order;
+    }
+
+    @Transactional
+    public Orders readyForDispatch(Long orderId, Long merchantId) {
+        Orders order = requireMerchantOrder(orderId, merchantId);
+        requireStatus(order, STATUS_ACCEPTED);
+        if (!"PREPARING".equals(order.getDeliveryStatus())) {
+            throw new BusinessException("订单当前不在制作中，不能发布配送", DomainErrorCode.DELIVERY_STATE_INVALID);
+        }
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
+        order.setDeliveryStatus("AVAILABLE");
+        ordersMapper.updateById(order);
+        lifecycleService.record(order, "MERCHANT_READY_FOR_DISPATCH", fromStatus, fromDelivery, "MERCHANT", String.valueOf(merchantId), "餐品已制作完成，已发布至骑手任务池");
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(), "餐品已制作完成", "订单 " + order.getId() + " 已发布配送，正在等待骑手接单。",
+            "DELIVERY_STATUS", "ORDER", order.getId(), null, null, order.getId(), merchantId, "/order/" + order.getId()
+        ));
+        return order;
+    }
+
     public Orders deliver(Long orderId, Long merchantId) {
         requireMerchantOrder(orderId, merchantId);
         throw new BusinessException("商家不能完成物理配送，请由已指派骑手取餐并送达", DomainErrorCode.DELIVERY_FORBIDDEN);
@@ -344,9 +406,12 @@ public class OrderService {
     public Orders complete(Long orderId) {
         Orders order = requireOrder(orderId);
         requireStatus(order, STATUS_ACCEPTED);
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
         order.setStatus(STATUS_COMPLETED);
         order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        lifecycleService.record(order, "ORDER_COMPLETED", fromStatus, fromDelivery, "SYSTEM", null, "订单完成");
         riderSettlementService.makeCommissionWithdrawable(order);
         merchantService.refreshAveragePrice(order.getMerchantId());
         return order;
@@ -355,14 +420,16 @@ public class OrderService {
     public Orders complete(Long orderId, String userId) {
         Orders order = requireUserOrder(orderId, userId);
         requireStatus(order, STATUS_ACCEPTED);
-        // PREPARING is retained only for paid legacy orders created before the rider task is published.
-        if (!"DELIVERED".equals(order.getDeliveryStatus()) && !"PREPARING".equals(order.getDeliveryStatus())) {
+        if (!"DELIVERED".equals(order.getDeliveryStatus())) {
             throw new BusinessException("订单尚未送达，暂不能确认收货", DomainErrorCode.DELIVERY_STATE_INVALID);
         }
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
         order.setStatus(STATUS_COMPLETED);
         order.setDeliveryStatus("DELIVERED");
         order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        lifecycleService.record(order, "USER_CONFIRMED_RECEIPT", fromStatus, fromDelivery, "USER", userId, "用户确认收货");
         merchantService.refreshAveragePrice(order.getMerchantId());
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
@@ -397,6 +464,8 @@ public class OrderService {
         if (STATUS_ACCEPTED.equals(order.getStatus()) && ("DELIVERING".equals(order.getDeliveryStatus()) || "DELIVERED".equals(order.getDeliveryStatus()))) {
             throw new BusinessException("骑手已取餐，订单不能取消，请通过售后申请退款", DomainErrorCode.DELIVERY_STATE_INVALID);
         }
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
         if (!STATUS_PENDING_PAYMENT.equals(order.getStatus())) restoreOrderStock(order.getId());
         order.setStatus(STATUS_CANCELED);
         order.setDeliveryStatus("CANCELED");
@@ -404,6 +473,7 @@ public class OrderService {
         order.setRiderAssignedAt(null);
         order.setCanceledAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        lifecycleService.record(order, "ORDER_CANCELED", fromStatus, fromDelivery, "USER", order.getUserId(), "用户取消订单");
         couponService.releaseForOrder(order.getUserCouponId());
         return order;
     }
@@ -412,11 +482,19 @@ public class OrderService {
     public Orders reject(Long orderId, Long merchantId, String reason) {
         Orders order = requireMerchantOrder(orderId, merchantId);
         requireStatusIn(order, STATUS_PAID, STATUS_ACCEPTED);
+        if (STATUS_ACCEPTED.equals(order.getStatus())
+            && !("PREPARING".equals(order.getDeliveryStatus()) || ("AVAILABLE".equals(order.getDeliveryStatus()) && order.getRiderId() == null))) {
+            throw new BusinessException("订单已发布配送或已进入骑手履约，不能拒单", DomainErrorCode.DELIVERY_STATE_INVALID);
+        }
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
         restoreOrderStock(orderId);
         order.setStatus(STATUS_REJECTED);
+        order.setDeliveryStatus("REJECTED");
         order.setRejectReason(trimToNull(reason));
         order.setRejectedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        lifecycleService.record(order, "MERCHANT_REJECTED", fromStatus, fromDelivery, "MERCHANT", String.valueOf(merchantId), order.getRejectReason());
         String rejectText = order.getRejectReason() == null ? "商家暂时无法接单" : order.getRejectReason();
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),

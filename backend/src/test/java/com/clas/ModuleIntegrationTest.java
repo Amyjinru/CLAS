@@ -1111,9 +1111,10 @@ class ModuleIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.orderStatus").value("ACCEPTED"));
 
-        mockMvc.perform(post("/api/order/accept/" + orderId)
-                .header("Authorization", auth(MERCHANT_PHONE)))
-            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/order/" + orderId)
+                .header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.order.deliveryStatus").value("AVAILABLE"));
 
         String riderToken = riderAuth("13800000004");
         mockMvc.perform(patch("/api/rider/online")

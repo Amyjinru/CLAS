@@ -27,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RiderDispatchService {
     private static final int TASK_RADIUS_METERS = 5000;
     private static final List<String> ACTIVE_STATES = List.of("ASSIGNED_WAITING_MEAL", "DELIVERING");
-    private final OrdersMapper orders; private final MerchantMapper merchants; private final RiderProfileMapper profiles; private final RiderLocationService locations; private final RiderAuditLogMapper audits; private final DeliveryTrackingService tracking; private final NotificationService notifications;
-    public RiderDispatchService(OrdersMapper orders, MerchantMapper merchants, RiderProfileMapper profiles, RiderLocationService locations, RiderAuditLogMapper audits, DeliveryTrackingService tracking, NotificationService notifications) { this.orders = orders; this.merchants = merchants; this.profiles = profiles; this.locations = locations; this.audits = audits; this.tracking = tracking; this.notifications = notifications; }
+    private final OrdersMapper orders; private final MerchantMapper merchants; private final RiderProfileMapper profiles; private final RiderLocationService locations; private final RiderAuditLogMapper audits; private final DeliveryTrackingService tracking; private final NotificationService notifications; private final AmapRouteService amap; private final OrderLifecycleService lifecycleService;
+    public RiderDispatchService(OrdersMapper orders, MerchantMapper merchants, RiderProfileMapper profiles, RiderLocationService locations, RiderAuditLogMapper audits, DeliveryTrackingService tracking, NotificationService notifications, AmapRouteService amap, OrderLifecycleService lifecycleService) { this.orders = orders; this.merchants = merchants; this.profiles = profiles; this.locations = locations; this.audits = audits; this.tracking = tracking; this.notifications = notifications; this.amap = amap; this.lifecycleService = lifecycleService; }
 
     public List<Orders> activeDeliveries() {
         locations.approvedProfile();
@@ -87,9 +87,12 @@ public class RiderDispatchService {
         if (order == null || !"ACCEPTED".equals(order.getStatus()) || !"AVAILABLE".equals(order.getDeliveryStatus()) || order.getRiderId() != null) throw unavailable();
         Merchant merchant = merchants.selectById(order.getMerchantId());
         if (merchant == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) throw unavailable();
-        if (GeoUtils.distanceMeters(rider.getCurrentLatitude(), rider.getCurrentLongitude(), merchant.getLatitude(), merchant.getLongitude()) > TASK_RADIUS_METERS) throw unavailable();
+        if (travelDistanceMeters(rider.getCurrentLongitude(), rider.getCurrentLatitude(), merchant.getLongitude(), merchant.getLatitude()) > TASK_RADIUS_METERS) throw unavailable();
+        // The conditional UPDATE below is the final authority: concurrent riders can both pass the
+        // distance check, but only one can transition this AVAILABLE task to an assigned task.
         if (orders.claimAvailableTask(orderId, riderId) != 1) throw unavailable();
         Orders claimed = orders.selectById(orderId);
+        lifecycleService.record(claimed, "RIDER_CLAIMED", order.getStatus(), order.getDeliveryStatus(), "RIDER", riderId, "骑手领取配送任务");
         notifyOrder(claimed, "骑手已接单", "订单已由骑手接单，正在前往商家取餐。");
         return claimed;
     }
@@ -97,7 +100,7 @@ public class RiderDispatchService {
     private RiderTaskResponse nearby(Orders order, RiderProfile rider) {
         Merchant merchant = merchants.selectById(order.getMerchantId());
         if (merchant == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) return null;
-        int distance = GeoUtils.distanceMeters(rider.getCurrentLatitude(), rider.getCurrentLongitude(), merchant.getLatitude(), merchant.getLongitude());
+        int distance = travelDistanceMeters(rider.getCurrentLongitude(), rider.getCurrentLatitude(), merchant.getLongitude(), merchant.getLatitude());
         return distance <= TASK_RADIUS_METERS ? RiderTaskResponse.from(order, merchant, distance, "结合当前配送路线、承诺时间与到店距离排序") : null;
     }
     private List<RiderTaskResponse> smartSort(List<RiderTaskResponse> candidates, RiderProfile rider) {
@@ -141,11 +144,21 @@ public class RiderDispatchService {
         BigDecimal currentLongitude = longitude;
         BigDecimal currentLatitude = latitude;
         for (BigDecimal[] stop : route) {
-            total += GeoUtils.distanceMeters(currentLatitude, currentLongitude, stop[1], stop[0]);
+            total += travelDistanceMeters(currentLongitude, currentLatitude, stop[0], stop[1]);
             currentLongitude = stop[0];
             currentLatitude = stop[1];
         }
         return total;
+    }
+    /**
+     * Use the same GaoDe driving route distance used by order delivery estimates.  A straight-line
+     * fallback keeps the task pool available when the route service is intentionally not configured
+     * in a local/test environment or is temporarily unavailable.
+     */
+    private int travelDistanceMeters(BigDecimal fromLongitude, BigDecimal fromLatitude, BigDecimal toLongitude, BigDecimal toLatitude) {
+        return amap.estimateDriving(fromLongitude, fromLatitude, toLongitude, toLatitude)
+            .map(AmapRouteService.RouteEstimate::distanceMeters)
+            .orElseGet(() -> GeoUtils.distanceMeters(fromLatitude, fromLongitude, toLatitude, toLongitude));
     }
     private List<Orders> activeOrders(String riderId) { return orders.selectList(new LambdaQueryWrapper<Orders>().eq(Orders::getRiderId, riderId).in(Orders::getDeliveryStatus, ACTIVE_STATES)); }
     private RiderProfile requireOnlineLocated(RiderProfile rider, boolean requireAcceptingOrders) {

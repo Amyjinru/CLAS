@@ -25,7 +25,7 @@ import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.MerchantAuditLogMapper;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.ProductMapper;
-import com.clas.mapper.RoleApplicationMapper;
+import com.clas.mapper.RiderApplicationMapper;
 import com.clas.mapper.UserAddressMapper;
 import com.clas.mapper.UserMapper;
 import com.clas.config.UserContext;
@@ -57,7 +57,7 @@ public class MerchantService {
     private final UserAddressMapper userAddressMapper;
     private final OrdersMapper ordersMapper;
     private final ProductMapper productMapper;
-    private final RoleApplicationMapper roleApplicationMapper;
+    private final RiderApplicationMapper riderApplicationMapper;
     private final FavoriteMapper favoriteMapper;
     private final VerificationCodeStore verificationCodeStore;
     private final AmapRouteService amapRouteService;
@@ -72,7 +72,7 @@ public class MerchantService {
         UserAddressMapper userAddressMapper,
         OrdersMapper ordersMapper,
         ProductMapper productMapper,
-        RoleApplicationMapper roleApplicationMapper,
+        RiderApplicationMapper riderApplicationMapper,
         FavoriteMapper favoriteMapper,
         VerificationCodeStore verificationCodeStore,
         AmapRouteService amapRouteService,
@@ -86,7 +86,7 @@ public class MerchantService {
         this.userAddressMapper = userAddressMapper;
         this.ordersMapper = ordersMapper;
         this.productMapper = productMapper;
-        this.roleApplicationMapper = roleApplicationMapper;
+        this.riderApplicationMapper = riderApplicationMapper;
         this.favoriteMapper = favoriteMapper;
         this.verificationCodeStore = verificationCodeStore;
         this.amapRouteService = amapRouteService;
@@ -342,10 +342,9 @@ public class MerchantService {
         if (userService.rolesOf(finalUserId).stream().anyMatch(role -> "MERCHANT".equals(role) || "RIDER".equals(role))) {
             throw new BusinessException("已拥有商家或骑手身份，不能申请其他业务身份");
         }
-        boolean riderPending = roleApplicationMapper.exists(new LambdaQueryWrapper<com.clas.entity.RoleApplication>()
-            .eq(com.clas.entity.RoleApplication::getUserId, finalUserId)
-            .eq(com.clas.entity.RoleApplication::getTargetRole, "RIDER")
-            .eq(com.clas.entity.RoleApplication::getStatus, "PENDING"));
+        boolean riderPending = riderApplicationMapper.exists(new LambdaQueryWrapper<com.clas.entity.RiderApplication>()
+            .eq(com.clas.entity.RiderApplication::getUserId, finalUserId)
+            .eq(com.clas.entity.RiderApplication::getStatus, "PENDING"));
         if (riderPending) {
             throw new BusinessException("已有待审核的骑手申请，暂不能申请商家身份");
         }

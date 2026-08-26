@@ -19,8 +19,8 @@ const props = defineProps({
 
 const statusLabel = {
   PENDING_PAYMENT: '待支付',
-  PAID: '已支付(自动接单中)',
-  ACCEPTED: '已支付(自动接单中)',
+  PAID: '待商家接单',
+  ACCEPTED: '履约中',
   COMPLETED: '已完成'
 }
 

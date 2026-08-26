@@ -35,8 +35,8 @@ const statusMap = {
 // ===== version_314: 订单状态映射 =====
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
-  PAID: '已支付(自动接单中)',
-  ACCEPTED: '已支付(自动接单中)',
+  PAID: '支付处理中',
+  ACCEPTED: '配送履约中',
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
@@ -235,6 +235,7 @@ onMounted(() => {
     :merchant="merchant"
     :loading="loading"
     active-module="orders"
+    :show-merchant-info="false"
     @merchant-updated="onMerchantProfileSaved"
   >
       <div v-if="merchant" class="main-work-area">
@@ -289,7 +290,7 @@ onMounted(() => {
         <el-card v-if="merchant.status === 'OPEN'" class="box-card work-card">
           <template #header>
           <div class="card-header">
-            <h3>自动接单管理 (营业中)</h3>
+            <h3>接单管理</h3>
           </div>
           </template>
 
@@ -312,7 +313,7 @@ onMounted(() => {
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="配送" width="180">
+            <el-table-column label="配送进度" width="180">
               <template #default="scope">
                 <div>{{ scope.row.order.deliveryStatus || 'WAITING' }}</div>
                 <small v-if="scope.row.order.deliveryAddress">{{ scope.row.order.deliveryAddress }}</small>
@@ -330,6 +331,7 @@ onMounted(() => {
                 <div class="contact-actions">
                   <el-button
                     v-if="scope.row.customerCallUrl"
+                    class="call-button"
                     type="success"
                     size="small"
                     plain
@@ -465,7 +467,7 @@ onMounted(() => {
           <button
             v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
             type="button"
-            class="secondary"
+            class="secondary call-button"
             @click="callUser(selectedOrder)"
           >
             拨打电话
@@ -673,6 +675,16 @@ onMounted(() => {
 
 .contact-actions :deep(.el-button + .el-button) {
   margin-left: 0;
+}
+
+/* 联系方式属于关键信息，按钮文字保持清晰的深色，避免受成功色主题影响。 */
+.call-button {
+  color: #1f2937 !important;
+}
+
+.call-button:hover,
+.call-button:focus-visible {
+  color: #111827 !important;
 }
 
 .order-item-list {

@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { claimRiderTask, createRiderCallSession, getRiderProfile, listRiderDeliveries, listRiderTasks, reportRiderLocation, startAcceptingOrders, stopAcceptingOrders } from '../api/clas'
+import { claimRiderTask, completeRiderDelivery, createRiderCallSession, getRiderProfile, listRiderDeliveries, listRiderTasks, pickupRiderDelivery, reportRiderLocation, startAcceptingOrders, stopAcceptingOrders } from '../api/clas'
 import RiderChatWindow from '../components/RiderChatWindow.vue'
 import RiderMerchantChatWindow from '../components/RiderMerchantChatWindow.vue'
 
@@ -125,6 +125,20 @@ async function claimTask(task) {
   } finally { actionOrderId.value = null }
 }
 
+async function advanceDelivery(order) {
+  actionOrderId.value = order.id
+  try {
+    if (order.deliveryStatus === 'ASSIGNED_WAITING_MEAL') {
+      await pickupRiderDelivery(order.id)
+      ElMessage.success(`订单 #${order.id} 已确认取餐，开始配送`)
+    } else {
+      await completeRiderDelivery(order.id)
+      ElMessage.success(`订单 #${order.id} 已确认送达，等待用户确认收货`)
+    }
+    await load()
+  } finally { actionOrderId.value = null }
+}
+
 function openContact(order) { contactOrder.value = order; contactDialogOpen.value = true }
 function openMerchantContact(order) { merchantContactOrder.value = order; merchantContactDialogOpen.value = true }
 
@@ -193,6 +207,9 @@ onBeforeUnmount(() => { if (locationTimer) window.clearInterval(locationTimer) }
               <el-button class="contact-button" type="primary" @click="openContact(order)">联系用户</el-button>
               <el-button class="merchant-contact-button" type="primary" plain @click="openMerchantContact(order)">联系商家</el-button>
               <el-button class="call-button" type="primary" :loading="callingOrderId === order.id" @click="callUser(order)">拨打用户</el-button>
+              <el-button type="primary" :loading="actionOrderId === order.id" @click="advanceDelivery(order)">
+                {{ order.deliveryStatus === 'ASSIGNED_WAITING_MEAL' ? '确认取餐' : '确认送达' }}
+              </el-button>
             </div>
           </article>
         </div>

@@ -21,6 +21,10 @@ const props = defineProps({
   activeModule: {
     type: String,
     default: ''
+  },
+  showMerchantInfo: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -125,8 +129,8 @@ function openProfileDialog() {
         </button>
       </nav>
 
-      <div class="workspace-grid">
-        <aside class="shop-info">
+      <div :class="['workspace-grid', { 'without-shop-info': !showMerchantInfo }]">
+        <aside v-if="showMerchantInfo" class="shop-info">
           <div class="shop-profile">
             <button class="store-logo-button" type="button" :disabled="logoUploading" @click="openLogoPicker">
               <img v-if="merchant.logo" :src="merchant.logo" alt="店铺头像" class="store-logo-img" />
@@ -253,6 +257,10 @@ function openProfileDialog() {
   display: grid;
   gap: 24px;
   grid-template-columns: 320px minmax(0, 1fr);
+}
+
+.workspace-grid.without-shop-info {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .shop-info {

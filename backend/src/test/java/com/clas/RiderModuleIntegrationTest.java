@@ -24,7 +24,9 @@ import org.springframework.test.web.servlet.MvcResult;
 @ActiveProfiles("test")
 class RiderModuleIntegrationTest {
     private static final long ORDER_ID = 990001L;
-    private static final long RIDER_MERCHANT_CONTACT_ORDER_ID = 990002L;
+    private static final long CONCURRENT_CLAIM_ORDER_ID = 990002L;
+    private static final long DELIVERY_CYCLE_ORDER_ID = 990003L;
+    private static final long RIDER_MERCHANT_CONTACT_ORDER_ID = 990004L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -71,6 +73,93 @@ class RiderModuleIntegrationTest {
         String userAuth = "Bearer " + switchRole(loginToken("13800000004"), "USER");
         mockMvc.perform(get("/api/user/profile").header("Authorization", userAuth))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void availableTaskCanOnlyBeClaimedByOneRider() throws Exception {
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", CONCURRENT_CLAIM_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (
+                id, user_id, merchant_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_longitude, delivery_latitude,
+                delivery_status, estimated_minutes, refund_status, create_time, accepted_at
+            ) VALUES (?, '13800000001', 1, 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 116.398000, 39.910000, 'AVAILABLE', 30, 'NONE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, CONCURRENT_CLAIM_ORDER_ID);
+        jdbcTemplate.update("""
+            UPDATE rider_profile
+            SET online_status = TRUE, accepting_orders = TRUE,
+                current_longitude = 116.397428, current_latitude = 39.909230,
+                location_updated_at = CURRENT_TIMESTAMP
+            WHERE user_id IN ('13800000004', '13800000005')
+            """);
+
+        String firstRider = "Bearer " + switchRole(loginToken("13800000004"), "RIDER");
+        String secondRider = "Bearer " + switchRole(loginToken("13800000005"), "RIDER");
+
+        mockMvc.perform(get("/api/rider/tasks").header("Authorization", firstRider))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[*].orderId").value(org.hamcrest.Matchers.hasItem((int) CONCURRENT_CLAIM_ORDER_ID)));
+
+        mockMvc.perform(post("/api/rider/tasks/{orderId}/claim", CONCURRENT_CLAIM_ORDER_ID).header("Authorization", firstRider))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.riderId").value("13800000004"))
+            .andExpect(jsonPath("$.data.deliveryStatus").value("ASSIGNED_WAITING_MEAL"));
+
+        mockMvc.perform(post("/api/rider/tasks/{orderId}/claim", CONCURRENT_CLAIM_ORDER_ID).header("Authorization", secondRider))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("配送任务已被领取或不可用"));
+
+        org.junit.jupiter.api.Assertions.assertEquals("13800000004", jdbcTemplate.queryForObject(
+            "SELECT rider_id FROM orders WHERE id = ?", String.class, CONCURRENT_CLAIM_ORDER_ID));
+    }
+
+    @Test
+    void merchantRiderUserCanCompleteDeliveryCycleAndLeaveAuditableHistory() throws Exception {
+        jdbcTemplate.update("DELETE FROM order_lifecycle_event WHERE order_id = ?", DELIVERY_CYCLE_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM rider_review WHERE order_id = ?", DELIVERY_CYCLE_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM review WHERE order_id = ?", DELIVERY_CYCLE_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", DELIVERY_CYCLE_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, total_price, subtotal, delivery_fee, coupon_discount,
+                status, delivery_address, delivery_longitude, delivery_latitude, delivery_status, estimated_minutes,
+                refund_status, create_time, paid_at)
+            VALUES (?, '13800000001', 1, 2890, 2590, 300, 0, 'PAID', '软件学院 A 座 302',
+                116.398000, 39.910000, 'WAITING', 30, 'NONE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, DELIVERY_CYCLE_ORDER_ID);
+        jdbcTemplate.update("UPDATE merchant SET longitude = 116.397428, latitude = 39.909230 WHERE id = 1");
+        jdbcTemplate.update("""
+            UPDATE rider_profile SET online_status = TRUE, accepting_orders = TRUE, max_active_orders = 5,
+                current_longitude = 116.397428, current_latitude = 39.909230, location_updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = '13800000004'
+            """);
+
+        String merchantAuth = "Bearer " + switchRole(loginToken("13800000002"), "MERCHANT");
+        String riderAuth = "Bearer " + switchRole(loginToken("13800000004"), "RIDER");
+        String userAuth = "Bearer " + switchRole(loginToken("13800000001"), "USER");
+        String adminAuth = "Bearer " + loginToken("13800000003");
+
+        mockMvc.perform(post("/api/order/accept/{orderId}", DELIVERY_CYCLE_ORDER_ID).header("Authorization", merchantAuth))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.deliveryStatus").value("PREPARING"));
+        mockMvc.perform(post("/api/order/ready-for-dispatch/{orderId}", DELIVERY_CYCLE_ORDER_ID).header("Authorization", merchantAuth))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.deliveryStatus").value("AVAILABLE"));
+        mockMvc.perform(post("/api/rider/tasks/{orderId}/claim", DELIVERY_CYCLE_ORDER_ID).header("Authorization", riderAuth))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.deliveryStatus").value("ASSIGNED_WAITING_MEAL"));
+        mockMvc.perform(post("/api/rider/deliveries/{orderId}/pickup", DELIVERY_CYCLE_ORDER_ID).header("Authorization", riderAuth))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.deliveryStatus").value("DELIVERING"));
+        mockMvc.perform(post("/api/rider/deliveries/{orderId}/complete", DELIVERY_CYCLE_ORDER_ID).header("Authorization", riderAuth))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.deliveryStatus").value("DELIVERED"));
+        mockMvc.perform(post("/api/order/complete/{orderId}", DELIVERY_CYCLE_ORDER_ID).header("Authorization", userAuth))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("COMPLETED"));
+        mockMvc.perform(post("/api/review/add").header("Authorization", userAuth).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("orderId", DELIVERY_CYCLE_ORDER_ID, "score", 5, "content", "餐品和配送都很好", "images", java.util.List.of()))))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/order/{orderId}/rider-review", DELIVERY_CYCLE_ORDER_ID).header("Authorization", userAuth).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("score", 5, "tags", "准时", "content", "送达及时"))))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/order/{orderId}/timeline", DELIVERY_CYCLE_ORDER_ID).header("Authorization", adminAuth))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(7)))
+            .andExpect(jsonPath("$.data[*].eventType").value(org.hamcrest.Matchers.hasItem("USER_CONFIRMED_RECEIPT")));
     }
 
     @Test

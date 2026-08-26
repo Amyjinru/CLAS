@@ -34,6 +34,7 @@ DROP TABLE IF EXISTS rider_profile_change_request;
 DROP TABLE IF EXISTS rider_profile;
 DROP TABLE IF EXISTS rider_application;
 DROP TABLE IF EXISTS user_role;
+DROP TABLE IF EXISTS order_lifecycle_event;
 DROP TABLE IF EXISTS order_item;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS cart;
@@ -246,6 +247,20 @@ CREATE TABLE order_item (
     product_id BIGINT NOT NULL,
     quantity INT NOT NULL,
     price INT NOT NULL
+);
+
+CREATE TABLE order_lifecycle_event (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    event_type VARCHAR(40) NOT NULL,
+    from_status VARCHAR(30),
+    to_status VARCHAR(30),
+    from_delivery_status VARCHAR(40),
+    to_delivery_status VARCHAR(40),
+    actor_role VARCHAR(20) NOT NULL,
+    actor_id VARCHAR(30),
+    remark VARCHAR(500),
+    created_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE chat_message (
