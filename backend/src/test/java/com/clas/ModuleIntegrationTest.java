@@ -1814,10 +1814,6 @@ class ModuleIntegrationTest {
         mockMvc.perform(post("/api/order/accept/" + orderId)
                 .header("Authorization", auth(MERCHANT_PHONE)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.deliveryStatus").value("PREPARING"));
-        mockMvc.perform(post("/api/order/ready-for-dispatch/" + orderId)
-                .header("Authorization", auth(MERCHANT_PHONE)))
-            .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.deliveryStatus").value("AVAILABLE"));
     }
 

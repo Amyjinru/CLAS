@@ -301,10 +301,10 @@ public class OrderService {
         String fromStatus = order.getStatus();
         String fromDelivery = order.getDeliveryStatus();
         order.setStatus(STATUS_ACCEPTED);
-        order.setDeliveryStatus("PREPARING");
+        order.setDeliveryStatus("AVAILABLE");
         order.setAcceptedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
-        lifecycleService.record(order, "MERCHANT_ACCEPTED", fromStatus, fromDelivery, "SYSTEM", null, "订单进入制作中");
+        lifecycleService.record(order, "MERCHANT_ACCEPTED", fromStatus, fromDelivery, "SYSTEM", null, "商家已接单，订单已发布至骑手任务池");
         return order;
     }
 
@@ -323,19 +323,19 @@ public class OrderService {
         int routeMinutes = order.getEstimatedMinutes() == null ? 20 : order.getEstimatedMinutes();
         LocalDateTime estimatedArrival = now.plusMinutes(prepareMinutes + routeMinutes);
         order.setStatus(STATUS_ACCEPTED);
-        order.setDeliveryStatus("PREPARING");
+        order.setDeliveryStatus("AVAILABLE");
         order.setPrepareMinutesSnapshot(prepareMinutes);
         order.setPromiseStartAt(estimatedArrival.minusMinutes(10));
         order.setPromiseEndAt(estimatedArrival.plusMinutes(10));
         order.setPredictedArrivalAt(estimatedArrival);
         order.setAcceptedAt(now);
         ordersMapper.updateById(order);
-        lifecycleService.record(order, "MERCHANT_ACCEPTED", fromStatus, fromDelivery, "MERCHANT", String.valueOf(merchantId), "商家已接单，开始制作");
+        lifecycleService.record(order, "MERCHANT_ACCEPTED", fromStatus, fromDelivery, "MERCHANT", String.valueOf(merchantId), "商家已接单，订单已发布至骑手任务池");
         notificationService.send(new NotificationService.NotificationTarget(
             order.getUserId(),
             "商家已接单",
-            "订单 " + order.getId() + " 正在制作中。",
-            "ORDER_STATUS",
+            "订单 " + order.getId() + " 已确认，正在等待骑手接单。",
+            "DELIVERY_STATUS",
             "ORDER",
             order.getId(),
             null,
