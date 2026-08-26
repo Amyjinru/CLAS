@@ -16,6 +16,8 @@ import com.clas.entity.RiderAuditLog;
 import com.clas.mapper.RiderAuditLogMapper;
 import com.clas.dto.RiderSequenceRequest;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -31,9 +33,9 @@ public class RiderDispatchService {
     public List<Orders> activeDeliveries() {
         locations.approvedProfile();
         return activeOrders(UserContext.getUserId()).stream()
-            .sorted(Comparator.comparing((Orders order) -> "DELIVERING".equals(order.getDeliveryStatus()) ? 0 : 1)
-                .thenComparing(Orders::getDeliverySequence, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(Orders::getPromiseEndAt, Comparator.nullsLast(Comparator.naturalOrder())))
+            .sorted(Comparator.comparing(Orders::getPromiseEndAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Orders::getPredictedArrivalAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Orders::getDeliverySequence, Comparator.nullsLast(Comparator.naturalOrder())))
             .toList();
     }
 
@@ -61,11 +63,18 @@ public class RiderDispatchService {
         return activeDeliveries();
     }
 
-    public List<RiderTaskResponse> nearbyTasks() {
+    public List<RiderTaskResponse> nearbyTasks(String sort) {
         RiderProfile rider = requireOnlineLocated(locations.approvedProfile(), false);
-        return orders.selectList(new LambdaQueryWrapper<Orders>().eq(Orders::getStatus, "ACCEPTED").eq(Orders::getDeliveryStatus, "AVAILABLE"))
+        List<RiderTaskResponse> candidates = orders.selectList(new LambdaQueryWrapper<Orders>().eq(Orders::getStatus, "ACCEPTED").eq(Orders::getDeliveryStatus, "AVAILABLE"))
             .stream().map(order -> nearby(order, rider)).filter(java.util.Objects::nonNull)
-            .sorted(Comparator.comparing(RiderTaskResponse::promiseEndAt, Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(RiderTaskResponse::merchantDistanceMeters)).toList();
+            .toList();
+        return switch (sort == null ? "SMART" : sort.toUpperCase()) {
+            case "COMMISSION" -> candidates.stream().sorted(Comparator.comparing(RiderTaskResponse::riderCommission, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(RiderTaskResponse::merchantDistanceMeters)).toList();
+            case "DISTANCE" -> candidates.stream().sorted(Comparator.comparing(RiderTaskResponse::merchantDistanceMeters, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(RiderTaskResponse::promiseEndAt, Comparator.nullsLast(Comparator.naturalOrder()))).toList();
+            default -> smartSort(candidates, rider);
+        };
     }
 
     @Transactional
@@ -89,7 +98,54 @@ public class RiderDispatchService {
         Merchant merchant = merchants.selectById(order.getMerchantId());
         if (merchant == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) return null;
         int distance = GeoUtils.distanceMeters(rider.getCurrentLatitude(), rider.getCurrentLongitude(), merchant.getLatitude(), merchant.getLongitude());
-        return distance <= TASK_RADIUS_METERS ? RiderTaskResponse.from(order, merchant, distance, "按承诺送达时间与到店距离排序") : null;
+        return distance <= TASK_RADIUS_METERS ? RiderTaskResponse.from(order, merchant, distance, "结合当前配送路线、承诺时间与到店距离排序") : null;
+    }
+    private List<RiderTaskResponse> smartSort(List<RiderTaskResponse> candidates, RiderProfile rider) {
+        List<Orders> active = activeOrders(UserContext.getUserId()).stream()
+            .sorted(Comparator.comparing(Orders::getDeliverySequence, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Orders::getPromiseEndAt, Comparator.nullsLast(Comparator.naturalOrder())))
+            .toList();
+        return candidates.stream().sorted(Comparator
+            .comparingInt((RiderTaskResponse task) -> routeInsertionCost(task, rider, active))
+            .thenComparing(RiderTaskResponse::promiseEndAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(RiderTaskResponse::merchantDistanceMeters)).toList();
+    }
+    private int routeInsertionCost(RiderTaskResponse task, RiderProfile rider, List<Orders> active) {
+        List<BigDecimal[]> route = new ArrayList<>();
+        for (Orders order : active) {
+            BigDecimal[] stop = "DELIVERING".equals(order.getDeliveryStatus())
+                ? coordinate(order.getDeliveryLongitude(), order.getDeliveryLatitude())
+                : merchantCoordinate(order.getMerchantId());
+            if (stop != null) route.add(stop);
+        }
+        int currentDistance = routeDistance(rider.getCurrentLongitude(), rider.getCurrentLatitude(), route);
+        Merchant merchant = merchants.selectById(task.merchantId());
+        BigDecimal[] merchantStop = merchant == null ? null : coordinate(merchant.getLongitude(), merchant.getLatitude());
+        if (merchantStop != null) route.add(merchantStop);
+        Orders candidate = orders.selectById(task.orderId());
+        if (candidate != null) {
+            BigDecimal[] customerStop = coordinate(candidate.getDeliveryLongitude(), candidate.getDeliveryLatitude());
+            if (customerStop != null) route.add(customerStop);
+        }
+        return routeDistance(rider.getCurrentLongitude(), rider.getCurrentLatitude(), route) - currentDistance;
+    }
+    private BigDecimal[] merchantCoordinate(Long merchantId) {
+        Merchant merchant = merchants.selectById(merchantId);
+        return merchant == null ? null : coordinate(merchant.getLongitude(), merchant.getLatitude());
+    }
+    private BigDecimal[] coordinate(BigDecimal longitude, BigDecimal latitude) {
+        return GeoUtils.hasCoordinate(longitude, latitude) ? new BigDecimal[] {longitude, latitude} : null;
+    }
+    private int routeDistance(BigDecimal longitude, BigDecimal latitude, List<BigDecimal[]> route) {
+        int total = 0;
+        BigDecimal currentLongitude = longitude;
+        BigDecimal currentLatitude = latitude;
+        for (BigDecimal[] stop : route) {
+            total += GeoUtils.distanceMeters(currentLatitude, currentLongitude, stop[1], stop[0]);
+            currentLongitude = stop[0];
+            currentLatitude = stop[1];
+        }
+        return total;
     }
     private List<Orders> activeOrders(String riderId) { return orders.selectList(new LambdaQueryWrapper<Orders>().eq(Orders::getRiderId, riderId).in(Orders::getDeliveryStatus, ACTIVE_STATES)); }
     private RiderProfile requireOnlineLocated(RiderProfile rider, boolean requireAcceptingOrders) {

@@ -26,6 +26,7 @@ const MerchantAnalyticsView = () => import('../views/MerchantAnalyticsView.vue')
 const MerchantProductsView = () => import('../views/MerchantProductsView.vue')
 const MerchantMessagesView = () => import('../views/MerchantMessagesView.vue')
 const RiderWorkbenchView = () => import('../views/RiderWorkbenchView.vue')
+const RiderProfileCenterView = () => import('../views/RiderProfileCenterView.vue')
 const MerchantDealsView = () => import('../views/MerchantDealsView.vue')
 const MerchantDealDetailView = () => import('../views/MerchantDealDetailView.vue')
 const MerchantBookingsView = () => import('../views/MerchantBookingsView.vue')
@@ -122,6 +123,7 @@ const routes = [
   { path: '/rider-workbench', component: RiderWorkbenchView, meta: { roles: ['RIDER'], title: '骑手工作台', motion: 'page-workbench' } },
 
   { path: '/rider', component: RiderWorkbenchView, meta: { roles: ['RIDER'], title: '骑手工作台', motion: 'page-workbench' } },
+  { path: '/rider/profile', component: RiderProfileCenterView, meta: { roles: ['RIDER'], title: '骑手个人中心', motion: 'page-lift' } },
 
   { path: '/user/announcements', component: UserAnnouncementsView, meta: { roles: ['USER'], title: '平台公告', motion: 'page-lift' } },
   { path: '/merchant/announcements', component: MerchantAnnouncementsView, meta: { roles: ['MERCHANT'], title: '平台公告', motion: 'page-lift' } },

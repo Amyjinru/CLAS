@@ -62,7 +62,7 @@ public class RiderApplicationController {
     @PutMapping("/location") @RequireRole("RIDER")
     public Result<RiderProfileResponse> location(@Valid @RequestBody RiderLocationRequest request) { return Result.ok(locationService.reportLocation(request)); }
     @GetMapping("/tasks") @RequireRole("RIDER")
-    public Result<List<RiderTaskResponse>> tasks() { return Result.ok(dispatchService.nearbyTasks()); }
+    public Result<List<RiderTaskResponse>> tasks(@RequestParam(defaultValue = "SMART") String sort) { return Result.ok(dispatchService.nearbyTasks(sort)); }
     @PostMapping("/tasks/{orderId}/claim") @RequireRole("RIDER")
     public Result<Orders> claim(@PathVariable Long orderId) { return Result.ok(dispatchService.claim(orderId)); }
     @GetMapping("/deliveries") @RequireRole("RIDER")
