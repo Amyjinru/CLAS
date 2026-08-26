@@ -447,6 +447,22 @@ nav a.router-link-active {
   .nav-divider {
     display: none;
   }
+
+  nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  nav a,
+  .portal-switcher {
+    flex: 0 0 auto;
+  }
 }
 
 /* version_314 兼容 */

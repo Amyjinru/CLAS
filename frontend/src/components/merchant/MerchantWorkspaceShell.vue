@@ -246,6 +246,10 @@ function openProfileDialog() {
   padding: 9px 14px;
 }
 
+.module-tab:active {
+  transform: scale(0.97);
+}
+
 .module-tab.active {
   background: var(--color-primary-light);
   border-color: var(--color-primary);
@@ -379,8 +383,21 @@ function openProfileDialog() {
     padding: 0 14px 36px;
   }
 
+  .module-tabs {
+    flex-wrap: nowrap;
+    margin-left: -14px;
+    margin-right: -14px;
+    overflow-x: auto;
+    padding: 0 14px 14px;
+    scrollbar-width: none;
+  }
+
+  .module-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
   .module-tab {
-    width: 100%;
+    flex: 0 0 auto;
   }
 }
 </style>

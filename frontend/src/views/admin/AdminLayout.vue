@@ -126,4 +126,67 @@ function navigateTo(path) {
   min-height: calc(100vh - 64px);
   background: var(--bg-page);
 }
+
+@media (max-width: 900px) {
+  .admin-shell {
+    flex-direction: column;
+  }
+
+  .admin-sidebar {
+    bottom: auto;
+    display: flex;
+    left: auto;
+    overflow: visible;
+    position: static;
+    top: auto;
+    width: 100%;
+  }
+
+  .sidebar-header {
+    align-items: center;
+    border-bottom: 0;
+    display: flex;
+    flex: 0 0 auto;
+    padding: 14px 18px;
+  }
+
+  .sidebar-menu {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 8px 10px;
+  }
+
+  .sidebar-menu .el-menu-item {
+    flex: 0 0 auto;
+    margin: 0 3px;
+  }
+
+  .sidebar-menu .el-menu-item.is-active {
+    border-bottom: 3px solid var(--color-primary);
+    border-left: 0;
+  }
+
+  .admin-main {
+    margin-left: 0;
+    min-height: auto;
+    padding: 22px 18px 36px;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-sidebar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding-bottom: 4px;
+  }
+
+  .sidebar-menu {
+    padding-top: 4px;
+  }
+}
 </style>

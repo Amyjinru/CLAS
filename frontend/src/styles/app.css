@@ -36,13 +36,15 @@ button:active,
 }
 button.secondary,
 .button.secondary {
-  background: #FFD100;
-  color: #ffffff;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
 }
 button.secondary:hover,
 .button.secondary:hover {
-  background: #E6BC00;
-  color: #ffffff;
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--text-primary);
 }
 button:disabled {
   background: var(--clas-warm-100);
@@ -262,6 +264,29 @@ nav a.router-link-active {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+/* 操作区统一为可换行的紧凑布局，避免多按钮在卡片和表格中彼此遮挡。 */
+:where(.header-actions, .hero-actions, .card-actions, .row-actions, .detail-actions, .form-actions, .dialog-actions, .contact-actions, .delivery-actions, .pending-actions, .cart-actions, .order-panel-foot, .shop-actions, .redeem-box) {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:where(.header-actions, .hero-actions, .card-actions, .row-actions, .detail-actions, .form-actions, .dialog-actions, .contact-actions, .delivery-actions, .pending-actions, .cart-actions, .order-panel-foot, .shop-actions, .redeem-box) > :where(.el-button, button, .button, a.button) + :where(.el-button, button, .button, a.button) {
+  margin-left: 0;
+}
+
+.action-primary {
+  flex: 0 0 auto;
+}
+
+.action-secondary {
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
 }
 
 /* ─── 网格 & 卡片 ─── */
@@ -439,7 +464,7 @@ nav a.router-link-active {
 .page-workbench-enter-active,
 .page-admin-enter-active,
 .page-pop-enter-active {
-  animation-duration: 0.52s;
+  animation-duration: 0.26s;
   animation-fill-mode: both;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -480,13 +505,13 @@ nav a.router-link-active {
 
 .page-pop-enter-active {
   animation-name: routePopIn;
-  animation-duration: 0.42s;
-  animation-timing-function: cubic-bezier(0.34, 1.36, 0.64, 1);
+  animation-duration: 0.24s;
+  animation-timing-function: var(--ease-out);
 }
 
 .page-market-enter-active :where(.hero, .toolbar, .panel),
 .page-market-enter-active :where(.card, .row, .el-card) {
-  animation: marketItemIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: marketItemIn 0.24s var(--ease-out) both;
 }
 
 .page-market-enter-active :where(.card, .row, .el-card):nth-of-type(2n) {
@@ -498,15 +523,15 @@ nav a.router-link-active {
 }
 
 .page-slide-enter-active :where(.toolbar, .panel, .checkout, .el-table, .el-card) {
-  animation: slidePanelIn 0.48s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+  animation: slidePanelIn 0.24s var(--ease-out) 0.04s both;
 }
 
 .page-focus-enter-active :where(.hero, .panel, .el-card, .detail-card, .merchant-detail) {
-  animation: focusSurfaceIn 0.56s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+  animation: focusSurfaceIn 0.26s var(--ease-out) 0.04s both;
 }
 
 .page-workbench-enter-active :where(.stat-card, .chart-card, .el-card, .panel) {
-  animation: workbenchTileIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: workbenchTileIn 0.24s var(--ease-out) both;
 }
 
 .page-workbench-enter-active :where(.stat-card, .chart-card, .el-card, .panel):nth-of-type(2n) {
@@ -518,11 +543,11 @@ nav a.router-link-active {
 }
 
 .page-admin-enter-active :where(.admin-page, .el-card, .el-table, .toolbar) {
-  animation: adminScanSurface 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both;
+  animation: adminScanSurface 0.22s var(--ease-out) 0.04s both;
 }
 
 .page-pop-enter-active :where(.panel, .el-card, .el-form, .review-card) {
-  animation: popSurfaceIn 0.42s cubic-bezier(0.34, 1.36, 0.64, 1) 0.08s both;
+  animation: popSurfaceIn 0.24s var(--ease-out) 0.04s both;
 }
 
 @keyframes routeLiftIn {
@@ -912,5 +937,39 @@ body {
   }
   .stat-value {
     font-size: 28px;
+  }
+
+  :where(.header-actions, .hero-actions, .card-actions, .row-actions, .detail-actions, .form-actions, .dialog-actions, .contact-actions, .delivery-actions, .pending-actions, .cart-actions, .order-panel-foot, .shop-actions, .redeem-box) {
+    align-items: stretch;
+  }
+
+  :where(.header-actions, .hero-actions, .card-actions, .row-actions, .detail-actions, .form-actions, .dialog-actions, .contact-actions, .delivery-actions, .pending-actions, .cart-actions, .order-panel-foot, .shop-actions, .redeem-box) > :where(.el-button, button, .button, a.button) {
+    flex: 1 1 132px;
+  }
+}
+
+@media (max-width: 640px) {
+  nav {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  nav a {
+    flex: 0 0 auto;
+  }
+
+  .el-card__header {
+    padding: 16px 18px !important;
+  }
+
+  .el-card__body {
+    padding: 18px !important;
   }
 }
