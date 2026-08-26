@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { claimRiderTask, getRiderProfile, listRiderDeliveries, listRiderTasks, reportRiderLocation, startAcceptingOrders, stopAcceptingOrders } from '../api/clas'
+import { claimRiderTask, createRiderCallSession, getRiderProfile, listRiderDeliveries, listRiderTasks, reportRiderLocation, startAcceptingOrders, stopAcceptingOrders } from '../api/clas'
 import RiderChatWindow from '../components/RiderChatWindow.vue'
 
 const router = useRouter()
@@ -16,6 +16,9 @@ const taskSort = ref('SMART')
 const locationMessage = ref('')
 const contactOrder = ref(null)
 const contactDialogOpen = ref(false)
+const callingOrderId = ref(null)
+const callSession = ref(null)
+const callDialogOpen = ref(false)
 let locationTimer = null
 
 const taskSortOptions = [
@@ -121,6 +124,20 @@ async function claimTask(task) {
 
 function openContact(order) { contactOrder.value = order; contactDialogOpen.value = true }
 
+async function callUser(order) {
+  callingOrderId.value = order.id
+  try {
+    callSession.value = await createRiderCallSession(order.id)
+    callDialogOpen.value = true
+  } finally { callingOrderId.value = null }
+}
+
+function formatCallExpiry(value) {
+  if (!value) return '10 分钟内有效'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '10 分钟内有效' : `有效至 ${formatTime(value)}`
+}
+
 function syncLocationReporting() {
   if (locationTimer) window.clearInterval(locationTimer)
   locationTimer = window.setInterval(() => {
@@ -168,7 +185,10 @@ onBeforeUnmount(() => { if (locationTimer) window.clearInterval(locationTimer) }
             <div class="order-topline"><strong>#{{ order.id }}</strong><span class="status-chip">{{ order.deliveryStatus === 'DELIVERING' ? '配送中' : '待取餐' }}</span><span v-if="isUrgent(order)" class="urgent-chip">优先处理</span></div>
             <p class="address">{{ order.deliveryAddress }}</p>
             <div class="delivery-meta"><span>承诺送达 {{ formatTime(order.promiseEndAt) }}</span><span>预计 {{ formatTime(order.predictedArrivalAt) }}</span></div>
-            <el-button text type="primary" @click="openContact(order)">联系用户</el-button>
+            <div class="delivery-actions">
+              <el-button class="contact-button" plain @click="openContact(order)">联系用户</el-button>
+              <el-button class="call-button" type="primary" :loading="callingOrderId === order.id" @click="callUser(order)">拨打用户</el-button>
+            </div>
           </article>
         </div>
         <div v-else class="empty-state">当前没有配送中的订单。开始接单后，可在右侧领取附近任务。</div>
@@ -195,9 +215,17 @@ onBeforeUnmount(() => { if (locationTimer) window.clearInterval(locationTimer) }
     </section>
 
     <el-dialog v-model="contactDialogOpen" title="配送沟通" width="min(560px,92vw)"><RiderChatWindow v-if="contactOrder" :order-id="contactOrder.id" role="RIDER" :active="['ASSIGNED_WAITING_MEAL', 'DELIVERING'].includes(contactOrder.deliveryStatus)" /></el-dialog>
+    <el-dialog v-model="callDialogOpen" title="隐私通话已准备" width="min(420px,92vw)">
+      <section v-if="callSession" class="call-session">
+        <p>请使用下方虚拟号码联系订单用户，系统不会展示用户真实手机号。</p>
+        <strong>{{ callSession.maskedPhone }}</strong>
+        <small>订单 #{{ callSession.orderId || callingOrderId }} · {{ formatCallExpiry(callSession.expiresAt) }}</small>
+      </section>
+      <template #footer><el-button type="primary" @click="callDialogOpen = false">知道了</el-button></template>
+    </el-dialog>
   </main>
 </template>
 
 <style scoped>
-.rider-workbench { --ink:#16242e; --muted:#6b7880; --line:#dce5e6; --teal:#006b68; --coral:#d94d35; margin:0 auto; max-width:1240px; padding:28px 24px 48px; color:var(--ink); font-family:"Noto Sans SC","Microsoft YaHei",sans-serif; }.work-header { align-items:center; background:#f4f1e8; border:1px solid #e6dfd2; border-radius:22px; display:flex; justify-content:space-between; padding:28px 32px; }.kicker,.panel-heading p { color:var(--teal); font-size:11px; font-weight:800; letter-spacing:.14em; margin:0 0 7px; }.work-header h1 { font-family:Georgia,"Noto Serif SC",serif; font-size:30px; letter-spacing:.02em; margin:0; }.header-note { color:var(--muted); margin:9px 0 0; }.header-actions { display:flex; gap:10px; }.profile-button { border-color:#9aa9aa; color:#253b3c; }.location-strip { align-items:center; background:#edf6f4; border-left:4px solid var(--teal); display:flex; justify-content:space-between; margin:18px 0; padding:13px 16px; }.location-strip div { display:flex; flex-direction:column; gap:3px; }.location-strip span { color:var(--muted); font-size:13px; }.location-strip.offline { background:#f8f2ea; border-color:#b56f2c; }.dispatch-grid { display:grid; gap:18px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }.dispatch-panel { border:1px solid var(--line); border-radius:18px; min-height:500px; overflow:hidden; }.deliveries-panel { background:#fffdf9; }.tasks-panel { background:#f8fbfb; }.panel-heading { align-items:center; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; padding:22px 22px 16px; }.panel-heading h2 { font-family:Georgia,"Noto Serif SC",serif; font-size:23px; margin:0; }.panel-heading em { color:var(--teal); font-family:"Noto Sans SC",sans-serif; font-size:18px; font-style:normal; margin-left:6px; }.panel-heading>span { color:var(--muted); font-size:12px; }.sort-select { width:120px; }.delivery-list,.task-list { display:flex; flex-direction:column; gap:12px; padding:16px; }.delivery-card,.task-card { background:#fff; border:1px solid #e6ecec; border-radius:13px; padding:16px; }.delivery-card.urgent { border-color:#e4a092; box-shadow:inset 4px 0 0 var(--coral); }.order-topline { align-items:center; display:flex; gap:8px; }.order-topline strong { font-size:16px; }.status-chip,.urgent-chip { border-radius:999px; font-size:12px; padding:3px 8px; }.status-chip { background:#e4f1ef; color:var(--teal); }.urgent-chip { background:#fbe6e1; color:#a43825; }.merchant-name { color:#334a51; font-weight:700; }.address { color:#33424a; line-height:1.5; margin:10px 0 0; }.destination { color:var(--muted); font-size:13px; }.delivery-meta,.task-metrics { color:var(--muted); display:flex; flex-wrap:wrap; font-size:12px; gap:9px 14px; margin-top:12px; }.delivery-card .el-button { margin-top:4px; padding-left:0; }.task-card { align-items:center; display:flex; gap:14px; justify-content:space-between; }.task-main { min-width:0; }.task-metrics b { color:var(--coral); font-size:15px; }.task-main small { color:#73868b; display:block; margin-top:10px; }.empty-state { color:var(--muted); line-height:1.7; padding:38px 22px; text-align:center; }@media (max-width:760px) { .work-header,.location-strip,.task-card { align-items:flex-start; flex-direction:column; }.header-actions { width:100%; }.header-actions .el-button { flex:1; }.location-strip .el-button,.task-card>.el-button { width:100%; }.dispatch-grid { grid-template-columns:1fr; }.dispatch-panel { min-height:auto; }.work-header { padding:23px; }.work-header h1 { font-size:25px; } }
+.rider-workbench { --ink:#16242e; --muted:#6b7880; --line:#dce5e6; --teal:#006b68; --coral:#d94d35; margin:0 auto; max-width:1240px; padding:28px 24px 48px; color:var(--ink); font-family:"Noto Sans SC","Microsoft YaHei",sans-serif; }.work-header { align-items:center; background:#f4f1e8; border:1px solid #e6dfd2; border-radius:22px; display:flex; justify-content:space-between; padding:28px 32px; }.kicker,.panel-heading p { color:var(--teal); font-size:11px; font-weight:800; letter-spacing:.14em; margin:0 0 7px; }.work-header h1 { font-family:Georgia,"Noto Serif SC",serif; font-size:30px; letter-spacing:.02em; margin:0; }.header-note { color:var(--muted); margin:9px 0 0; }.header-actions { display:flex; gap:10px; }.profile-button { border-color:#9aa9aa; color:#253b3c; }.location-strip { align-items:center; background:#edf6f4; border-left:4px solid var(--teal); display:flex; justify-content:space-between; margin:18px 0; padding:13px 16px; }.location-strip div { display:flex; flex-direction:column; gap:3px; }.location-strip span { color:var(--muted); font-size:13px; }.location-strip.offline { background:#f8f2ea; border-color:#b56f2c; }.dispatch-grid { display:grid; gap:18px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }.dispatch-panel { border:1px solid var(--line); border-radius:18px; min-height:500px; overflow:hidden; }.deliveries-panel { background:#fffdf9; }.tasks-panel { background:#f8fbfb; }.panel-heading { align-items:center; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; padding:22px 22px 16px; }.panel-heading h2 { font-family:Georgia,"Noto Serif SC",serif; font-size:23px; margin:0; }.panel-heading em { color:var(--teal); font-family:"Noto Sans SC",sans-serif; font-size:18px; font-style:normal; margin-left:6px; }.panel-heading>span { color:var(--muted); font-size:12px; }.sort-select { width:120px; }.delivery-list,.task-list { display:flex; flex-direction:column; gap:12px; padding:16px; }.delivery-card,.task-card { background:#fff; border:1px solid #e6ecec; border-radius:13px; padding:16px; }.delivery-card.urgent { border-color:#e4a092; box-shadow:inset 4px 0 0 var(--coral); }.order-topline { align-items:center; display:flex; gap:8px; }.order-topline strong { font-size:16px; }.status-chip,.urgent-chip { border-radius:999px; font-size:12px; padding:3px 8px; }.status-chip { background:#e4f1ef; color:var(--teal); }.urgent-chip { background:#fbe6e1; color:#a43825; }.merchant-name { color:#334a51; font-weight:700; }.address { color:#33424a; line-height:1.5; margin:10px 0 0; }.destination { color:var(--muted); font-size:13px; }.delivery-meta,.task-metrics { color:var(--muted); display:flex; flex-wrap:wrap; font-size:12px; gap:9px 14px; margin-top:12px; }.delivery-actions { align-items:center; border-top:1px solid #edf1f0; display:flex; gap:9px; justify-content:flex-end; margin-top:15px; padding-top:13px; }.delivery-actions .el-button { margin:0; min-width:88px; }.contact-button { border-color:#b8cfca; color:#176964; background:#f6fbfa; }.call-button { box-shadow:0 6px 12px rgba(0,107,104,.18); }.call-session { border:1px solid #cfe4df; border-radius:14px; background:#f4fbf8; display:flex; flex-direction:column; gap:8px; padding:17px; }.call-session p { color:var(--muted); line-height:1.6; margin:0; }.call-session strong { color:var(--teal); font-family:Georgia,"Noto Serif SC",serif; font-size:24px; letter-spacing:.08em; }.call-session small { color:#59716e; }.task-card { align-items:center; display:flex; gap:14px; justify-content:space-between; }.task-main { min-width:0; }.task-metrics b { color:var(--coral); font-size:15px; }.task-main small { color:#73868b; display:block; margin-top:10px; }.empty-state { color:var(--muted); line-height:1.7; padding:38px 22px; text-align:center; }@media (max-width:760px) { .work-header,.location-strip,.task-card { align-items:flex-start; flex-direction:column; }.header-actions { width:100%; }.header-actions .el-button { flex:1; }.location-strip .el-button,.task-card>.el-button { width:100%; }.delivery-actions { justify-content:stretch; width:100%; }.delivery-actions .el-button { flex:1; }.dispatch-grid { grid-template-columns:1fr; }.dispatch-panel { min-height:auto; }.work-header { padding:23px; }.work-header h1 { font-size:25px; } }
 </style>
