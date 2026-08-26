@@ -19,6 +19,8 @@ export const reportRiderLocation = (payload) => api.put('/rider/location', paylo
 export const getRiderOrderMessages = (orderId) => api.get(`/rider/deliveries/${orderId}/messages`).then(unwrap)
 export const sendRiderOrderMessage = (orderId, content) => api.post(`/rider/deliveries/${orderId}/messages`, { content }).then(unwrap)
 export const createRiderCallSession = (orderId) => api.post(`/rider/deliveries/${orderId}/call-session`).then(unwrap)
+export const getRiderMerchantMessages = (orderId) => api.get(`/delivery/orders/${orderId}/merchant-messages`).then(unwrap)
+export const sendRiderMerchantMessage = (orderId, content) => api.post(`/delivery/orders/${orderId}/merchant-messages`, { content }).then(unwrap)
 export const listMyRiderWithdrawals = () => api.get('/rider/withdrawals').then(unwrap)
 export const listMyRiderReviews = () => api.get('/rider/reviews').then(unwrap)
 export const listMyRiderMetrics = () => api.get('/rider/metrics').then(unwrap)

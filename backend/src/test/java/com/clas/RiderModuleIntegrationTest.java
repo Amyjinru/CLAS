@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @ActiveProfiles("test")
 class RiderModuleIntegrationTest {
     private static final long ORDER_ID = 990001L;
+    private static final long RIDER_MERCHANT_CONTACT_ORDER_ID = 990002L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -161,6 +162,45 @@ class RiderModuleIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.servicePhone").value("13900000064"))
             .andExpect(jsonPath("$.data.latestPhoneChange.status").value("APPROVED"));
+    }
+
+    @Test
+    void assignedRiderAndMerchantCanExchangeOrderMessages() throws Exception {
+        jdbcTemplate.update("DELETE FROM chat_message WHERE order_id = ?", RIDER_MERCHANT_CONTACT_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM chat_conversation WHERE order_id = ?", RIDER_MERCHANT_CONTACT_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", RIDER_MERCHANT_CONTACT_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (
+                id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_status,
+                estimated_minutes, refund_status, create_time, accepted_at, rider_assigned_at
+            ) VALUES (?, '13800000001', 1, '13800000004', 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 'ASSIGNED_WAITING_MEAL', 30, 'NONE', CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, RIDER_MERCHANT_CONTACT_ORDER_ID);
+
+        String riderAuth = "Bearer " + switchRole(loginToken("13800000004"), "RIDER");
+        String merchantAuth = "Bearer " + loginToken("13800000002");
+
+        mockMvc.perform(post("/api/delivery/orders/{orderId}/merchant-messages", RIDER_MERCHANT_CONTACT_ORDER_ID)
+                .header("Authorization", riderAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("content", "我已到店，麻烦确认出餐进度。"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.senderRole").value("RIDER"));
+
+        mockMvc.perform(post("/api/delivery/orders/{orderId}/merchant-messages", RIDER_MERCHANT_CONTACT_ORDER_ID)
+                .header("Authorization", merchantAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("content", "预计两分钟出餐。"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.senderRole").value("MERCHANT"));
+
+        mockMvc.perform(get("/api/delivery/orders/{orderId}/merchant-messages", RIDER_MERCHANT_CONTACT_ORDER_ID)
+                .header("Authorization", riderAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(2))
+            .andExpect(jsonPath("$.data[1].content").value("预计两分钟出餐。"));
     }
 
     private String switchRole(String token, String role) throws Exception {
