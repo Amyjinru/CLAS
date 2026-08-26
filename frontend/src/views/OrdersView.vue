@@ -256,7 +256,7 @@ watch(() => route.query.tab, (tab) => {
           </button>
           <button
             v-if="hasLiveRiderDelivery(order.order)"
-            class="contact-rider"
+            class="secondary"
             @click="openRiderChat(order)"
           >
             联系骑手
@@ -365,17 +365,6 @@ watch(() => route.query.tab, (tab) => {
   font-size: 13px;
   font-weight: 700;
   padding: 6px 12px;
-}
-
-.contact-rider {
-  background: #eaf7f4;
-  border: 1px solid #9fcfc5;
-  color: #086c64;
-}
-
-.contact-rider:hover {
-  background: #d8efe9;
-  border-color: #53a99b;
 }
 
 @media (min-width: 1024px) {
