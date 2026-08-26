@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { acceptOrder, getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, readyForDispatch, rejectOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
+import { acceptOrder, getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, rejectOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
@@ -132,16 +132,7 @@ async function handleReject(orderId) {
 
 async function handleAccept(orderId) {
   await acceptOrder(orderId)
-  ElMessage.success('已确认接单，订单进入备餐')
-  await load()
-  if (selectedOrder.value?.order.id === orderId) {
-    selectedOrder.value = orders.value.find((item) => item.order.id === orderId) || null
-  }
-}
-
-async function handleReadyForDispatch(orderId) {
-  await readyForDispatch(orderId)
-  ElMessage.success('餐品已出餐，已发布至骑手任务池')
+  ElMessage.success('已确认接单，订单已发布至骑手任务池')
   await load()
   if (selectedOrder.value?.order.id === orderId) {
     selectedOrder.value = orders.value.find((item) => item.order.id === orderId) || null
@@ -396,14 +387,6 @@ onMounted(() => {
                   确认接单
                 </el-button>
                 <el-button
-                  v-if="scope.row.order.status === 'ACCEPTED' && scope.row.order.deliveryStatus === 'PREPARING'"
-                  type="primary"
-                  size="small"
-                  @click="handleReadyForDispatch(scope.row.order.id)"
-                >
-                  出餐并派送
-                </el-button>
-                <el-button
                   type="primary"
                   size="small"
                   @click="openDetail(scope.row)"
@@ -505,14 +488,6 @@ onMounted(() => {
             @click="handleAccept(selectedOrder.order.id)"
           >
             确认接单
-          </button>
-          <button
-            v-if="selectedOrder.order.status === 'ACCEPTED' && selectedOrder.order.deliveryStatus === 'PREPARING'"
-            type="button"
-            class="secondary"
-            @click="handleReadyForDispatch(selectedOrder.order.id)"
-          >
-            出餐并派送
           </button>
           <button
             v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"

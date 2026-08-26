@@ -140,8 +140,6 @@ class RiderModuleIntegrationTest {
         String adminAuth = "Bearer " + loginToken("13800000003");
 
         mockMvc.perform(post("/api/order/accept/{orderId}", DELIVERY_CYCLE_ORDER_ID).header("Authorization", merchantAuth))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.deliveryStatus").value("PREPARING"));
-        mockMvc.perform(post("/api/order/ready-for-dispatch/{orderId}", DELIVERY_CYCLE_ORDER_ID).header("Authorization", merchantAuth))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.deliveryStatus").value("AVAILABLE"));
         mockMvc.perform(post("/api/rider/tasks/{orderId}/claim", DELIVERY_CYCLE_ORDER_ID).header("Authorization", riderAuth))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.deliveryStatus").value("ASSIGNED_WAITING_MEAL"));
