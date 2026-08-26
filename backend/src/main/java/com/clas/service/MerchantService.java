@@ -20,6 +20,7 @@ import com.clas.entity.UserAddress;
 import com.clas.entity.Favorite;
 import com.clas.entity.Orders;
 import com.clas.entity.Product;
+import com.clas.entity.RoleApplication;
 import com.clas.mapper.FavoriteMapper;
 import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.MerchantAuditLogMapper;
@@ -349,10 +350,10 @@ public class MerchantService {
         boolean riderPending = riderApplicationMapper.exists(new LambdaQueryWrapper<com.clas.entity.RiderApplication>()
             .eq(com.clas.entity.RiderApplication::getUserId, finalUserId)
             .eq(com.clas.entity.RiderApplication::getStatus, "PENDING"));
-        boolean legacyRiderPending = roleApplicationMapper.exists(new LambdaQueryWrapper<com.clas.entity.RoleApplication>()
-            .eq(com.clas.entity.RoleApplication::getUserId, finalUserId)
-            .eq(com.clas.entity.RoleApplication::getTargetRole, "RIDER")
-            .eq(com.clas.entity.RoleApplication::getStatus, "PENDING"));
+        boolean legacyRiderPending = roleApplicationMapper.exists(new LambdaQueryWrapper<RoleApplication>()
+            .eq(RoleApplication::getUserId, finalUserId)
+            .eq(RoleApplication::getTargetRole, "RIDER")
+            .eq(RoleApplication::getStatus, "PENDING"));
         if (riderPending || legacyRiderPending) {
             throw new BusinessException("已有待审核的骑手申请，暂不能申请商家身份");
         }
