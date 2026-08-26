@@ -2,6 +2,8 @@ package com.clas;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -114,6 +116,51 @@ class RiderModuleIntegrationTest {
             .andExpect(jsonPath("$.data[0].id").value("rider-" + applicationId))
             .andExpect(jsonPath("$.data[0].targetRole").value("RIDER"))
             .andExpect(jsonPath("$.data[0].status").value("APPROVED"));
+    }
+
+    @Test
+    void riderCanUpdateNormalInformationAndServicePhoneNeedsAdminApproval() throws Exception {
+        String riderAuth = "Bearer " + switchRole(loginToken("13800000004"), "RIDER");
+
+        mockMvc.perform(get("/api/rider/info").header("Authorization", riderAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.userId").value("13800000004"));
+
+        mockMvc.perform(put("/api/rider/info")
+                .header("Authorization", riderAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "vehicleType", "MOTORCYCLE", "serviceArea", "大学城东区",
+                    "emergencyContactName", "测试联系人", "emergencyContactPhone", "13900000063"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.vehicleType").value("MOTORCYCLE"))
+            .andExpect(jsonPath("$.data.serviceArea").value("大学城东区"));
+
+        MvcResult change = mockMvc.perform(post("/api/rider/info/service-phone-change")
+                .header("Authorization", riderAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", "13900000064"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PENDING"))
+            .andReturn();
+        long changeId = objectMapper.readTree(change.getResponse().getContentAsString()).path("data").path("id").asLong();
+
+        String adminAuth = "Bearer " + loginToken("13800000003");
+        mockMvc.perform(get("/api/rider/admin/info-change-requests").header("Authorization", adminAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[*].id").value(org.hamcrest.Matchers.hasItem((int) changeId)));
+        mockMvc.perform(patch("/api/rider/admin/info-change-requests/{id}", changeId)
+                .header("Authorization", adminAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("approved", true, "reason", "资料核验通过"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("APPROVED"));
+
+        mockMvc.perform(get("/api/rider/info").header("Authorization", riderAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.servicePhone").value("13900000064"))
+            .andExpect(jsonPath("$.data.latestPhoneChange.status").value("APPROVED"));
     }
 
     private String switchRole(String token, String role) throws Exception {

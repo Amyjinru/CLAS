@@ -142,7 +142,8 @@ async function switchPortal(nextRole) {
         <!-- ===== RIDER 骑手（最小演示端） ===== -->
         <template v-else-if="role === 'RIDER'">
           <RouterLink to="/rider">骑手工作台</RouterLink>
-          <RouterLink to="/rider/profile">个人中心</RouterLink>
+          <RouterLink to="/rider/profile">账户中心</RouterLink>
+          <RouterLink to="/rider/info">骑手信息</RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
 

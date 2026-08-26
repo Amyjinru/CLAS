@@ -58,7 +58,7 @@ onMounted(load)
       <div class="hero-grid" aria-hidden="true"></div>
       <div class="hero-content">
         <button class="back-link" type="button" @click="router.push('/rider')">← 返回调度台</button>
-        <p class="eyebrow">RIDER ACCOUNT / 个人中心</p>
+        <p class="eyebrow">RIDER ACCOUNT / 账户中心</p>
         <div class="identity-line">
           <div class="avatar-mark">{{ (profile?.realName || '骑').slice(0, 1) }}</div>
           <div><h1>{{ profile?.realName || '骑手' }}</h1><p>{{ profile?.vehicleType || '配送骑手' }} · {{ profile?.serviceArea || '服务区域待完善' }}</p></div>

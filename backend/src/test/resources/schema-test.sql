@@ -30,6 +30,7 @@ DROP TABLE IF EXISTS rider_settlement;
 DROP TABLE IF EXISTS delivery_exception;
 DROP TABLE IF EXISTS rider_location_history;
 DROP TABLE IF EXISTS rider_audit_log;
+DROP TABLE IF EXISTS rider_profile_change_request;
 DROP TABLE IF EXISTS rider_profile;
 DROP TABLE IF EXISTS rider_application;
 DROP TABLE IF EXISTS user_role;
@@ -492,7 +493,7 @@ CREATE TABLE rider_profile (
     user_id VARCHAR(20) PRIMARY KEY, real_name VARCHAR(50) NOT NULL,
     id_card_ciphertext VARCHAR(1024) NOT NULL, id_card_masked VARCHAR(32) NOT NULL,
     vehicle_type VARCHAR(20) NOT NULL, service_area VARCHAR(100) NOT NULL,
-    emergency_contact_name VARCHAR(50) NOT NULL, emergency_contact_phone VARCHAR(20) NOT NULL,
+    emergency_contact_name VARCHAR(50) NOT NULL, emergency_contact_phone VARCHAR(20) NOT NULL, service_phone VARCHAR(20),
     online_status BOOLEAN NOT NULL DEFAULT FALSE, accepting_orders BOOLEAN NOT NULL DEFAULT FALSE, max_active_orders INT NOT NULL DEFAULT 3,
     current_longitude DECIMAL(10,6), current_latitude DECIMAL(10,6), location_updated_at TIMESTAMP,
     withdrawable_balance INT NOT NULL DEFAULT 0, frozen_balance INT NOT NULL DEFAULT 0,
@@ -500,6 +501,7 @@ CREATE TABLE rider_profile (
 );
 
 CREATE TABLE rider_audit_log (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, operator_id VARCHAR(20) NOT NULL, action VARCHAR(50) NOT NULL, reason VARCHAR(255), before_value CLOB, after_value CLOB, created_at TIMESTAMP NOT NULL);
+CREATE TABLE rider_profile_change_request (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, current_phone VARCHAR(20) NOT NULL, requested_phone VARCHAR(20) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'PENDING', review_reason VARCHAR(255), reviewer_id VARCHAR(20), reviewed_at TIMESTAMP, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL);
 CREATE TABLE rider_location_history (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, longitude DECIMAL(10,6) NOT NULL, latitude DECIMAL(10,6) NOT NULL, accuracy_meters INT, reported_at TIMESTAMP NOT NULL);
 CREATE TABLE delivery_exception (id BIGINT PRIMARY KEY AUTO_INCREMENT, order_id BIGINT NOT NULL, rider_id VARCHAR(20), exception_type VARCHAR(30) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'OPEN', score_deduction INT NOT NULL DEFAULT 0, commission_deduction INT NOT NULL DEFAULT 0, detail VARCHAR(255), created_at TIMESTAMP NOT NULL, UNIQUE(order_id, exception_type));
 CREATE TABLE rider_settlement (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, order_id BIGINT, source_type VARCHAR(30) NOT NULL, source_id VARCHAR(64) NOT NULL, settlement_type VARCHAR(30) NOT NULL, amount INT NOT NULL, balance_type VARCHAR(20) NOT NULL, created_at TIMESTAMP NOT NULL, UNIQUE(source_type, source_id));

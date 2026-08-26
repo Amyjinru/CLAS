@@ -266,6 +266,7 @@ public class UserProfileService {
         }
         deleteBySql("DELETE FROM service_booking WHERE user_id = ?", userId);
         deleteBySql("DELETE FROM deal_order WHERE user_id = ?", userId);
+        deleteBySql("DELETE FROM rider_profile_change_request WHERE rider_id = ?", userId);
         deleteBySql("DELETE FROM orders WHERE user_id = ?", userId);
 
         // 骑手和商家端不再可用：清除骑手标识，并下架、去标识化该账号的商家档案。

@@ -11,7 +11,7 @@ import lombok.Data;
 public class RiderProfile {
     @TableId private String userId;
     private String realName; private String idCardCiphertext; private String idCardMasked; private String vehicleType;
-    private String serviceArea; private String emergencyContactName; private String emergencyContactPhone;
+    private String serviceArea; private String emergencyContactName; private String emergencyContactPhone; private String servicePhone;
     private Boolean onlineStatus; private Boolean acceptingOrders; private Integer maxActiveOrders; private BigDecimal currentLongitude; private BigDecimal currentLatitude;
     private LocalDateTime locationUpdatedAt; private Integer withdrawableBalance; private Integer frozenBalance; private String status;
     private LocalDateTime createdAt; private LocalDateTime updatedAt;

@@ -20,3 +20,5 @@ export const listRiderApplications = () => api.get('/rider/admin/applications').
 export const auditRiderApplication = (id, payload) => api.patch(`/rider/admin/applications/${id}`, payload).then(unwrap)
 export const listRiderWithdrawals = () => api.get('/rider/admin/withdrawals').then(unwrap)
 export const auditRiderWithdrawal = (id, payload) => api.patch(`/rider/admin/withdrawals/${id}`, payload).then(unwrap)
+export const listRiderInfoChangeRequests = () => api.get('/rider/admin/info-change-requests').then(unwrap)
+export const auditRiderInfoChangeRequest = (id, payload) => api.patch(`/rider/admin/info-change-requests/${id}`, payload).then(unwrap)

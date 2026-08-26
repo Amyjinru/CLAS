@@ -141,7 +141,7 @@ onBeforeUnmount(() => { if (locationTimer) window.clearInterval(locationTimer) }
         <p class="header-note">{{ profile?.onlineStatus ? '当前已上线' : '当前未上线' }} · 结束接单只停止新订单，不影响手中配送。</p>
       </div>
       <div class="header-actions">
-        <el-button class="profile-button" plain @click="router.push('/rider/profile')">个人中心</el-button>
+        <el-button class="profile-button" plain @click="router.push('/rider/profile')">账户中心</el-button>
         <el-button v-if="!profile?.acceptingOrders" type="primary" size="large" @click="start">开始接单</el-button>
         <el-button v-else type="danger" plain size="large" @click="stop">结束接单</el-button>
       </div>

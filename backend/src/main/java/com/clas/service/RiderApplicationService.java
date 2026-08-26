@@ -37,12 +37,16 @@ public class RiderApplicationService {
         String userId = UserContext.getUserId();
         RiderApplication latest = applications.selectOne(new LambdaQueryWrapper<RiderApplication>().eq(RiderApplication::getUserId, userId).orderByDesc(RiderApplication::getId).last("LIMIT 1"));
         if (latest != null && "PENDING".equals(latest.getStatus())) throw new BusinessException("已有待审核骑手申请");
+        // Preserve the approved identity while the rider's replacement data is reviewed.
+        boolean alreadyApproved = profiles.selectById(userId) != null;
         RiderApplication application = new RiderApplication();
         application.setUserId(userId); application.setRealName(request.realName().trim()); application.setIdCardCiphertext(crypto.encrypt(request.idCardNo())); application.setIdCardMasked(crypto.mask(request.idCardNo()));
         application.setVehicleType(request.vehicleType().trim()); application.setServiceArea(request.serviceArea().trim()); application.setEmergencyContactName(request.emergencyContactName().trim()); application.setEmergencyContactPhone(request.emergencyContactPhone()); application.setCredentialUrls(request.credentialUrls()); application.setStatus("PENDING"); application.setCreatedAt(LocalDateTime.now()); applications.insert(application);
         UserRole role = roles.selectOne(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId).eq(UserRole::getRole, "RIDER"));
         if (role == null) { role = new UserRole(); LocalDateTime now = LocalDateTime.now(); role.setUserId(userId); role.setRole("RIDER"); role.setCreatedAt(now); role.setUpdatedAt(now); roles.insert(role); }
-        role.setStatus("PENDING"); role.setUpdatedAt(LocalDateTime.now()); roles.updateById(role);
+        if (!alreadyApproved) {
+            role.setStatus("PENDING"); role.setUpdatedAt(LocalDateTime.now()); roles.updateById(role);
+        }
         return response(application);
     }
     public RiderApplicationResponse mine() {
@@ -92,6 +96,7 @@ public class RiderApplicationService {
         if (approved) {
             RiderProfile profile = profiles.selectById(application.getUserId()); if (profile == null) { profile = new RiderProfile(); profile.setUserId(application.getUserId()); profile.setCreatedAt(LocalDateTime.now()); profile.setOnlineStatus(false); profile.setAcceptingOrders(false); profile.setWithdrawableBalance(0); profile.setFrozenBalance(0); }
             profile.setRealName(application.getRealName()); profile.setIdCardCiphertext(application.getIdCardCiphertext()); profile.setIdCardMasked(application.getIdCardMasked()); profile.setVehicleType(application.getVehicleType()); profile.setServiceArea(application.getServiceArea()); profile.setEmergencyContactName(application.getEmergencyContactName()); profile.setEmergencyContactPhone(application.getEmergencyContactPhone()); profile.setStatus("APPROVED"); profile.setMaxActiveOrders(maxActiveOrders == null ? 3 : Math.max(1, Math.min(10, maxActiveOrders))); profile.setUpdatedAt(LocalDateTime.now());
+            if (profile.getServicePhone() == null || profile.getServicePhone().isBlank()) profile.setServicePhone(application.getUserId());
             if (profiles.selectById(profile.getUserId()) == null) profiles.insert(profile); else profiles.updateById(profile);
         }
         RiderAuditLog log = new RiderAuditLog(); log.setRiderId(application.getUserId()); log.setOperatorId(adminId); log.setAction(application.getStatus()); log.setReason(reason); log.setCreatedAt(LocalDateTime.now()); audits.insert(log);

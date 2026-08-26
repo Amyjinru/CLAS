@@ -27,10 +27,16 @@ import com.clas.dto.RiderWithdrawalAuditRequest;
 import com.clas.entity.RiderWithdrawal;
 import com.clas.entity.RiderReview;
 import com.clas.service.RiderReviewService;
+import com.clas.service.RiderInfoService;
 import com.clas.entity.RiderDailyMetric;
 import com.clas.entity.RiderSettlement;
 import com.clas.mapper.RiderDailyMetricMapper;
 import com.clas.mapper.RiderSettlementMapper;
+import com.clas.dto.RiderInfoResponse;
+import com.clas.dto.RiderInfoUpdateRequest;
+import com.clas.dto.RiderPhoneChangeRequest;
+import com.clas.dto.RiderPhoneChangeAuditRequest;
+import com.clas.dto.RiderPhoneChangeResponse;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.entity.Orders;
 import jakarta.validation.Valid;
@@ -46,13 +52,20 @@ public class RiderApplicationController {
     private final RiderReviewService riderReviewService;
     private final RiderDailyMetricMapper metrics;
     private final RiderSettlementMapper settlements;
-    public RiderApplicationController(RiderApplicationService service, RiderLocationService locationService, RiderDispatchService dispatchService, RiderDeliveryService deliveryService, RiderContactService contactService, RiderWithdrawalService withdrawalService, RiderReviewService riderReviewService, RiderDailyMetricMapper metrics, RiderSettlementMapper settlements) { this.service = service; this.locationService = locationService; this.dispatchService = dispatchService; this.deliveryService = deliveryService; this.contactService = contactService; this.withdrawalService = withdrawalService; this.riderReviewService = riderReviewService; this.metrics = metrics; this.settlements = settlements; }
-    @PostMapping("/applications") @RequireRole({"USER", "MERCHANT"})
+    private final RiderInfoService riderInfoService;
+    public RiderApplicationController(RiderApplicationService service, RiderLocationService locationService, RiderDispatchService dispatchService, RiderDeliveryService deliveryService, RiderContactService contactService, RiderWithdrawalService withdrawalService, RiderReviewService riderReviewService, RiderDailyMetricMapper metrics, RiderSettlementMapper settlements, RiderInfoService riderInfoService) { this.service = service; this.locationService = locationService; this.dispatchService = dispatchService; this.deliveryService = deliveryService; this.contactService = contactService; this.withdrawalService = withdrawalService; this.riderReviewService = riderReviewService; this.metrics = metrics; this.settlements = settlements; this.riderInfoService = riderInfoService; }
+    @PostMapping("/applications") @RequireRole({"USER", "MERCHANT", "RIDER"})
     public Result<RiderApplicationResponse> apply(@Valid @RequestBody RiderApplicationRequest request) { return Result.ok(service.apply(request)); }
     @GetMapping("/application") @RequireRole({"USER", "MERCHANT", "RIDER"})
     public Result<RiderApplicationResponse> mine() { return Result.ok(service.mine()); }
     @GetMapping("/profile") @RequireRole("RIDER")
     public Result<RiderProfileResponse> profile() { return Result.ok(service.profile()); }
+    @GetMapping("/info") @RequireRole("RIDER")
+    public Result<RiderInfoResponse> info() { return Result.ok(riderInfoService.mine()); }
+    @PutMapping("/info") @RequireRole("RIDER")
+    public Result<RiderInfoResponse> updateInfo(@Valid @RequestBody RiderInfoUpdateRequest request) { return Result.ok(riderInfoService.updateMine(request)); }
+    @PostMapping("/info/service-phone-change") @RequireRole("RIDER")
+    public Result<RiderPhoneChangeResponse> requestServicePhoneChange(@Valid @RequestBody RiderPhoneChangeRequest request) { return Result.ok(riderInfoService.requestServicePhoneChange(request)); }
     @PatchMapping("/online") @RequireRole("RIDER")
     public Result<RiderProfileResponse> online(@Valid @RequestBody RiderOnlineRequest request) { return Result.ok(locationService.setOnline(request.online())); }
     @PostMapping("/work/start") @RequireRole("RIDER")
@@ -90,6 +103,10 @@ public class RiderApplicationController {
     @PatchMapping("/admin/withdrawals/{id}") @RequireRole("ADMIN") public Result<RiderWithdrawal> auditWithdrawal(@PathVariable Long id,@Valid @RequestBody RiderWithdrawalAuditRequest request) { return Result.ok(withdrawalService.audit(id,request.approved(),request.reason(),UserContext.getUserId())); }
     @GetMapping("/admin/applications") @RequireRole("ADMIN")
     public Result<List<RiderApplicationResponse>> pending() { return Result.ok(service.pending()); }
+    @GetMapping("/admin/info-change-requests") @RequireRole("ADMIN")
+    public Result<List<RiderPhoneChangeResponse>> pendingInfoChanges() { return Result.ok(riderInfoService.pendingChanges()); }
+    @PatchMapping("/admin/info-change-requests/{id}") @RequireRole("ADMIN")
+    public Result<RiderPhoneChangeResponse> auditInfoChange(@PathVariable Long id, @Valid @RequestBody RiderPhoneChangeAuditRequest request) { return Result.ok(riderInfoService.auditChange(id, request, UserContext.getUserId())); }
     @PatchMapping("/admin/applications/{id}") @RequireRole("ADMIN")
     public Result<RiderApplicationResponse> audit(@PathVariable Long id, @Valid @RequestBody RiderAuditRequest request) { return Result.ok(service.audit(id, request.decision(), request.reason(), request.maxActiveOrders(), UserContext.getUserId())); }
     @GetMapping("/admin/riders/{riderId}") @RequireRole("ADMIN")
