@@ -60,13 +60,5 @@ ensure_rider() {
 ensure_rider '13345678903' '配送测试骑手一' '11010519491231002X'
 ensure_rider '13345678904' '配送测试骑手二' '11010519491231003X'
 
-# Keep both riders offline initially, but seed a nearby coordinate so browser location denial does not hide the demo task pool.
-mysql "${MYSQL_ARGS[@]}" -e "
-  UPDATE rider_profile
-  SET online_status = 0, accepting_orders = 0,
-      current_longitude = 116.397428, current_latitude = 39.909230,
-      location_updated_at = NOW(), updated_at = NOW()
-  WHERE user_id IN ('13345678903', '13345678904');
-  SELECT 'approved_demo_riders' AS metric, COUNT(*) AS value FROM rider_profile WHERE user_id IN ('13345678903', '13345678904') AND status = 'APPROVED';
-  SELECT 'demo_orders' AS metric, COUNT(*) AS value FROM orders WHERE remark LIKE 'RIDER_DEMO_13345678900_%';
-"
+# 补充脚本在骑手档案审核完成后运行，避免将敏感申请资料写入 SQL。
+mysql "${MYSQL_ARGS[@]}" < "$APP_DIR/database/seed-rider-demo-enrichment.sql"
