@@ -1048,6 +1048,7 @@ class ModuleIntegrationTest {
         mockMvc.perform(get("/api/product/list/1"))
             .andExpect(jsonPath("$.data[0].stock").value(29));
 
+        jdbcTemplate.update("UPDATE orders SET delivery_status = 'DELIVERED' WHERE id = ?", orderId);
         mockMvc.perform(post("/api/order/complete/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(jsonPath("$.data.status").value("COMPLETED"));
@@ -1791,6 +1792,7 @@ class ModuleIntegrationTest {
                     "payMethod", "MOCK"
                 ))))
             .andExpect(status().isOk());
+        jdbcTemplate.update("UPDATE orders SET delivery_status = 'DELIVERED' WHERE id = ?", orderId);
         mockMvc.perform(post("/api/order/complete/" + orderId)
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk());
