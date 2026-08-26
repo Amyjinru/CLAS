@@ -20,14 +20,43 @@ const metrics = ref([])
 let map = null
 let locationTimer = null
 
+function canLoadTasks(riderProfile) {
+  return Boolean(
+    riderProfile?.onlineStatus
+    && riderProfile.currentLongitude != null
+    && riderProfile.currentLatitude != null
+  )
+}
+
+async function loadTasks(riderProfile = profile.value) {
+  if (!canLoadTasks(riderProfile)) {
+    tasks.value = []
+    return
+  }
+  try {
+    tasks.value = await listRiderTasks()
+  } catch {
+    // 任务池依赖在线坐标；单独失败不能覆盖已从服务端读取的上线状态。
+    tasks.value = []
+  }
+}
+
 async function load() {
   loading.value = true
   try {
-    const [nextProfile, nextTasks, nextDeliveries, nextIncome, nextWithdrawals, nextReviews, nextMetrics] = await Promise.all([getRiderProfile(), listRiderTasks(), listRiderDeliveries(), listMyRiderSettlements(), listMyRiderWithdrawals(), listMyRiderReviews(), listMyRiderMetrics()])
+    // 资料是工作台的状态源。任务池要求骑手已上报坐标，不能让其失败掩盖线上状态。
+    const nextProfile = await getRiderProfile()
     profile.value = nextProfile
-    tasks.value = nextTasks
+    const [nextDeliveries, nextIncome, nextWithdrawals, nextReviews, nextMetrics] = await Promise.all([
+      listRiderDeliveries(),
+      listMyRiderSettlements(),
+      listMyRiderWithdrawals(),
+      listMyRiderReviews(),
+      listMyRiderMetrics()
+    ])
     deliveries.value = nextDeliveries
     income.value = nextIncome; withdrawals.value = nextWithdrawals; reviews.value = nextReviews; metrics.value = nextMetrics
+    await loadTasks(nextProfile)
   } finally {
     loading.value = false
   }
@@ -38,6 +67,7 @@ async function updateLocation() {
   navigator.geolocation.getCurrentPosition(async (position) => {
     try {
       profile.value = await reportRiderLocation({ longitude: position.coords.longitude, latitude: position.coords.latitude, accuracyMeters: Math.round(position.coords.accuracy || 0) })
+      await loadTasks(profile.value)
     } catch { /* client interceptor has displayed the error */ }
   }, () => { mapMessage.value = '未获取到定位权限，仍可查看和处理已有订单。' }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 })
 }

@@ -283,10 +283,15 @@ onBeforeUnmount(() => {
         请填写基础说明。车辆、健康证及实名认证等材料将在后续版本接入。
       </el-alert>
       <el-form class="application-form" label-position="top">
-        <el-form-item label="申请说明">
-          <el-input v-model="form.realName" placeholder="真实姓名" />
-          <el-input v-model="form.idCardNo" placeholder="18 位身份证号" class="field" />
-          <el-input v-model="form.vehicleType" placeholder="交通工具，如电动车" class="field" />
+        <el-form-item label="实名信息">
+          <div class="form-grid">
+            <el-input v-model="form.realName" placeholder="真实姓名" />
+            <el-input v-model="form.idCardNo" placeholder="18 位身份证号" />
+            <el-input v-model="form.vehicleType" placeholder="交通工具，如电动车" />
+          </div>
+        </el-form-item>
+        <el-form-item label="服务区域">
+          <div class="area-selection">
           <el-input :model-value="form.serviceArea" readonly placeholder="请点击右侧按钮获取省、市、区服务区域" class="field">
             <template #append>
               <el-button :loading="locatingServiceArea" @click="locateServiceArea">获取定位</el-button>
@@ -294,18 +299,34 @@ onBeforeUnmount(() => {
           </el-input>
           <p class="area-tip">服务区域仅保存省、市、区（县）。也可直接在下方选择，无需等待定位失败。</p>
           <div v-loading="areaOptionsLoading" class="area-picker">
-            <el-select :model-value="selectedArea.province" placeholder="请选择省" filterable @update:model-value="selectProvince">
-              <el-option v-for="area in provinceOptions" :key="area.adcode" :label="area.name" :value="area.name" />
-            </el-select>
-            <el-select :model-value="selectedArea.city" placeholder="请选择市" filterable :disabled="!selectedArea.province" @update:model-value="selectCity">
-              <el-option v-for="area in cityOptions" :key="area.adcode" :label="area.name" :value="area.name" />
-            </el-select>
-            <el-select :model-value="selectedArea.district" placeholder="请选择区（县）" filterable :disabled="!selectedArea.city" @update:model-value="selectDistrict">
-              <el-option v-for="area in districtOptions" :key="area.adcode" :label="area.name" :value="area.name" />
-            </el-select>
+            <div class="area-select-field">
+              <span>省</span>
+              <el-select :model-value="selectedArea.province" placeholder="请选择省" filterable @update:model-value="selectProvince">
+                <el-option v-for="area in provinceOptions" :key="area.adcode" :label="area.name" :value="area.name" />
+              </el-select>
+            </div>
+            <div class="area-select-field">
+              <span>市</span>
+              <el-select :model-value="selectedArea.city" placeholder="请选择市" filterable :disabled="!selectedArea.province" @update:model-value="selectCity">
+                <el-option v-for="area in cityOptions" :key="area.adcode" :label="area.name" :value="area.name" />
+              </el-select>
+            </div>
+            <div class="area-select-field">
+              <span>区 / 县</span>
+              <el-select :model-value="selectedArea.district" placeholder="请选择区（县）" filterable :disabled="!selectedArea.city" @update:model-value="selectDistrict">
+                <el-option v-for="area in districtOptions" :key="area.adcode" :label="area.name" :value="area.name" />
+              </el-select>
+            </div>
           </div>
-          <el-input v-model="form.emergencyContactName" placeholder="紧急联系人姓名" class="field" />
-          <el-input v-model="form.emergencyContactPhone" placeholder="紧急联系人手机号" class="field" />
+          </div>
+        </el-form-item>
+        <el-form-item label="紧急联系人">
+          <div class="form-grid two-columns">
+            <el-input v-model="form.emergencyContactName" placeholder="紧急联系人姓名" />
+            <el-input v-model="form.emergencyContactPhone" placeholder="紧急联系人手机号" />
+          </div>
+        </el-form-item>
+        <el-form-item label="资质证明（可选）">
           <el-input v-model="form.credentialUrls" type="textarea" :rows="2" placeholder="资质证明链接（可选，多个链接用逗号分隔）" class="field" />
         </el-form-item>
         <el-button type="primary" :loading="submitting" @click="submit">提交骑手申请</el-button>
@@ -335,10 +356,18 @@ onBeforeUnmount(() => {
 .hero { padding: 30px; border-radius: 24px; color: #fff; background: linear-gradient(135deg, #173f35, #0d9488); }
 .eyebrow { font-size: 12px; letter-spacing: .12em; opacity: .8; }.hero h1 { margin: 8px 0; }.hero p { margin: 0; opacity: .88; }
 .application-card { margin-top: 18px; border-radius: 18px; }.application-card h2 { margin: 0; font-size: 18px; }
-.application-form { margin-top: 20px; }.status-tag { margin-left: 10px; }.remarks { color: #606266; }
-.area-tip { color: #909399; font-size: 12px; line-height: 1.5; margin: 8px 0 0; }
-.area-picker { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
-@media (max-width: 640px) { .area-picker { grid-template-columns: 1fr; } }
+.application-form { margin-top: 22px; }.status-tag { margin-left: 10px; }.remarks { color: #606266; }
+.application-form :deep(.el-form-item) { margin-bottom: 22px; }
+.application-form :deep(.el-form-item__content) { display: block; line-height: normal; }
+.form-grid { display: grid; gap: 14px 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.form-grid.two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.area-selection { border: 1px solid #e6edf0; border-radius: 14px; background: #fbfdfd; padding: 16px; width: 100%; box-sizing: border-box; }
+.area-tip { color: #697b7c; font-size: 12px; line-height: 1.6; margin: 10px 0 0; }
+.area-picker { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; }
+.area-select-field { align-items: center; display: grid; gap: 7px; grid-template-columns: max-content minmax(0, 1fr); }
+.area-select-field > span { color: #496362; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.area-select-field :deep(.el-select) { width: 100%; }
+@media (max-width: 720px) { .form-grid, .form-grid.two-columns, .area-picker { grid-template-columns: 1fr; } .area-selection { padding: 14px; } }
 .merchant-copy { margin: 0 0 18px; color: #606266; line-height: 1.7; }
 .approved-action { display: grid; gap: 10px; margin-top: 10px; justify-items: start; }
 </style>
