@@ -6,6 +6,7 @@ import { cancelOrder, completeOrder, getReviewByOrder, listOrders, requestRefund
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import RiderChatWindow from '../components/RiderChatWindow.vue'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
 import { orderStatusMap } from '../utils/status'
@@ -15,6 +16,8 @@ const message = ref('')
 const reviewedOrderIds = ref(new Set())
 const { confirmAction } = useConfirmAction()
 const chatOrder = ref(null)
+const riderChatOrder = ref(null)
+const riderChatOpen = ref(false)
 const chatHasHistory = ref(new Set())
 const route = useRoute()
 const activeTab = ref(route.query.tab || 'all')
@@ -129,6 +132,20 @@ function closeChat() {
   chatOrder.value = null
 }
 
+function hasLiveRiderDelivery(order) {
+  return ['ASSIGNED_WAITING_MEAL', 'DELIVERING'].includes(order.deliveryStatus)
+}
+
+function openRiderChat(order) {
+  riderChatOrder.value = order
+  riderChatOpen.value = true
+}
+
+function closeRiderChat() {
+  riderChatOpen.value = false
+  riderChatOrder.value = null
+}
+
 async function checkChatHistory(order) {
   try {
     const messages = await getOrderMessages(order.order.id)
@@ -238,6 +255,13 @@ watch(() => route.query.tab, (tab) => {
             联系商家
           </button>
           <button
+            v-if="hasLiveRiderDelivery(order.order)"
+            class="contact-rider"
+            @click="openRiderChat(order)"
+          >
+            联系骑手
+          </button>
+          <button
             v-if="order.order.status === 'COMPLETED' && chatHasHistory.has(order.order.id)"
             class="secondary"
             @click="openChat(order)"
@@ -278,6 +302,15 @@ watch(() => route.query.tab, (tab) => {
         </div>
       </aside>
     </div>
+
+    <el-dialog v-model="riderChatOpen" title="配送沟通" width="min(560px,92vw)" @closed="closeRiderChat">
+      <RiderChatWindow
+        v-if="riderChatOrder"
+        :order-id="riderChatOrder.order.id"
+        role="USER"
+        :active="hasLiveRiderDelivery(riderChatOrder.order)"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -332,6 +365,17 @@ watch(() => route.query.tab, (tab) => {
   font-size: 13px;
   font-weight: 700;
   padding: 6px 12px;
+}
+
+.contact-rider {
+  background: #eaf7f4;
+  border: 1px solid #9fcfc5;
+  color: #086c64;
+}
+
+.contact-rider:hover {
+  background: #d8efe9;
+  border-color: #53a99b;
 }
 
 @media (min-width: 1024px) {
