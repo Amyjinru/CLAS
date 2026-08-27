@@ -90,7 +90,7 @@ async function openTimeline(order) {
   try { timeline.value = await getAdminOrderTimeline(order.id) } catch { ElMessage.error('加载订单流程记录失败') } finally { timelineLoading.value = false }
 }
 
-const lifecycleLabel = { ORDER_CREATED: '订单创建', PAYMENT_SUCCEEDED: '支付成功', MERCHANT_ACCEPTED: '商家接单，开始制作', MERCHANT_READY_FOR_DISPATCH: '餐品制作完成，发布配送', RIDER_CLAIMED: '骑手接单', RIDER_PICKED_UP: '骑手取餐', RIDER_DELIVERED: '骑手送达', USER_CONFIRMED_RECEIPT: '用户确认收货', MERCHANT_REVIEWED: '完成商家评价', RIDER_REVIEWED: '完成骑手评价', ORDER_CANCELED: '订单取消', MERCHANT_REJECTED: '商家拒单' }
+const lifecycleLabel = { ORDER_CREATED: '订单创建', PAYMENT_SUCCEEDED: '支付成功', MERCHANT_ACCEPTED: '商家接单，开始制作', MERCHANT_READY_FOR_DISPATCH: '餐品制作完成，发布配送', RIDER_CLAIMED: '骑手接单', RIDER_PICKED_UP: '骑手取餐', RIDER_DELIVERED: '骑手送达', USER_CONFIRMED_RECEIPT: '用户确认收货', MERCHANT_REVIEWED: '完成商家评价', RIDER_REVIEWED: '完成骑手评价', ORDER_CANCELED: '订单取消', MERCHANT_REJECTED: '商家拒单', REFUND_REQUESTED: '用户申请退款', REFUND_REJECTED: '商家提交退款处理意见', REFUND_APPROVED: '退款已通过', REFUND_DISPUTE_SUBMITTED: '提交平台退款争议', REFUND_DISPUTE_AUTO_SUBMITTED: '退款自动转入平台审核', REFUND_DISPUTE_REJECTED: '平台驳回退款争议' }
 
 function handleSearch() {
   search().catch(() => ElMessage.error('加载订单列表失败'))

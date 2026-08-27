@@ -23,6 +23,9 @@ const actionMessage = ref('')
 const deliveryTracking = ref(null)
 const lifecycleEvents = ref([])
 const riderChatOpen = ref(false)
+const refundDialogOpen = ref(false)
+const refundReason = ref('')
+const refundSubmitting = ref(false)
 let trackingTimer = null
 
 const deliveryLabel = {
@@ -37,7 +40,8 @@ const deliveryLabel = {
 const refundStatusLabel = {
   PENDING: '待商家审核',
   APPROVED: '已通过',
-  REJECTED: '已拒绝'
+  REJECTED: '平台已维持商家处理',
+  DISPUTE_PENDING: '平台争议审核中'
 }
 
 const orderTimeline = computed(() => {
@@ -65,7 +69,8 @@ const lifecycleLabel = {
   ORDER_CREATED: '订单创建', PAYMENT_SUCCEEDED: '支付成功', MERCHANT_ACCEPTED: '商家接单，开始制作',
   MERCHANT_READY_FOR_DISPATCH: '餐品制作完成，发布配送', RIDER_CLAIMED: '骑手接单',
   RIDER_PICKED_UP: '骑手取餐', RIDER_DELIVERED: '骑手送达', USER_CONFIRMED_RECEIPT: '确认收货',
-  MERCHANT_REVIEWED: '完成商家评价', RIDER_REVIEWED: '完成骑手评价', ORDER_CANCELED: '订单取消', MERCHANT_REJECTED: '商家拒单'
+  MERCHANT_REVIEWED: '完成商家评价', RIDER_REVIEWED: '完成骑手评价', ORDER_CANCELED: '订单取消', MERCHANT_REJECTED: '商家拒单',
+  REFUND_REQUESTED: '用户申请退款', REFUND_REJECTED: '商家提交退款处理意见', REFUND_APPROVED: '退款已通过', REFUND_DISPUTE_SUBMITTED: '提交平台退款争议', REFUND_DISPUTE_AUTO_SUBMITTED: '退款自动转入平台审核', REFUND_DISPUTE_REJECTED: '平台驳回退款争议'
 }
 
 const currentStatus = computed(() => orderEntry.value?.order?.status)
@@ -155,14 +160,54 @@ async function completeCurrentOrder() {
   }, { type: 'success' })
 }
 
-async function refundCurrentOrder() {
-  const reason = window.prompt('请输入退款原因', '配送超时')
-  if (!reason) return
-  await requestRefund(orderEntry.value.order.id, reason.trim())
-  await loadDetail()
-  syncTrackingPolling()
-  actionMessage.value = '退款申请已提交'
+function openRefundDialog() {
+  refundReason.value = '配送超时'
+  refundDialogOpen.value = true
 }
+
+function closeRefundDialog() {
+  if (refundSubmitting.value) return
+  refundDialogOpen.value = false
+  refundReason.value = ''
+}
+
+async function submitRefund() {
+  const reason = refundReason.value.trim()
+  if (!reason) {
+    actionMessage.value = '请填写退款原因'
+    return
+  }
+  refundSubmitting.value = true
+  let submitted = false
+  try {
+    await requestRefund(orderEntry.value.order.id, reason)
+    await loadDetail()
+    syncTrackingPolling()
+    actionMessage.value = '退款申请已提交'
+    submitted = true
+  } catch (error) {
+    actionMessage.value = error?.response?.data?.message || error?.message || '退款申请提交失败，请稍后重试'
+  } finally {
+    refundSubmitting.value = false
+  }
+  if (submitted) closeRefundDialog()
+}
+
+function canRequestRefund() {
+  const order = orderEntry.value?.order
+  if (!order || !['PAID', 'ACCEPTED', 'COMPLETED'].includes(order.status) || (order.refundStatus && order.refundStatus !== 'NONE')) return false
+  if (order.deliveryStatus !== 'DELIVERED') return true
+  const deliveredAt = order.deliveryCompletedAt || order.deliveredAt
+  return deliveredAt && Date.now() <= new Date(deliveredAt).getTime() + 15 * 60 * 1000
+}
+
+const refundWindowHint = computed(() => {
+  const order = orderEntry.value?.order
+  if (!order || order.deliveryStatus !== 'DELIVERED' || order.refundStatus && order.refundStatus !== 'NONE') return ''
+  const deliveredAt = order.deliveryCompletedAt || order.deliveredAt
+  const remaining = Math.ceil((new Date(deliveredAt).getTime() + 15 * 60 * 1000 - Date.now()) / 60000)
+  return remaining > 0 ? `已送达，退款申请剩余约 ${remaining} 分钟` : '已超过送达后 15 分钟退款申请时限'
+})
 
 onMounted(async () => {
   try {
@@ -212,10 +257,10 @@ onBeforeUnmount(() => { if (trackingTimer) window.clearInterval(trackingTimer) }
           确认完成
         </button>
         <button
-          v-if="['PAID', 'ACCEPTED', 'COMPLETED'].includes(currentStatus)"
+          v-if="canRequestRefund()"
           class="secondary"
           type="button"
-          @click="refundCurrentOrder"
+          @click="openRefundDialog"
         >
           申请退款
         </button>
@@ -321,9 +366,25 @@ onBeforeUnmount(() => { if (trackingTimer) window.clearInterval(trackingTimer) }
             拒绝理由：{{ orderEntry.order.refundRejectReason }}
           </p>
         </div>
+        <div v-else-if="refundWindowHint" class="detail-block"><h2>退款时限</h2><p class="warn">{{ refundWindowHint }}</p></div>
       </div>
     </section>
     <el-dialog v-model="riderChatOpen" title="配送沟通" width="min(560px,92vw)"><RiderChatWindow v-if="riderChatOpen" :order-id="orderEntry.order.id" role="USER" :active="hasLiveDelivery()" /></el-dialog>
+    <el-dialog
+      v-model="refundDialogOpen"
+      title="申请退款"
+      width="min(480px,92vw)"
+      :close-on-click-modal="!refundSubmitting"
+      :close-on-press-escape="!refundSubmitting"
+      @closed="closeRefundDialog"
+    >
+      <p class="refund-dialog-hint">请说明退款原因，商家会据此处理；已送达订单仅可在送达后 15 分钟内申请。</p>
+      <el-input v-model="refundReason" maxlength="200" show-word-limit type="textarea" :rows="4" placeholder="例如：配送超时、商品质量问题等" />
+      <template #footer>
+        <el-button :disabled="refundSubmitting" @click="closeRefundDialog">取消</el-button>
+        <el-button type="primary" :loading="refundSubmitting" @click="submitRefund">提交申请</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -415,6 +476,13 @@ onBeforeUnmount(() => { if (trackingTimer) window.clearInterval(trackingTimer) }
 
 .warn {
   color: var(--clas-warning);
+}
+
+.refund-dialog-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0 0 16px;
 }
 
 .order-timeline {

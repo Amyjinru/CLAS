@@ -9,6 +9,7 @@ const route = useRoute()
 const menuItems = [
   { path: '/admin/dashboard', label: '仪表盘', icon: 'DataAnalysis' },
   { path: '/admin/orders',     label: '订单管理', icon: 'Document' },
+  { path: '/admin/order-refund-disputes', label: '订单争议', icon: 'WarningFilled' },
   { path: '/admin/users',      label: '用户管理', icon: 'User' },
   { path: '/admin/audit',      label: '商家审核', icon: 'Checked' },
   { path: '/admin/riders',     label: '骑手运营', icon: 'Bicycle' },

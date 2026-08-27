@@ -25,6 +25,8 @@ import org.springframework.test.web.servlet.MvcResult;
 class RiderModuleIntegrationTest {
     private static final long ORDER_ID = 990001L;
     private static final long CONCURRENT_CLAIM_ORDER_ID = 990002L;
+    private static final long REFUND_DISPUTE_ORDER_ID = 990003L;
+    private static final long EXPIRED_REFUND_ORDER_ID = 990004L;
     private static final long DELIVERY_CYCLE_ORDER_ID = 990003L;
     private static final long RIDER_MERCHANT_CONTACT_ORDER_ID = 990004L;
 
@@ -112,6 +114,60 @@ class RiderModuleIntegrationTest {
 
         org.junit.jupiter.api.Assertions.assertEquals("13800000004", jdbcTemplate.queryForObject(
             "SELECT rider_id FROM orders WHERE id = ?", String.class, CONCURRENT_CLAIM_ORDER_ID));
+    }
+
+    @Test
+    void deliveredRefundDisputeReversesTemporaryRiderCommission() throws Exception {
+        jdbcTemplate.update("DELETE FROM order_refund_dispute WHERE order_id = ?", REFUND_DISPUTE_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM rider_settlement WHERE order_id = ?", REFUND_DISPUTE_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", REFUND_DISPUTE_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee, rider_commission,
+                coupon_discount, status, delivery_address, delivery_status, refund_status, estimated_minutes, create_time,
+                accepted_at, delivery_completed_at, delivered_at)
+            VALUES (?, '13800000001', 1, '13800000004', 2890, 2590, 300, 180, 0, 'ACCEPTED', '软件学院 A 座 302',
+                'DELIVERED', 'NONE', 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, REFUND_DISPUTE_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO rider_settlement (rider_id, order_id, source_type, source_id, settlement_type, amount, balance_type, created_at)
+            VALUES ('13800000004', ?, 'DELIVERY_COMMISSION', ?, 'COMMISSION', 180, 'PENDING', CURRENT_TIMESTAMP)
+            """, REFUND_DISPUTE_ORDER_ID, String.valueOf(REFUND_DISPUTE_ORDER_ID));
+        jdbcTemplate.update("UPDATE rider_profile SET withdrawable_balance = 0 WHERE user_id = '13800000004'");
+
+        String userAuth = "Bearer " + loginToken("13800000001");
+        String merchantAuth = "Bearer " + loginToken("13800000002");
+        String adminAuth = "Bearer " + loginToken("13800000003");
+        mockMvc.perform(post("/api/order/refund/{orderId}", REFUND_DISPUTE_ORDER_ID).header("Authorization", userAuth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"餐品破损\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.refundStatus").value("PENDING"));
+        mockMvc.perform(post("/api/order/refund/{orderId}/reject", REFUND_DISPUTE_ORDER_ID).header("Authorization", merchantAuth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"配送已完成\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.refundStatus").value("DISPUTE_PENDING"));
+        long disputeId = jdbcTemplate.queryForObject(
+            "SELECT id FROM order_refund_dispute WHERE order_id = ? AND status = 'PENDING'", Long.class, REFUND_DISPUTE_ORDER_ID);
+        mockMvc.perform(patch("/api/admin/order-refund-disputes/{id}", disputeId).header("Authorization", adminAuth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"approved\":true,\"reason\":\"凭证充分，支持退款\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("APPROVED"));
+
+        org.junit.jupiter.api.Assertions.assertEquals("REFUNDED", jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?", String.class, REFUND_DISPUTE_ORDER_ID));
+        org.junit.jupiter.api.Assertions.assertEquals("REFUND_REVERSED", jdbcTemplate.queryForObject("SELECT balance_type FROM rider_settlement WHERE order_id = ?", String.class, REFUND_DISPUTE_ORDER_ID));
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject("SELECT withdrawable_balance FROM rider_profile WHERE user_id = '13800000004'", Integer.class));
+    }
+
+    @Test
+    void deliveredOrderCannotRequestRefundAfterFifteenMinutes() throws Exception {
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", EXPIRED_REFUND_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, total_price, subtotal, delivery_fee, coupon_discount, status,
+                delivery_address, delivery_status, refund_status, estimated_minutes, create_time, accepted_at, delivery_completed_at, delivered_at)
+            VALUES (?, '13800000001', 1, 2890, 2590, 300, 0, 'ACCEPTED', '软件学院 A 座 302', 'DELIVERED', 'NONE', 30,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, DATEADD('MINUTE', -16, CURRENT_TIMESTAMP), DATEADD('MINUTE', -16, CURRENT_TIMESTAMP))
+            """, EXPIRED_REFUND_ORDER_ID);
+        String userAuth = "Bearer " + loginToken("13800000001");
+        mockMvc.perform(post("/api/order/refund/{orderId}", EXPIRED_REFUND_ORDER_ID).header("Authorization", userAuth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"送达后发现问题\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("订单送达超过 15 分钟，已无法发起退款申请"));
     }
 
     @Test

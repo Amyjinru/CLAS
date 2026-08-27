@@ -23,6 +23,7 @@ DROP TABLE IF EXISTS chat_message;
 DROP TABLE IF EXISTS chat_conversation;
 DROP TABLE IF EXISTS delivery_call_session;
 DROP TABLE IF EXISTS order_lifecycle_event;
+DROP TABLE IF EXISTS order_refund_dispute;
 DROP TABLE IF EXISTS rider_daily_metrics;
 DROP TABLE IF EXISTS rider_review;
 DROP TABLE IF EXISTS rider_tip;
@@ -242,6 +243,23 @@ CREATE TABLE orders (
     completed_at TIMESTAMP,
     canceled_at TIMESTAMP,
     rejected_at TIMESTAMP
+);
+
+CREATE TABLE order_refund_dispute (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    merchant_id BIGINT NOT NULL,
+    rider_id VARCHAR(20),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    user_reason VARCHAR(500) NOT NULL,
+    merchant_reject_reason VARCHAR(255),
+    original_order_status VARCHAR(20) NOT NULL,
+    original_delivery_status VARCHAR(40),
+    admin_reason VARCHAR(500),
+    reviewer_id VARCHAR(20),
+    created_at TIMESTAMP NOT NULL,
+    reviewed_at TIMESTAMP
 );
 
 CREATE TABLE order_item (

@@ -531,6 +531,9 @@ public class OrderService {
     public Orders requestRefund(Long orderId, String userId, String reason) {
         Orders order = requireUserOrder(orderId, userId);
         requireStatusIn(order, STATUS_PAID, STATUS_ACCEPTED, STATUS_COMPLETED);
+        assertRefundWithinDeliveryWindow(order);
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
         order.setStatus(STATUS_REFUND_PENDING);
         order.setRefundStatus("PENDING");
         order.setRefundReason(reason);
@@ -538,6 +541,7 @@ public class OrderService {
         order.setRefundResolvedAt(null);
         order.setRefundRejectReason(null);
         ordersMapper.updateById(order);
+        lifecycleService.record(order, "REFUND_REQUESTED", fromStatus, fromDelivery, "USER", userId, "用户申请退款：" + reason);
         notificationService.send(new NotificationService.NotificationTarget(
             userId,
             "退款申请已提交",
@@ -561,8 +565,7 @@ public class OrderService {
         order.setRefundStatus(approved ? "APPROVED" : "REJECTED");
         order.setRefundResolvedAt(LocalDateTime.now());
         if (approved) {
-            restoreOrderStock(orderId);
-            order.setStatus(STATUS_REFUNDED);
+            finalizeRefundApproval(order, "MERCHANT", String.valueOf(merchantId), "商家通过退款");
             notificationService.send(new NotificationService.NotificationTarget(
                 order.getUserId(),
                 "退款已通过",
@@ -576,6 +579,7 @@ public class OrderService {
                 merchantId,
                 "/order/" + orderId
             ));
+            notifyRiderRefund(order, "订单退款已通过", "订单 " + orderId + " 已退款，相关配送佣金已撤销或扣回。");
         } else {
             order.setStatus(resolveStatusAfterRefundReject(order));
             order.setRefundRejectReason(trimToNull(rejectReason));
@@ -585,8 +589,8 @@ public class OrderService {
                 : "订单 " + orderId + " 的退款申请未通过：" + reasonText;
             notificationService.send(new NotificationService.NotificationTarget(
                 order.getUserId(),
-                "退款被拒绝",
-                content,
+                "退款申请已转平台审核",
+                content + " 已自动转入平台订单争议审核。",
                 "ORDER_STATUS",
                 "ORDER",
                 orderId,
@@ -596,8 +600,28 @@ public class OrderService {
                 merchantId,
                 "/order/" + orderId
             ));
+            lifecycleService.record(order, "REFUND_REJECTED", "REFUND_PENDING", order.getDeliveryStatus(), "MERCHANT", String.valueOf(merchantId), "商家拒绝退款：" + (reasonText == null ? "未填写理由" : reasonText));
         }
         ordersMapper.updateById(order);
+        return order;
+    }
+
+    /** Final administrator decision for an already submitted refund dispute. */
+    @Transactional
+    public Orders approveRefundByAdmin(Orders order, String adminId, String reason) {
+        requireStatus(order, STATUS_REFUND_PENDING);
+        if (!"DISPUTE_PENDING".equals(order.getRefundStatus())) {
+            throw new BusinessException("订单当前不处于待裁定退款争议状态");
+        }
+        order.setRefundStatus("APPROVED");
+        order.setRefundResolvedAt(LocalDateTime.now());
+        finalizeRefundApproval(order, "ADMIN", adminId, "管理员通过退款争议：" + reason);
+        ordersMapper.updateById(order);
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getUserId(), "退款争议已通过", "订单 " + order.getId() + " 的退款争议已通过，退款已处理。",
+            "ORDER_STATUS", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/order/" + order.getId()
+        ));
+        notifyRiderRefund(order, "订单退款争议已通过", "订单 " + order.getId() + " 已退款，相关配送佣金已撤销或扣回。");
         return order;
     }
 
@@ -718,10 +742,38 @@ public class OrderService {
         if ("DELIVERED".equals(order.getDeliveryStatus())) {
             return STATUS_COMPLETED;
         }
-        if ("DELIVERING".equals(order.getDeliveryStatus()) || "PREPARING".equals(order.getDeliveryStatus())) {
+        if ("DELIVERING".equals(order.getDeliveryStatus()) || "ASSIGNED_WAITING_MEAL".equals(order.getDeliveryStatus())
+            || "AVAILABLE".equals(order.getDeliveryStatus()) || "PREPARING".equals(order.getDeliveryStatus())) {
             return STATUS_ACCEPTED;
         }
         return STATUS_PAID;
+    }
+
+    private void assertRefundWithinDeliveryWindow(Orders order) {
+        if (!"DELIVERED".equals(order.getDeliveryStatus())) return;
+        LocalDateTime deliveredAt = order.getDeliveryCompletedAt() == null ? order.getDeliveredAt() : order.getDeliveryCompletedAt();
+        if (deliveredAt == null || LocalDateTime.now().isAfter(deliveredAt.plusMinutes(15))) {
+            throw new BusinessException("订单送达超过 15 分钟，已无法发起退款申请");
+        }
+    }
+
+    private void finalizeRefundApproval(Orders order, String actorRole, String actorId, String remark) {
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
+        if (order.getPickedUpAt() == null && !"DELIVERING".equals(order.getDeliveryStatus()) && !"DELIVERED".equals(order.getDeliveryStatus())) {
+            restoreOrderStock(order.getId());
+        }
+        order.setStatus(STATUS_REFUNDED);
+        riderSettlementService.reverseCommissionForRefund(order);
+        lifecycleService.record(order, "REFUND_APPROVED", fromStatus, fromDelivery, actorRole, actorId, remark);
+    }
+
+    private void notifyRiderRefund(Orders order, String title, String content) {
+        if (order.getRiderId() == null) return;
+        notificationService.send(new NotificationService.NotificationTarget(
+            order.getRiderId(), title, content, "DELIVERY_STATUS", "ORDER", order.getId(), null, null,
+            order.getId(), order.getMerchantId(), "/rider/profile"
+        ));
     }
 
     private DeliverySnapshot resolveDeliverySnapshot(CreateOrderRequest request) {

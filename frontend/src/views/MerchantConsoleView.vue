@@ -151,7 +151,7 @@ async function handleRefund(orderId, approved) {
         inputPlaceholder: '例如：订单已完成配送'
       })
       await rejectRefund(orderId, value?.trim() || undefined)
-      ElMessage.success('已拒绝退款')
+      ElMessage.success('已转入平台订单争议审核')
     } catch (error) {
       if (error !== 'cancel') {
         ElMessage.error('操作失败')
@@ -402,7 +402,7 @@ onMounted(() => {
                   拒单
                 </el-button>
                 <el-button
-                  v-if="scope.row.order.status === 'REFUND_PENDING'"
+                  v-if="scope.row.order.status === 'REFUND_PENDING' && scope.row.order.refundStatus === 'PENDING'"
                   type="primary"
                   size="small"
                   @click="handleRefund(scope.row.order.id, true)"
@@ -410,7 +410,7 @@ onMounted(() => {
                   通过退款
                 </el-button>
                 <el-button
-                  v-if="scope.row.order.status === 'REFUND_PENDING'"
+                  v-if="scope.row.order.status === 'REFUND_PENDING' && scope.row.order.refundStatus === 'PENDING'"
                   type="danger"
                   size="small"
                   @click="handleRefund(scope.row.order.id, false)"
