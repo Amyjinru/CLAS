@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.common.GeoUtils;
+import com.clas.dto.BatchOrderGroupRequest;
+import com.clas.dto.CreateOrderBatchRequest;
+import com.clas.dto.CreateOrderBatchResponse;
 import com.clas.dto.CreateOrderRequest;
 import com.clas.dto.OrderPreviewResponse;
 import com.clas.dto.OrderResponse;
@@ -23,9 +26,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,14 +103,8 @@ public class OrderService {
         }
         List<Long> productIds = cartItems.stream().map(Cart::getProductId).toList();
         Map<Long, Product> products = productMapper.selectBatchIds(productIds).stream()
-            .filter(product -> request.merchantId().equals(product.getMerchantId()))
             .collect(Collectors.toMap(Product::getId, product -> product));
-        List<Cart> merchantCartItems = cartItems.stream()
-            .filter(item -> products.containsKey(item.getProductId()))
-            .toList();
-        if (merchantCartItems.isEmpty()) {
-            throw new BusinessException("该商家的购物车为空");
-        }
+        List<Cart> merchantCartItems = selectCartItems(request, cartItems, products);
         DeliverySnapshot deliverySnapshot = resolveDeliverySnapshot(request);
 
         int subtotal = 0;
@@ -184,7 +184,47 @@ public class OrderService {
         return new OrderResponse(order, orderItems);
     }
 
-    public OrderPreviewResponse previewCheckout(String userId, Long merchantId, Long addressId, Long userCouponId) {
+    @Transactional
+    public CreateOrderBatchResponse createBatch(String userId, CreateOrderBatchRequest request) {
+        if (request.merchantGroups() == null || request.merchantGroups().isEmpty()) {
+            throw new BusinessException("请至少选择一个店铺的商品");
+        }
+        Set<Long> merchantIds = new HashSet<>();
+        Set<Long> productIds = new HashSet<>();
+        Set<Long> couponIds = new HashSet<>();
+        for (BatchOrderGroupRequest group : request.merchantGroups()) {
+            if (!merchantIds.add(group.merchantId())) {
+                throw new BusinessException("同一店铺不能重复提交");
+            }
+            if (group.productIds() == null || group.productIds().isEmpty()) {
+                throw new BusinessException("每个店铺至少选择一件商品");
+            }
+            for (Long productId : group.productIds()) {
+                if (!productIds.add(productId)) {
+                    throw new BusinessException("同一商品不能重复提交");
+                }
+            }
+            if (group.userCouponId() != null && !couponIds.add(group.userCouponId())) {
+                throw new BusinessException("同一优惠券不能用于多个店铺");
+            }
+        }
+
+        List<OrderResponse> orders = request.merchantGroups().stream()
+            .map(group -> create(new CreateOrderRequest(
+                userId,
+                group.merchantId(),
+                request.addressId(),
+                request.deliveryAddress(),
+                request.remark(),
+                group.userCouponId(),
+                group.productIds()
+            )))
+            .toList();
+        int totalAmount = orders.stream().mapToInt(entry -> entry.order().getTotalPrice()).sum();
+        return new CreateOrderBatchResponse(orders, totalAmount);
+    }
+
+    public OrderPreviewResponse previewCheckout(String userId, Long merchantId, Long addressId, Long userCouponId, List<Long> selectedProductIds) {
         Merchant merchant = requireMerchant(merchantId);
         List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, userId));
@@ -193,14 +233,22 @@ public class OrderService {
             ? Map.of()
             : productMapper.selectBatchIds(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, product -> product));
+        List<Cart> merchantCartItems = selectCartItems(
+            new CreateOrderRequest(userId, merchantId, addressId, null, null, userCouponId, selectedProductIds),
+            cartItems,
+            products
+        );
 
         int subtotal = 0;
-        for (Cart item : cartItems) {
+        String selectionError = null;
+        for (Cart item : merchantCartItems) {
             Product product = products.get(item.getProductId());
-            if (product == null || !merchantId.equals(product.getMerchantId())) {
+            if (!"ON_SALE".equals(product.getStatus())) {
+                selectionError = "商品已下架：" + product.getName();
                 continue;
             }
-            if (!"ON_SALE".equals(product.getStatus()) || product.getStock() < item.getQuantity()) {
+            if (product.getStock() < item.getQuantity()) {
+                selectionError = "库存不足：" + product.getName();
                 continue;
             }
             subtotal += product.getPrice() * item.getQuantity();
@@ -210,10 +258,12 @@ public class OrderService {
         int deliveryFee = calculateDeliveryFee(merchant, null);
         int minOrderPrice = merchant.getMinOrderPrice() == null ? 0 : merchant.getMinOrderPrice();
         int minOrderGap = Math.max(minOrderPrice - subtotal, 0);
-        boolean canCheckout = subtotal > 0 && minOrderGap == 0;
-        String message = subtotal <= 0
+        boolean canCheckout = selectionError == null && subtotal > 0 && minOrderGap == 0;
+        String message = selectionError != null
+            ? selectionError
+            : (subtotal <= 0
             ? "当前商家购物车为空"
-            : (minOrderGap > 0 ? "未达到起送价，还差 ¥" + String.format("%.2f", minOrderGap / 100.0) : "可以提交订单");
+            : (minOrderGap > 0 ? "未达到起送价，还差 ¥" + String.format("%.2f", minOrderGap / 100.0) : "可以提交订单"));
 
         if (addressId != null && canCheckout) {
             try {
@@ -259,6 +309,10 @@ public class OrderService {
             message,
             availableCoupons
         );
+    }
+
+    public OrderPreviewResponse previewCheckout(String userId, Long merchantId, Long addressId, Long userCouponId) {
+        return previewCheckout(userId, merchantId, addressId, userCouponId, null);
     }
 
     public List<OrderResponse> listForUser(String userId) {
@@ -774,6 +828,47 @@ public class OrderService {
             order.getRiderId(), title, content, "DELIVERY_STATUS", "ORDER", order.getId(), null, null,
             order.getId(), order.getMerchantId(), "/rider/profile"
         ));
+    }
+
+    private List<Cart> selectCartItems(
+        CreateOrderRequest request,
+        List<Cart> cartItems,
+        Map<Long, Product> products
+    ) {
+        Map<Long, Cart> cartByProductId = cartItems.stream()
+            .collect(Collectors.toMap(Cart::getProductId, item -> item));
+        List<Long> requestedProductIds = request.productIds();
+        if (requestedProductIds == null) {
+            List<Cart> merchantItems = cartItems.stream()
+                .filter(item -> {
+                    Product product = products.get(item.getProductId());
+                    return product != null && request.merchantId().equals(product.getMerchantId());
+                })
+                .toList();
+            if (merchantItems.isEmpty()) {
+                throw new BusinessException("该商家的购物车为空");
+            }
+            return merchantItems;
+        }
+
+        if (requestedProductIds.isEmpty()) {
+            throw new BusinessException("请至少选择一件商品");
+        }
+        LinkedHashSet<Long> uniqueProductIds = new LinkedHashSet<>(requestedProductIds);
+        if (uniqueProductIds.size() != requestedProductIds.size()) {
+            throw new BusinessException("选择的商品不能重复");
+        }
+        return uniqueProductIds.stream().map(productId -> {
+            Cart cart = cartByProductId.get(productId);
+            Product product = products.get(productId);
+            if (cart == null || product == null) {
+                throw new BusinessException("所选商品不在当前购物车中");
+            }
+            if (!request.merchantId().equals(product.getMerchantId())) {
+                throw new BusinessException("所选商品不属于当前店铺");
+            }
+            return cart;
+        }).toList();
     }
 
     private DeliverySnapshot resolveDeliverySnapshot(CreateOrderRequest request) {

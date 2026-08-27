@@ -1,6 +1,8 @@
 package com.clas.service;
 
 import com.clas.common.BusinessException;
+import com.clas.dto.BatchPaymentRequest;
+import com.clas.dto.BatchPaymentResponse;
 import com.clas.dto.PaymentRequest;
 import com.clas.dto.PaymentResponse;
 import com.clas.entity.Orders;
@@ -8,8 +10,9 @@ import com.clas.entity.Payment;
 import com.clas.mapper.OrdersMapper;
 import com.clas.repository.PaymentRepository;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
@@ -87,6 +90,30 @@ public class PaymentService {
     public PaymentResponse getPaymentStatus(Long orderId, String userId) {
         Orders order = orderService.requireUserOrder(orderId, userId);
         return paymentStatusForOrder(orderId, order);
+    }
+
+    public BatchPaymentResponse getBatchPaymentStatus(List<Long> orderIds, String userId) {
+        List<Long> normalizedIds = normalizeOrderIds(orderIds);
+        List<PaymentResponse> payments = normalizedIds.stream()
+            .map(orderId -> getPaymentStatus(orderId, userId))
+            .toList();
+        return toBatchResponse(payments);
+    }
+
+    public BatchPaymentResponse mockPayBatch(BatchPaymentRequest request, String userId) {
+        List<Long> normalizedIds = normalizeOrderIds(request.orderIds());
+        normalizedIds.forEach(orderId -> orderService.requireUserOrder(orderId, userId));
+
+        String batchKey = normalizeIdempotencyKey(request.idempotencyKey());
+        List<PaymentResponse> payments = normalizedIds.stream().map(orderId -> {
+            try {
+                String orderKey = batchKey == null ? null : batchKey.substring(0, Math.min(batchKey.length(), 96)) + ":" + orderId;
+                return mockPay(new PaymentRequest(orderId, userId, request.payMethod(), orderKey));
+            } catch (BusinessException exception) {
+                return getPaymentStatus(orderId, userId);
+            }
+        }).toList();
+        return toBatchResponse(payments);
     }
 
     private PaymentResponse beginAndConfirmPayment(Orders order, PaymentRequest request) {
@@ -210,6 +237,30 @@ public class PaymentService {
             throw new BusinessException("幂等键长度不能超过128个字符");
         }
         return normalized;
+    }
+
+    private List<Long> normalizeOrderIds(List<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            throw new BusinessException("请至少选择一个待支付订单");
+        }
+        LinkedHashSet<Long> uniqueIds = new LinkedHashSet<>(orderIds);
+        if (uniqueIds.contains(null) || uniqueIds.size() != orderIds.size()) {
+            throw new BusinessException("订单列表包含无效或重复项");
+        }
+        if (uniqueIds.size() > 50) {
+            throw new BusinessException("单次最多支付 50 个订单");
+        }
+        return List.copyOf(uniqueIds);
+    }
+
+    private BatchPaymentResponse toBatchResponse(List<PaymentResponse> payments) {
+        int totalAmount = payments.stream().mapToInt(payment -> payment.amount() == null ? 0 : payment.amount()).sum();
+        long successCount = payments.stream().filter(payment -> STATUS_SUCCESS.equals(payment.paymentStatus())).count();
+        boolean hasPending = payments.stream().anyMatch(payment -> STATUS_PENDING.equals(payment.paymentStatus()));
+        String status = successCount == payments.size()
+            ? STATUS_SUCCESS
+            : (successCount > 0 ? "PARTIAL" : (hasPending ? STATUS_PENDING : STATUS_FAILED));
+        return new BatchPaymentResponse(payments, totalAmount, status);
     }
 
     private String mapOrderStatusToPaymentStatus(String orderStatus) {

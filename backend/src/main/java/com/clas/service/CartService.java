@@ -8,8 +8,10 @@ import com.clas.dto.CartValidationResponse;
 import com.clas.dto.RemoveCartRequest;
 import com.clas.dto.UpdateCartRequest;
 import com.clas.entity.Cart;
+import com.clas.entity.Merchant;
 import com.clas.entity.Product;
 import com.clas.mapper.CartMapper;
+import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.ProductMapper;
 import java.util.HashSet;
 import java.util.List;
@@ -24,11 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class CartService {
     private final CartMapper cartMapper;
     private final ProductMapper productMapper;
+    private final MerchantMapper merchantMapper;
     private final PenaltyService penaltyService;
 
-    public CartService(CartMapper cartMapper, ProductMapper productMapper, PenaltyService penaltyService) {
+    public CartService(CartMapper cartMapper, ProductMapper productMapper, MerchantMapper merchantMapper, PenaltyService penaltyService) {
         this.cartMapper = cartMapper;
         this.productMapper = productMapper;
+        this.merchantMapper = merchantMapper;
         this.penaltyService = penaltyService;
     }
 
@@ -111,8 +115,21 @@ public class CartService {
             ? Map.of()
             : productMapper.selectBatchIds(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, product -> product));
+        List<Long> merchantIdList = products.values().stream()
+            .map(Product::getMerchantId)
+            .filter(id -> id != null)
+            .distinct()
+            .toList();
+        Map<Long, Merchant> merchants = merchantIdList.isEmpty()
+            ? Map.of()
+            : merchantMapper.selectBatchIds(merchantIdList).stream()
+                .collect(Collectors.toMap(Merchant::getId, merchant -> merchant));
         List<CartItemResponse> items = cartItems.stream()
-            .map(item -> toResponse(item, products.get(item.getProductId())))
+            .map(item -> {
+                Product product = products.get(item.getProductId());
+                Merchant merchant = product == null ? null : merchants.get(product.getMerchantId());
+                return toResponse(item, product, merchant);
+            })
             .toList();
         int invalidCount = (int) items.stream().filter(item -> !item.valid()).count();
         Set<Long> merchantIds = items.stream()
@@ -146,7 +163,7 @@ public class CartService {
         return cart;
     }
 
-    private CartItemResponse toResponse(Cart item, Product product) {
+    private CartItemResponse toResponse(Cart item, Product product, Merchant merchant) {
         String invalidReason = resolveInvalidReason(item, product);
         boolean valid = invalidReason == null;
         String name = product == null ? "商品已失效" : product.getName();
@@ -159,6 +176,7 @@ public class CartService {
             item.getUserId(),
             item.getProductId(),
             merchantId,
+            merchant == null ? null : merchant.getMerchantName(),
             name,
             price,
             stock,

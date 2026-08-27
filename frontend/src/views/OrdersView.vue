@@ -10,6 +10,7 @@ import RiderChatWindow from '../components/RiderChatWindow.vue'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
 import { orderStatusMap } from '../utils/status'
+import { isReceivingOrder } from '../utils/orderReceiving'
 
 const orders = ref([])
 const message = ref('')
@@ -59,15 +60,7 @@ const orderTabs = [
 
 const filteredOrders = computed(() => {
   if (activeTab.value === 'receiving') {
-    return orders.value.filter((entry) => {
-      const { status, deliveryStatus, refundStatus } = entry.order
-      // 明确排除退款、取消和拒单订单
-      if (['REFUNDED', 'REFUND_PENDING', 'CANCELED', 'REJECTED'].includes(status)) return false
-      if (refundStatus && refundStatus !== 'NONE') return false
-      // 自动接单且已配送/已送达（未确认收货）
-      if (status === 'ACCEPTED' && ['DELIVERING', 'DELIVERED'].includes(deliveryStatus)) return true
-      return false
-    })
+    return orders.value.filter((entry) => isReceivingOrder(entry.order))
   }
   if (activeTab.value === 'review') {
     return orders.value.filter((entry) => entry.order.status === 'COMPLETED' && !hasReview(entry.order.id))

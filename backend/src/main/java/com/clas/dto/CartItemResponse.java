@@ -5,6 +5,7 @@ public record CartItemResponse(
     String userId,
     Long productId,
     Long merchantId,
+    String merchantName,
     String productName,
     Integer price,
     Integer stock,

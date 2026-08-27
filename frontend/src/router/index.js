@@ -85,6 +85,7 @@ const routes = [
   { path: '/order/:orderId', component: OrderDetailView, meta: { roles: ['USER'], title: '订单详情', motion: 'page-focus' } },
 
   { path: '/payment/deal/:orderId', name: 'DealPayment', component: PaymentView, meta: { roles: ['USER'], title: '支付', motion: 'page-pop' } },
+  { path: '/payment/batch', name: 'BatchPayment', component: PaymentView, meta: { roles: ['USER'], title: '合并付款', motion: 'page-pop' } },
   { path: '/payment/:orderId', name: 'OrderPayment', component: PaymentView, meta: { roles: ['USER'], title: '支付', motion: 'page-pop' } },
   { path: '/review/:orderId', component: ReviewView, meta: { roles: ['USER'], title: '评价', motion: 'page-pop' } },
 
