@@ -41,6 +41,7 @@ const AdminAnnouncementsView = () => import('../views/admin/AdminAnnouncementsVi
 const AdminDashboardView = () => import('../views/admin/AdminDashboardView.vue')
 const AdminUsersView = () => import('../views/admin/AdminUsersView.vue')
 const AdminOrdersView = () => import('../views/admin/AdminOrdersView.vue')
+const AdminOrderRefundDisputesView = () => import('../views/admin/AdminOrderRefundDisputesView.vue')
 const AdminReviewsView = () => import('../views/admin/AdminReviewsView.vue')
 const AdminAppealsView = () => import('../views/admin/AdminAppealsView.vue')
 const AdminMessagesView = () => import('../views/admin/AdminMessagesView.vue')
@@ -99,6 +100,7 @@ const routes = [
       { path: '', redirect: '/admin/dashboard' },
       { path: 'dashboard', component: AdminDashboardView, meta: { title: '管理后台', motion: 'page-admin' } },
       { path: 'orders', component: AdminOrdersView, meta: { title: '订单管理', motion: 'page-admin' } },
+      { path: 'order-refund-disputes', component: AdminOrderRefundDisputesView, meta: { title: '订单争议', motion: 'page-admin' } },
       { path: 'users', component: AdminUsersView, meta: { title: '用户管理', motion: 'page-admin' } },
       { path: 'audit', component: AdminAuditView, meta: { title: '商家审核', motion: 'page-admin' } },
       { path: 'role-applications', redirect: '/admin/riders' },

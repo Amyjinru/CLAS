@@ -13,7 +13,8 @@ const metrics = ref([])
 const loading = ref(false)
 
 const orderedDeliveries = computed(() => [...deliveries.value].sort((left, right) => deadlineOf(left) - deadlineOf(right)))
-const totalIncome = computed(() => settlements.value.reduce((total, item) => total + (Number(item.amount) || 0), 0))
+const totalIncome = computed(() => settlements.value.filter((item) => item.balanceType === 'WITHDRAWABLE').reduce((total, item) => total + (Number(item.amount) || 0), 0))
+const temporaryIncome = computed(() => settlements.value.filter((item) => item.balanceType === 'PENDING').reduce((total, item) => total + (Number(item.amount) || 0), 0))
 const averageScore = computed(() => {
   if (!reviews.value.length) return '—'
   return (reviews.value.reduce((total, item) => total + (Number(item.score) || 0), 0) / reviews.value.length).toFixed(1)
@@ -32,7 +33,15 @@ function formatTime(value) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '暂未计算' : date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
-function settlementLabel(type) { return ({ COMMISSION: '配送佣金', TIP: '用户打赏', OVERDUE_DEDUCTION: '超时扣减', WITHDRAWAL: '提现' })[type] || type || '收入变动' }
+function settlementLabel(item) {
+  if (item.balanceType === 'REFUND_REVERSED') return '争议订单'
+  return ({ COMMISSION: '配送佣金', TIP: '用户打赏', OVERDUE_DEDUCTION: '超时扣减', WITHDRAWAL: '提现' })[item.settlementType] || item.settlementType || '收入变动'
+}
+function settlementState(item) { return ({ PENDING: '临时收益 · 15 分钟争议期', WITHDRAWABLE: '已进入可提现余额', REFUND_REVERSED: '退款已裁定，配送佣金已扣回' })[item.balanceType] || item.balanceType }
+function settlementAmount(item) {
+  const amount = Number(item.amount) || 0
+  return item.balanceType === 'REFUND_REVERSED' ? `-${formatMoney(Math.abs(amount))}` : formatMoney(amount)
+}
 
 async function load() {
   loading.value = true
@@ -68,7 +77,7 @@ onMounted(load)
     </header>
 
     <section class="metric-strip" aria-label="骑手账户概览">
-      <article class="metric-card income"><span>累计流水</span><strong>{{ formatMoney(totalIncome) }}</strong><small>佣金、打赏及结算记录</small></article>
+      <article class="metric-card income"><span>已结算收益</span><strong>{{ formatMoney(totalIncome) }}</strong><small>临时收益 {{ formatMoney(temporaryIncome) }} · 送达后 15 分钟内不可提现</small></article>
       <article class="metric-card balance"><span>可提现余额</span><strong>{{ formatMoney(profile?.withdrawableBalance) }}</strong><small>冻结中 {{ formatMoney(profile?.frozenBalance) }}</small></article>
       <article class="metric-card rating"><span>用户评价</span><strong>{{ averageScore }}<i v-if="averageScore !== '—'"> / 5</i></strong><small>{{ reviews.length }} 条骑手评价</small></article>
       <article class="metric-card performance"><span>最新表现</span><strong>{{ latestMetric?.finalScore ?? '—' }}<i v-if="latestMetric"> 分</i></strong><small>{{ latestMetric ? `${latestMetric.metricDate} · ${latestMetric.grade}` : '暂无归档数据' }}</small></article>
@@ -87,7 +96,7 @@ onMounted(load)
     </section>
 
     <section class="record-grid">
-      <article class="record-card ledger-card"><header><p>SETTLEMENTS</p><h2>收入流水</h2><span>{{ formatMoney(totalIncome) }}</span></header><ul v-if="settlements.length"><li v-for="item in settlements.slice(0, 6)" :key="item.id"><div><strong>{{ settlementLabel(item.settlementType) }}</strong><small>{{ item.balanceType }}</small></div><b :class="{ deduction: item.settlementType === 'OVERDUE_DEDUCTION' }">{{ formatMoney(item.amount) }}</b></li></ul><p v-else class="card-empty">暂无收入流水</p></article>
+      <article class="record-card ledger-card"><header><p>SETTLEMENTS</p><h2>收入流水</h2><span>{{ formatMoney(totalIncome) }}</span></header><ul v-if="settlements.length"><li v-for="item in settlements.slice(0, 6)" :key="item.id"><div><strong>{{ settlementLabel(item) }}</strong><small>{{ settlementState(item) }}</small></div><b :class="{ deduction: item.settlementType === 'OVERDUE_DEDUCTION' || item.balanceType === 'REFUND_REVERSED' }">{{ settlementAmount(item) }}</b></li></ul><p v-else class="card-empty">暂无收入流水</p></article>
       <article class="record-card withdrawal-card"><header><p>WITHDRAWALS</p><h2>提现记录</h2><span>{{ withdrawals.length }} 笔</span></header><ul v-if="withdrawals.length"><li v-for="item in withdrawals.slice(0, 6)" :key="item.id"><div><strong>{{ formatMoney(item.amount) }}</strong><small>{{ item.createdAt ? formatTime(item.createdAt) : '提现申请' }}</small></div><b>{{ item.status }}</b></li></ul><p v-else class="card-empty">暂无提现记录</p></article>
       <article class="record-card review-card"><header><p>REVIEWS</p><h2>用户评价</h2><span>{{ averageScore }} 分</span></header><ul v-if="reviews.length"><li v-for="item in reviews.slice(0, 6)" :key="item.id"><div><strong>{{ item.score }} 星</strong><small>{{ item.tags || '未添加评价标签' }}</small></div><b>已评价</b></li></ul><p v-else class="card-empty">暂无用户评价</p></article>
       <article class="record-card metric-card-list"><header><p>PERFORMANCE</p><h2>每日表现</h2><span>{{ latestMetric?.grade || '—' }}</span></header><ul v-if="metrics.length"><li v-for="item in metrics.slice(0, 6)" :key="item.id"><div><strong>{{ item.metricDate }}</strong><small>表现归档</small></div><b>{{ item.finalScore }} 分 · {{ item.grade }}</b></li></ul><p v-else class="card-empty">暂无每日表现归档</p></article>

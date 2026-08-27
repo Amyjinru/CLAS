@@ -11,6 +11,7 @@ import com.clas.dto.PaymentRequest;
 import com.clas.dto.PaymentResponse;
 import com.clas.dto.RefundRequest;
 import com.clas.dto.RefundResolveRequest;
+import com.clas.dto.RefundDisputeRequest;
 import com.clas.dto.RejectOrderRequest;
 import com.clas.dto.RiderTipRequest;
 import com.clas.dto.RiderReviewRequest;
@@ -23,6 +24,8 @@ import com.clas.service.PaymentService;
 import com.clas.service.RiderTipService;
 import com.clas.service.RiderReviewService;
 import com.clas.service.OrderLifecycleService;
+import com.clas.service.OrderRefundDisputeService;
+import com.clas.service.RefundResolutionService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,14 +46,18 @@ public class OrderController {
     private final RiderTipService riderTipService;
     private final RiderReviewService riderReviewService;
     private final OrderLifecycleService lifecycleService;
+    private final OrderRefundDisputeService refundDisputeService;
+    private final RefundResolutionService refundResolutionService;
 
-    public OrderController(OrderService orderService, PaymentService paymentService, MerchantService merchantService, RiderTipService riderTipService, RiderReviewService riderReviewService, OrderLifecycleService lifecycleService) {
+    public OrderController(OrderService orderService, PaymentService paymentService, MerchantService merchantService, RiderTipService riderTipService, RiderReviewService riderReviewService, OrderLifecycleService lifecycleService, OrderRefundDisputeService refundDisputeService, RefundResolutionService refundResolutionService) {
         this.orderService = orderService;
         this.paymentService = paymentService;
         this.merchantService = merchantService;
         this.riderTipService = riderTipService;
         this.riderReviewService = riderReviewService;
         this.lifecycleService = lifecycleService;
+        this.refundDisputeService = refundDisputeService;
+        this.refundResolutionService = refundResolutionService;
     }
 
     @PostMapping("/create")
@@ -209,7 +216,15 @@ public class OrderController {
         @RequestBody(required = false) RefundResolveRequest request
     ) {
         String reason = request == null ? null : request.reason();
-        return Result.ok(orderService.resolveRefund(orderId, merchantService.getCurrentMerchantId(), false, reason));
+        return Result.ok(refundResolutionService.resolveByMerchant(orderId, merchantService.getCurrentMerchantId(), false, reason));
+    }
+
+    @PostMapping("/refund/{orderId}/dispute")
+    @RequireRole("USER")
+    public Result<com.clas.entity.OrderRefundDispute> submitRefundDispute(
+        @PathVariable Long orderId, @Valid @RequestBody RefundDisputeRequest request
+    ) {
+        return Result.ok(refundDisputeService.submit(orderId, currentUserId(), request.reason()));
     }
 
     private String currentUserId() {

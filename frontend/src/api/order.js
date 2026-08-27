@@ -19,3 +19,4 @@ export const deliverOrder = (orderId) => api.post(`/order/deliver/${orderId}`).t
 export const requestRefund = (orderId, reason) => api.post(`/order/refund/${orderId}`, { reason }).then(unwrap)
 export const approveRefund = (orderId) => api.post(`/order/refund/${orderId}/approve`).then(unwrap)
 export const rejectRefund = (orderId, reason) => api.post(`/order/refund/${orderId}/reject`, { reason }).then(unwrap)
+export const submitRefundDispute = (orderId, reason) => api.post(`/order/refund/${orderId}/dispute`, { reason }).then(unwrap)
