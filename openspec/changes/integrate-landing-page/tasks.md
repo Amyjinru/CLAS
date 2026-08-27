@@ -1,7 +1,7 @@
 ## 1. 路由集成
 
 - [x] 1.1 创建 `frontend/public/landing.html` 落地页静态文件
-- [ ] 1.2 修改 `frontend/src/router/index.js` 的 `/` 路由：未登录用户 `window.location.replace('/landing.html')`
+- [x] 1.2 修改 `frontend/src/router/index.js` 的 `/` 路由：未登录用户 `window.location.replace('/landing.html')`
 - [ ] 1.3 验证：未登录访问 `http://8.141.112.182/` 自动跳转到落地页
 
 ## 2. Footer 链接

@@ -137,7 +137,7 @@ public class UserProfileService {
 
         user.setPhone(newPhone);
         user.setPassword(null);
-        String token = jwtUtil.generateToken(newPhone, user.getRole());
+        String token = jwtUtil.generateToken(newPhone, user.getRole(), user.getSessionToken());
         return new LoginResponse(user, token);
     }
 

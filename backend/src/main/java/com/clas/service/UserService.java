@@ -16,6 +16,7 @@ import com.clas.mapper.UserMapper;
 import com.clas.mapper.UserRoleMapper;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +51,12 @@ public class UserService {
         }
         if (!passwordMatches) throw new BusinessException("手机号或密码错误");
         if (Boolean.FALSE.equals(user.getEnabled())) throw new BusinessException("账号已被禁用，请联系管理员");
+        if (hasActiveSession(user)) {
+            if (request.code() == null || request.code().isBlank()) {
+                throw new BusinessException(409, "账号已在其他设备登录，请使用手机验证码确认登录", "LOGIN_VERIFICATION_REQUIRED");
+            }
+            verificationCodeStore.verify(phone, "login-session", request.code());
+        }
         return loginResponse(user, defaultRole(phone));
     }
 
@@ -84,6 +91,18 @@ public class UserService {
         if (user == null) throw new BusinessException("该手机号未绑定任何账号");
         if (Boolean.FALSE.equals(user.getEnabled())) throw new BusinessException("该账号已被禁用，无法重置密码");
         verificationCodeStore.generateAndStore(phone, "forgot");
+    }
+
+    public void sendLoginCode(SendCodeRequest request) {
+        String phone = PhoneValidator.normalizeAndValidate(request.phone());
+        User user = userMapper.selectById(phone);
+        if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
+            throw new BusinessException("账号已被禁用或不存在");
+        }
+        if (!hasActiveSession(user)) {
+            throw new BusinessException("当前账号没有其他有效登录会话");
+        }
+        verificationCodeStore.generateAndStore(phone, "login-session");
     }
 
     public LoginResponse resetForgotPassword(ResetPasswordRequest request) {
@@ -140,11 +159,23 @@ public class UserService {
     }
 
     private LoginResponse loginResponse(User user, String activeRole) {
+        String sessionToken = UUID.randomUUID().toString();
+        LocalDateTime sessionExpiresAt = LocalDateTime.now().plusNanos(jwtUtil.getExpirationMs() * 1_000_000L);
+        int updated = userMapper.updateSessionToken(user.getPhone(), sessionToken, sessionExpiresAt);
+        if (updated != 1) throw new BusinessException("登录状态创建失败，请重试");
         List<String> roles = rolesOf(user.getPhone());
         user.setRole(roles.contains(activeRole) ? activeRole : "USER");
         user.setRoles(roles);
+        user.setSessionToken(sessionToken);
+        user.setSessionExpiresAt(sessionExpiresAt);
         user.setPassword(null);
-        return new LoginResponse(user, jwtUtil.generateToken(user.getPhone(), user.getRole()), roles);
+        return new LoginResponse(user, jwtUtil.generateToken(
+            user.getPhone(), user.getRole(), sessionToken), roles);
+    }
+
+    private boolean hasActiveSession(User user) {
+        return user.getSessionToken() != null && !user.getSessionToken().isBlank()
+            && user.getSessionExpiresAt() != null && user.getSessionExpiresAt().isAfter(LocalDateTime.now());
     }
 
     private String defaultRole(String userId) {

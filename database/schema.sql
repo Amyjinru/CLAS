@@ -48,7 +48,9 @@ CREATE TABLE `user` (
     role VARCHAR(20) NOT NULL,
     enabled TINYINT(1) NOT NULL DEFAULT 1,
     avatar VARCHAR(512),
-    nickname VARCHAR(50)
+    nickname VARCHAR(50),
+    session_token VARCHAR(64),
+    session_expires_at DATETIME
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE role_application (

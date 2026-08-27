@@ -18,6 +18,8 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
+    private static final String SESSION_TOKEN_CLAIM = "sessionToken";
+
     private final SecretKey key;
     private final long expirationMs;
     private static final int MIN_SECRET_LENGTH = 32;
@@ -55,12 +57,17 @@ public class JwtUtil {
     }
 
     public String generateToken(String phone, String role) {
+        return generateToken(phone, role, null);
+    }
+
+    public String generateToken(String phone, String role, String sessionToken) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + expirationMs);
 
         return Jwts.builder()
             .subject(phone)
             .claim("role", role)
+            .claim(SESSION_TOKEN_CLAIM, sessionToken)
             .issuedAt(now)
             .expiration(expiration)
             .signWith(key)
@@ -100,5 +107,17 @@ public class JwtUtil {
         } catch (JwtException e) {
             return null;
         }
+    }
+
+    public String getSessionTokenFromToken(String token) {
+        try {
+            return parseToken(token).get(SESSION_TOKEN_CLAIM, String.class);
+        } catch (JwtException e) {
+            return null;
+        }
+    }
+
+    public long getExpirationMs() {
+        return expirationMs;
     }
 }

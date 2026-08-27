@@ -12,6 +12,7 @@ import {
 } from '../api/clas'
 import { currentRole } from '../api/session'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Bottom, Top } from '@element-plus/icons-vue'
 
 const props = defineProps({
   merchantId: { type: [Number, String], required: true },
@@ -54,6 +55,10 @@ async function vote(targetType, targetId, voteType) {
   } catch (error) {
     ElMessage.error(error.response?.data?.message || error.message || '投票失败')
   }
+}
+
+function voteLabel(direction, count) {
+  return `${direction === 'LIKE' ? '点赞' : '点踩'}，当前 ${count || 0} 票`
 }
 
 async function submitComment(review) {
@@ -187,12 +192,24 @@ onMounted(load)
         <img v-for="(img, idx) in review.images" :key="idx" :src="img" alt="评价图片" loading="lazy" />
       </div>
       <div class="actions">
-        <el-button text class="vote-action" @click="vote('REVIEW', review.id, 'LIKE')">👍 赞 {{ review.likeCount || 0 }}</el-button>
-        <el-button text class="vote-action" @click="vote('REVIEW', review.id, 'DISLIKE')">👎 踩 {{ review.dislikeCount || 0 }}</el-button>
+        <el-button text class="vote-action" :class="{ selected: review.myVote === 'LIKE' }" :aria-label="voteLabel('LIKE', review.likeCount)" @click="vote('REVIEW', review.id, 'LIKE')"><el-icon><Top /></el-icon><span>{{ review.likeCount || 0 }}</span></el-button>
+        <el-button text class="vote-action" :class="{ selected: review.myVote === 'DISLIKE' }" :aria-label="voteLabel('DISLIKE', review.dislikeCount)" @click="vote('REVIEW', review.id, 'DISLIKE')"><el-icon><Bottom /></el-icon><span>{{ review.dislikeCount || 0 }}</span></el-button>
         <el-button text class="danger-action" @click="hideOrDelete(review)">{{ review.mine ? '删除' : '隐藏' }}</el-button>
         <el-button v-if="currentRole() && !review.mine && !showMerchantActions" text class="report-action" @click="reportComment(review)">举报</el-button>
         <el-button v-if="showMerchantActions" text class="report-action" @click="requestDelete(review)">申请删评</el-button>
         <el-button text class="reply-action" @click="selectReplyTarget(review)">回复</el-button>
+      </div>
+
+      <div v-if="review.merchantReply" class="nested-reply merchant-reply">
+        <div class="review-head">
+          <div class="avatar small merchant-avatar">商</div>
+          <strong>商家回复</strong>
+        </div>
+        <p>{{ review.merchantReply }}</p>
+        <div class="actions">
+          <el-button text class="vote-action" :class="{ selected: review.merchantReplyVote === 'LIKE' }" :aria-label="voteLabel('LIKE', review.merchantReplyLikeCount)" @click="vote('MERCHANT_REPLY', review.id, 'LIKE')"><el-icon><Top /></el-icon><span>{{ review.merchantReplyLikeCount || 0 }}</span></el-button>
+          <el-button text class="vote-action" :class="{ selected: review.merchantReplyVote === 'DISLIKE' }" :aria-label="voteLabel('DISLIKE', review.merchantReplyDislikeCount)" @click="vote('MERCHANT_REPLY', review.id, 'DISLIKE')"><el-icon><Bottom /></el-icon><span>{{ review.merchantReplyDislikeCount || 0 }}</span></el-button>
+        </div>
       </div>
 
       <div v-for="reply in review.replies || []" :key="reply.id" class="nested-reply">
@@ -205,8 +222,8 @@ onMounted(load)
           {{ reply.content }}
         </p>
         <div class="actions">
-          <el-button text class="vote-action" @click="vote('REPLY', reply.id, 'LIKE')">👍 赞 {{ reply.likeCount || 0 }}</el-button>
-          <el-button text class="vote-action" @click="vote('REPLY', reply.id, 'DISLIKE')">👎 踩 {{ reply.dislikeCount || 0 }}</el-button>
+          <el-button text class="vote-action" :class="{ selected: reply.myVote === 'LIKE' }" :aria-label="voteLabel('LIKE', reply.likeCount)" @click="vote('REPLY', reply.id, 'LIKE')"><el-icon><Top /></el-icon><span>{{ reply.likeCount || 0 }}</span></el-button>
+          <el-button text class="vote-action" :class="{ selected: reply.myVote === 'DISLIKE' }" :aria-label="voteLabel('DISLIKE', reply.dislikeCount)" @click="vote('REPLY', reply.id, 'DISLIKE')"><el-icon><Bottom /></el-icon><span>{{ reply.dislikeCount || 0 }}</span></el-button>
           <el-button v-if="reply.mine" text class="danger-action" @click="removeReply(reply)">删除</el-button>
           <el-button v-else-if="currentRole() && !showMerchantActions" text class="report-action" @click="reportReplyComment(reply)">举报</el-button>
           <el-button text class="reply-action" @click="selectReplyTarget(review, reply)">回复</el-button>
@@ -236,6 +253,7 @@ onMounted(load)
   display: flex; height: 42px; justify-content: center; width: 42px; font-weight: 700;
 }
 .avatar.small { height: 32px; width: 32px; font-size: 12px; }
+.merchant-avatar { background: var(--clas-amber-100); color: var(--clas-amber-700); }
 .content { margin: 8px 0; }
 .images { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .images img { border-radius: var(--radius-sm); height: 88px; object-fit: cover; width: 88px; }
@@ -268,6 +286,14 @@ onMounted(load)
   background: #fff3e0;
   color: var(--text-primary);
 }
+
+.actions :deep(.vote-action.el-button.is-text.selected) {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.actions :deep(.vote-action .el-icon) { font-size: 16px; }
 
 .actions :deep(.danger-action.el-button.is-text) {
   background: #ef4444;

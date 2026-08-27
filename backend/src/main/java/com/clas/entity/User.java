@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.Data;
 
@@ -18,6 +20,10 @@ public class User {
     private Boolean enabled;
     private String avatar;
     private String nickname;
+    @JsonIgnore
+    private String sessionToken;
+    @JsonIgnore
+    private LocalDateTime sessionExpiresAt;
     @TableField(exist = false)
     private List<String> roles;
 }

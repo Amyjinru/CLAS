@@ -1,8 +1,9 @@
 import axios from 'axios'
-import { ElLoading, ElMessage } from 'element-plus'
+import { ElLoading, ElMessage, ElMessageBox } from 'element-plus'
 
 let loadingInstance = null
 let requestCount = 0
+let sessionExitPending = false
 
 function showLoading() {
   if (requestCount === 0) {
@@ -26,13 +27,23 @@ function hideLoading() {
   }
 }
 
-function clearAuthAndRedirect() {
+function clearAuthAndRedirect(message = '账号已在其他设备登录，请重新登录') {
+  if (sessionExitPending) return
+  sessionExitPending = true
   localStorage.removeItem('clas_user')
-  // 刷新页面以重置状态并跳转到登录页
   const currentPath = window.location.pathname
-  if (currentPath !== '/login') {
-    window.location.href = '/login?redirect=' + encodeURIComponent(currentPath)
-  }
+  ElMessageBox.alert(message, '登录状态已失效', {
+    confirmButtonText: '重新登录',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false,
+    type: 'warning'
+  }).finally(() => {
+    if (currentPath !== '/login') {
+      window.location.href = '/login?redirect=' + encodeURIComponent(currentPath)
+    }
+    sessionExitPending = false
+  })
 }
 
 export const api = axios.create({
@@ -74,9 +85,8 @@ api.interceptors.response.use(
       const msg = response.data.message || '请求失败'
       // 401 清除认证并跳转登录
       if (response.data.code === 401) {
-        clearAuthAndRedirect()
-      }
-      if (!response.config.silent) {
+        clearAuthAndRedirect(msg)
+      } else if (!response.config.silent) {
         ElMessage.error(msg)
       }
       const error = new Error(msg)
@@ -93,8 +103,7 @@ api.interceptors.response.use(
 
     // HTTP 401 自动清除认证并跳转登录
     if (error.response?.status === 401) {
-      ElMessage.error('登录已过期，请重新登录')
-      clearAuthAndRedirect()
+      clearAuthAndRedirect(error.response?.data?.message || '登录已过期，请重新登录')
       return Promise.reject(error)
     }
 
