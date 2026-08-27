@@ -104,6 +104,9 @@ class AuthorizationIsolationIntegrationTest {
     @Test
     void demoLoginUsesTheSameSingleDeviceVerificationRule() throws Exception {
         String riderPhone = "13800000005";
+        jdbcTemplate.update("UPDATE \"user\" SET session_token = NULL, session_expires_at = NULL, session_device_id = NULL, "
+            + "session_last_seen_at = NULL, pending_login_challenge_id = NULL, pending_login_device_id = NULL, "
+            + "pending_login_created_at = NULL WHERE phone = ?", riderPhone);
         mockMvc.perform(post("/api/user/demo-login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "deviceId", "demo-a"))))
