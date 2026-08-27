@@ -1065,6 +1065,129 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void selectedAndMultiMerchantCheckoutIsAtomicAndBatchPaymentIsIdempotent() throws Exception {
+        long secondMerchantId = 9001L;
+        long firstSelectedProductId = 9001L;
+        long secondMerchantProductId = 9002L;
+        jdbcTemplate.update("DELETE FROM cart WHERE user_id = ?", USER_PHONE);
+        jdbcTemplate.update("DELETE FROM product WHERE id IN (?, ?)", firstSelectedProductId, secondMerchantProductId);
+        jdbcTemplate.update("DELETE FROM merchant WHERE id = ?", secondMerchantId);
+        jdbcTemplate.update("""
+            INSERT INTO merchant (
+              id, user_id, merchant_name, phone, category, address, longitude, latitude,
+              delivery_radius_m, business_hours, delivery_fee, min_order_price, average_price,
+              score, status, manual_closed, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'Food', 'Second Test Store', 116.397500, 39.909300,
+              3000, '00:00-23:59', 200, 0, 2000, 4.50, 'OPEN', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, secondMerchantId, "batch-merchant-user", "Batch Merchant", "13999999001");
+        jdbcTemplate.update("""
+            INSERT INTO product (id, merchant_id, name, description, price, stock, status, created_at, updated_at)
+            VALUES (?, 1, 'Selected Product', 'selected checkout', 2000, 10, 'ON_SALE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, firstSelectedProductId);
+        jdbcTemplate.update("""
+            INSERT INTO product (id, merchant_id, name, description, price, stock, status, created_at, updated_at)
+            VALUES (?, ?, 'Second Merchant Product', 'batch checkout', 2100, 10, 'ON_SALE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, secondMerchantProductId, secondMerchantId);
+
+        try {
+            jdbcTemplate.update("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, 1, 1)", USER_PHONE);
+            jdbcTemplate.update("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, 1)", USER_PHONE, firstSelectedProductId);
+
+            mockMvc.perform(get("/api/cart/me").header("Authorization", auth(USER_PHONE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].merchantName").isString())
+                .andExpect(jsonPath("$.data[0].merchantName").isNotEmpty());
+
+            mockMvc.perform(get("/api/order/preview")
+                    .header("Authorization", auth(USER_PHONE))
+                    .param("merchantId", "1")
+                    .param("productIds", String.valueOf(firstSelectedProductId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subtotal").value(2000));
+
+            MvcResult selectedOrder = mockMvc.perform(post("/api/order/create")
+                    .header("Authorization", auth(USER_PHONE))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of(
+                        "merchantId", 1,
+                        "productIds", new long[]{firstSelectedProductId}
+                    ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].productId").value(firstSelectedProductId))
+                .andReturn();
+            long selectedOrderId = objectMapper.readTree(selectedOrder.getResponse().getContentAsString())
+                .path("data").path("order").path("id").asLong();
+            assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cart WHERE user_id = ? AND product_id = 1", Integer.class, USER_PHONE));
+            mockMvc.perform(post("/api/order/cancel/" + selectedOrderId).header("Authorization", auth(USER_PHONE)))
+                .andExpect(status().isOk());
+
+            jdbcTemplate.update("DELETE FROM cart WHERE user_id = ?", USER_PHONE);
+            jdbcTemplate.update("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, 1, 1)", USER_PHONE);
+            jdbcTemplate.update("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, 1)", USER_PHONE, secondMerchantProductId);
+            int orderCountBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM orders", Integer.class);
+            Map<String, Object> batchRequest = Map.of(
+                "addressId", 1,
+                "remark", "batch test",
+                "merchantGroups", new Object[]{
+                    Map.of("merchantId", 1, "productIds", new long[]{1}),
+                    Map.of("merchantId", secondMerchantId, "productIds", new long[]{secondMerchantProductId})
+                }
+            );
+
+            mockMvc.perform(post("/api/order/create-batch")
+                    .header("Authorization", auth(USER_PHONE))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(batchRequest)))
+                .andExpect(status().isBadRequest());
+            assertEquals(orderCountBefore, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM orders", Integer.class));
+            assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM cart WHERE user_id = ?", Integer.class, USER_PHONE));
+
+            jdbcTemplate.update("UPDATE merchant SET manual_closed = FALSE WHERE id = ?", secondMerchantId);
+            MvcResult batchResult = mockMvc.perform(post("/api/order/create-batch")
+                    .header("Authorization", auth(USER_PHONE))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(batchRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orders.length()").value(2))
+                .andExpect(jsonPath("$.data.totalAmount").value(5190))
+                .andReturn();
+            var batchData = objectMapper.readTree(batchResult.getResponse().getContentAsString()).path("data");
+            long firstOrderId = batchData.path("orders").get(0).path("order").path("id").asLong();
+            long secondOrderId = batchData.path("orders").get(1).path("order").path("id").asLong();
+            int firstStockBefore = productMapper.selectById(1L).getStock();
+            int secondStockBefore = productMapper.selectById(secondMerchantProductId).getStock();
+            Map<String, Object> paymentRequest = Map.of(
+                "orderIds", new long[]{firstOrderId, secondOrderId},
+                "payMethod", "MOCK",
+                "idempotencyKey", "batch-checkout-test"
+            );
+
+            mockMvc.perform(post("/api/payment/mock/batch")
+                    .header("Authorization", auth(USER_PHONE))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(paymentRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.payments.length()").value(2));
+            assertEquals(firstStockBefore - 1, productMapper.selectById(1L).getStock());
+            assertEquals(secondStockBefore - 1, productMapper.selectById(secondMerchantProductId).getStock());
+
+            mockMvc.perform(post("/api/payment/mock/batch")
+                    .header("Authorization", auth(USER_PHONE))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(paymentRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.paymentStatus").value("SUCCESS"));
+            assertEquals(firstStockBefore - 1, productMapper.selectById(1L).getStock());
+            assertEquals(secondStockBefore - 1, productMapper.selectById(secondMerchantProductId).getStock());
+        } finally {
+            jdbcTemplate.update("DELETE FROM cart WHERE user_id = ?", USER_PHONE);
+        }
+    }
+
+    @Test
     void orderLifecycleTimestampsProgressThroughDetail() throws Exception {
         mockMvc.perform(post("/api/cart/add")
                 .header("Authorization", auth(USER_PHONE))

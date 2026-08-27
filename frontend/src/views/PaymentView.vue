@@ -2,12 +2,24 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
-import { getDealPaymentStatus, getPaymentStatus, mockPay, payDealOrder } from '../api/clas'
+import {
+  getBatchPaymentStatus,
+  getDealPaymentStatus,
+  getPaymentStatus,
+  mockPay,
+  mockPayBatch,
+  payDealOrder
+} from '../api/clas'
 
 const route = useRoute()
 const router = useRouter()
 const isDealPayment = computed(() => route.name === 'DealPayment')
+const isBatchPayment = computed(() => route.name === 'BatchPayment')
 const orderId = computed(() => Number(route.params.orderId))
+const batchOrderIds = computed(() => [...new Set(String(route.query.orderIds || '')
+  .split(',')
+  .map((value) => Number(value))
+  .filter((value) => Number.isInteger(value) && value > 0))])
 const paymentInfo = ref(null)
 const payMethod = ref('MOCK')
 const loading = ref(false)
@@ -31,16 +43,26 @@ const orderStatusLabel = {
   USED: '已核销'
 }
 
-const backTarget = computed(() => (isDealPayment.value ? '/deals' : '/orders'))
-const backLabel = computed(() => (isDealPayment.value ? '返回团购' : '返回我的订单'))
-const pageTitle = computed(() => (isDealPayment.value ? '团购券支付' : '模拟支付'))
+const backTarget = computed(() => (isDealPayment.value ? '/deals' : (isBatchPayment.value ? '/cart' : '/orders')))
+const backLabel = computed(() => (isDealPayment.value ? '返回团购' : (isBatchPayment.value ? '返回购物车' : '返回我的订单')))
+const pageTitle = computed(() => (isDealPayment.value ? '团购券支付' : (isBatchPayment.value ? '合并付款' : '模拟支付')))
 const orderLabel = computed(() => (isDealPayment.value ? '团购订单号' : '订单号'))
+const displayAmount = computed(() => isBatchPayment.value ? paymentInfo.value?.totalAmount : paymentInfo.value?.amount)
+const hasBatchPayableOrders = computed(() => paymentInfo.value?.payments?.some((item) => item.orderStatus === 'PENDING_PAYMENT'))
+const showPaymentForm = computed(() => isBatchPayment.value
+  ? hasBatchPayableOrders.value
+  : paymentInfo.value?.orderStatus === 'PENDING_PAYMENT')
 
 async function loadStatus() {
   try {
-    paymentInfo.value = isDealPayment.value
-      ? await getDealPaymentStatus(orderId.value)
-      : await getPaymentStatus(orderId.value)
+    if (isBatchPayment.value) {
+      if (!batchOrderIds.value.length) throw new Error('EMPTY_BATCH')
+      paymentInfo.value = await getBatchPaymentStatus(batchOrderIds.value)
+    } else {
+      paymentInfo.value = isDealPayment.value
+        ? await getDealPaymentStatus(orderId.value)
+        : await getPaymentStatus(orderId.value)
+    }
   } catch (error) {
     message.value = error.response?.data?.message || '加载支付信息失败'
   }
@@ -50,13 +72,23 @@ async function submitPay() {
   loading.value = true
   message.value = '正在模拟支付，请稍候...'
   try {
-    paymentInfo.value = isDealPayment.value
-      ? await payDealOrder(orderId.value, payMethod.value)
-      : await mockPay({ orderId: orderId.value, payMethod: payMethod.value })
+    if (isBatchPayment.value) {
+      paymentInfo.value = await mockPayBatch({
+        orderIds: batchOrderIds.value,
+        payMethod: payMethod.value,
+        idempotencyKey: `batch-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      })
+    } else {
+      paymentInfo.value = isDealPayment.value
+        ? await payDealOrder(orderId.value, payMethod.value)
+        : await mockPay({ orderId: orderId.value, payMethod: payMethod.value })
+    }
     if (paymentInfo.value.paymentStatus === 'FAILED') {
       message.value = '模拟支付失败，请更换方式后重试'
+    } else if (paymentInfo.value.paymentStatus === 'PARTIAL') {
+      message.value = '部分订单支付成功，请重试剩余待支付订单'
     } else {
-      message.value = isDealPayment.value ? '支付成功，团购券已生成' : '支付成功'
+      message.value = isDealPayment.value ? '支付成功，团购券已生成' : (isBatchPayment.value ? '全部订单支付成功' : '支付成功')
     }
   } catch (error) {
     message.value = error.response?.data?.message || '支付失败'
@@ -66,7 +98,7 @@ async function submitPay() {
 }
 
 function goNext() {
-  router.push(isDealPayment.value ? '/profile' : '/orders')
+  router.push(isDealPayment.value ? '/profile' : (isBatchPayment.value ? '/orders?tab=receiving' : '/orders'))
 }
 
 onMounted(loadStatus)
@@ -77,19 +109,27 @@ onMounted(loadStatus)
 
   <section class="panel narrow">
     <h1>{{ pageTitle }}</h1>
-    <p>{{ orderLabel }}：{{ orderId }}</p>
+    <p v-if="!isBatchPayment">{{ orderLabel }}：{{ orderId }}</p>
+    <p v-else>本次包含 {{ batchOrderIds.length }} 张订单</p>
     <p v-if="paymentInfo">
-      应付金额：¥{{ (paymentInfo.amount / 100).toFixed(2) }}
+      应付金额：¥{{ ((displayAmount || 0) / 100).toFixed(2) }}
     </p>
-    <p v-if="paymentInfo">
+    <p v-if="paymentInfo && !isBatchPayment">
       支付状态：{{ statusLabel[paymentInfo.paymentStatus] || paymentInfo.paymentStatus }}
     </p>
-    <p v-if="paymentInfo">
+    <p v-if="paymentInfo && !isBatchPayment">
       订单状态：{{ orderStatusLabel[paymentInfo.orderStatus] || paymentInfo.orderStatus }}
     </p>
+    <div v-if="isBatchPayment && paymentInfo" class="batch-orders">
+      <div v-for="item in paymentInfo.payments" :key="item.orderId" class="batch-order-row">
+        <span>订单 #{{ item.orderId }}</span>
+        <span>¥{{ ((item.amount || 0) / 100).toFixed(2) }}</span>
+        <span>{{ statusLabel[item.paymentStatus] || item.paymentStatus }}</span>
+      </div>
+    </div>
     <p class="message">{{ message }}</p>
 
-    <label v-if="paymentInfo?.orderStatus === 'PENDING_PAYMENT'">
+    <label v-if="showPaymentForm">
       支付方式
       <select v-model="payMethod">
         <option value="MOCK">模拟支付</option>
@@ -99,7 +139,7 @@ onMounted(loadStatus)
       </select>
     </label>
 
-    <div class="toolbar" v-if="paymentInfo?.orderStatus === 'PENDING_PAYMENT'">
+    <div class="toolbar" v-if="showPaymentForm">
       <button :disabled="loading" @click="submitPay">
         {{ loading ? '支付中...' : '确认支付' }}
       </button>
@@ -121,5 +161,20 @@ select {
   padding: 8px 10px;
   font: inherit;
   background: white;
+}
+.batch-orders {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  margin: 16px 0;
+  overflow: hidden;
+}
+.batch-order-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto auto;
+  padding: 10px 12px;
+}
+.batch-order-row + .batch-order-row {
+  border-top: 1px solid var(--border-color);
 }
 </style>

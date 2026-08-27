@@ -33,6 +33,7 @@ import ProfileFavoritesBlock from '../components/profile/ProfileFavoritesBlock.v
 import ProfileVoucherBlock from '../components/profile/ProfileVoucherBlock.vue'
 import ProfileMessageBlock from '../components/profile/ProfileMessageBlock.vue'
 import { useChatStore } from '../composables/useChatStore'
+import { isReceivingOrder } from '../utils/orderReceiving'
 
 const activeProfileTab = ref('orders')
 const router = useRouter()
@@ -65,13 +66,7 @@ const displayName = computed(() => profileForm.nickname || currentUser.value?.us
 const unreadCount = computed(() => notifications.value.filter((item) => !item.readFlag).length)
 const pendingPaymentOrders = computed(() => orders.value.filter((item) => item.order.status === 'PENDING_PAYMENT'))
 const pendingDealOrders = computed(() => dealOrders.value.filter((item) => item.status === 'PENDING_PAYMENT'))
-const waitingReceiveOrders = computed(() => orders.value.filter((item) => {
-  const { status, deliveryStatus, refundStatus } = item.order
-  if (['REFUNDED', 'REFUND_PENDING', 'CANCELED', 'REJECTED'].includes(status)) return false
-  if (refundStatus && refundStatus !== 'NONE') return false
-  if (status === 'ACCEPTED' && ['DELIVERING', 'DELIVERED'].includes(deliveryStatus)) return true
-  return false
-}))
+const waitingReceiveOrders = computed(() => orders.value.filter((item) => isReceivingOrder(item.order)))
 const pendingReviewOrders = computed(() => orders.value.filter((item) => item.order.status === 'COMPLETED' && !reviewedOrderIds.value.has(item.order.id)))
 const afterSaleOrders = computed(() => orders.value.filter((item) => item.order.status === 'REFUND_PENDING' || item.order.status === 'REFUNDED' || (item.order.refundStatus && item.order.refundStatus !== 'NONE')))
 const unusedDealOrders = computed(() => dealOrders.value.filter((item) => item.status === 'UNUSED'))

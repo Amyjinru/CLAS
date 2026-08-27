@@ -1,8 +1,16 @@
 import { api, unwrap } from './client'
 
-export const previewOrder = (merchantId, addressId, userCouponId) =>
-  api.get('/order/preview', { params: { merchantId, addressId, userCouponId } }).then(unwrap)
+export const previewOrder = (merchantId, addressId, userCouponId, productIds) =>
+  api.get('/order/preview', {
+    params: {
+      merchantId,
+      addressId,
+      userCouponId,
+      productIds: productIds?.length ? productIds.join(',') : undefined
+    }
+  }).then(unwrap)
 export const createOrder = (payload) => api.post('/order/create', payload).then(unwrap)
+export const createOrderBatch = (payload) => api.post('/order/create-batch', payload).then(unwrap)
 export const listOrders = () => api.get('/order/me').then(unwrap)
 export const getOrderDetail = (orderId) => api.get(`/order/${orderId}`).then(unwrap)
 export const payOrder = (orderId) => api.post(`/order/pay/${orderId}`).then(unwrap)

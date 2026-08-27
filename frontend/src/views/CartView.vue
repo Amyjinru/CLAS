@@ -2,63 +2,171 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import {
-  cancelOrder,
-  claimCoupon,
-  clearInvalidCart,
-  createOrder,
-  getCart,
-  listAddresses,
-  listClaimableCoupons,
-  listMyDealOrders,
-  listOrders,
-  previewOrder
+  cancelOrder, claimCoupon, clearInvalidCart, createOrderBatch, getCart, listAddresses,
+  listClaimableCoupons, listMyDealOrders, listOrders, previewOrder
 } from '../api/clas'
 import { useCartActions } from '../composables/useCartActions'
 
 const router = useRouter()
 const { cartMessage, actionProductId, updateQuantity, removeItem } = useCartActions()
 const items = ref([])
+const selectedProductIds = ref(new Set())
+const previews = ref({})
+const previewErrors = ref({})
+const previewRequests = new Map()
+const selectedCoupons = ref({})
+const previewLoadingIds = ref(new Set())
 const pendingFoodOrders = ref([])
 const pendingDealOrders = ref([])
-const message = cartMessage
 const addresses = ref([])
 const selectedAddressId = ref('')
 const orderRemark = ref('')
-const selectedUserCouponId = ref('')
 const claimableCoupons = ref([])
-const checkoutPreview = ref(null)
+const submitting = ref(false)
+const message = cartMessage
 
-const merchantIds = () => [...new Set(items.value.map((item) => item.merchantId).filter(Boolean))]
-const activeMerchantId = computed(() => merchantIds()[0] || null)
-const invalidCount = computed(() => items.value.filter((item) => item.valid === false).length)
-const hasPendingPayments = computed(
-  () => pendingFoodOrders.value.length > 0 || pendingDealOrders.value.length > 0
-)
-const hasCartContent = computed(() => items.value.length > 0 || hasPendingPayments.value)
-const canSubmit = computed(() => checkoutPreview.value?.canCheckout && !invalidCount.value)
-
-async function loadPreview() {
-  if (!activeMerchantId.value) {
-    checkoutPreview.value = null
-    return
+const merchantGroups = computed(() => {
+  const groups = new Map()
+  for (const item of items.value) {
+    const key = item.merchantId ?? `invalid-${item.id}`
+    if (!groups.has(key)) {
+      groups.set(key, {
+        merchantId: item.merchantId,
+        merchantName: item.merchantName || (item.merchantId ? `店铺 #${item.merchantId}` : '失效商品'),
+        items: []
+      })
+    }
+    groups.get(key).items.push(item)
   }
-  try {
-    checkoutPreview.value = await previewOrder(
-      activeMerchantId.value,
-      selectedAddressId.value || undefined,
-      selectedUserCouponId.value || undefined
-    )
-  } catch {
-    checkoutPreview.value = null
+  return [...groups.values()]
+})
+
+const invalidCount = computed(() => items.value.filter((item) => item.valid === false).length)
+const selectedGroups = computed(() => merchantGroups.value
+  .map((group) => ({
+    ...group,
+    selectedItems: group.items.filter((item) => selectedProductIds.value.has(item.productId) && item.valid !== false)
+  }))
+  .filter((group) => group.merchantId && group.selectedItems.length))
+const selectedItemCount = computed(() => selectedGroups.value.reduce((sum, group) => sum + group.selectedItems.length, 0))
+const hasPendingPayments = computed(() => pendingFoodOrders.value.length > 0 || pendingDealOrders.value.length > 0)
+const hasCartContent = computed(() => items.value.length > 0 || hasPendingPayments.value)
+const aggregateTotal = computed(() => selectedGroups.value.reduce(
+  (sum, group) => sum + (previews.value[group.merchantId]?.totalPrice || 0), 0
+))
+const canSubmit = computed(() => {
+  if (!selectedAddressId.value || !selectedGroups.value.length || submitting.value) return false
+  return selectedGroups.value.every((group) => (
+    !previewLoadingIds.value.has(group.merchantId)
+    && previews.value[group.merchantId]?.canCheckout
+    && !previewErrors.value[group.merchantId]
+  ))
+})
+
+function validItems(group) {
+  return group.items.filter((item) => item.valid !== false)
+}
+
+function groupSelection(group) {
+  const selectable = validItems(group)
+  const selectedCount = selectable.filter((item) => selectedProductIds.value.has(item.productId)).length
+  return {
+    checked: selectable.length > 0 && selectedCount === selectable.length,
+    indeterminate: selectedCount > 0 && selectedCount < selectable.length
   }
 }
 
-async function loadClaimableCoupons() {
-  try {
-    claimableCoupons.value = await listClaimableCoupons()
-  } catch {
-    claimableCoupons.value = []
+function replaceSelection(next) {
+  selectedProductIds.value = new Set(next)
+}
+
+async function toggleItem(item, checked) {
+  if (item.valid === false) return
+  const next = new Set(selectedProductIds.value)
+  if (checked) next.add(item.productId)
+  else next.delete(item.productId)
+  replaceSelection(next)
+  await loadMerchantPreview(item.merchantId)
+}
+
+async function toggleMerchant(group, checked) {
+  const next = new Set(selectedProductIds.value)
+  for (const item of validItems(group)) {
+    if (checked) next.add(item.productId)
+    else next.delete(item.productId)
   }
+  replaceSelection(next)
+  await loadMerchantPreview(group.merchantId)
+}
+
+function selectedIdsForMerchant(merchantId) {
+  return items.value
+    .filter((item) => item.merchantId === merchantId && item.valid !== false && selectedProductIds.value.has(item.productId))
+    .map((item) => item.productId)
+}
+
+function setPreviewLoading(merchantId, loading) {
+  const next = new Set(previewLoadingIds.value)
+  if (loading) next.add(merchantId)
+  else next.delete(merchantId)
+  previewLoadingIds.value = next
+}
+
+async function loadMerchantPreview(merchantId) {
+  if (!merchantId) return
+  const productIds = selectedIdsForMerchant(merchantId)
+  if (!productIds.length) {
+    const nextPreviews = { ...previews.value }
+    const nextErrors = { ...previewErrors.value }
+    const nextCoupons = { ...selectedCoupons.value }
+    delete nextPreviews[merchantId]
+    delete nextErrors[merchantId]
+    delete nextCoupons[merchantId]
+    previews.value = nextPreviews
+    previewErrors.value = nextErrors
+    selectedCoupons.value = nextCoupons
+    return
+  }
+
+  const requestId = (previewRequests.get(merchantId) || 0) + 1
+  previewRequests.set(merchantId, requestId)
+  setPreviewLoading(merchantId, true)
+  try {
+    let couponId = selectedCoupons.value[merchantId] || undefined
+    let preview = await previewOrder(merchantId, selectedAddressId.value || undefined, couponId, productIds)
+    if (previewRequests.get(merchantId) !== requestId) return
+    if (couponId && !(preview.availableCoupons || []).some((coupon) => String(coupon.id) === String(couponId))) {
+      selectedCoupons.value = { ...selectedCoupons.value, [merchantId]: '' }
+      couponId = undefined
+      preview = await previewOrder(merchantId, selectedAddressId.value || undefined, couponId, productIds)
+      if (previewRequests.get(merchantId) !== requestId) return
+    }
+    previews.value = { ...previews.value, [merchantId]: preview }
+    const nextErrors = { ...previewErrors.value }
+    delete nextErrors[merchantId]
+    previewErrors.value = nextErrors
+  } catch (error) {
+    if (previewRequests.get(merchantId) !== requestId) return
+    const nextPreviews = { ...previews.value }
+    delete nextPreviews[merchantId]
+    previews.value = nextPreviews
+    previewErrors.value = { ...previewErrors.value, [merchantId]: error.response?.data?.message || '结算信息加载失败' }
+  } finally {
+    if (previewRequests.get(merchantId) === requestId) setPreviewLoading(merchantId, false)
+  }
+}
+
+async function loadAllSelectedPreviews() {
+  await Promise.all(selectedGroups.value.map((group) => loadMerchantPreview(group.merchantId)))
+}
+
+async function changeCoupon(merchantId, couponId) {
+  selectedCoupons.value = { ...selectedCoupons.value, [merchantId]: couponId }
+  await loadMerchantPreview(merchantId)
+}
+
+async function loadClaimableCoupons() {
+  try { claimableCoupons.value = await listClaimableCoupons() } catch { claimableCoupons.value = [] }
 }
 
 async function handleClaimCoupon(couponId) {
@@ -66,7 +174,7 @@ async function handleClaimCoupon(couponId) {
     await claimCoupon(couponId)
     message.value = '优惠券领取成功'
     await loadClaimableCoupons()
-    await loadPreview()
+    await loadAllSelectedPreviews()
   } catch (error) {
     message.value = error.response?.data?.message || '领取失败'
   }
@@ -75,48 +183,42 @@ async function handleClaimCoupon(couponId) {
 async function load() {
   try {
     const [cartItems, orderList, dealList, addressList] = await Promise.all([
-      getCart(),
-      listOrders(),
-      listMyDealOrders(),
-      listAddresses()
+      getCart(), listOrders(), listMyDealOrders(), listAddresses()
     ])
     items.value = cartItems
+    replaceSelection([])
+    previews.value = {}
+    selectedCoupons.value = {}
     pendingFoodOrders.value = orderList.filter((entry) => entry.order.status === 'PENDING_PAYMENT')
     pendingDealOrders.value = dealList.filter((entry) => entry.status === 'PENDING_PAYMENT')
     addresses.value = addressList
     selectedAddressId.value = addresses.value.find((item) => item.isDefault)?.id || addresses.value[0]?.id || ''
     message.value = ''
-    await loadPreview()
   } catch {
     message.value = '请先登录后查看购物车'
   }
 }
 
 async function submit() {
-  if (!items.value.length || !activeMerchantId.value) return
-  if (!selectedAddressId.value) {
-    message.value = '请先在个人中心添加并选择配送地址'
-    return
-  }
-  if (invalidCount.value) {
-    message.value = '请先清理失效商品'
-    return
-  }
-  if (!checkoutPreview.value?.canCheckout) {
-    message.value = checkoutPreview.value?.message || '当前订单不满足下单条件'
-    return
-  }
+  if (!canSubmit.value) return
+  submitting.value = true
   try {
-    const data = await createOrder({
-      merchantId: activeMerchantId.value,
+    const data = await createOrderBatch({
       addressId: selectedAddressId.value,
       remark: orderRemark.value.trim() || undefined,
-      userCouponId: selectedUserCouponId.value || undefined
+      merchantGroups: selectedGroups.value.map((group) => ({
+        merchantId: group.merchantId,
+        productIds: group.selectedItems.map((item) => item.productId),
+        userCouponId: selectedCoupons.value[group.merchantId] || undefined
+      }))
     })
-    message.value = `订单 ${data.order.id} 已创建，请完成支付`
-    await router.push(`/payment/${data.order.id}`)
+    const orderIds = data.orders.map((entry) => entry.order.id)
+    await router.push({ name: 'BatchPayment', query: { orderIds: orderIds.join(',') } })
   } catch (error) {
     message.value = error.response?.data?.message || '提交订单失败'
+    await loadAllSelectedPreviews()
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -124,32 +226,25 @@ async function removeInvalidItems() {
   try {
     items.value = await clearInvalidCart()
     message.value = '失效商品已清理'
-    await loadPreview()
-  } catch (error) {
-    message.value = error.response?.data?.message || '清理失败'
-  }
+  } catch (error) { message.value = error.response?.data?.message || '清理失败' }
 }
 
 async function changeQuantity(item, quantity) {
-  const nextQuantity = Math.min(
-    Number(item.stock || 1),
-    Math.max(1, Math.trunc(Number(quantity || 1)))
-  )
+  const nextQuantity = Math.min(Number(item.stock || 1), Math.max(1, Math.trunc(Number(quantity || 1))))
   const result = await updateQuantity(item.productId, nextQuantity)
-  if (result) {
-    items.value = result
-    await loadPreview()
-  } else {
-    await load()
-  }
+  if (result) items.value = result
+  else await load()
+  await loadMerchantPreview(item.merchantId)
 }
 
 async function deleteItem(item) {
   const result = await removeItem(item.productId)
-  if (result) {
-    items.value = result
-    await loadPreview()
-  }
+  if (!result) return
+  items.value = result
+  const next = new Set(selectedProductIds.value)
+  next.delete(item.productId)
+  replaceSelection(next)
+  await loadMerchantPreview(item.merchantId)
 }
 
 async function cancelPendingFood(order) {
@@ -158,175 +253,76 @@ async function cancelPendingFood(order) {
   await load()
 }
 
-onMounted(async () => {
-  await loadClaimableCoupons()
-  await load()
-})
-
-watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
+watch(selectedAddressId, loadAllSelectedPreviews)
+onMounted(async () => { await loadClaimableCoupons(); await load() })
 </script>
 
 <template>
   <div class="user-page cart-page">
-    <div class="cart-header">
+    <header class="cart-header">
       <h1>购物车</h1>
-      <p v-if="merchantIds().length > 1" class="multi-merchant-warn">
-        购物车包含多个商家商品，本次将提交第一个商家的商品
-      </p>
-    </div>
-
+      <p>按店铺选择商品，可跨店合并结算</p>
+    </header>
     <div class="user-page-split cart-layout">
-      <div class="cart-main">
+      <main class="cart-main">
         <section v-if="hasPendingPayments" class="pending-section">
-          <div class="section-title">
-            <h2>待支付</h2>
-            <span>下单或购买后未完成的订单会集中显示在这里</span>
-          </div>
-
+          <div class="section-title"><h2>待支付</h2><span>此前未完成支付的订单</span></div>
           <div class="pending-grid">
             <article v-for="order in pendingFoodOrders" :key="`food-${order.order.id}`" class="pending-card">
-              <div class="pending-main">
-                <div>
-                  <strong>外卖订单 #{{ order.order.id }}</strong>
-                  <p>{{ order.items.length }} 件商品 · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p>
-                </div>
-                <span class="pending-tag">待支付</span>
-              </div>
-              <div class="pending-actions">
-                <RouterLink class="pay-btn" :to="`/payment/${order.order.id}`">去支付</RouterLink>
-                <button class="cancel-btn" type="button" @click="cancelPendingFood(order)">取消订单</button>
-              </div>
+              <div><strong>外卖订单 #{{ order.order.id }}</strong><p>{{ order.items.length }} 件商品 · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p></div>
+              <div class="pending-actions"><RouterLink class="pay-btn" :to="`/payment/${order.order.id}`">去支付</RouterLink><button class="cancel-btn" type="button" @click="cancelPendingFood(order)">取消订单</button></div>
             </article>
-
             <article v-for="deal in pendingDealOrders" :key="`deal-${deal.id}`" class="pending-card">
-              <div class="pending-main">
-                <div>
-                  <strong>团购券订单 #{{ deal.id }}</strong>
-                  <p>团购商品 #{{ deal.dealId }} · ¥{{ (deal.payAmount / 100).toFixed(2) }}</p>
-                </div>
-                <span class="pending-tag deal">团购待支付</span>
-              </div>
-              <div class="pending-actions">
-                <RouterLink class="pay-btn" :to="`/payment/deal/${deal.id}`">去支付</RouterLink>
-              </div>
+              <div><strong>团购券订单 #{{ deal.id }}</strong><p>团购商品 #{{ deal.dealId }} · ¥{{ (deal.payAmount / 100).toFixed(2) }}</p></div>
+              <div class="pending-actions"><RouterLink class="pay-btn" :to="`/payment/deal/${deal.id}`">去支付</RouterLink></div>
             </article>
           </div>
         </section>
 
-        <div class="cart-items" v-if="items.length">
-          <div class="section-title compact">
-            <h2>购物车商品</h2>
-          </div>
-          <div class="cart-item" :class="{ invalid: item.valid === false }" v-for="item in items" :key="item.productId">
-            <div class="item-main">
-              <div class="item-info">
-                <h2 class="item-name">{{ item.productName }}</h2>
-                <p class="item-meta">库存 {{ item.stock }} · 单价 ¥{{ (item.price / 100).toFixed(2) }}</p>
-                <p v-if="item.valid === false" class="invalid-tip">{{ item.invalidReason || '商品不可购买' }}</p>
+        <section v-if="items.length" class="cart-items">
+          <div class="section-title compact"><h2>购物车商品</h2><span>已选择 {{ selectedItemCount }} 件</span></div>
+          <article v-for="group in merchantGroups" :key="group.merchantId || group.merchantName" class="merchant-group">
+            <header class="merchant-header">
+              <el-checkbox :model-value="groupSelection(group).checked" :indeterminate="groupSelection(group).indeterminate" :disabled="!validItems(group).length" @change="toggleMerchant(group, $event)"><strong>{{ group.merchantName }}</strong></el-checkbox>
+              <span>{{ validItems(group).length }} 件可结算</span>
+            </header>
+            <div v-for="item in group.items" :key="item.productId" class="cart-item" :class="{ invalid: item.valid === false, selected: selectedProductIds.has(item.productId) }">
+              <el-checkbox :model-value="selectedProductIds.has(item.productId)" :disabled="item.valid === false" :aria-label="`选择 ${item.productName}`" @change="toggleItem(item, $event)" />
+              <div class="item-main">
+                <div class="item-info"><h3>{{ item.productName }}</h3><p>库存 {{ item.stock }} · 单价 ¥{{ (item.price / 100).toFixed(2) }}</p><p v-if="item.valid === false" class="invalid-tip">{{ item.invalidReason || '商品不可购买' }}</p></div>
+                <strong class="item-price">¥{{ (item.subtotal / 100).toFixed(2) }}</strong>
               </div>
-              <div class="item-price">¥{{ (item.subtotal / 100).toFixed(2) }}</div>
+              <div class="cart-actions">
+                <label class="quantity-field">数量<input type="number" min="1" step="1" :max="item.stock" :value="item.quantity" :disabled="actionProductId === item.productId || item.valid === false" @change="changeQuantity(item, $event.target.value)" /></label>
+                <button class="delete-btn" :disabled="actionProductId === item.productId" @click="deleteItem(item)">删除</button>
+              </div>
             </div>
-            <div class="cart-actions">
-              <label class="quantity-field">
-                数量
-                <input
-                  type="number"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  min="1"
-                  step="1"
-                  :max="item.stock"
-                  :value="item.quantity"
-                  :disabled="actionProductId === item.productId"
-                  @change="changeQuantity(item, $event.target.value)"
-                />
-              </label>
-              <button
-                class="delete-btn"
-                :disabled="actionProductId === item.productId"
-                @click="deleteItem(item)"
-              >
-                删除
-              </button>
-            </div>
-          </div>
-          <div v-if="invalidCount" class="invalid-actions">
-            <p>有 {{ invalidCount }} 件商品已失效或库存不足</p>
-            <button class="secondary" type="button" @click="removeInvalidItems">清理失效商品</button>
-          </div>
-        </div>
-
-        <div class="cart-empty" v-if="!hasCartContent">
-          <p>购物车暂无商品，也没有待支付订单</p>
-        </div>
-
-        <p class="cart-message" v-if="message">{{ message }}</p>
-      </div>
+          </article>
+          <div v-if="invalidCount" class="invalid-actions"><p>有 {{ invalidCount }} 件商品已失效或库存不足</p><button class="secondary" type="button" @click="removeInvalidItems">清理失效商品</button></div>
+        </section>
+        <div v-if="!hasCartContent" class="cart-empty">购物车暂无商品，也没有待支付订单</div>
+        <p v-if="message" class="cart-message">{{ message }}</p>
+      </main>
 
       <aside v-if="items.length" class="cart-sidebar">
-        <footer class="checkout-bar checkout-bar-side">
-          <label class="address-select address-select-block">
-            <span class="total-label">配送地址</span>
-            <select v-model="selectedAddressId">
-              <option value="">暂不选择</option>
-              <option v-for="item in addresses" :key="item.id" :value="item.id">
-                {{ item.contactName }} · {{ item.address }}
-              </option>
-            </select>
-          </label>
-          <label class="address-select address-select-block">
-            <span class="total-label">订单备注</span>
-            <textarea v-model="orderRemark" rows="2" placeholder="口味、送达要求等（可选）" />
-          </label>
-          <label class="address-select address-select-block">
-            <span class="total-label">优惠券</span>
-            <select v-model="selectedUserCouponId">
-              <option value="">不使用优惠券</option>
-              <option
-                v-for="coupon in checkoutPreview?.availableCoupons || []"
-                :key="coupon.id"
-                :value="coupon.id"
-              >
-                {{ coupon.title }} · 减 ¥{{ (coupon.discountAmount / 100).toFixed(2) }}
-              </option>
-            </select>
-          </label>
-          <div v-if="claimableCoupons.length" class="claimable-coupons">
-            <p class="claimable-title">可领取优惠券</p>
-            <div v-for="coupon in claimableCoupons" :key="coupon.id" class="claimable-item">
-              <span>{{ coupon.title }}</span>
-              <button type="button" class="secondary compact" @click="handleClaimCoupon(coupon.id)">领取</button>
-            </div>
-          </div>
-          <div v-if="checkoutPreview" class="checkout-breakdown">
-            <div class="breakdown-row">
-              <span>商品小计</span>
-              <span>¥{{ (checkoutPreview.subtotal / 100).toFixed(2) }}</span>
-            </div>
-            <div v-if="checkoutPreview.deliveryFee > 0 || checkoutPreview.distanceMeters" class="breakdown-row">
-              <span>
-                配送费
-                <small v-if="checkoutPreview.distanceMeters">
-                  · {{ checkoutPreview.distanceMeters < 1000 ? `${checkoutPreview.distanceMeters}m` : `${(checkoutPreview.distanceMeters / 1000).toFixed(1)}km` }}
-                </small>
-              </span>
-              <span>¥{{ (checkoutPreview.deliveryFee / 100).toFixed(2) }}</span>
-            </div>
-            <div v-if="checkoutPreview.couponDiscount > 0" class="breakdown-row discount">
-              <span>优惠券抵扣</span>
-              <span>-¥{{ (checkoutPreview.couponDiscount / 100).toFixed(2) }}</span>
-            </div>
-            <div v-if="checkoutPreview.minOrderGap > 0" class="breakdown-row warn">
-              <span>距起送价还差</span>
-              <span>¥{{ (checkoutPreview.minOrderGap / 100).toFixed(2) }}</span>
-            </div>
-          </div>
-          <div class="checkout-total">
-            <span class="total-label">应付合计</span>
-            <span class="total-price">¥{{ ((checkoutPreview?.totalPrice || 0) / 100).toFixed(2) }}</span>
-          </div>
-          <p v-if="checkoutPreview && !checkoutPreview.canCheckout" class="checkout-tip">{{ checkoutPreview.message }}</p>
-          <button class="submit-btn" :disabled="!canSubmit" @click="submit">提交订单</button>
+        <footer class="checkout-panel">
+          <label class="field-block"><span>配送地址</span><select v-model="selectedAddressId"><option value="">请选择配送地址</option><option v-for="address in addresses" :key="address.id" :value="address.id">{{ address.contactName }} · {{ address.address }}</option></select></label>
+          <label class="field-block"><span>订单备注</span><textarea v-model="orderRemark" rows="2" placeholder="所有店铺共用（可选）" /></label>
+          <section v-for="group in selectedGroups" :key="`summary-${group.merchantId}`" class="merchant-summary">
+            <h3>{{ group.merchantName }}</h3>
+            <label class="field-block compact-field"><span>优惠券</span><select :value="selectedCoupons[group.merchantId] || ''" @change="changeCoupon(group.merchantId, $event.target.value)"><option value="">不使用优惠券</option><option v-for="coupon in previews[group.merchantId]?.availableCoupons || []" :key="coupon.id" :value="coupon.id">{{ coupon.title }} · 减 ¥{{ (coupon.discountAmount / 100).toFixed(2) }}</option></select></label>
+            <p v-if="previewLoadingIds.has(group.merchantId)" class="checkout-tip">正在计算...</p>
+            <p v-else-if="previewErrors[group.merchantId]" class="checkout-tip">{{ previewErrors[group.merchantId] }}</p>
+            <template v-else-if="previews[group.merchantId]">
+              <div class="breakdown-row"><span>商品小计</span><span>¥{{ (previews[group.merchantId].subtotal / 100).toFixed(2) }}</span></div>
+              <div class="breakdown-row"><span>配送费</span><span>¥{{ (previews[group.merchantId].deliveryFee / 100).toFixed(2) }}</span></div>
+              <div v-if="previews[group.merchantId].couponDiscount" class="breakdown-row discount"><span>优惠</span><span>-¥{{ (previews[group.merchantId].couponDiscount / 100).toFixed(2) }}</span></div>
+              <p v-if="!previews[group.merchantId].canCheckout" class="checkout-tip">{{ previews[group.merchantId].message }}</p>
+            </template>
+          </section>
+          <div v-if="claimableCoupons.length" class="claimable-coupons"><p>可领取优惠券</p><div v-for="coupon in claimableCoupons" :key="coupon.id"><span>{{ coupon.title }}</span><button type="button" class="secondary compact" @click="handleClaimCoupon(coupon.id)">领取</button></div></div>
+          <div class="checkout-total"><span>已选 {{ selectedItemCount }} 件 · 应付合计</span><strong>¥{{ (aggregateTotal / 100).toFixed(2) }}</strong></div>
+          <button class="submit-btn" :disabled="!canSubmit" @click="submit">{{ submitting ? '正在提交...' : '提交订单并付款' }}</button>
         </footer>
       </aside>
     </div>
@@ -334,489 +330,7 @@ watch([selectedAddressId, activeMerchantId, selectedUserCouponId], loadPreview)
 </template>
 
 <style scoped>
-.cart-page {
-  width: 100%;
-}
-
-.cart-header h1 {
-  font-size: 26px;
-  font-weight: 800;
-  margin: 0 0 8px 0;
-  letter-spacing: 0.04em;
-  padding-left: 16px;
-  position: relative;
-}
-.cart-header h1::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 4px;
-  bottom: 4px;
-  width: 4px;
-  background: linear-gradient(180deg, var(--color-primary), var(--clas-amber-300));
-  border-radius: var(--radius-full);
-}
-
-.multi-merchant-warn {
-  color: var(--clas-warning);
-  font-size: 13px;
-  background: var(--clas-warning-light);
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  margin: 12px 0 0 16px;
-}
-
-.section-title {
-  margin: 24px 0 12px;
-}
-.section-title.compact {
-  margin-top: 8px;
-}
-.section-title h2 {
-  font-size: 18px;
-  margin: 0 0 4px;
-}
-.section-title span {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.pending-section {
-  margin-top: 0;
-}
-
-.pending-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.pending-card {
-  background: var(--color-primary-light);
-  border: 1px solid var(--color-primary-soft);
-  border-radius: var(--radius-md);
-  margin-bottom: 10px;
-  padding: 16px 18px;
-}
-
-.pending-main {
-  align-items: flex-start;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.pending-main p {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin: 6px 0 0;
-}
-
-.pending-tag {
-  background: var(--color-primary-soft);
-  border-radius: var(--radius-full);
-  color: var(--clas-amber-700);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 10px;
-  white-space: nowrap;
-}
-.pending-tag.deal {
-  background: var(--color-accent-light);
-  color: var(--color-accent);
-}
-
-.pending-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-.pay-btn {
-  background: var(--color-primary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 16px;
-  text-decoration: none;
-}
-
-.cancel-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 13px;
-  padding: 8px 14px;
-}
-
-.cart-items {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 24px;
-}
-
-.cart-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 18px 22px;
-  transition-property: box-shadow, transform;
-  transition-duration: var(--transition-fast);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-.cart-item:hover {
-  border-color: var(--clas-amber-200);
-  box-shadow: var(--shadow-sm);
-}
-
-.item-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.item-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.item-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-.item-meta {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-.item-price {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--clas-amber-600);
-  white-space: nowrap;
-  margin-left: 24px;
-}
-
-.cart-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
-}
-
-.quantity-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.quantity-field input {
-  width: 72px;
-  height: 32px;
-  padding: 4px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  text-align: center;
-  background: var(--bg-page);
-  color: var(--text-primary);
-  transition: border-color var(--transition-fast);
-}
-.quantity-field input:focus {
-  border-color: var(--color-primary);
-  outline: none;
-}
-.quantity-field input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.delete-btn {
-  height: 32px;
-  padding: 0 16px;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--clas-error, #ef4444);
-  border: 1px solid var(--clas-error-light, #fecaca);
-  cursor: pointer;
-  transition-property: background-color, color, border-color, box-shadow;
-  transition-duration: var(--transition-fast);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-.delete-btn:hover:not(:disabled) {
-  background: var(--clas-error-light, #fef2f2);
-  border-color: var(--clas-error, #ef4444);
-}
-.delete-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.cart-empty {
-  text-align: center;
-  padding: 48px 0;
-  color: var(--text-muted);
-  font-size: 15px;
-}
-
-.checkout-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 20px 24px;
-  box-shadow: var(--shadow-md);
-}
-
-.checkout-bar-side textarea {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  font: inherit;
-  min-height: 64px;
-  padding: 8px 10px;
-  resize: vertical;
-  width: 100%;
-}
-
-.checkout-breakdown {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0;
-}
-
-.breakdown-row {
-  color: var(--text-secondary);
-  display: flex;
-  font-size: 13px;
-  justify-content: space-between;
-}
-
-.breakdown-row.warn {
-  color: var(--clas-warning);
-}
-
-.checkout-tip {
-  color: var(--clas-warning);
-  font-size: 13px;
-  margin: 0 0 10px;
-}
-
-.cart-item.invalid {
-  background: var(--color-primary-light);
-  border-color: var(--clas-amber-300);
-}
-
-.invalid-tip {
-  color: var(--clas-warning);
-  font-size: 13px;
-  margin: 4px 0 0;
-}
-
-.invalid-actions {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: space-between;
-  margin-top: 12px;
-}
-
-.invalid-actions p {
-  color: var(--clas-warning);
-  margin: 0;
-}
-
-.submit-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.breakdown-row.discount {
-  color: var(--clas-success);
-}
-
-.breakdown-row small {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.claimable-coupons {
-  margin: 8px 0 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--clas-warning-light);
-}
-
-.claimable-title {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.claimable-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.claimable-item + .claimable-item {
-  margin-top: 6px;
-}
-
-button.compact {
-  padding: 4px 10px;
-  font-size: 12px;
-}
-
-.checkout-bar-side {
-  align-items: stretch;
-  flex-direction: column;
-  gap: 16px;
-  position: sticky;
-  top: 88px;
-}
-
-.address-select-block {
-  align-items: stretch;
-  flex-direction: column;
-}
-
-.address-select-block select {
-  max-width: none;
-  width: 100%;
-}
-
-.cart-sidebar {
-  min-width: 0;
-}
-
-.checkout-total {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-.address-select {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-}
-.address-select select {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  height: 38px;
-  max-width: 240px;
-  padding: 0 10px;
-}
-.total-label {
-  font-size: 15px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-.total-price {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--clas-amber-600);
-  letter-spacing: -0.02em;
-}
-
-.submit-btn {
-  height: 44px;
-  padding: 0 32px;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  border-radius: var(--radius-sm);
-  background: var(--color-primary);
-  color: var(--text-primary);
-  border: none;
-  cursor: pointer;
-  transition-property: background-color, transform, box-shadow;
-  transition-duration: var(--transition-fast);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-  width: 100%;
-}
-.submit-btn:hover {
-  background: var(--color-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-.submit-btn:active {
-  transform: scale(0.97);
-}
-
-.cart-message {
-  text-align: center;
-  margin-top: 20px;
-  font-size: 14px;
-  color: var(--clas-success);
-  font-weight: 500;
-  padding: 10px 16px;
-  background: var(--clas-success-light);
-  border-radius: var(--radius-sm);
-}
-
-@media (max-width: 768px) {
-  .pending-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .cart-item {
-    padding: 14px 16px;
-  }
-  .item-main {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .item-price {
-    margin-left: 0;
-    align-self: flex-end;
-  }
-  .cart-actions {
-    justify-content: stretch;
-  }
-  .quantity-field {
-    flex: 1;
-  }
-  .quantity-field input {
-    flex: 1;
-  }
-  .checkout-bar {
-    flex-direction: column;
-    gap: 14px;
-    padding: 16px 18px;
-  }
-  .total-price {
-    font-size: 22px;
-  }
-  .submit-btn {
-    width: 100%;
-  }
-}
+.cart-page{width:100%}.cart-header h1{margin:0;font-size:26px}.cart-header p,.section-title span,.merchant-header span{color:var(--text-secondary);font-size:13px}.cart-main{min-width:0}.section-title{align-items:baseline;display:flex;gap:10px;margin:24px 0 12px}.section-title.compact{margin-top:8px}.section-title h2{font-size:18px;margin:0}.pending-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.pending-card{background:var(--color-primary-light);border:1px solid var(--color-primary-soft);border-radius:var(--radius-lg);padding:16px 18px}.pending-card p{color:var(--text-secondary);font-size:13px;margin:6px 0 0}.pending-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}.pay-btn,.cancel-btn{border-radius:var(--radius-sm);font-size:13px;padding:8px 14px;text-decoration:none}.pay-btn{background:var(--color-primary);color:var(--text-primary);font-weight:600}.cancel-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);cursor:pointer}.cart-items{display:flex;flex-direction:column;gap:14px;margin-top:24px}.merchant-group{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);overflow:hidden}.merchant-header{align-items:center;background:var(--color-primary-light);display:flex;justify-content:space-between;padding:14px 18px}.cart-item{align-items:center;border-top:1px solid var(--border-color);display:grid;gap:16px;grid-template-columns:auto minmax(0,1fr) auto;padding:18px}.cart-item.selected{background:var(--bg-page)}.cart-item.invalid{opacity:.68}.item-main{align-items:center;display:flex;justify-content:space-between;min-width:0}.item-info h3{font-size:16px;margin:0 0 5px}.item-info p{color:var(--text-muted);font-size:13px;margin:0}.item-info .invalid-tip,.checkout-tip{color:var(--clas-warning)}.item-price{color:var(--clas-amber-600);font-size:18px;margin-left:18px;white-space:nowrap}.cart-actions{align-items:center;display:flex;gap:10px}.quantity-field{align-items:center;color:var(--text-secondary);display:flex;font-size:13px;gap:6px}.quantity-field input{background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);padding:6px;text-align:center;width:62px}.delete-btn{background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--clas-error);cursor:pointer;padding:7px 12px}.delete-btn:disabled,.submit-btn:disabled{cursor:not-allowed;opacity:.55}.invalid-actions{align-items:center;display:flex;justify-content:space-between}.invalid-actions p{color:var(--clas-warning);margin:0}.cart-empty{color:var(--text-muted);padding:48px 0;text-align:center}.cart-message{color:var(--clas-warning)}.cart-sidebar{min-width:0}.checkout-panel{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:14px;padding:20px;position:sticky;top:88px}.field-block{display:flex;flex-direction:column;gap:7px}.field-block>span{color:var(--text-secondary);font-size:13px;font-weight:600}.field-block select,.field-block textarea{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font:inherit;padding:9px 10px;width:100%}.field-block textarea{resize:vertical}.merchant-summary{border-top:1px solid var(--border-color);padding-top:13px}.merchant-summary h3{font-size:14px;margin:0 0 10px}.compact-field{margin-bottom:10px}.breakdown-row{color:var(--text-secondary);display:flex;font-size:13px;justify-content:space-between;margin-top:6px}.breakdown-row.discount{color:var(--clas-success)}.checkout-tip{font-size:13px;margin:8px 0 0}.claimable-coupons{background:var(--clas-warning-light);border-radius:var(--radius-sm);padding:10px 12px}.claimable-coupons p{color:var(--text-secondary);font-size:13px;margin:0 0 8px}.claimable-coupons div{align-items:center;display:flex;font-size:13px;justify-content:space-between}.claimable-coupons div+div{margin-top:6px}button.compact{font-size:12px;padding:4px 10px}.checkout-total{align-items:flex-end;border-top:1px solid var(--border-color);display:flex;flex-direction:column;gap:4px;padding-top:14px}.checkout-total span{color:var(--text-secondary);font-size:13px}.checkout-total strong{color:var(--clas-amber-600);font-size:26px}.submit-btn{background:var(--color-primary);border:0;border-radius:var(--radius-sm);color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:700;min-height:44px}
+@media(max-width:900px){.pending-grid{grid-template-columns:1fr}.cart-item{grid-template-columns:auto minmax(0,1fr)}.cart-actions{grid-column:2;justify-content:flex-end}}
+@media(max-width:640px){.cart-item{align-items:flex-start}.item-main{align-items:flex-start;flex-direction:column;gap:8px}.item-price{margin-left:0}.cart-actions{flex-wrap:wrap;justify-content:flex-start}}
 </style>

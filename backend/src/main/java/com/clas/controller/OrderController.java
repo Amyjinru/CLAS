@@ -4,6 +4,8 @@ import com.clas.common.Result;
 import com.clas.config.RequireRole;
 import com.clas.config.UserContext;
 import com.clas.dto.CreateOrderRequest;
+import com.clas.dto.CreateOrderBatchRequest;
+import com.clas.dto.CreateOrderBatchResponse;
 import com.clas.dto.OrderPreviewResponse;
 import com.clas.dto.OrderResponse;
 import com.clas.dto.OrderLifecycleEventResponse;
@@ -69,8 +71,15 @@ public class OrderController {
             request.addressId(),
             request.deliveryAddress(),
             request.remark(),
-            request.userCouponId()
+            request.userCouponId(),
+            request.productIds()
         )));
+    }
+
+    @PostMapping("/create-batch")
+    @RequireRole("USER")
+    public Result<CreateOrderBatchResponse> createBatch(@Valid @RequestBody CreateOrderBatchRequest request) {
+        return Result.ok(orderService.createBatch(currentUserId(), request));
     }
 
     @GetMapping("/preview")
@@ -78,9 +87,10 @@ public class OrderController {
     public Result<OrderPreviewResponse> preview(
         @RequestParam Long merchantId,
         @RequestParam(required = false) Long addressId,
-        @RequestParam(required = false) Long userCouponId
+        @RequestParam(required = false) Long userCouponId,
+        @RequestParam(required = false) List<Long> productIds
     ) {
-        return Result.ok(orderService.previewCheckout(currentUserId(), merchantId, addressId, userCouponId));
+        return Result.ok(orderService.previewCheckout(currentUserId(), merchantId, addressId, userCouponId, productIds));
     }
 
     @GetMapping("/list/{userId}")

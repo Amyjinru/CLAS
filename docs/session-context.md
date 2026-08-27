@@ -20,7 +20,7 @@ dev (最新提交 62bfaee3，已推送 upstream/dev)
 
 CLAS（Comprehensive Life Assistant System）— 外卖电商 MVP + 第二阶段增强。
 
-- **后端**：Spring Boot 3.3.5, MyBatis Plus 3.5.9, MySQL 8.0, Lombok, Java 17 目标
+- **后端**：Spring Boot 3.3.5, MyBatis Plus 3.5.9, MySQL 8.0, Lombok, Java 25 目标
 - **前端**：Vue 3 + Vite 5 + Element Plus + ECharts + Pinia + Vue Router + Axios
 - **数据库**：8 张表（user, merchant, merchant_audit_log, product, cart, orders, order_item, review）
 
