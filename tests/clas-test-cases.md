@@ -24,7 +24,7 @@
 - **优先级**: High
 - **前置条件**: 用户 13800000001 存在
 - **测试步骤**:
-  1. 发送 POST `/api/user/login`，body: `{"phone":"13800000001","password":"123456"}`
+  1. 发送 POST `/api/user/login`，body: `{"phone":"13800000001","password":"Abc123!"}`
   2. 验证响应包含 token
 - **预期结果**: code=200, data.token 非空, token 格式为 JWT (三段 base64)
 - **后置条件**: 可使用该 token 访问受保护接口
@@ -598,4 +598,4 @@
 - 模拟支付延迟不阻塞数据库事务 (已通过 resolve-clas-core-risks 修复)
 - 优惠券领取使用原子更新防超发 (`claimed_count <= total_limit`)
 - 密码存储使用 BCrypt (以 `$2a$` 开头)
-- 测试用手机号: 13800000001~13800000012 (密码 123456)
+- 测试用手机号: 13800000001~13800000012 (密码 Abc123!)

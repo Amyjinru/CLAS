@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 const BASE = 'http://8.141.112.182'
-const TEST_USER = { phone: '13800000001', password: '123456' }
+const TEST_USER = { phone: '13800000001', password: 'Abc123!' }
 
 test.describe('CLAS 外卖网站 — 核心流程 E2E', () => {
 
