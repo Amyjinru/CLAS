@@ -5,6 +5,7 @@ import com.clas.config.UserContext;
 import com.clas.dto.LoginRequest;
 import com.clas.dto.LoginNoticeResponse;
 import com.clas.dto.LoginResponse;
+import com.clas.dto.DemoLoginRequest;
 import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
 import com.clas.config.RequireRole;
@@ -30,6 +31,11 @@ public class UserController {
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return Result.ok(userService.login(request));
+    }
+
+    @PostMapping("/demo-login")
+    public Result<LoginResponse> demoLogin(@Valid @RequestBody DemoLoginRequest request) {
+        return Result.ok(userService.demoLogin(request));
     }
 
     @PostMapping("/register")

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { login, register, sendLoginCode, sendRegisterCode, setSessionUser, currentRole, switchRole, getDeviceId } from '../api/clas'
+import { demoLogin, login, register, sendLoginCode, sendRegisterCode, setSessionUser, currentRole, switchRole, getDeviceId } from '../api/clas'
 import { passwordChecks, passwordRuleMessage, passwordStrength as calculatePasswordStrength } from '../utils/passwordRules'
 
 const route = useRoute()
@@ -40,6 +40,19 @@ const loginCodeCooldown = ref(0)
 const portalPickerVisible = ref(false)
 const loginSession = ref(null)
 const portalLabels = { USER: '普通用户端', MERCHANT: '商家端', RIDER: '骑手端', ADMIN: '管理端' }
+const demoAccessAvailable = import.meta.env.DEV
+const accessPickerVisible = ref(false)
+const demoLoginCode = ref('')
+const demoVerificationAccount = ref(null)
+const demoLoginLoadingPhone = ref('')
+const demoCodeSending = ref(false)
+const demoCodeCooldown = ref(0)
+const demoAccounts = [
+  { role: 'USER', label: '普通用户', phone: '13800000001', description: '浏览、下单与查看配送' },
+  { role: 'MERCHANT', label: '商家', phone: '13800000002', description: '经营店铺与处理订单' },
+  { role: 'ADMIN', label: '管理员', phone: '13800000003', description: '审核与运营管理' },
+  { role: 'RIDER', label: '骑手', phone: '13800000004', description: '接单与配送工作台' }
+]
 
 function validPhone(phone) {
   return phonePattern.test((phone || '').trim())
@@ -54,21 +67,7 @@ async function submitLogin() {
   showMessage('')
   try {
     const data = await login({ ...loginForm, deviceId: getDeviceId() })
-    // 将用户信息和 token 一并写入 session
-    const sessionData = { ...data.user, roles: data.roles || data.user.roles || [data.user.role], token: data.token }
-    setSessionUser(sessionData)
-    showMessage(`已登录：${sessionData.username}（${sessionData.role}）`, 'success')
-    if (sessionData.roles.length > 1) {
-      loginSession.value = sessionData
-      portalPickerVisible.value = true
-      loginLoading.value = false
-      return
-    }
-    // 直接从 session 读取角色做跳转，避免 data.user.role 未定义
-    const role = currentRole()
-    const redirect = route.query.redirect
-    const target = typeof redirect === 'string' && redirect ? redirect : roleHome[role] || '/home'
-    await router.push(target)
+    await completeLogin(data)
   } catch (error) {
     if (error.response?.data?.errorCode === 'LOGIN_VERIFICATION_REQUIRED') {
       loginVerificationRequired.value = true
@@ -77,6 +76,74 @@ async function submitLogin() {
       showMessage(error.response?.data?.message || '登录失败', 'error')
     }
     loginLoading.value = false
+  }
+}
+
+async function completeLogin(data, targetRole = '') {
+  let sessionData = { ...data.user, roles: data.roles || data.user.roles || [data.user.role], token: data.token }
+  setSessionUser(sessionData)
+  if (targetRole && targetRole !== sessionData.role) {
+    const switched = await switchRole(targetRole)
+    sessionData = { ...switched.user, roles: switched.roles || switched.user.roles || [switched.user.role], token: switched.token }
+    setSessionUser(sessionData)
+  }
+  showMessage(`已登录：${sessionData.username}（${sessionData.role}）`, 'success')
+  if (!targetRole && sessionData.roles.length > 1) {
+    loginSession.value = sessionData
+    portalPickerVisible.value = true
+    loginLoading.value = false
+    return
+  }
+  const role = currentRole()
+  const redirect = route.query.redirect
+  const target = targetRole ? roleHome[targetRole] || '/home' : typeof redirect === 'string' && redirect ? redirect : roleHome[role] || '/home'
+  await router.push(target)
+}
+
+function closeAccessPicker() {
+  accessPickerVisible.value = false
+  demoVerificationAccount.value = null
+  demoLoginCode.value = ''
+}
+
+async function loginWithDemoAccount(account) {
+  demoLoginLoadingPhone.value = account.phone
+  showMessage('')
+  try {
+    const data = await demoLogin({
+      phone: account.phone,
+      code: demoVerificationAccount.value?.phone === account.phone ? demoLoginCode.value : '',
+      deviceId: getDeviceId()
+    })
+    await completeLogin(data, account.role)
+    closeAccessPicker()
+  } catch (error) {
+    if (error.response?.data?.errorCode === 'LOGIN_VERIFICATION_REQUIRED') {
+      demoVerificationAccount.value = account
+      showMessage('该演示账号正在另一台设备使用，请获取验证码后确认登录', 'error')
+    } else {
+      showMessage(error.response?.data?.message || '演示账号登录失败', 'error')
+    }
+  } finally {
+    demoLoginLoadingPhone.value = ''
+  }
+}
+
+async function sendDemoVerificationCode() {
+  if (!demoVerificationAccount.value) return
+  demoCodeSending.value = true
+  try {
+    await sendLoginCode({ phone: demoVerificationAccount.value.phone })
+    demoCodeCooldown.value = 60
+    const timer = setInterval(() => {
+      demoCodeCooldown.value--
+      if (demoCodeCooldown.value <= 0) clearInterval(timer)
+    }, 1000)
+    showMessage('验证码已发送，请完成确认登录', 'success')
+  } catch (error) {
+    showMessage(error.response?.data?.message || '发送验证码失败', 'error')
+  } finally {
+    demoCodeSending.value = false
   }
 }
 
@@ -261,11 +328,18 @@ function switchTab(tab) {
           <p>{{ visualContent.description }}</p>
           <p v-if="visualContent.roleNote" class="visual-role-note">{{ visualContent.roleNote }}</p>
         </div>
-        <div class="visual-steps" :key="`${visualContent.mode}-steps`" aria-hidden="true">
+        <div class="visual-steps" :key="`${visualContent.mode}-steps`">
           <span
             v-for="step in visualContent.steps"
             :key="step"
           >{{ step }}</span>
+          <button
+            v-if="activeTab === 'login' && demoAccessAvailable"
+            type="button"
+            class="permission-trigger"
+            :aria-expanded="accessPickerVisible"
+            @click="accessPickerVisible = true"
+          >获得权限 <span aria-hidden="true">→</span></button>
         </div>
         <figure class="visual-photo" :key="`${visualContent.mode}-photo`">
           <img
@@ -519,6 +593,33 @@ function switchTab(tab) {
         </button>
       </div>
     </el-dialog>
+    <el-dialog v-model="accessPickerVisible" title="获得权限" width="min(680px, calc(100% - 32px))" @closed="closeAccessPicker">
+      <p class="demo-access-copy">本地演示环境可直接进入不同端口；手机号按钮不会展示或传递账号密码。</p>
+      <div class="demo-access-grid">
+        <article v-for="account in demoAccounts" :key="account.role" class="demo-access-card">
+          <span class="demo-role-badge">{{ account.label }}</span>
+          <strong>{{ account.description }}</strong>
+          <button type="button" class="demo-access-phone" :disabled="Boolean(demoLoginLoadingPhone)" @click="loginWithDemoAccount(account)">
+            <span>{{ account.phone }}</span>
+            <span v-if="demoLoginLoadingPhone === account.phone" class="spinner-small"></span>
+            <span v-else aria-hidden="true">一键登录 →</span>
+          </button>
+        </article>
+      </div>
+      <div v-if="demoVerificationAccount" class="demo-verification">
+        <div>
+          <strong>{{ demoVerificationAccount.label }}账号需要确认登录</strong>
+          <span>旧设备将立即退出，验证码仅用于本次会话确认。</span>
+        </div>
+        <div class="demo-verification-actions">
+          <input v-model="demoLoginCode" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="6位验证码" />
+          <button type="button" class="demo-code-button" :disabled="demoCodeSending || demoCodeCooldown > 0" @click="sendDemoVerificationCode">
+            {{ demoCodeSending ? '发送中' : demoCodeCooldown > 0 ? `${demoCodeCooldown}秒后重发` : '获取验证码' }}
+          </button>
+          <button type="button" class="demo-confirm-button" :disabled="!demoLoginCode" @click="loginWithDemoAccount(demoVerificationAccount)">确认登录</button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -698,6 +799,112 @@ function switchTab(tab) {
   font-size: 13px;
   font-weight: 700;
 }
+
+.permission-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 209, 0, 0.58);
+  border-radius: 999px;
+  background: #ffd100;
+  color: #3b2a0f;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(255, 209, 0, 0.2);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.permission-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(255, 209, 0, 0.3);
+}
+
+.demo-access-copy {
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.demo-access-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.demo-access-card {
+  display: grid;
+  gap: 9px;
+  padding: 16px;
+  border: 1px solid rgba(116, 82, 32, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #fffdf8, #fff7df);
+}
+
+.demo-access-card strong {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.demo-role-badge {
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 209, 0, 0.24);
+  color: #8b5b00;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.demo-access-phone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid rgba(15, 118, 110, 0.32);
+  border-radius: 10px;
+  background: #f1fbf9;
+  color: #0f766e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.demo-access-phone:hover:not(:disabled) {
+  background: #e1f5f1;
+  transform: translateY(-1px);
+}
+
+.demo-access-phone:disabled { cursor: wait; opacity: 0.7; }
+
+.demo-verification {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid rgba(234, 88, 12, 0.22);
+  border-radius: 16px;
+  background: #fff7ed;
+}
+
+.demo-verification strong,
+.demo-verification span { display: block; }
+.demo-verification strong { color: #9a3412; margin-bottom: 4px; }
+.demo-verification span { color: #9a5a38; font-size: 13px; line-height: 1.55; }
+.demo-verification-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+.demo-verification-actions input { min-width: 0; padding: 0 11px; border: 1px solid rgba(154, 52, 18, 0.24); border-radius: 10px; background: #fff; color: var(--text-primary); font: inherit; }
+.demo-code-button, .demo-confirm-button { min-height: 40px; padding: 0 12px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.demo-code-button { border: 1px solid rgba(15, 118, 110, 0.3); background: #fff; color: #0f766e; }
+.demo-confirm-button { border: 1px solid #ffd100; background: #ffd100; color: #3b2a0f; }
+.demo-code-button:disabled, .demo-confirm-button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .visual-login .visual-steps {
   margin-top: -2px;
@@ -1473,6 +1680,25 @@ input:focus-visible,
     min-height: 30px;
     padding: 6px 10px;
     font-size: 12px;
+  }
+
+  .permission-trigger {
+    min-height: 30px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .demo-access-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-verification-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .demo-verification-actions input {
+    grid-column: 1 / -1;
+    min-height: 40px;
   }
 
   .visual-kicker {

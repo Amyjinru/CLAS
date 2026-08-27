@@ -1,6 +1,7 @@
 import { api, unwrap } from './client'
 
 export const login = (payload) => api.post('/user/login', payload, { silent: true }).then(unwrap)
+export const demoLogin = (payload) => api.post('/user/demo-login', payload, { silent: true }).then(unwrap)
 export const sendLoginCode = (payload) => api.post('/user/login/send-code', payload, { silent: true }).then(unwrap)
 export const getPendingLoginNotice = (config = {}) => api.get('/user/login-notice', { silent: true, ...config }).then(unwrap)
 export const register = (payload) => api.post('/user/register', payload, { silent: true }).then(unwrap)

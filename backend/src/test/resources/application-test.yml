@@ -16,6 +16,8 @@ spring:
 clas:
   verification:
     fixed-code: "123456"
+  demo-accounts:
+    enabled: true
 
 jwt:
   secret: clas-test-secret-key-2026-must-be-32bytes!

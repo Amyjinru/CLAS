@@ -5,6 +5,7 @@ import com.clas.common.BusinessException;
 import com.clas.common.PasswordValidator;
 import com.clas.common.PhoneValidator;
 import com.clas.common.VerificationCodeStore;
+import com.clas.dto.DemoLoginRequest;
 import com.clas.dto.LoginRequest;
 import com.clas.dto.LoginNoticeResponse;
 import com.clas.dto.LoginResponse;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -30,6 +32,9 @@ public class UserService {
     private final VerificationCodeStore verificationCodeStore;
     private final BCryptPasswordEncoder passwordEncoder;
     private final com.clas.common.JwtUtil jwtUtil;
+
+    @Value("${clas.demo-accounts.enabled:false}")
+    private boolean demoAccountsEnabled;
 
     public UserService(UserMapper userMapper, UserRoleMapper userRoleMapper, VerificationCodeStore verificationCodeStore,
                        BCryptPasswordEncoder passwordEncoder, com.clas.common.JwtUtil jwtUtil) {
@@ -54,6 +59,28 @@ public class UserService {
         }
         if (!passwordMatches) throw new BusinessException("手机号或密码错误");
         if (Boolean.FALSE.equals(user.getEnabled())) throw new BusinessException("账号已被禁用，请联系管理员");
+        if (hasActiveSession(user) && !isSameDevice(user, request.deviceId())) {
+            if (request.code() == null || request.code().isBlank()) {
+                userMapper.createLoginChallenge(phone, user.getSessionToken(), UUID.randomUUID().toString(),
+                    normalizeDeviceId(request.deviceId()), LocalDateTime.now());
+                throw new BusinessException(409, "账号已在其他设备登录，请使用手机验证码确认登录", "LOGIN_VERIFICATION_REQUIRED");
+            }
+            verificationCodeStore.verify(phone, "login-session", request.code());
+        }
+        return loginResponse(user, defaultRole(phone), request.deviceId());
+    }
+
+    /**
+     * 快捷登录只在测试配置启用，避免演示账号入口进入正式部署环境。
+     * 已存在有效会话时仍要求验证码，保证与常规登录一致的单设备保护。
+     */
+    public LoginResponse demoLogin(DemoLoginRequest request) {
+        if (!demoAccountsEnabled) throw new BusinessException(404, "演示账号入口未启用", "DEMO_LOGIN_DISABLED");
+        String phone = PhoneValidator.normalizeAndValidate(request.phone());
+        User user = userMapper.selectById(phone);
+        if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
+            throw new BusinessException("演示账号不存在或已被禁用");
+        }
         if (hasActiveSession(user) && !isSameDevice(user, request.deviceId())) {
             if (request.code() == null || request.code().isBlank()) {
                 userMapper.createLoginChallenge(phone, user.getSessionToken(), UUID.randomUUID().toString(),
