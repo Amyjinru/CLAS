@@ -51,9 +51,11 @@ const demoCodeSending = ref(false)
 const demoCodeCooldown = ref(0)
 const demoAccounts = [
   { role: 'USER', label: '普通用户', phone: '13800000001', description: '浏览、下单与查看配送' },
-  { role: 'MERCHANT', label: '商家', phone: '13800000002', description: '经营店铺与处理订单' },
+  { role: 'MERCHANT', label: '商家（14）', phone: '14000000001', description: '经营店铺与处理订单' },
+  { role: 'MERCHANT', label: '商家（配送演示）', phone: '13345678901', description: '查看骑手联调餐厅与订单' },
   { role: 'ADMIN', label: '管理员', phone: '13800000003', description: '审核与运营管理' },
-  { role: 'RIDER', label: '骑手', phone: '13800000004', description: '接单与配送工作台' }
+  { role: 'RIDER', label: '骑手（08）', phone: '13800000008', description: '接单与配送工作台' },
+  { role: 'RIDER', label: '骑手（配送演示）', phone: '13345678903', description: '查看骑手联调订单与配送数据' }
 ]
 
 function validPhone(phone) {

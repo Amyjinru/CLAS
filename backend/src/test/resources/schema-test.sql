@@ -558,7 +558,11 @@ INSERT INTO "user" (phone, username, password, role, enabled, avatar, nickname) 
     ('13800000002', 'merchant', 'Abc123!', 'MERCHANT', TRUE, NULL, 'Merchant One'),
     ('13800000003', 'admin', 'Abc123!', 'ADMIN', TRUE, NULL, 'Admin One'),
     ('13800000004', 'rider_one', 'Abc123!', 'USER', TRUE, NULL, 'Rider One'),
-    ('13800000005', 'rider_two', 'Abc123!', 'USER', TRUE, NULL, 'Rider Two');
+    ('13800000005', 'rider_two', 'Abc123!', 'USER', TRUE, NULL, 'Rider Two'),
+    ('13800000008', 'rider_eight', 'Abc123!', 'USER', TRUE, NULL, 'Rider Eight'),
+    ('13345678903', 'delivery_demo_rider_a', 'Abc123!', 'USER', TRUE, NULL, 'Delivery Demo Rider'),
+    ('14000000001', 'merchant_fourteen', 'Abc123!', 'MERCHANT', TRUE, NULL, 'Merchant Fourteen'),
+    ('13345678901', 'delivery_demo_merchant', 'Abc123!', 'MERCHANT', TRUE, NULL, 'Delivery Demo Merchant');
 
 INSERT INTO user_role (user_id, role, status, created_at, updated_at) VALUES
     ('13800000001', 'USER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -567,21 +571,40 @@ INSERT INTO user_role (user_id, role, status, created_at, updated_at) VALUES
     ('13800000004', 'USER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('13800000004', 'RIDER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('13800000005', 'USER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('13800000005', 'RIDER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('13800000005', 'RIDER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000008', 'USER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000008', 'RIDER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13345678903', 'USER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13345678903', 'RIDER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('14000000001', 'MERCHANT', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13345678901', 'MERCHANT', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO rider_profile (user_id, real_name, id_card_ciphertext, id_card_masked, vehicle_type, service_area, emergency_contact_name, emergency_contact_phone, status, created_at, updated_at) VALUES
     ('13800000004', 'Test Rider One', 'test-ciphertext-rider-one', '110***********0001', 'E_BIKE', 'Campus', 'Emergency One', '13800000004', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('13800000005', 'Test Rider Two', 'test-ciphertext-rider-two', '110***********0002', 'E_BIKE', 'Campus', 'Emergency Two', '13800000005', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('13800000005', 'Test Rider Two', 'test-ciphertext-rider-two', '110***********0002', 'E_BIKE', 'Campus', 'Emergency Two', '13800000005', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000008', 'Test Rider Eight', 'test-ciphertext-rider-eight', '110***********0008', 'E_BIKE', 'Campus', 'Emergency Eight', '13800000008', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13345678903', 'Delivery Demo Rider', 'test-ciphertext-delivery-demo', '110***********0003', 'E_BIKE', 'Campus', 'Emergency Demo', '13345678903', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO merchant (
     id, user_id, merchant_name, phone, category, address, longitude, latitude,
     delivery_radius_m, business_hours, delivery_fee, min_order_price,
     average_price, score, status, bank_account, admin_remarks, settlement_cycle,
     created_at, updated_at
-) VALUES (
+) VALUES
+(
     1, '13800000002', 'Campus Light Meals', '13800000022', 'Food', 'Software Park East Gate No.1',
     116.397428, 39.909230, 3000, '00:00-23:59', 300, 1500, 2800, 4.70, 'OPEN',
     '6222000000000000001', 'Seed merchant for integration tests', 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+),
+(
+    2, '14000000001', 'Merchant Fourteen', '14000000001', 'Food', 'Campus Demo Zone',
+    116.397428, 39.909230, 3000, '09:00-22:00', 300, 1200, 2200, 4.60, 'OPEN',
+    '6222000000000000002', 'Quick-login merchant seed', 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+),
+(
+    3, '13345678901', 'Delivery Demo Restaurant', '13345678901', 'Food', 'Delivery Demo Zone',
+    116.397428, 39.909230, 5000, '09:00-22:00', 300, 0, 2600, 4.80, 'OPEN',
+    '6222000000000000003', 'Delivery demo merchant seed', 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );
 
 INSERT INTO product_category (id, merchant_id, name, sort_order, created_at, updated_at) VALUES
