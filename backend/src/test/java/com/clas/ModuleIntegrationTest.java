@@ -1842,6 +1842,41 @@ class ModuleIntegrationTest {
         reviewVoteMapper.insert(replyVote);
     }
 
+    /**
+     * 退出登录会清除服务端会话：其它设备存在时密码登录需验证码，退出后免验证码直接登录。
+     */
+    @Test
+    void logoutClearsSessionThenPasswordLoginSucceedsWithoutCode() throws Exception {
+        // 起点干净：无遗留会话，可直接密码登录
+        jdbcTemplate.update("UPDATE `user` SET session_token = NULL, session_expires_at = NULL WHERE phone = ?", USER_PHONE);
+
+        // 1. 首次登录建立会话
+        String token = loginToken(USER_PHONE, STRONG_PASSWORD);
+
+        // 2. 会话存在时，纯密码登录应返回 409（需要验证码）
+        MvcResult conflict = mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", USER_PHONE,
+                    "password", STRONG_PASSWORD))))
+            .andReturn();
+        assertEquals(409, conflict.getResponse().getStatus());
+
+        // 3. 退出登录，清除服务端会话
+        mockMvc.perform(post("/api/user/logout")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk());
+
+        // 4. 再次纯密码登录应直接成功，无需验证码
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", USER_PHONE,
+                    "password", STRONG_PASSWORD))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.token").isString());
+    }
+
     private String loginToken(String phone) throws Exception {
         return loginToken(phone, STRONG_PASSWORD);
     }

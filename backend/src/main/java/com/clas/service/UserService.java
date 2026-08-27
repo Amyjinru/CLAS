@@ -136,6 +136,15 @@ public class UserService {
         return loginResponse(user, role);
     }
 
+    /**
+     * 退出登录：清除当前会话，使其它设备无需验证码即可再次登录。
+     * 仅当 token 中的 sessionToken 仍与库中一致时才清除，避免误清新设备的会话。
+     */
+    public void logout(String phone, String sessionToken) {
+        if (phone == null || phone.isBlank() || sessionToken == null || sessionToken.isBlank()) return;
+        userMapper.clearSessionToken(phone, sessionToken);
+    }
+
     public List<String> rolesOf(String userId) {
         List<String> roles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId)).stream()
             .filter(identity -> "APPROVED".equals(identity.getStatus()))
