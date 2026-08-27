@@ -21,3 +21,9 @@
 - [x] 4.1 Add backend integration coverage for selected products, atomic batch rollback, and aggregate payment retries
 - [x] 4.2 Add frontend unit-testable selection/status helpers and focused tests where supported
 - [x] 4.3 Run backend tests and frontend production build, fixing regressions
+
+## 5. Runtime repair
+
+- [x] 5.1 Remove byte-identical untracked “ 2” source copies that caused duplicate Java class compilation
+- [x] 5.2 Align the default Maven bytecode target with Spring Boot 3.3 runtime support
+- [x] 5.3 Re-run standard backend tests, frontend tests/build, and a real application startup smoke check
