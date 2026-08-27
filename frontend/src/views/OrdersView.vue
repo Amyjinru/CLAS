@@ -19,13 +19,18 @@ const chatOrder = ref(null)
 const riderChatOrder = ref(null)
 const riderChatOpen = ref(false)
 const chatHasHistory = ref(new Set())
+const refundDialogOpen = ref(false)
+const refundTarget = ref(null)
+const refundReason = ref('')
+const refundSubmitting = ref(false)
 const route = useRoute()
 const activeTab = ref(route.query.tab || 'all')
 
 const refundStatusLabel = {
   PENDING: '待商家审核',
   APPROVED: '已通过',
-  REJECTED: '已拒绝'
+  REJECTED: '平台已维持商家处理',
+  DISPUTE_PENDING: '平台争议审核中'
 }
 
 const refundReasonOptions = [
@@ -108,13 +113,53 @@ async function cancel(order) {
   })
 }
 
-async function refund(order) {
-  const hint = refundReasonOptions.map((item, index) => `${index + 1}. ${item}`).join('\n')
-  const reason = window.prompt(`请选择或输入退款原因：\n${hint}`, refundReasonOptions[0])
-  if (!reason) return
-  await requestRefund(order.order.id, reason.trim())
-  message.value = '退款申请已提交'
-  await load()
+function openRefundDialog(order) {
+  refundTarget.value = order
+  refundReason.value = refundReasonOptions[0]
+  refundDialogOpen.value = true
+}
+
+function closeRefundDialog() {
+  if (refundSubmitting.value) return
+  refundDialogOpen.value = false
+  refundTarget.value = null
+  refundReason.value = ''
+}
+
+async function submitRefund() {
+  const reason = refundReason.value.trim()
+  if (!reason) {
+    message.value = '请填写退款原因'
+    return
+  }
+  if (!refundTarget.value) return
+  refundSubmitting.value = true
+  let submitted = false
+  try {
+    await requestRefund(refundTarget.value.order.id, reason)
+    message.value = '退款申请已提交'
+    await load()
+    submitted = true
+  } catch (error) {
+    message.value = error?.response?.data?.message || error?.message || '退款申请提交失败，请稍后重试'
+  } finally {
+    refundSubmitting.value = false
+  }
+  if (submitted) closeRefundDialog()
+}
+
+function canRequestRefund(order) {
+  if (!['PAID', 'ACCEPTED', 'COMPLETED'].includes(order.status) || (order.refundStatus && order.refundStatus !== 'NONE')) return false
+  if (order.deliveryStatus !== 'DELIVERED') return true
+  const deliveredAt = order.deliveryCompletedAt || order.deliveredAt
+  return deliveredAt && Date.now() <= new Date(deliveredAt).getTime() + 15 * 60 * 1000
+}
+
+function refundWindowHint(order) {
+  if (order.deliveryStatus !== 'DELIVERED' || order.refundStatus && order.refundStatus !== 'NONE') return ''
+  const deliveredAt = order.deliveryCompletedAt || order.deliveredAt
+  const remaining = Math.ceil((new Date(deliveredAt).getTime() + 15 * 60 * 1000 - Date.now()) / 60000)
+  return remaining > 0 ? `已送达，退款申请剩余约 ${remaining} 分钟` : '已超过送达后 15 分钟退款申请时限'
 }
 
 function hasReview(orderId) {
@@ -219,6 +264,7 @@ watch(() => route.query.tab, (tab) => {
           <p v-if="order.order.refundRejectReason" class="order-note warn">
             退款拒绝理由：{{ order.order.refundRejectReason }}
           </p>
+          <p v-if="refundWindowHint(order.order)" class="order-note warn">{{ refundWindowHint(order.order) }}</p>
           <p v-if="order.order.deliveryAddress">
             送至 {{ order.order.deliveryAddress }} · 约 {{ order.order.estimatedMinutes }} 分钟
             <span v-if="order.order.routeDistanceMeters"> · 路线 {{ distanceText(order.order.routeDistanceMeters) }}</span>
@@ -243,9 +289,10 @@ watch(() => route.query.tab, (tab) => {
           </button>
           <button v-if="order.order.status === 'ACCEPTED'" @click="complete(order)">确认完成</button>
           <button
-            v-if="['PAID', 'ACCEPTED', 'COMPLETED'].includes(order.order.status)"
+            v-if="canRequestRefund(order.order)"
             class="secondary"
-            @click="refund(order)"
+            type="button"
+            @click="openRefundDialog(order)"
           >
             申请退款
           </button>
@@ -313,6 +360,24 @@ watch(() => route.query.tab, (tab) => {
         :active="hasLiveRiderDelivery(riderChatOrder.order)"
       />
     </el-dialog>
+
+    <el-dialog
+      v-model="refundDialogOpen"
+      title="申请退款"
+      width="min(480px,92vw)"
+      :close-on-click-modal="!refundSubmitting"
+      :close-on-press-escape="!refundSubmitting"
+      @closed="closeRefundDialog"
+    >
+      <p class="refund-dialog-hint">请说明退款原因，商家会据此处理；已送达订单仅可在送达后 15 分钟内申请。</p>
+      <el-select v-model="refundReason" filterable allow-create default-first-option placeholder="请选择或输入退款原因" class="refund-reason-select">
+        <el-option v-for="reason in refundReasonOptions" :key="reason" :label="reason" :value="reason" />
+      </el-select>
+      <template #footer>
+        <el-button :disabled="refundSubmitting" @click="closeRefundDialog">取消</el-button>
+        <el-button type="primary" :loading="refundSubmitting" @click="submitRefund">提交申请</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -358,6 +423,17 @@ watch(() => route.query.tab, (tab) => {
 
 .order-note.warn {
   color: var(--clas-warning);
+}
+
+.refund-dialog-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0 0 16px;
+}
+
+.refund-reason-select {
+  width: 100%;
 }
 
 .tag {

@@ -16,6 +16,8 @@ import com.clas.service.AppealService;
 import com.clas.service.PenaltyService;
 import com.clas.service.ReviewService;
 import com.clas.service.StatisticsService;
+import com.clas.service.OrderRefundDisputeService;
+import com.clas.config.UserContext;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -47,6 +49,7 @@ public class AdminController {
     private final ProductMapper productMapper;
     private final PenaltyService penaltyService;
     private final AppealService appealService;
+    private final OrderRefundDisputeService refundDisputeService;
 
     public AdminController(
         StatisticsService statisticsService,
@@ -58,7 +61,8 @@ public class AdminController {
         ReviewService reviewService,
         ProductMapper productMapper,
         PenaltyService penaltyService,
-        AppealService appealService
+        AppealService appealService,
+        OrderRefundDisputeService refundDisputeService
     ) {
         this.statisticsService = statisticsService;
         this.userMapper = userMapper;
@@ -70,6 +74,7 @@ public class AdminController {
         this.productMapper = productMapper;
         this.penaltyService = penaltyService;
         this.appealService = appealService;
+        this.refundDisputeService = refundDisputeService;
     }
 
     // ==================== 仪表盘 ====================
@@ -111,6 +116,18 @@ public class AdminController {
     }
 
     // ==================== 订单管理 ====================
+
+    @GetMapping("/order-refund-disputes")
+    public Result<List<OrderRefundDispute>> orderRefundDisputes(@RequestParam(required = false) String status) {
+        return Result.ok(refundDisputeService.list(status));
+    }
+
+    @PatchMapping("/order-refund-disputes/{id}")
+    public Result<OrderRefundDispute> auditOrderRefundDispute(
+        @PathVariable Long id, @Valid @RequestBody RefundDisputeAuditRequest request
+    ) {
+        return Result.ok(refundDisputeService.audit(id, request.approved(), request.reason(), UserContext.getUserId()));
+    }
 
     @GetMapping("/orders")
     public Result<Map<String, Object>> listOrders(

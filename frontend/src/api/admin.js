@@ -7,6 +7,8 @@ export const getMerchantRanking = () => api.get('/admin/stats/merchants').then(u
 export const getTopProducts = () => api.get('/admin/stats/products').then(unwrap)
 export const listAdminOrders = (params) => api.get('/admin/orders', { params }).then(unwrap)
 export const getAdminOrderTimeline = (orderId) => api.get(`/order/${orderId}/timeline`).then(unwrap)
+export const listOrderRefundDisputes = (status) => api.get('/admin/order-refund-disputes', { params: { status } }).then(unwrap)
+export const auditOrderRefundDispute = (id, payload) => api.patch(`/admin/order-refund-disputes/${id}`, payload).then(unwrap)
 export const listAdminUsers = (params) => api.get('/admin/users', { params }).then(unwrap)
 export const toggleUserStatus = (id, enabled) => api.put(`/admin/users/${id}/status`, { enabled }).then(unwrap)
 export const listAdminReviews = (params) => api.get('/admin/reviews', { params, silent: true }).then(unwrap)
