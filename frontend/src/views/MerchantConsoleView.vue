@@ -2,12 +2,13 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // ===== test1: 商户审核 API =====
-import { getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, rejectOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
+import { acceptOrder, getMyMerchant, listMerchantOrders, currentUser, currentRole, listProducts, rejectOrder, redeemDeal, approveRefund, rejectRefund } from '../api/clas'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // ===== version_314: 订单详情组件 =====
 import OrderDetailContent from '../components/OrderDetailContent.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import RiderMerchantChatWindow from '../components/RiderMerchantChatWindow.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
 import MerchantWorkspaceShell from '../components/merchant/MerchantWorkspaceShell.vue'
 
@@ -34,8 +35,8 @@ const statusMap = {
 // ===== version_314: 订单状态映射 =====
 const orderStatusLabel = {
   PENDING_PAYMENT: '待支付',
-  PAID: '已支付(自动接单中)',
-  ACCEPTED: '已支付(自动接单中)',
+  PAID: '待确认接单',
+  ACCEPTED: '履约中',
   COMPLETED: '已完成',
   CANCELED: '已取消',
   REJECTED: '商家已拒单',
@@ -129,6 +130,15 @@ async function handleReject(orderId) {
   }
 }
 
+async function handleAccept(orderId) {
+  await acceptOrder(orderId)
+  ElMessage.success('已确认接单，订单已发布至骑手任务池')
+  await load()
+  if (selectedOrder.value?.order.id === orderId) {
+    selectedOrder.value = orders.value.find((item) => item.order.id === orderId) || null
+  }
+}
+
 async function handleRefund(orderId, approved) {
   if (approved) {
     await approveRefund(orderId)
@@ -179,6 +189,8 @@ function openDetail(order) {
 }
 
 const chatOrder = ref(null)
+const riderChatOrder = ref(null)
+const riderChatOpen = ref(false)
 
 function closeDetail() {
   selectedOrder.value = null
@@ -190,6 +202,20 @@ function openChat(order) {
 
 function closeChat() {
   chatOrder.value = null
+}
+
+function hasActiveRider(order) {
+  return ['ASSIGNED_WAITING_MEAL', 'DELIVERING'].includes(order?.deliveryStatus)
+}
+
+function openRiderChat(order) {
+  riderChatOrder.value = order
+  riderChatOpen.value = true
+}
+
+function closeRiderChat() {
+  riderChatOpen.value = false
+  riderChatOrder.value = null
 }
 
 function callUser(order) {
@@ -218,6 +244,7 @@ onMounted(() => {
     :merchant="merchant"
     :loading="loading"
     active-module="orders"
+    :show-merchant-info="false"
     @merchant-updated="onMerchantProfileSaved"
   >
       <div v-if="merchant" class="main-work-area">
@@ -272,7 +299,7 @@ onMounted(() => {
         <el-card v-if="merchant.status === 'OPEN'" class="box-card work-card">
           <template #header>
           <div class="card-header">
-            <h3>自动接单管理 (营业中)</h3>
+            <h3>接单管理</h3>
           </div>
           </template>
 
@@ -295,7 +322,7 @@ onMounted(() => {
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="配送" width="180">
+            <el-table-column label="配送进度" width="180">
               <template #default="scope">
                 <div>{{ scope.row.order.deliveryStatus || 'WAITING' }}</div>
                 <small v-if="scope.row.order.deliveryAddress">{{ scope.row.order.deliveryAddress }}</small>
@@ -313,6 +340,7 @@ onMounted(() => {
                 <div class="contact-actions">
                   <el-button
                     v-if="scope.row.customerCallUrl"
+                    class="call-button"
                     type="success"
                     size="small"
                     plain
@@ -330,6 +358,15 @@ onMounted(() => {
                     联系用户
                   </el-button>
                   <el-button
+                    v-if="hasActiveRider(scope.row.order)"
+                    type="primary"
+                    size="small"
+                    plain
+                    @click="openRiderChat(scope.row)"
+                  >
+                    联系骑手
+                  </el-button>
+                  <el-button
                     v-else
                     size="small"
                     @click="openChat(scope.row)"
@@ -341,6 +378,14 @@ onMounted(() => {
             </el-table-column>
             <el-table-column label="操作" width="180" fixed="right">
               <template #default="scope">
+                <el-button
+                  v-if="scope.row.order.status === 'PAID'"
+                  type="primary"
+                  size="small"
+                  @click="handleAccept(scope.row.order.id)"
+                >
+                  确认接单
+                </el-button>
                 <el-button
                   type="primary"
                   size="small"
@@ -414,6 +459,15 @@ onMounted(() => {
       </aside>
     </div>
 
+    <el-dialog v-model="riderChatOpen" title="与骑手沟通" width="min(560px,92vw)" @closed="closeRiderChat">
+      <RiderMerchantChatWindow
+        v-if="riderChatOrder"
+        :order-id="riderChatOrder.order.id"
+        role="MERCHANT"
+        :active="hasActiveRider(riderChatOrder.order)"
+      />
+    </el-dialog>
+
     <!-- ===== version_314: 订单详情侧滑弹窗 ===== -->
     <div v-if="selectedOrder" class="order-overlay" @click.self="closeDetail">
       <aside class="order-panel">
@@ -428,9 +482,17 @@ onMounted(() => {
 
         <footer class="order-panel-foot">
           <button
-            v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
+            v-if="selectedOrder.order.status === 'PAID'"
             type="button"
             class="secondary"
+            @click="handleAccept(selectedOrder.order.id)"
+          >
+            确认接单
+          </button>
+          <button
+            v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
+            type="button"
+            class="secondary call-button"
             @click="callUser(selectedOrder)"
           >
             拨打电话
@@ -442,6 +504,14 @@ onMounted(() => {
             @click="openChat(selectedOrder)"
           >
             联系用户
+          </button>
+          <button
+            v-if="hasActiveRider(selectedOrder.order)"
+            type="button"
+            class="secondary"
+            @click="openRiderChat(selectedOrder)"
+          >
+            联系骑手
           </button>
           <button
             v-if="['PAID', 'ACCEPTED'].includes(selectedOrder.order.status)"
@@ -630,6 +700,16 @@ onMounted(() => {
 
 .contact-actions :deep(.el-button + .el-button) {
   margin-left: 0;
+}
+
+/* 联系方式属于关键信息，按钮文字保持清晰的深色，避免受成功色主题影响。 */
+.call-button {
+  color: #1f2937 !important;
+}
+
+.call-button:hover,
+.call-button:focus-visible {
+  color: #111827 !important;
 }
 
 .order-item-list {

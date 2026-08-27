@@ -6,8 +6,8 @@ import com.clas.dto.LoginRequest;
 import com.clas.dto.LoginResponse;
 import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
+import com.clas.config.RequireRole;
 import com.clas.dto.SendCodeRequest;
-import com.clas.dto.SwitchRoleRequest;
 import com.clas.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,6 +53,12 @@ public class UserController {
         return Result.ok("验证码已发送");
     }
 
+    @PostMapping("/login/send-code")
+    public Result<String> sendLoginCode(@Valid @RequestBody SendCodeRequest request) {
+        userService.sendLoginCode(request);
+        return Result.ok("验证码已发送");
+    }
+
     /**
      * 忘记密码 — 验证码校验 + 密码重置 + 自动登录。
      */
@@ -62,7 +68,8 @@ public class UserController {
     }
 
     @PostMapping("/switch-role")
-    public Result<LoginResponse> switchRole(@Valid @RequestBody SwitchRoleRequest request) {
-        return Result.ok(userService.switchRole(UserContext.getUserId(), request));
+    @RequireRole({"USER", "MERCHANT", "ADMIN", "RIDER"})
+    public Result<LoginResponse> switchRole(@Valid @RequestBody com.clas.dto.RoleSwitchRequest request) {
+        return Result.ok(userService.switchRole(UserContext.getUserId(), request.role()));
     }
 }

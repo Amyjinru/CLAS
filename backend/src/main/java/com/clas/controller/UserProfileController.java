@@ -9,6 +9,8 @@ import com.clas.dto.PasswordChangeRequest;
 import com.clas.dto.PhoneChangeRequest;
 import com.clas.dto.ProfileUpdateRequest;
 import com.clas.dto.SendCodeRequest;
+import com.clas.dto.RoleCancellationRequest;
+import com.clas.dto.AccountCancellationRequest;
 import com.clas.entity.Appeal;
 import com.clas.entity.User;
 import com.clas.entity.UserPenalty;
@@ -50,13 +52,14 @@ public class UserProfileController {
     @GetMapping("/profile")
     @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<User> profile() {
-        return Result.ok(userProfileService.getProfile(UserContext.getUserId()));
+        return Result.ok(userProfileService.getProfile(UserContext.getUserId(), UserContext.getRole()));
     }
 
     @PutMapping("/profile")
     @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<User> updateProfile(@Valid @RequestBody ProfileUpdateRequest request) {
-        return Result.ok(userProfileService.updateProfile(UserContext.getUserId(), request));
+        userProfileService.updateProfile(UserContext.getUserId(), request);
+        return Result.ok(userProfileService.getProfile(UserContext.getUserId(), UserContext.getRole()));
     }
 
     @PostMapping("/phone-change/send-code")
@@ -76,6 +79,20 @@ public class UserProfileController {
     @RequireRole({"USER", "MERCHANT", "RIDER", "ADMIN"})
     public Result<Void> changePassword(@Valid @RequestBody PasswordChangeRequest request) {
         userProfileService.changePassword(UserContext.getUserId(), request);
+        return Result.ok();
+    }
+
+    @PostMapping("/roles/cancel")
+    @RequireRole({"USER", "MERCHANT", "RIDER"})
+    public Result<Void> cancelBusinessRole(@Valid @RequestBody RoleCancellationRequest request) {
+        userProfileService.cancelBusinessRole(UserContext.getUserId(), request);
+        return Result.ok();
+    }
+
+    @PostMapping("/account/cancel")
+    @RequireRole({"USER", "MERCHANT", "RIDER"})
+    public Result<Void> cancelAccount(@Valid @RequestBody AccountCancellationRequest request) {
+        userProfileService.cancelAccount(UserContext.getUserId(), request);
         return Result.ok();
     }
 

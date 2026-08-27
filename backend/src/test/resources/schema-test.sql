@@ -20,6 +20,22 @@ DROP TABLE IF EXISTS user_bank_card;
 DROP TABLE IF EXISTS payment;
 DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS chat_message;
+DROP TABLE IF EXISTS chat_conversation;
+DROP TABLE IF EXISTS delivery_call_session;
+DROP TABLE IF EXISTS order_lifecycle_event;
+DROP TABLE IF EXISTS rider_daily_metrics;
+DROP TABLE IF EXISTS rider_review;
+DROP TABLE IF EXISTS rider_tip;
+DROP TABLE IF EXISTS rider_withdrawal;
+DROP TABLE IF EXISTS rider_settlement;
+DROP TABLE IF EXISTS delivery_exception;
+DROP TABLE IF EXISTS rider_location_history;
+DROP TABLE IF EXISTS rider_audit_log;
+DROP TABLE IF EXISTS rider_profile_change_request;
+DROP TABLE IF EXISTS rider_profile;
+DROP TABLE IF EXISTS rider_application;
+DROP TABLE IF EXISTS user_role;
+DROP TABLE IF EXISTS order_lifecycle_event;
 DROP TABLE IF EXISTS order_item;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS cart;
@@ -38,7 +54,9 @@ CREATE TABLE "user" (
     role VARCHAR(20) NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     avatar VARCHAR(512),
-    nickname VARCHAR(50)
+    nickname VARCHAR(50),
+    session_token VARCHAR(64),
+    session_expires_at TIMESTAMP
 );
 
 CREATE TABLE role_application (
@@ -57,6 +75,9 @@ CREATE TABLE user_role (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,
     role VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'APPROVED',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_user_role UNIQUE (user_id, role)
 );
 
@@ -81,6 +102,7 @@ CREATE TABLE merchant (
     bank_account VARCHAR(50),
     admin_remarks VARCHAR(255),
     settlement_cycle INT,
+    default_prepare_minutes INT NOT NULL DEFAULT 15,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     UNIQUE(user_id)
@@ -181,9 +203,13 @@ CREATE TABLE orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(20) NOT NULL,
     merchant_id BIGINT NOT NULL,
+    rider_id VARCHAR(20),
     total_price INT NOT NULL,
     subtotal INT NOT NULL DEFAULT 0,
     delivery_fee INT NOT NULL DEFAULT 0,
+    rider_commission INT NOT NULL DEFAULT 0,
+    reassign_count INT NOT NULL DEFAULT 0,
+    delivery_sequence INT,
     coupon_discount INT NOT NULL DEFAULT 0,
     user_coupon_id BIGINT,
     status VARCHAR(20) NOT NULL,
@@ -192,10 +218,13 @@ CREATE TABLE orders (
     delivery_latitude DECIMAL(10,6),
     distance_meters INT,
     route_distance_meters INT,
-    delivery_status VARCHAR(20) NOT NULL DEFAULT 'WAITING',
-    rider_id VARCHAR(20),
+    delivery_status VARCHAR(40) NOT NULL DEFAULT 'WAITING',
     rider_accepted_at TIMESTAMP,
     estimated_minutes INT NOT NULL DEFAULT 30,
+    prepare_minutes_snapshot INT,
+    promise_start_at TIMESTAMP,
+    promise_end_at TIMESTAMP,
+    predicted_arrival_at TIMESTAMP,
     refund_reason VARCHAR(255),
     refund_status VARCHAR(20) NOT NULL DEFAULT 'NONE',
     refund_requested_at TIMESTAMP,
@@ -206,6 +235,9 @@ CREATE TABLE orders (
     create_time TIMESTAMP NOT NULL,
     paid_at TIMESTAMP,
     accepted_at TIMESTAMP,
+    rider_assigned_at TIMESTAMP,
+    picked_up_at TIMESTAMP,
+    delivery_completed_at TIMESTAMP,
     delivered_at TIMESTAMP,
     completed_at TIMESTAMP,
     canceled_at TIMESTAMP,
@@ -220,11 +252,27 @@ CREATE TABLE order_item (
     price INT NOT NULL
 );
 
+CREATE TABLE order_lifecycle_event (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    event_type VARCHAR(40) NOT NULL,
+    from_status VARCHAR(30),
+    to_status VARCHAR(30),
+    from_delivery_status VARCHAR(40),
+    to_delivery_status VARCHAR(40),
+    actor_role VARCHAR(20) NOT NULL,
+    actor_id VARCHAR(30),
+    remark VARCHAR(500),
+    created_at TIMESTAMP NOT NULL
+);
+
 CREATE TABLE chat_message (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT,
-    merchant_id BIGINT NOT NULL,
+    conversation_type VARCHAR(30) NOT NULL DEFAULT 'USER_MERCHANT',
+    merchant_id BIGINT,
     user_id VARCHAR(11) NOT NULL,
+    rider_id VARCHAR(20),
     sender_role VARCHAR(10) NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL
@@ -449,11 +497,58 @@ CREATE TABLE appeal (
     processed_at TIMESTAMP
 );
 
+CREATE TABLE rider_application (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT, user_id VARCHAR(20) NOT NULL,
+    real_name VARCHAR(50) NOT NULL, id_card_ciphertext VARCHAR(1024) NOT NULL,
+    id_card_masked VARCHAR(32) NOT NULL, vehicle_type VARCHAR(20) NOT NULL,
+    service_area VARCHAR(100) NOT NULL, emergency_contact_name VARCHAR(50) NOT NULL,
+    emergency_contact_phone VARCHAR(20) NOT NULL, credential_urls CLOB,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING', reject_reason VARCHAR(255),
+    reviewer_id VARCHAR(20), reviewed_at TIMESTAMP, created_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE rider_profile (
+    user_id VARCHAR(20) PRIMARY KEY, real_name VARCHAR(50) NOT NULL,
+    id_card_ciphertext VARCHAR(1024) NOT NULL, id_card_masked VARCHAR(32) NOT NULL,
+    vehicle_type VARCHAR(20) NOT NULL, service_area VARCHAR(100) NOT NULL,
+    emergency_contact_name VARCHAR(50) NOT NULL, emergency_contact_phone VARCHAR(20) NOT NULL, service_phone VARCHAR(20),
+    online_status BOOLEAN NOT NULL DEFAULT FALSE, accepting_orders BOOLEAN NOT NULL DEFAULT FALSE, max_active_orders INT NOT NULL DEFAULT 3,
+    current_longitude DECIMAL(10,6), current_latitude DECIMAL(10,6), location_updated_at TIMESTAMP,
+    withdrawable_balance INT NOT NULL DEFAULT 0, frozen_balance INT NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'APPROVED', created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE rider_audit_log (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, operator_id VARCHAR(20) NOT NULL, action VARCHAR(50) NOT NULL, reason VARCHAR(255), before_value CLOB, after_value CLOB, created_at TIMESTAMP NOT NULL);
+CREATE TABLE rider_profile_change_request (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, current_phone VARCHAR(20) NOT NULL, requested_phone VARCHAR(20) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'PENDING', review_reason VARCHAR(255), reviewer_id VARCHAR(20), reviewed_at TIMESTAMP, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL);
+CREATE TABLE rider_location_history (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, longitude DECIMAL(10,6) NOT NULL, latitude DECIMAL(10,6) NOT NULL, accuracy_meters INT, reported_at TIMESTAMP NOT NULL);
+CREATE TABLE delivery_exception (id BIGINT PRIMARY KEY AUTO_INCREMENT, order_id BIGINT NOT NULL, rider_id VARCHAR(20), exception_type VARCHAR(30) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'OPEN', score_deduction INT NOT NULL DEFAULT 0, commission_deduction INT NOT NULL DEFAULT 0, detail VARCHAR(255), created_at TIMESTAMP NOT NULL, UNIQUE(order_id, exception_type));
+CREATE TABLE rider_settlement (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, order_id BIGINT, source_type VARCHAR(30) NOT NULL, source_id VARCHAR(64) NOT NULL, settlement_type VARCHAR(30) NOT NULL, amount INT NOT NULL, balance_type VARCHAR(20) NOT NULL, created_at TIMESTAMP NOT NULL, UNIQUE(source_type, source_id));
+CREATE TABLE rider_withdrawal (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, bank_card_id BIGINT NOT NULL, amount INT NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'PENDING', reviewer_id VARCHAR(20), review_reason VARCHAR(255), created_at TIMESTAMP NOT NULL, reviewed_at TIMESTAMP);
+CREATE TABLE rider_tip (id BIGINT PRIMARY KEY AUTO_INCREMENT, order_id BIGINT NOT NULL UNIQUE, user_id VARCHAR(20) NOT NULL, rider_id VARCHAR(20) NOT NULL, amount INT NOT NULL, idempotency_key VARCHAR(100) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'PAID', paid_at TIMESTAMP NOT NULL, UNIQUE(user_id, idempotency_key));
+CREATE TABLE rider_review (id BIGINT PRIMARY KEY AUTO_INCREMENT, order_id BIGINT NOT NULL UNIQUE, user_id VARCHAR(20) NOT NULL, rider_id VARCHAR(20) NOT NULL, score INT NOT NULL, tags VARCHAR(255), content VARCHAR(500), created_at TIMESTAMP NOT NULL);
+CREATE TABLE rider_daily_metrics (id BIGINT PRIMARY KEY AUTO_INCREMENT, rider_id VARCHAR(20) NOT NULL, metric_date DATE NOT NULL, completed_orders INT NOT NULL DEFAULT 0, net_income INT NOT NULL DEFAULT 0, average_rating DECIMAL(3,2), overdue_count INT NOT NULL DEFAULT 0, average_delivery_minutes INT NOT NULL DEFAULT 0, base_score DECIMAL(5,2) NOT NULL DEFAULT 0, manual_adjustment DECIMAL(5,2) NOT NULL DEFAULT 0, final_score DECIMAL(5,2) NOT NULL DEFAULT 0, grade VARCHAR(2) NOT NULL DEFAULT 'D', archived_at TIMESTAMP, UNIQUE(rider_id, metric_date));
+CREATE TABLE delivery_call_session (id BIGINT PRIMARY KEY AUTO_INCREMENT, order_id BIGINT NOT NULL, rider_id VARCHAR(20) NOT NULL, user_id VARCHAR(20) NOT NULL, masked_phone VARCHAR(20) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', expires_at TIMESTAMP NOT NULL, created_at TIMESTAMP NOT NULL);
+CREATE TABLE chat_conversation (id BIGINT PRIMARY KEY AUTO_INCREMENT, order_id BIGINT NOT NULL, conversation_type VARCHAR(30) NOT NULL, user_id VARCHAR(20) NOT NULL, peer_id VARCHAR(20) NOT NULL, last_message_at TIMESTAMP, created_at TIMESTAMP NOT NULL, UNIQUE(order_id, conversation_type));
+
 INSERT INTO "user" (phone, username, password, role, enabled, avatar, nickname) VALUES
     ('13800000001', 'user', 'Abc123!', 'USER', TRUE, NULL, 'User One'),
     ('13800000002', 'merchant', 'Abc123!', 'MERCHANT', TRUE, NULL, 'Merchant One'),
     ('13800000003', 'admin', 'Abc123!', 'ADMIN', TRUE, NULL, 'Admin One'),
-    ('13800000004', 'rider', 'Abc123!', 'RIDER', TRUE, NULL, 'Rider One');
+    ('13800000004', 'rider_one', 'Abc123!', 'USER', TRUE, NULL, 'Rider One'),
+    ('13800000005', 'rider_two', 'Abc123!', 'USER', TRUE, NULL, 'Rider Two');
+
+INSERT INTO user_role (user_id, role, status, created_at, updated_at) VALUES
+    ('13800000001', 'USER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000002', 'MERCHANT', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000003', 'ADMIN', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000004', 'USER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000004', 'RIDER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000005', 'USER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000005', 'RIDER', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+INSERT INTO rider_profile (user_id, real_name, id_card_ciphertext, id_card_masked, vehicle_type, service_area, emergency_contact_name, emergency_contact_phone, status, created_at, updated_at) VALUES
+    ('13800000004', 'Test Rider One', 'test-ciphertext-rider-one', '110***********0001', 'E_BIKE', 'Campus', 'Emergency One', '13800000004', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('13800000005', 'Test Rider Two', 'test-ciphertext-rider-two', '110***********0002', 'E_BIKE', 'Campus', 'Emergency Two', '13800000005', 'APPROVED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO merchant (
     id, user_id, merchant_name, phone, category, address, longitude, latitude,

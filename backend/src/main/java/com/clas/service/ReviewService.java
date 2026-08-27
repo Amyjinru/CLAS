@@ -66,6 +66,7 @@ public class ReviewService {
     private final ContentModerationService contentModerationService;
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
+    private final OrderLifecycleService lifecycleService;
 
     public ReviewService(
         ReviewMapper reviewMapper,
@@ -84,7 +85,8 @@ public class ReviewService {
         UserProfileService userProfileService,
         ContentModerationService contentModerationService,
         UserMapper userMapper,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        OrderLifecycleService lifecycleService
     ) {
         this.reviewMapper = reviewMapper;
         this.reviewImageMapper = reviewImageMapper;
@@ -103,6 +105,7 @@ public class ReviewService {
         this.contentModerationService = contentModerationService;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
+        this.lifecycleService = lifecycleService;
     }
 
     @Transactional
@@ -133,6 +136,7 @@ public class ReviewService {
         review.setReportStatus("NONE");
         review.setCreatedAt(LocalDateTime.now());
         reviewMapper.insert(review);
+        lifecycleService.record(order, "MERCHANT_REVIEWED", order.getStatus(), order.getDeliveryStatus(), "USER", request.userId(), "用户完成商家评价");
         saveImages(review.getId(), images);
         recalculateMerchantScore(order.getMerchantId());
         return review;
@@ -210,7 +214,7 @@ public class ReviewService {
         List<Long> replyIds = replies.stream().map(ReviewReply::getId).toList();
         List<ReviewVote> votes = new ArrayList<>();
         votes.addAll(reviewVoteMapper.selectList(new LambdaQueryWrapper<ReviewVote>()
-            .eq(ReviewVote::getTargetType, "REVIEW")
+            .in(ReviewVote::getTargetType, List.of("REVIEW", "MERCHANT_REPLY"))
             .in(ReviewVote::getTargetId, reviewIds)));
         if (!replyIds.isEmpty()) {
             votes.addAll(reviewVoteMapper.selectList(new LambdaQueryWrapper<ReviewVote>()
@@ -459,6 +463,8 @@ public class ReviewService {
         User user = context.users().get(review.getUserId());
         VoteSummary reviewVotes = summarizeVotes(context.votesByTarget()
             .getOrDefault(voteKey("REVIEW", review.getId()), List.of()), viewerId);
+        VoteSummary merchantReplyVotes = summarizeVotes(context.votesByTarget()
+            .getOrDefault(voteKey("MERCHANT_REPLY", review.getId()), List.of()), viewerId);
         List<ReviewReply> replies = context.repliesByReview().getOrDefault(review.getId(), List.of());
         List<ReviewReplyResponse> replyResponses = replies.stream()
             .map(reply -> toReplyResponse(reply, viewerId, context))
@@ -476,9 +482,9 @@ public class ReviewService {
             reviewVotes.likes(),
             reviewVotes.dislikes(),
             reviewVotes.myVote(),
-            null,
-            0L,
-            0L,
+            merchantReplyVotes.myVote(),
+            merchantReplyVotes.likes(),
+            merchantReplyVotes.dislikes(),
             replyResponses,
             review.getCreatedAt() == null ? null : review.getCreatedAt().toString(),
             viewerId != null && viewerId.equals(review.getUserId())
@@ -578,6 +584,12 @@ public class ReviewService {
                 ReviewReply reply = reviewReplyMapper.selectById(targetId);
                 if (reply == null || Boolean.TRUE.equals(reply.getDeleted())) {
                     throw new BusinessException("回复不存在");
+                }
+            }
+            case "MERCHANT_REPLY" -> {
+                Review review = requireReview(targetId);
+                if (review.getMerchantReply() == null || review.getMerchantReply().isBlank()) {
+                    throw new BusinessException("商家回复不存在");
                 }
             }
             default -> throw new BusinessException("不支持的投票目标");

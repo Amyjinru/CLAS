@@ -12,6 +12,9 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
     @Select("SELECT * FROM chat_message WHERE order_id = #{orderId} ORDER BY created_at ASC")
     List<ChatMessage> selectByOrderId(@Param("orderId") Long orderId);
 
+    @Select("SELECT * FROM chat_message WHERE order_id = #{orderId} AND conversation_type = 'USER_RIDER' ORDER BY created_at ASC")
+    List<ChatMessage> selectUserRiderByOrderId(@Param("orderId") Long orderId);
+
     @Select("SELECT cm.* FROM chat_message cm " +
         "INNER JOIN (SELECT merchant_id, MAX(created_at) AS max_time FROM chat_message " +
         "WHERE user_id = #{userId} GROUP BY merchant_id) latest " +

@@ -22,8 +22,8 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     public AuthInterceptor(UserMapper userMapper, UserRoleMapper userRoleMapper, JwtUtil jwtUtil) {
         this.userMapper = userMapper;
-        this.userRoleMapper = userRoleMapper;
         this.jwtUtil = jwtUtil;
+        this.userRoleMapper = userRoleMapper;
     }
 
     @Override
@@ -46,15 +46,22 @@ public class AuthInterceptor implements HandlerInterceptor {
                 if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
                     throw new BusinessException(401, "账号已被禁用或不存在");
                 }
+                String tokenSession = jwtUtil.getSessionTokenFromToken(token);
+                if (tokenSession == null || !tokenSession.equals(user.getSessionToken())) {
+                    throw new BusinessException(401, "账号已在其他设备登录，请重新登录");
+                }
                 String activeRole = jwtUtil.getRoleFromToken(token);
-                boolean roleGranted = userRoleMapper.exists(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserRole>()
+                UserRole identity = userRoleMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserRole>()
                     .eq(UserRole::getUserId, phone).eq(UserRole::getRole, activeRole));
-                // 兼容尚未执行身份表迁移的旧账号；迁移后每次请求均由 user_role 校验。
-                // USER 是每个账号永久拥有的基础端口；兼容迁移前尚未回填 user_role 的旧会话。
-                if ("USER".equals(activeRole)) roleGranted = true;
-                if (!roleGranted && activeRole.equals(user.getRole())) roleGranted = true;
-                if (!roleGranted) throw new BusinessException(403, "当前端口身份已失效，请重新登录");
-                // 令牌只证明登录身份；当前端口必须仍属于数据库中的已授予身份。
+                boolean legacyIdentity = identity == null && activeRole != null && activeRole.equals(user.getRole());
+                if (!legacyIdentity && (identity == null || !"APPROVED".equals(identity.getStatus()))) {
+                    throw new BusinessException(403, "当前身份尚未审核通过或已不可用");
+                }
+                // Administrator tokens remain bound to the legacy administrator flag; merchant and rider
+                // identities may be added to an originally USER account through the approved role table.
+                if ("ADMIN".equals(activeRole) && !activeRole.equals(user.getRole())) {
+                    throw new BusinessException(403, "当前端口身份已失效，请重新登录");
+                }
                 user.setRole(activeRole);
                 UserContext.setUser(user);
             } else {

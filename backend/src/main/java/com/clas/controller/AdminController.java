@@ -117,6 +117,7 @@ public class AdminController {
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int size,
         @RequestParam(required = false) String status,
+        @RequestParam(required = false) String deliveryStatus,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
         @RequestParam(required = false) String keyword
@@ -124,6 +125,9 @@ public class AdminController {
         LambdaQueryWrapper<Orders> wrapper = new LambdaQueryWrapper<>();
         if (status != null && !status.isBlank()) {
             wrapper.eq(Orders::getStatus, status);
+        }
+        if (deliveryStatus != null && !deliveryStatus.isBlank()) {
+            wrapper.eq(Orders::getDeliveryStatus, deliveryStatus);
         }
         if (startDate != null) {
             wrapper.ge(Orders::getCreateTime, startDate.atStartOfDay());

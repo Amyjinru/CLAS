@@ -317,6 +317,7 @@ onMounted(async () => {
               <el-button type="primary" :loading="changingPassword" @click="submitPasswordChange">更新密码</el-button>
             </el-form>
           </div>
+
         </el-tab-pane>
 
         <el-tab-pane label="支付设置" name="payment">

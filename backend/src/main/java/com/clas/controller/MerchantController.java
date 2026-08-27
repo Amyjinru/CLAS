@@ -167,6 +167,8 @@ public class MerchantController {
             throw new BusinessException("当前用户未入驻为商家");
         }
         Map<String, Object> response = new LinkedHashMap<>();
+        response.put("merchantName", merchant.merchantName());
+        response.put("createdAt", merchant.createdAt());
         response.put("status", merchant.status());
         response.put("adminRemarks", merchant.adminRemarks());
         response.put("auditTimeline", merchantService.getAuditLogs(merchant.id()));

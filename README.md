@@ -1,112 +1,210 @@
-﻿# CLAS MVP 极简框架
+# CLAS 综合生活服务平台
 
-这是按软件详细设计说明书核心验收流程重建的最小可运行版本。第一阶段只保留外卖下单闭环：
+> 面向校园与社区场景的多角色生活服务系统。项目以外卖为主线，覆盖用户消费、商家经营、骑手配送和平台运营，并扩展团购、到店预约、评价治理、公告通知等生活服务能力。
 
-```text
-浏览商家 -> 浏览商品 -> 加入购物车 -> 提交订单 -> 模拟支付 -> 商家接单 -> 确认完成 -> 评价
+CLAS（Comprehensive Life Assistant System）不是单一的点餐页面，而是一个可以完整演示「下单—履约—结算—评价—运营」链路的全栈项目。前端提供四端工作台，后端以角色、状态机、审计记录和接口权限保证业务协作可追踪。
+
+## 项目亮点
+
+- 四角色协同：普通用户、商家、骑手和管理员使用同一账号体系，通过角色申请与切换进入各自工作台。
+- 外卖履约闭环：支付、商家接单与出餐、骑手上线定位、任务调度、接单、取餐、配送、用户确认收货、评价和结算形成可追踪状态链路。
+- 真实配送能力：附近任务按佣金、距离和智能路线排序；骑手支持多单配送、重新定位、配送时效、异常记录、收入流水、提现、小费和每日表现。
+- 双向协作沟通：用户可联系商家和骑手；骑手可在配送期间联系用户、通过隐私号码拨号，并与订单所属商家双向聊天。
+- 平台运营治理：管理员可审核商家/骑手申请、管理用户和订单、处理评价举报与申诉、审核提现，并查看统计仪表盘与运营数据。
+- 安全与工程化：JWT + RBAC、BCrypt、Redis 验证码、幂等支付、内容审核、数据库迁移、H2 集成测试、GitHub Actions 构建测试与云端自动部署。
+
+## 业务全景
+
+```mermaid
+flowchart LR
+    U[用户] -->|浏览 / 下单 / 支付| M[商家]
+    M -->|接单 / 备餐 / 出餐| R[骑手]
+    R -->|取餐 / 定位 / 配送| U
+    U -->|确认收货 / 打赏 / 评价| R
+    U -->|评价 / 退款 / 咨询| M
+    A[管理员] -->|审核、运营、风控、结算| U
+    A -->|审核、运营、风控、结算| M
+    A -->|审核、运营、风控、结算| R
 ```
 
-当前版本已接入 Redis 验证码、模拟支付、公告管理（含置顶/有效期）、数据统计与管理员后台、CSV 数据导出、Dashboard 大屏模式；鉴权已升级为 JWT Bearer Token + BCrypt 密码哈希，HTTP 状态码规范化（401/403/400），CORS 白名单配置化。收藏功能已实现（收藏店铺、取消收藏、收藏列表）。优惠券模块、评价治理（举报/删评/申诉/违规处罚）已上线。
+### 外卖配送状态链路
 
-> 第二阶段已实现商家入驻、5态状态机、管理员审核、RBAC 权限控制，详见下方「功能改进」章节。
+```text
+待支付 → 已支付 → 商家接单 → 备餐中 → 可配送
+                                      ↓
+骑手上线定位 → 接单 → 待取餐 → 配送中 → 已送达 → 用户确认 → 已完成
+```
 
-## 技术栈
+系统会记录订单及配送状态变更的时间线；骑手接单、取餐、送达等关键操作均由后端校验当前状态和订单归属。
 
-- 后端：Spring Boot 3、MyBatis Plus、MySQL、Redis、Lombok
-- 前端：Vue3、Vite、axios
-- 数据库：28 张业务表，见 `database/schema.sql`；旧本地库请按文件名顺序执行 `database/migration-*.sql` 补齐字段和新增表。
+## 功能模块
+
+| 端 | 核心能力 |
+| --- | --- |
+| 用户端 | 手机号注册登录、地址管理、商家浏览与筛选、商品购物车、下单支付、订单追踪、联系商家/骑手、退款、收藏、团购、预约、公告、评价与举报 |
+| 商家端 | 入驻申请与审核状态、营业开关、商品与分类、订单接单/出餐、联系用户/骑手、退款处理、团购券、预约、评价回复、经营分析与消息中心 |
+| 骑手端 | 骑手申请与身份审核、开始/结束接单、浏览附近任务、佣金/距离/智能排序、接单、取餐、确认送达、实时定位、用户/商家沟通、隐私通话、收入、提现、评价与日绩效 |
+| 管理端 | 数据仪表盘、用户/商家/骑手运营、订单全局查看、商家与骑手审核、角色申请、评价治理、申诉处理、公告管理、消息和统计导出 |
+
+### 骑手配送模块
+
+骑手模块是项目的重点履约能力，包含：
+
+- 经管理员审核后获得 `RIDER` 身份；同一账号可保留 `USER`、`MERCHANT` 等多个已审批身份并切换。
+- “上线”和“开始接单”分离：开始接单后才进入任务池；结束接单只停止接收新任务，手中订单仍须送完。
+- 使用浏览器定位和高德 Web 服务能力计算附近可接任务，支持佣金、距离、智能路线三种排序。
+- 每位骑手默认最多并行配送 3 单，管理员可调整上限；配送中订单按承诺送达时间排序，临近超时订单优先提示。
+- 订单配送期间，骑手可联系用户、联系商家；用户可查看骑手位置与预计剩余时间。拨打用户时仅返回虚拟/脱敏号码，不暴露真实手机号。
+- 用户可给骑手打赏并评价；平台按订单数、收入、评分、超时等指标生成骑手每日表现，支持收入结算与提现审核。
+
+### 平台治理与内容安全
+
+- 商家、骑手、角色申请和关键资料变更均支持审核、状态和审计记录。
+- 评价支持图片、回复、点赞、举报、隐藏/删除申请、申诉与违规处罚等治理流程。
+- 头像、昵称、评价和评论等内容提交前可通过本地敏感词与可选 DashScope 审核服务拦截。
+- 公告支持发布、置顶、有效期和多端查看；通知中心支持业务消息跳转。
+
+## 技术架构
+
+| 层次 | 技术与职责 |
+| --- | --- |
+| 前端 | Vue 3、Vite、Vue Router、Pinia、Element Plus、Axios、ECharts；按角色路由守卫和工作台页面组织 |
+| 后端 | Spring Boot 3.3、Spring Validation、MyBatis-Plus、Redis、JWT、BCrypt、Lombok |
+| 数据 | MySQL 8，完整结构见 `database/schema.sql`；H2 测试库结构见 `backend/src/test/resources/schema-test.sql` |
+| 工程 | Maven、npm、GitHub Actions、SSH 云端部署、数据库迁移脚本、后端集成测试 |
+
+```text
+浏览器（Vue 3）
+    │ Axios + Bearer Token
+    ▼
+Spring Boot REST API
+    ├── AuthInterceptor / @RequireRole / UserContext
+    ├── Controller → Service → Mapper（MyBatis-Plus）
+    ├── Redis：注册验证码等短期数据
+    ├── MySQL：订单、角色、配送、结算、评价、审计等业务数据
+    └── 可选能力：高德 Web 服务、DashScope 内容审核
+```
 
 ## 项目结构
 
 ```text
-backend/src/main/java/com/clas
-├── common      # Result、业务异常、全局异常处理、商家状态枚举
-├── config      # CORS、AuthInterceptor、RequireRole、UserContext、MyMetaObjectHandler
-├── controller  # REST API（用户、商家、商品、购物车、订单、评价、健康检查）
-├── dto         # 请求与响应 DTO（含商家入驻、审核）
-├── entity      # 业务表实体（含商家审核日志、支付、公告）
-├── mapper      # MyBatis Plus Mapper（含审核日志 Mapper）
-└── service     # 用户、商家、商品、购物车、订单、评价
+.
+├── backend/                         # Spring Boot 后端
+│   ├── src/main/java/com/clas/
+│   │   ├── config/                  # JWT、CORS、权限注解、请求上下文
+│   │   ├── controller/              # 用户、订单、骑手、商家、管理端 REST API
+│   │   ├── service/                 # 业务规则、状态机、调度、结算与审核
+│   │   ├── entity/ mapper/ dto/     # 数据模型、持久层与接口对象
+│   │   └── common/                  # 统一响应、异常与错误码
+│   └── src/test/                    # H2 集成测试与测试数据库结构
+├── frontend/                        # Vue 3 前端
+│   ├── src/views/                   # 用户、商家、骑手、管理员页面
+│   ├── src/components/              # 订单、聊天、商家工作台等复用组件
+│   ├── src/api/                     # 按领域划分的 API 客户端
+│   └── src/router/                  # 路由与角色访问控制
+├── database/                        # MySQL 完整建库脚本与增量迁移
+├── .github/workflows/deploy.yml     # 构建、测试、自动部署工作流
+├── scripts/                         # 手动部署、数据初始化、烟雾测试辅助脚本
+├── docs/                            # 项目文档
+└── openspec/                        # 需求、设计与任务变更记录
 ```
 
-## 初始化数据库
+## 快速开始
 
-新同学首次初始化，或可以清空演示数据时，执行完整重建脚本：
+### 1. 环境要求
 
-```bash
-mysql -h127.0.0.1 -P3306 -uroot -p < database/schema.sql
-```
+| 工具 | 建议版本 |
+| --- | --- |
+| JDK | 17 |
+| Maven | 3.9+ |
+| Node.js | 22+ |
+| MySQL | 8.0+ |
+| Redis | 6+ |
 
-已经有本地旧数据、不想清空时，按文件名顺序执行非破坏性迁移脚本补齐缺失字段和表：
+### 2. 配置本地环境变量
 
-```bash
-for f in database/migration-*.sql; do mysql -h127.0.0.1 -P3306 -uroot -p < "$f"; done
-```
-
-PowerShell 不能使用 `<` 重定向时，可以改用：
+后端的敏感配置由环境变量注入。PowerShell 示例：
 
 ```powershell
-Get-ChildItem database\migration-*.sql | Sort-Object Name | ForEach-Object {
-  Get-Content -Raw $_.FullName | mysql --host=127.0.0.1 --port=3306 --user=root --password=你的密码
-}
+$env:MYSQL_PASSWORD = "你的 MySQL 密码"
+$env:JWT_SECRET = "至少 32 字节的随机密钥"
+$env:RIDER_IDENTITY_ENCRYPTION_KEY = "32 字节 AES 密钥"
+$env:CORS_ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 ```
 
-`schema.sql` 会重建 `clas` 数据库和 28 张业务表（含优惠券/评价治理/违规处理/团购核销等）；`migration-*.sql` 只补字段/表并保留已有数据。
+按需配置的可选能力：
 
-## 启动后端
+```powershell
+$env:AMAP_WEB_SERVICE_KEY = "高德 Web 服务 Key"
+$env:DASHSCOPE_API_KEY = "DashScope API Key"
+$env:FORBIDDEN_WORDS = "额外敏感词1,额外敏感词2"
+```
 
-确认 `backend/src/main/resources/application.yml` 中的 MySQL 用户名和密码正确，并启动本地 Redis（默认 `127.0.0.1:6379`）后运行：
+也可创建仅保存在本机的 `backend/src/main/resources/application-local.yml` 覆盖配置；不要将密码、密钥、身份证明文或真实手机号提交到仓库。
 
-```bash
-cd backend
+### 3. 初始化数据库
+
+首次开发或允许重建演示数据时，执行完整脚本：
+
+```powershell
+mysql --host=127.0.0.1 --port=3306 --user=root --password < database/schema.sql
+```
+
+已有历史数据库时，按文件名顺序执行 `database/migration-*.sql`，以保留原有数据并补齐表和字段。完整结构脚本会重建数据库；迁移前请先备份。
+
+### 4. 启动后端
+
+```powershell
+Set-Location backend
 mvn spring-boot:run
 ```
 
-默认端口：`http://localhost:8080`
+后端默认运行于 `http://127.0.0.1:8080`，健康检查为 `GET /api/health`。
 
-## 启动前端
+### 5. 启动前端
 
-```bash
-cd frontend
+另开一个终端：
+
+```powershell
+Set-Location frontend
 npm install
 npm run dev
 ```
 
-默认端口：`http://localhost:5173`
+前端默认地址为 `http://127.0.0.1:5173`。
 
-## 演示账号
+## 演示账号与推荐演示流程
 
-| 角色 | 手机号 | 展示名 | 密码 |
-| --- | --- | --- | --- |
-| 用户 | `13800000001` | `user` | `Abc123!` |
-| 商家 | `13800000002` | `merchant` | `Abc123!` |
-| 管理员 | `13800000003` | `admin` | `Abc123!` |
-| 骑手（MVP） | `13800000004` | `rider` | `Abc123!` |
+完整初始化脚本包含以下测试账号，密码均为 `Abc123!`，仅用于本地/演示数据库：
 
-当前版本采用 JWT 鉴权：前端登录后存储 Token 到 `localStorage`，请求时携带 `Authorization: Bearer <token>` Header，后端解析 JWT 获取用户身份并做角色校验。密码使用 BCrypt 哈希存储，旧明文密码登录时自动升级。
+| 角色 | 手机号 | 账号名 |
+| --- | --- | --- |
+| 用户 | `13800000001` | `user` |
+| 商家 | `13800000002` | `merchant` |
+| 管理员 | `13800000003` | `admin` |
+| 骑手一 | `13800000004` | `rider_one` |
+| 骑手二 | `13800000005` | `rider_two` |
 
-## 用户模块与接口约定
+推荐答辩演示顺序：
 
-### 用户接口
+1. 用户浏览商家、加入购物车、提交订单并模拟支付。
+2. 商家进入工作台接单、备餐并标记可配送。
+3. 骑手切换 `RIDER` 身份，开始接单、重新定位、按智能排序领取任务。
+4. 骑手与商家确认出餐，取餐后用户在订单页查看骑手位置和预计到达时间。
+5. 骑手通过订单沟通或隐私号码联系用户，确认送达；用户确认收货、打赏并评价。
+6. 骑手查看收入、评价和日表现，申请提现；管理员在骑手运营页审核相关事项。
 
-| 接口 | 说明 |
-| --- | --- |
-| `POST /api/user/register/send-code` | 发送注册验证码，验证码存 Redis，控制台模拟短信输出 |
-| `POST /api/user/register` | 手机号注册，默认角色为 `USER` |
-| `POST /api/user/login` | 手机号登录，成功后返回当前用户信息 |
+## 角色与权限模型
 
-注册规则：
+- 公开注册默认创建 `USER` 身份。
+- 用户可提交商家或骑手申请；管理员审核通过后授予对应角色。
+- 登录后系统读取账号已审批身份，用户可切换进入不同工作台。
+- 后端通过 `Authorization: Bearer <token>`、`AuthInterceptor` 和 `@RequireRole` 校验；前端路由同样按角色限制访问。
+- 所有金额以“分”为单位存储，展示层转换为“元”；支付接口支持 `Idempotency-Key`，避免重复扣款。
 
-- `phone` 必填且唯一，是用户表主键。
-- `username` 必填，仅作为展示名，允许重复。
-- `password` 必填，至少 6 位，必须包含大小写英文字母、数字和特殊符号。
-- `code` 必填，必须匹配 Redis 中保存的验证码。
-- 公开注册只创建 `USER`；`MERCHANT`、`RIDER`、`ADMIN` 均由受控流程授予。
-- 所有用户响应都会隐藏 `password` 字段。
+## 核心 API 导览
 
-### 统一返回格式
-
-所有 `/api/**` 接口统一返回：
+所有 `/api/**` 接口均使用统一响应结构，并回传/生成 `X-Request-Id` 方便联调与日志追踪。
 
 ```json
 {
@@ -114,329 +212,63 @@ npm run dev
   "message": "success",
   "data": {},
   "timestamp": 1781179200000,
-  "requestId": "trace-test-123",
+  "requestId": "trace-id",
   "errorCode": null
 }
 ```
 
-后端会读取请求头 `X-Request-Id` 并在响应头与响应体中回传；未传入时自动生成，用于联调、日志定位和云端冒烟测试关联。
-
-业务错误统一返回 `code=400`，例如：
-
-```json
-{
-  "code": 400,
-  "message": "手机号或密码错误",
-  "data": null,
-  "timestamp": 1781179200000,
-  "requestId": "trace-test-123",
-  "errorCode": "BUSINESS_ERROR"
-}
-```
-
-错误响应会额外提供稳定的 `errorCode`，用于前端分支处理和联调排查。常见取值包括：`AUTH_UNAUTHORIZED`、`AUTH_FORBIDDEN`、`VALIDATION_ERROR`、`RESOURCE_NOT_FOUND`、`ORDER_INVALID_STATE`、`PAYMENT_IDEMPOTENCY_CONFLICT`、`STOCK_NOT_ENOUGH`、`SYSTEM_ERROR`。
-
-### JWT 鉴权与角色
-
-- 已接入 JWT（HMAC-SHA256 签名，24 小时过期），`Authorization: Bearer <token>` 标准格式。
-- 前端登录后将 Token 和用户信息写入 `localStorage` 的 `clas_token` / `clas_user`。
-- 后端 `AuthInterceptor` 解析 JWT 获取当前用户，购物车、订单、支付、评价等私有操作以服务端当前用户为准。
-- 角色统一使用字符串：`USER`、`MERCHANT`、`RIDER`、`ADMIN`。
-- 需要权限的接口使用 `@RequireRole` 注解控制。
-- HTTP 状态码规范化：401（未认证）、403（无权限）、400（业务错误）。
-- 密码使用 BCrypt 哈希存储，旧明文密码（非 `$2b$` 前缀）登录时自动升级为 BCrypt 哈希。
-- CORS 通过 `app.cors.allowed-origins` 配置白名单，不再使用 `*` 全放通。
-- 敏感配置（数据库密码、JWT 密钥）强制通过环境变量注入，无默认明文值。
-
-### 金额单位
-
-所有金额字段统一使用 `INT`，单位为“分”；前端展示时再除以 `100` 转成“元”。
-
-### 支付幂等
-
-`POST /api/payment/mock` 和兼容入口 `POST /api/order/pay/{orderId}` 支持可选请求头 `Idempotency-Key`。同一用户对同一订单重复提交相同幂等键时，会复用同一条支付流水并在响应 `data.idempotencyKey` 中回传；同一幂等键不能用于该用户的其他订单。
-
-### 待支付订单超时
-
-后端默认每 60 秒扫描一次超过 30 分钟未支付的 `PENDING_PAYMENT` 订单，自动改为 `CANCELED`，释放已预占优惠券，并发送订单状态通知。可通过 `app.order-timeout.enabled`、`app.order-timeout.pending-payment-minutes`、`app.order-timeout.scan-delay-ms` 调整。
-
-### 订单详情
-
-用户订单详情页使用 `GET /api/order/{orderId}` 按 ID 加载单个订单，后端会校验当前用户只能查看自己的订单。商家可通过 `GET /api/order/merchant/detail/{orderId}` 查看本店订单，管理员可通过 `GET /api/order/admin/{orderId}` 查看任意订单。三个接口均返回与订单列表一致的 `OrderResponse` 结构。
-
-订单详情会随订单返回 `paidAt`、`acceptedAt`、`deliveredAt`、`completedAt`、`canceledAt`、`rejectedAt` 等关键状态时间戳，前端据此渲染订单时间线。
-
-### AI 内容安全审核（2026-06-10）
-
-本次重点补充了头像与文本内容的提交前安全审核，保持现有 Spring Boot + Vue 框架、数据库结构和接口路径不变，只在后端 Service 层复用原有上传/提交入口进行拦截。
-
-**审核入口**
-
-| 类型 | 现有接口 | 审核内容 |
+| 领域 | 示例接口 | 说明 |
 | --- | --- | --- |
-| 头像上传 | `POST /api/user/profile/avatar` | 图片内容与图片中可见文字 |
-| 头像 URL 更新 | `PUT /api/user/profile` | `avatar` URL 指向的图片 |
-| 昵称更新 | `PUT /api/user/profile` | `nickname` 文本 |
-| 提交评价 | `POST /api/review/add` | 评价正文 |
-| 评论回复 | `POST /api/review/{reviewId}/comments` | 评论正文 |
-
-**实现方式**
-
-- 新增 `ContentModerationService` 统一封装本地违禁词过滤与阿里云百炼 DashScope 调用。
-- 本地违禁词过滤始终启用，默认包含：`色情`、`涉黄`、`赌博`、`毒品`、`违禁`、`诈骗`。
-- 配置 `DASHSCOPE_API_KEY` 后启用 AI 审核；未配置时不调用外部 AI，只执行本地违禁词过滤，不阻塞原有业务流程。
-- AI 审核不新增人工复核流程：判定不通过时直接返回业务错误，判定通过时继续原有保存逻辑。
-- 现有评价举报、商家删评申请、管理员处理等治理功能保持原样。
-
-**配置**
-
-生产或本地环境可通过环境变量配置：
-
-```bash
-DASHSCOPE_API_KEY=你的百炼API_KEY
-DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-DASHSCOPE_TEXT_MODEL=qwen3.6-flash
-DASHSCOPE_IMAGE_MODEL=qwen3.5-flash
-FORBIDDEN_WORDS=额外词1,额外词2
-```
-
-本地开发也可以复制 `backend/src/main/resources/application-local.yml.example` 为 `application-local.yml` 后填写；该文件已被 `.gitignore` 忽略，避免 API Key 提交到仓库。
-
-**验证**
-
-- `mvn test` 已同步当前接口契约，18 项后端测试全部通过。
-- 测试断言已更新为当前响应结构：注册/登录成功返回 `data.user`；业务异常返回真实 HTTP 状态码，例如 `400`、`401`、`403`。
-
----
-
-## 功能改进：商家列表/详情、商家入驻/状态
-
-### 一、商家列表与详情
-
-**API**
-
-| 接口 | 说明 |
-| --- | --- |
-| `GET /api/merchant/list` | 营业中商家列表，按评分降序排列 |
-| `GET /api/merchant/{id}` | 商家详情，仅 OPEN 状态可查看，非营业状态返回错误提示 |
-| `GET /api/merchant/my` | 当前登录用户的商家信息 |
-
-**前端**
-
-- `/home` 首页展示营业中商家列表
-- `/merchant/:id` 商家详情页展示商品列表，支持加入购物车
-
-### 二、商家入驻系统
-
-**API**
-
-| 接口 | 说明 |
-| --- | --- |
-| `POST /api/merchant/register` | 商家入驻申请 |
-
-**入驻逻辑**
-
-- 已登录用户：自动关联当前账号，角色不足时自动升级 `USER → MERCHANT`
-- 未登录游客：提供 accountPhone + 验证码 + username + password，系统自动创建商家账号并入驻
-- 商家账号手机号 `accountPhone` 与店铺联系电话 `contactPhone` 可分开填写
-- 防重复入驻：一个用户只能入驻一个商家
-- 唯一性校验：商家名称、联系电话不可重复
-- 参数校验：手机号格式（`^1[3-9]\d{9}$`）、银行账号格式（`\d{9,25}`）
-
-**前端**
-
-- `/merchant-register` 商家入驻申请表单
-
-### 三、商家 5 态状态机
-
-**状态流转**
-
-```text
-PENDING（待审核）──→ APPROVED（已审核）──→ OPEN（营业中）──→ CLOSED（停业）
-   │                     │                    │                  │
-   └─────────────────→ BLOCKED（禁用）←─────────────────────────┘
-```
-
-- `PENDING`：入驻后默认状态，等待管理员审核
-- `APPROVED`：审核通过，待开通营业
-- `OPEN`：正常营业，可接单，在列表页展示
-- `CLOSED`：商家主动停业
-- `BLOCKED`：管理员禁用（违规等）
-
-**状态跳转校验**：`MerchantStatusEnum` + `validateStatusTransition()` 严格校验合法跳转，非法操作精确拒绝并返回中文错误提示。
-
-**前端商家控制台** `/merchant-console`
-
-| 状态 | UI 表现 |
-| --- | --- |
-| PENDING | 黄色提示「正在审核中」 |
-| APPROVED | 蓝色提示「已审核，等待开通营业」 |
-| OPEN | 正常营业面板 + 待接单管理列表 |
-| CLOSED | 灰色提示「停业中」+ 锁定工作台 |
-| BLOCKED | 红色警告「已被禁用」+ 锁定工作台 |
-
-### 四、管理员审核系统
-
-**API**（均需 `@RequireRole("ADMIN")` 权限）
-
-| 接口 | 说明 |
-| --- | --- |
-| `GET /api/merchant/admin/list` | 查看全部商家（含各状态） |
-| `POST /api/merchant/admin/audit/{id}` | 审核商家，变更状态 + 备注 |
-| `GET /api/merchant/admin/audit-logs/{id}` | 查看商家审核日志 |
-
-**审计追踪**：每次审核操作写入 `merchant_audit_log` 表（操作人、旧状态、新状态、备注、时间）。
-
-**前端**：`/admin-audit` 管理员审核面板（仅 ADMIN 角色可访问）。
-
-### 五、RBAC 权限控制
-
-- `AuthInterceptor`：解析 `Authorization` Header（手机号）→ 查 DB → 写入 `UserContext`（ThreadLocal）
-- `@RequireRole`：声明式角色校验注解，标注在 Controller 方法上即可拦截非授权访问
-- 前端路由守卫：`meta.roles: ['ADMIN']` 拦截非管理员页面访问
-
-### 六、数据库变更
-
-| 变更 | 说明 |
-| --- | --- |
-| `merchant` 表新增字段 | `user_id`, `phone`(UNIQUE), `bank_account`, `admin_remarks`, `settlement_cycle`, `created_at`, `updated_at` |
-| 新增 `merchant_audit_log` 表 | `id`, `merchant_id`, `admin_id`, `old_status`, `new_status`, `remarks`, `created_at` |
-| `user.phone` | 改为 UNIQUE 约束 |
-
-### 七、其他改进
-
-- `DELETE /api/cart/clear/{userId}` 清空购物车
-- `MyMetaObjectHandler` 自动填充 `created_at` / `updated_at` 时间戳
----
-
-## 功能改进：管理后台 + 数据统计 + 前端整合
-
-### 一、管理后台仪表盘
-
-**API**
-
-| 接口 | 说明 |
-| --- | --- |
-| `GET /api/admin/dashboard` | 仪表盘汇总（总用户/商家/订单/销售额 + 今日数据） |
-| `GET /api/admin/stats/orders` | 订单统计（按状态分布 + 近7天每日趋势） |
-| `GET /api/admin/stats/sales` | 销售额统计（按日期趋势 + 总/月/周销售额） |
-| `GET /api/admin/stats/merchants` | 商家排行（按销售额 + 按评分，Top 10） |
-| `GET /api/admin/stats/products` | 热销商品排行（按销量，Top 10） |
-
-**前端**
-
-- `/admin/dashboard` 仪表盘页面：4个统计卡片 + 今日概览 + 订单状态饼图 + 近7天销售额柱线混合图 + 商家排行 + 热销商品
-
-### 二、管理员统一管理后台
-
-**API**（均需 `@RequireRole("ADMIN")` 权限）
-
-| 接口 | 说明 |
-| --- | --- |
-| `GET /api/admin/users` | 用户列表（分页，屏蔽密码字段） |
-| `PUT /api/admin/users/{id}/status` | 禁用/启用用户账号 |
-| `GET /api/admin/orders` | 全平台订单列表（分页 + 状态筛选） |
-| `GET /api/admin/reviews` | 全平台评价列表（含关联用户/商家信息） |
-| `DELETE /api/admin/reviews/{id}` | 删除评价并自动重新计算商家评分 |
-
-**前端**（AdminLayout 侧边栏布局）
-
-| 路由 | 页面 | 说明 |
-| --- | --- | --- |
-| `/admin/dashboard` | 仪表盘 | ECharts 统计图表 |
-| `/admin/orders` | 订单管理 | 全平台订单分页列表 |
-| `/admin/users` | 用户管理 | 用户列表 + 禁用/启用 |
-| `/admin/audit` | 商家审核 | 整合自第二阶段 |
-| `/admin/reviews` | 评价管理 | 评价列表 + 删除 |
-| `/admin/announcements` | 公告管理 | 整合自第四阶段 |
-
-### 三、安全修复
-
-- `AnnouncementController` 的创建/修改/删除操作添加 `@RequireRole("ADMIN")` 权限保护
-- `UserService.login()` 增加 `enabled` 字段校验，禁用用户无法登录
-- 用户表新增 `enabled TINYINT(1) NOT NULL DEFAULT 1` 字段
-
-### 四、UI 全面优化 —「暖食」设计语言
-
-- 暖琥珀主色调（#f97316）+ 深青强调色（#0d9488）
-- 完整 CSS 变量体系覆盖 Element Plus 所有组件
-- 管理后台深咖啡色侧边栏固定定位，切换页面不抖动
-- 毛玻璃顶栏 + 卡片圆角阴影 + 按钮悬浮微动效
-- ECharts 图表配色与主题统一
-- 导航栏按角色（USER/MERCHANT/ADMIN）分离显示
-
-### 五、数据库变更
-
-| 变更 | 说明 |
-| --- | --- |
-| `user` 表新增字段 | `enabled TINYINT(1) NOT NULL DEFAULT 1`，支持管理员禁用用户 |
-
-### 六、新增文件
-
-| 文件 | 说明 |
-| --- | --- |
-| `controller/AdminController.java` | 管理后台统一控制器 |
-| `service/StatisticsService.java` | 数据聚合统计服务 |
-| `dto/DashboardStats.java` 等 5 个 DTO | 仪表盘/统计/排行数据对象 |
-| `views/admin/AdminLayout.vue` | 管理后台侧边栏布局 |
-| `views/admin/AdminDashboardView.vue` | ECharts 仪表盘页面 |
-| `views/admin/AdminUsersView.vue` | 用户管理页面 |
-| `views/admin/AdminOrdersView.vue` | 订单管理页面 |
-| `views/admin/AdminReviewsView.vue` | 评价管理页面 |
-| `styles/theme.css` | CSS 主题变量体系 |
-# 2026-06-10 开发进度快照
-
-当前 `dev` 分支已从外卖下单 MVP 扩展为”生活助手平台”综合演示版本，围绕软件工程课程设计补齐了用户、商家、管理员三端能力，并完成了安全加固和数据库统一：
-
-- **安全加固**：JWT Bearer Token 鉴权 + BCrypt 密码哈希 + HTTP 状态码规范化（401/403/400）+ CORS 白名单 + 敏感配置环境变量注入。
-- **管理后台增强**：公告置顶/有效期管理、CSV 数据导出（用户/订单/评价）、Dashboard 大屏模式（实时时钟 + 30 秒自动刷新）。
-- **数据库统一**：`schema.sql` 统一为 28 张业务表，补齐所有迁移字段和索引，H2 测试 schema 同步。新增表包括优惠券（coupon/user_coupon）、评价治理（review_image/review_reply/review_vote/review_delete_request/review_user_hidden/deleted_review_backup）、违规处罚（user_penalty/appeal）、团购核销日志（deal_redeem_log）。
-- **测试验证**：后端 18 项测试全部通过（`mvn test`），前端构建成功（`npm run build`）。
-- 用户端：商家搜索/筛选、商品下单、地址管理、团购券购买、收藏店铺、消息通知、订单退款申请、生活服务预约、评价与举报。
-- 商家端：接单/配送/完成、团购券创建与核销、评价回复、退款审核、预约确认/完成/取消、公告查看。
-- 管理端：商家审核、仪表盘统计（ECharts + 大屏模式）、用户/订单/评价/公告管理、CSV 导出、评价举报处理、违规处罚/申诉。
-- 鉴权说明：已接入 JWT + BCrypt，生产级 Token 认证替代旧 `Authorization: <phone>` 方案。
-
-新增页面入口：
-
-| 角色 | 路由 | 功能 |
-| --- | --- | --- |
-| USER | `/home` | 商家搜索、筛选、推荐排序 |
-| USER | `/deals` | 团购券列表与购买 |
-| USER | `/bookings` | 生活服务预约提交与取消 |
-| USER | `/profile` | 地址、收藏、通知中心 |
-| MERCHANT | `/merchant-console` | 订单、配送、退款、评价回复、核销 |
-| MERCHANT | `/merchant/deals` | 团购券管理 |
-| MERCHANT | `/merchant/bookings` | 预约管理 |
-| ADMIN | `/admin/reviews` | 评价举报处理 |
-
----
-
-## 部署
-
-### 自动部署（推荐）
-
-推送 `dev` 分支后 **GitHub Actions 自动触发**部署，无需手动操作。
-
-```
-git push upstream dev  →  GitHub Actions  →  SSH 服务器  →  clas deploy  →  ✅
-```
-
-**首次配置**：在仓库 Settings → Secrets → Actions 中添加 `SSH_PASSWORD`。
-**手动触发**：GitHub Actions → Deploy to Cloud Server → Run workflow。
-**查看状态**：`gh run list --repo Amyjinru/CLAS --workflow deploy.yml`
-
-工作流文件：`.github/workflows/deploy.yml`
-
-### 手动部署（备选）
+| 账户与身份 | `POST /api/user/login`、`POST /api/user/switch-role`、`POST /api/role-applications/rider` | 登录、角色切换、骑手申请 |
+| 点餐与订单 | `GET /api/merchant/list`、`POST /api/order/create`、`POST /api/payment/mock` | 商家浏览、下单、模拟支付 |
+| 商家履约 | `POST /api/order/accept/{id}`、`POST /api/order/ready-for-dispatch/{id}` | 接单、出餐并投放任务 |
+| 骑手配送 | `GET /api/rider/tasks`、`POST /api/rider/tasks/{id}/claim`、`POST /api/rider/deliveries/{id}/pickup`、`POST /api/rider/deliveries/{id}/complete` | 任务池、接单、取餐、送达 |
+| 配送沟通 | `GET/POST /api/rider/deliveries/{id}/messages`、`GET/POST /api/delivery/orders/{id}/merchant-messages` | 用户—骑手、骑手—商家订单内沟通 |
+| 运营管理 | `GET /api/admin/dashboard`、`GET /api/admin/orders`、`GET /api/rider/admin/...` | 统计、订单运营、骑手审核与管理 |
+
+接口以控制器和前端 `src/api/` 目录为准；生产环境请使用实际域名和 HTTPS。
+
+## 测试与质量保障
 
 ```powershell
-.\scripts\deploy.ps1 "your commit message"
+# 后端：使用 H2 内存数据库运行集成测试
+mvn -f backend/pom.xml test
+
+# 前端：生产构建检查
+npm --prefix frontend run build
+
+# 仅验证骑手配送及双向沟通链路
+mvn -f backend/pom.xml -Dtest=RiderModuleIntegrationTest test
 ```
 
-流程：commit → push → SSH 交互式连接 → git pull → build → restart。
+测试覆盖登录与权限隔离、订单取消、支付和评价、角色申请、骑手任务领取并发控制、配送生命周期、骑手资料审核、骑手—商家订单沟通等关键场景。
 
-服务器信息：
-- 前端: http://8.141.112.182
-- 健康检查: http://8.141.112.182/api/health
-- 服务器命令: `clas status | deploy | restart`
+## CI/CD 与部署
+
+推送到 `dev` 分支后，GitHub Actions 工作流 `.github/workflows/deploy.yml` 会依次执行：
+
+```text
+push dev → 后端 Maven 测试 → 前端 npm ci + build → 上传测试报告 → SSH 云端部署 → 健康检查
+```
+
+部署工作流需要在仓库 Actions Secrets 中配置 `SSH_PASSWORD`。测试报告会作为构建产物上传；部署端通过 `clas deploy` 完成构建和服务重启，并访问 `/api/health` 进行校验。
+
+本地手动部署可参考 `scripts/deploy.ps1`。发布前请确认数据库迁移已完成、所需环境变量已在服务器中配置，并在 Actions 页面确认构建通过。
+
+## 文档与协作
+
+- `看板.md`：团队任务看板的可读摘要。
+- `docs/`：项目过程文档与交付材料。
+- `openspec/changes/add-rider-delivery-system/`：骑手配送功能的需求、设计与任务记录。
+- `database/schema.sql` 与 `database/migration-*.sql`：完整数据库结构和增量演进脚本。
+- `.github/workflows/deploy.yml`：持续集成与自动部署的可审查流水线。
+
+## 安全提示
+
+- 不要提交真实数据库密码、JWT 密钥、高德/DashScope 密钥、身份证原文或真实用户联系方式。
+- 生产环境必须设置强随机 `JWT_SECRET`、`RIDER_IDENTITY_ENCRYPTION_KEY` 和数据库密码，并限制 `CORS_ALLOWED_ORIGINS`。
+- 骑手联系用户使用订单归属校验和虚拟/脱敏号码机制；商家与骑手沟通仅在订单配送期间开放写入。
+
+---
+
+如需继续迭代，请从 `dev` 分支开始开发，保持数据库迁移、接口实现、前端页面和自动化测试同步更新。

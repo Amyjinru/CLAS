@@ -6,6 +6,7 @@ import { cancelOrder, completeOrder, getReviewByOrder, listOrders, requestRefund
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import RiderChatWindow from '../components/RiderChatWindow.vue'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { formatCompactDateTime, formatDistance } from '../utils/formatters'
 import { orderStatusMap } from '../utils/status'
@@ -15,6 +16,8 @@ const message = ref('')
 const reviewedOrderIds = ref(new Set())
 const { confirmAction } = useConfirmAction()
 const chatOrder = ref(null)
+const riderChatOrder = ref(null)
+const riderChatOpen = ref(false)
 const chatHasHistory = ref(new Set())
 const route = useRoute()
 const activeTab = ref(route.query.tab || 'all')
@@ -34,8 +37,10 @@ const refundReasonOptions = [
 ]
 
 const deliveryLabel = {
-  WAITING: '等待自动接单',
+  WAITING: '等待商家接单',
   PREPARING: '商家备餐中',
+  AVAILABLE: '等待骑手接单',
+  ASSIGNED_WAITING_MEAL: '骑手已接单，等待取餐',
   DELIVERING: '配送中',
   DELIVERED: '已送达'
 }
@@ -127,6 +132,20 @@ function openChat(order) {
 
 function closeChat() {
   chatOrder.value = null
+}
+
+function hasLiveRiderDelivery(order) {
+  return ['ASSIGNED_WAITING_MEAL', 'DELIVERING'].includes(order.deliveryStatus)
+}
+
+function openRiderChat(order) {
+  riderChatOrder.value = order
+  riderChatOpen.value = true
+}
+
+function closeRiderChat() {
+  riderChatOpen.value = false
+  riderChatOrder.value = null
 }
 
 async function checkChatHistory(order) {
@@ -238,6 +257,13 @@ watch(() => route.query.tab, (tab) => {
             联系商家
           </button>
           <button
+            v-if="hasLiveRiderDelivery(order.order)"
+            class="secondary"
+            @click="openRiderChat(order)"
+          >
+            联系骑手
+          </button>
+          <button
             v-if="order.order.status === 'COMPLETED' && chatHasHistory.has(order.order.id)"
             class="secondary"
             @click="openChat(order)"
@@ -278,6 +304,15 @@ watch(() => route.query.tab, (tab) => {
         </div>
       </aside>
     </div>
+
+    <el-dialog v-model="riderChatOpen" title="配送沟通" width="min(560px,92vw)" @closed="closeRiderChat">
+      <RiderChatWindow
+        v-if="riderChatOrder"
+        :order-id="riderChatOrder.order.id"
+        role="USER"
+        :active="hasLiveRiderDelivery(riderChatOrder.order)"
+      />
+    </el-dialog>
   </div>
 </template>
 

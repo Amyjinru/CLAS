@@ -1,10 +1,11 @@
 ﻿<script setup>
-import { onMounted, watch, computed, ref } from 'vue'
+import { onMounted, onUnmounted, watch, computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { logout, sessionUser, setSessionUser, switchRole } from './api/clas'
 import { ElMessage } from 'element-plus'
 import ChatSidebar from './components/ChatSidebar.vue'
 import { preferenceState } from './utils/preferences'
+import { api } from './api/client'
 import patternBg from './assets/pattern-bg.svg'
 import foodLines from './assets/food-lines.svg'
 
@@ -51,6 +52,20 @@ function updateUser() {
 // test1: 监听路由变化以确保顶栏用户信息同步
 watch(() => route.path, updateUser)
 onMounted(updateUser)
+
+let sessionHeartbeat = null
+function refreshSessionHeartbeat() {
+  if (sessionHeartbeat) clearInterval(sessionHeartbeat)
+  sessionHeartbeat = null
+  if (user.value?.token) {
+    // 会话被新设备确认替换后，尽快让当前页面得到服务端的失效结果。
+    sessionHeartbeat = setInterval(() => api.get('/user/profile', { silent: true }).catch(() => {}), 1000)
+  }
+}
+watch(() => user.value?.token, refreshSessionHeartbeat, { immediate: true })
+onUnmounted(() => {
+  if (sessionHeartbeat) clearInterval(sessionHeartbeat)
+})
 
 // version_314: logout() 接口退出 + test1: ElMessage 提示
 async function handleLogout() {
@@ -142,6 +157,8 @@ async function switchPortal(nextRole) {
         <!-- ===== RIDER 骑手（最小演示端） ===== -->
         <template v-else-if="role === 'RIDER'">
           <RouterLink to="/rider">骑手工作台</RouterLink>
+          <RouterLink to="/rider/profile">账户中心</RouterLink>
+          <RouterLink to="/rider/info">骑手信息</RouterLink>
           <a href="#" @click.prevent="handleLogout" class="logout-link">退出</a>
         </template>
 
@@ -444,6 +461,22 @@ nav a.router-link-active {
 
   .nav-divider {
     display: none;
+  }
+
+  nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  nav a,
+  .portal-switcher {
+    flex: 0 0 auto;
   }
 }
 

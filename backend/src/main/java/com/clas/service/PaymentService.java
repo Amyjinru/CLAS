@@ -24,17 +24,20 @@ public class PaymentService {
     private final OrderService orderService;
     private final OrdersMapper ordersMapper;
     private final TransactionTemplate transactionTemplate;
+    private final OrderLifecycleService lifecycleService;
 
     public PaymentService(
         PaymentRepository paymentRepository,
         OrderService orderService,
         OrdersMapper ordersMapper,
-        TransactionTemplate transactionTemplate
+        TransactionTemplate transactionTemplate,
+        OrderLifecycleService lifecycleService
     ) {
         this.paymentRepository = paymentRepository;
         this.orderService = orderService;
         this.ordersMapper = ordersMapper;
         this.transactionTemplate = transactionTemplate;
+        this.lifecycleService = lifecycleService;
     }
 
     public PaymentResponse mockPay(PaymentRequest request) {
@@ -64,7 +67,8 @@ public class PaymentService {
         return paymentRepository.findSuccessfulByOrderId(order.getId())
             .map(payment -> {
                 if (OrderService.STATUS_PENDING_PAYMENT.equals(order.getStatus())) {
-                    markOrderAutoAccepted(order);
+                    Orders paidOrder = markOrderPaidAwaitingMerchant(order);
+                    return PaymentResponse.from(payment, paidOrder.getStatus());
                 }
                 return PaymentResponse.from(payment, order.getStatus());
             })
@@ -135,9 +139,9 @@ public class PaymentService {
             orderService.markCouponUsed(order.getId());
             payment.setStatus(STATUS_SUCCESS);
             paymentRepository.save(payment);
-            ordersMapper.updateStatusIfCurrent(order.getId(), ORDER_STATUS_PAYING, OrderService.STATUS_ACCEPTED);
-            markOrderAutoAccepted(order);
-            return new PaymentOutcome(PaymentResponse.from(payment, order.getStatus()), null);
+            ordersMapper.updateStatusIfCurrent(order.getId(), ORDER_STATUS_PAYING, OrderService.STATUS_PAID);
+            Orders paidOrder = markOrderPaidAwaitingMerchant(order);
+            return new PaymentOutcome(PaymentResponse.from(payment, paidOrder.getStatus()), null);
         } catch (RuntimeException exception) {
             payment.setStatus(STATUS_FAILED);
             paymentRepository.save(payment);
@@ -155,15 +159,16 @@ public class PaymentService {
         return PaymentResponse.from(payment, order.getStatus());
     }
 
-    private void markOrderAutoAccepted(Orders order) {
+    private Orders markOrderPaidAwaitingMerchant(Orders order) {
         LocalDateTime now = LocalDateTime.now();
-        order.setStatus(OrderService.STATUS_ACCEPTED);
-        order.setDeliveryStatus("PREPARING");
+        String fromStatus = order.getStatus();
+        String fromDelivery = order.getDeliveryStatus();
+        order.setStatus(OrderService.STATUS_PAID);
+        order.setDeliveryStatus("WAITING");
         order.setPaidAt(now);
-        if (order.getAcceptedAt() == null) {
-            order.setAcceptedAt(now);
-        }
         ordersMapper.updateById(order);
+        lifecycleService.record(order, "PAYMENT_SUCCEEDED", fromStatus, fromDelivery, "USER", order.getUserId(), "支付成功，等待商家接单");
+        return order;
     }
 
     private PaymentResponse paymentStatusForOrder(Long orderId, Orders order) {

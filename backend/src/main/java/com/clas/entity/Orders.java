@@ -14,9 +14,13 @@ public class Orders {
     private Long id;
     private String userId;
     private Long merchantId;
+    private String riderId;
     private Integer totalPrice;
     private Integer subtotal;
     private Integer deliveryFee;
+    private Integer riderCommission;
+    private Integer reassignCount;
+    private Integer deliverySequence;
     private Integer couponDiscount;
     private Long userCouponId;
     private String status;
@@ -26,9 +30,12 @@ public class Orders {
     private Integer distanceMeters;
     private Integer routeDistanceMeters;
     private String deliveryStatus;
-    private String riderId;
     private LocalDateTime riderAcceptedAt;
     private Integer estimatedMinutes;
+    private Integer prepareMinutesSnapshot;
+    private LocalDateTime promiseStartAt;
+    private LocalDateTime promiseEndAt;
+    private LocalDateTime predictedArrivalAt;
     private String refundReason;
     private String refundStatus;
     private LocalDateTime refundRequestedAt;
@@ -39,6 +46,9 @@ public class Orders {
     private LocalDateTime createTime;
     private LocalDateTime paidAt;
     private LocalDateTime acceptedAt;
+    private LocalDateTime riderAssignedAt;
+    private LocalDateTime pickedUpAt;
+    private LocalDateTime deliveryCompletedAt;
     private LocalDateTime deliveredAt;
     private LocalDateTime completedAt;
     private LocalDateTime canceledAt;

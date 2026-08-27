@@ -24,6 +24,7 @@ public record MerchantRegisterRequest(
     String bankAccount,
 
     Integer settlementCycle,
+    Integer defaultPrepareMinutes,
 
     // Optional fields for visitor merchant account registration.
     String accountPhone,

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { login, register, sendRegisterCode, setSessionUser, currentRole, switchRole } from '../api/clas'
+import { login, register, sendLoginCode, sendRegisterCode, setSessionUser, currentRole, switchRole } from '../api/clas'
 import { passwordChecks, passwordRuleMessage, passwordStrength as calculatePasswordStrength } from '../utils/passwordRules'
 
 const route = useRoute()
@@ -31,9 +31,12 @@ const roleHome = {
 // 登录
 // ============================================================
 const phonePattern = /^1[3-9]\d{9}$/
-const loginForm = reactive({ phone: '', password: '' })
+const loginForm = reactive({ phone: '', password: '', code: '' })
 const loginLoading = ref(false)
 const showLoginPassword = ref(false)
+const loginVerificationRequired = ref(false)
+const loginCodeSending = ref(false)
+const loginCodeCooldown = ref(0)
 const portalPickerVisible = ref(false)
 const loginSession = ref(null)
 const portalLabels = { USER: '普通用户端', MERCHANT: '商家端', RIDER: '骑手端', ADMIN: '管理端' }
@@ -67,8 +70,34 @@ async function submitLogin() {
     const target = typeof redirect === 'string' && redirect ? redirect : roleHome[role] || '/home'
     await router.push(target)
   } catch (error) {
-    showMessage(error.response?.data?.message || '登录失败', 'error')
+    if (error.response?.data?.errorCode === 'LOGIN_VERIFICATION_REQUIRED') {
+      loginVerificationRequired.value = true
+      showMessage('该账号正在另一台设备使用，请获取验证码后确认登录', 'error')
+    } else {
+      showMessage(error.response?.data?.message || '登录失败', 'error')
+    }
     loginLoading.value = false
+  }
+}
+
+async function sendLoginVerificationCode() {
+  if (!validPhone(loginForm.phone)) {
+    showMessage('请输入正确的手机号', 'error')
+    return
+  }
+  loginCodeSending.value = true
+  try {
+    await sendLoginCode({ phone: loginForm.phone })
+    loginCodeCooldown.value = 60
+    const timer = setInterval(() => {
+      loginCodeCooldown.value--
+      if (loginCodeCooldown.value <= 0) clearInterval(timer)
+    }, 1000)
+    showMessage('验证码已发送，请完成确认登录', 'success')
+  } catch (error) {
+    showMessage(error.response?.data?.message || '发送验证码失败', 'error')
+  } finally {
+    loginCodeSending.value = false
   }
 }
 
@@ -216,6 +245,8 @@ function switchTab(tab) {
     cooldownTimer = null
   }
   codeCooldown.value = 0
+  loginVerificationRequired.value = false
+  loginForm.code = ''
 }
 </script>
 
@@ -308,6 +339,17 @@ function switchTab(tab) {
           <div class="password-actions">
             <button type="button" class="link-btn" @click="router.push('/forgot-password')">忘记密码？</button>
           </div>
+        </div>
+
+        <div v-if="loginVerificationRequired" class="form-group login-verification">
+          <label for="login-code">确认登录验证码 <span class="required">*</span></label>
+          <div class="code-row">
+            <input id="login-code" v-model="loginForm.code" placeholder="请输入6位验证码" maxlength="6" inputmode="numeric" autocomplete="one-time-code" class="code-input" />
+            <button type="button" class="resend-btn" :disabled="loginCodeSending || loginCodeCooldown > 0" @click="sendLoginVerificationCode">
+              {{ loginCodeSending ? '发送中' : loginCodeCooldown > 0 ? `${loginCodeCooldown}秒后重发` : '获取验证码' }}
+            </button>
+          </div>
+          <p class="code-tip">为保护账号安全，确认后将退出另一台设备。</p>
         </div>
 
         <button

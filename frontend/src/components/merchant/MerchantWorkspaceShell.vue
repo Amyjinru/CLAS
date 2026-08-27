@@ -21,6 +21,10 @@ const props = defineProps({
   activeModule: {
     type: String,
     default: ''
+  },
+  showMerchantInfo: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -125,8 +129,8 @@ function openProfileDialog() {
         </button>
       </nav>
 
-      <div class="workspace-grid">
-        <aside class="shop-info">
+      <div :class="['workspace-grid', { 'without-shop-info': !showMerchantInfo }]">
+        <aside v-if="showMerchantInfo" class="shop-info">
           <div class="shop-profile">
             <button class="store-logo-button" type="button" :disabled="logoUploading" @click="openLogoPicker">
               <img v-if="merchant.logo" :src="merchant.logo" alt="店铺头像" class="store-logo-img" />
@@ -242,6 +246,10 @@ function openProfileDialog() {
   padding: 9px 14px;
 }
 
+.module-tab:active {
+  transform: scale(0.97);
+}
+
 .module-tab.active {
   background: var(--color-primary-light);
   border-color: var(--color-primary);
@@ -253,6 +261,10 @@ function openProfileDialog() {
   display: grid;
   gap: 24px;
   grid-template-columns: 320px minmax(0, 1fr);
+}
+
+.workspace-grid.without-shop-info {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .shop-info {
@@ -371,8 +383,21 @@ function openProfileDialog() {
     padding: 0 14px 36px;
   }
 
+  .module-tabs {
+    flex-wrap: nowrap;
+    margin-left: -14px;
+    margin-right: -14px;
+    overflow-x: auto;
+    padding: 0 14px 14px;
+    scrollbar-width: none;
+  }
+
+  .module-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
   .module-tab {
-    width: 100%;
+    flex: 0 0 auto;
   }
 }
 </style>

@@ -29,6 +29,9 @@ mybatis-plus:
 amap:
   web-service-key: ${AMAP_WEB_SERVICE_KEY:}
 
+rider:
+  identity-encryption-key: ${RIDER_IDENTITY_ENCRYPTION_KEY:}
+
 dashscope:
   api-key: ${DASHSCOPE_API_KEY:}
   base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}

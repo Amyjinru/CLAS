@@ -48,7 +48,9 @@ CREATE TABLE `user` (
     role VARCHAR(20) NOT NULL,
     enabled TINYINT(1) NOT NULL DEFAULT 1,
     avatar VARCHAR(512),
-    nickname VARCHAR(50)
+    nickname VARCHAR(50),
+    session_token VARCHAR(64),
+    session_expires_at DATETIME
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE role_application (
@@ -258,16 +260,45 @@ CREATE TABLE order_item (
     CONSTRAINT fk_order_item_product FOREIGN KEY (product_id) REFERENCES product(id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE order_lifecycle_event (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
+    event_type VARCHAR(40) NOT NULL,
+    from_status VARCHAR(30),
+    to_status VARCHAR(30),
+    from_delivery_status VARCHAR(40),
+    to_delivery_status VARCHAR(40),
+    actor_role VARCHAR(20) NOT NULL,
+    actor_id VARCHAR(30),
+    remark VARCHAR(500),
+    created_at DATETIME NOT NULL,
+    INDEX idx_order_lifecycle_event_order_time (order_id, created_at, id),
+    INDEX idx_order_lifecycle_event_type_time (event_type, created_at)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE chat_message (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT,
-    merchant_id BIGINT NOT NULL,
+    conversation_type VARCHAR(30) NOT NULL DEFAULT 'USER_MERCHANT',
+    merchant_id BIGINT,
     user_id VARCHAR(11) NOT NULL,
+    rider_id VARCHAR(20),
     sender_role VARCHAR(10) NOT NULL COMMENT 'USER or MERCHANT',
     content TEXT NOT NULL,
     created_at DATETIME NOT NULL,
     INDEX idx_chat_order (order_id),
     INDEX idx_chat_merchant_user (merchant_id, user_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE chat_conversation (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    conversation_type VARCHAR(30) NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    peer_id VARCHAR(20) NOT NULL,
+    last_message_at DATETIME,
+    created_at DATETIME NOT NULL,
+    UNIQUE KEY uk_chat_conversation (order_id, conversation_type)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
