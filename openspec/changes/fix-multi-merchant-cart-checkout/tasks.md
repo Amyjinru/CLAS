@@ -27,3 +27,8 @@
 - [x] 5.1 Remove byte-identical untracked “ 2” source copies that caused duplicate Java class compilation
 - [x] 5.2 Align the default Maven bytecode target with Spring Boot 3.3 runtime support
 - [x] 5.3 Re-run standard backend tests, frontend tests/build, and a real application startup smoke check
+
+## 6. Local browser and CI verification
+
+- [x] 6.1 Reproduce and fix the GitHub Actions Java toolchain mismatch
+- [x] 6.2 Start the backend and frontend locally and verify the changed user flows in a real browser
