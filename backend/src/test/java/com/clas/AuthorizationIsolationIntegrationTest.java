@@ -101,6 +101,27 @@ class AuthorizationIsolationIntegrationTest {
             .andExpect(status().isOk());
     }
 
+    @Test
+    void demoLoginUsesTheSameSingleDeviceVerificationRule() throws Exception {
+        String riderPhone = "13800000005";
+        mockMvc.perform(post("/api/user/demo-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "deviceId", "demo-a"))))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/user/demo-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "deviceId", "demo-b"))))
+            .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/user/login/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone))))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/user/demo-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "code", "123456", "deviceId", "demo-b"))))
+            .andExpect(status().isOk());
+    }
+
     private String loginToken(String phone) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/user/login")
                 .contentType(MediaType.APPLICATION_JSON)
