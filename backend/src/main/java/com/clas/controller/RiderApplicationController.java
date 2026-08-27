@@ -88,6 +88,8 @@ public class RiderApplicationController {
     public Result<Orders> deliver(@PathVariable Long orderId) { return Result.ok(deliveryService.deliver(orderId)); }
     @PostMapping("/deliveries/{orderId}/abandon") @RequireRole("RIDER")
     public Result<Orders> abandon(@PathVariable Long orderId, @RequestParam String reason) { return Result.ok(deliveryService.abandonBeforePickup(orderId, reason)); }
+    @GetMapping("/deliveries/{orderId}/detail") @RequireRole("RIDER")
+    public Result<com.clas.dto.RiderOrderDetailResponse> deliveryDetail(@PathVariable Long orderId) { return Result.ok(deliveryService.detail(orderId)); }
     @GetMapping("/deliveries/{orderId}/messages") @RequireRole({"USER", "RIDER"})
     public Result<List<ChatMessageResponse>> riderMessages(@PathVariable Long orderId) { return Result.ok(contactService.messages(orderId, UserContext.getUserId(), UserContext.getRole())); }
     @PostMapping("/deliveries/{orderId}/messages") @RequireRole({"USER", "RIDER"})

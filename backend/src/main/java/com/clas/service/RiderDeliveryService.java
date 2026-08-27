@@ -1,13 +1,23 @@
 package com.clas.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.config.UserContext;
-import com.clas.entity.Orders;
-import com.clas.mapper.OrdersMapper;
-import com.clas.mapper.MerchantMapper;
+import com.clas.dto.RiderOrderDetailResponse;
 import com.clas.entity.Merchant;
+import com.clas.entity.OrderItem;
+import com.clas.entity.Orders;
+import com.clas.entity.Product;
+import com.clas.mapper.MerchantMapper;
+import com.clas.mapper.OrderItemMapper;
+import com.clas.mapper.OrdersMapper;
+import com.clas.mapper.ProductMapper;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +29,9 @@ public class RiderDeliveryService {
     private final NotificationService notifications;
     private final RiderSettlementService settlements;
     private final OrderLifecycleService lifecycleService;
-    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantMapper merchants, NotificationService notifications, RiderSettlementService settlements, OrderLifecycleService lifecycleService) { this.orders = orders; this.locations = locations; this.merchants = merchants; this.notifications = notifications; this.settlements = settlements; this.lifecycleService = lifecycleService; }
+    private final OrderItemMapper orderItems;
+    private final ProductMapper products;
+    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantMapper merchants, NotificationService notifications, RiderSettlementService settlements, OrderLifecycleService lifecycleService, OrderItemMapper orderItems, ProductMapper products) { this.orders = orders; this.locations = locations; this.merchants = merchants; this.notifications = notifications; this.settlements = settlements; this.lifecycleService = lifecycleService; this.orderItems = orderItems; this.products = products; }
 
     @Transactional
     public Orders pickup(Long orderId) { return transition(orderId, "ASSIGNED_WAITING_MEAL", "DELIVERING", true); }
@@ -60,6 +72,27 @@ public class RiderDeliveryService {
         Orders order = orders.selectById(orderId);
         if (order == null || !UserContext.getUserId().equals(order.getRiderId())) throw new BusinessException("仅已指派骑手可操作配送任务", DomainErrorCode.DELIVERY_FORBIDDEN);
         return order;
+    }
+
+    /** 骑手查看「订单详情」：订单 + 商家 + 带商品名的餐品明细。 */
+    public RiderOrderDetailResponse detail(Long orderId) {
+        Orders order = owned(orderId);
+        Merchant merchant = merchants.selectById(order.getMerchantId());
+        List<OrderItem> items = orderItems.selectList(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        List<Long> productIds = items.stream().map(OrderItem::getProductId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, String> nameByProductId = productIds.isEmpty()
+            ? Map.of()
+            : products.selectBatchIds(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Product::getName, (a, b) -> a));
+        List<RiderOrderDetailResponse.Item> detailItems = items.stream()
+            .map(item -> new RiderOrderDetailResponse.Item(
+                item.getProductId(),
+                nameByProductId.getOrDefault(item.getProductId(), "商品#" + item.getProductId()),
+                item.getQuantity(),
+                item.getPrice()))
+            .toList();
+        return new RiderOrderDetailResponse(order, merchant, detailItems);
     }
     private BusinessException invalid() { return new BusinessException("配送状态不允许此操作", DomainErrorCode.DELIVERY_STATE_INVALID); }
     private void notifyOrder(Orders order, String title, String content) {

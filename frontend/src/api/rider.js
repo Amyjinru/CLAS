@@ -14,6 +14,7 @@ export const stopAcceptingOrders = () => api.post('/rider/work/end').then(unwrap
 export const listRiderTasks = (sort = 'SMART') => api.get('/rider/tasks', { params: { sort } }).then(unwrap)
 export const claimRiderTask = (orderId) => api.post(`/rider/tasks/${orderId}/claim`).then(unwrap)
 export const listRiderDeliveries = () => api.get('/rider/deliveries').then(unwrap)
+export const getRiderOrderDetail = (orderId) => api.get(`/rider/deliveries/${orderId}/detail`).then(unwrap)
 export const pickupRiderDelivery = (orderId) => api.post(`/rider/deliveries/${orderId}/pickup`).then(unwrap)
 export const completeRiderDelivery = (orderId) => api.post(`/rider/deliveries/${orderId}/complete`).then(unwrap)
 export const getDeliveryTracking = (orderId) => api.get(`/delivery/orders/${orderId}/tracking`).then(unwrap)
