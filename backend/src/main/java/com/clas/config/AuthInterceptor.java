@@ -67,7 +67,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                 }
                 user.setRole(activeRole);
                 UserContext.setUser(user);
-                userService.touchActiveSession(phone, tokenSession);
+                userService.touchActiveSession(user);
             } else {
                 throw new BusinessException(401, "未登录，请先登录");
             }

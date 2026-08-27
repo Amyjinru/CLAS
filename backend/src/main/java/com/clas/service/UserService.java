@@ -151,12 +151,11 @@ public class UserService {
     }
 
     /** 仅对仍处于当前会话的请求刷新活跃时间，避免轮询请求把旧会话长期判定为在线。 */
-    public void touchActiveSession(String phone, String sessionToken) {
-        User user = userMapper.selectById(phone);
-        if (user == null || !sessionToken.equals(user.getSessionToken())) return;
+    public void touchActiveSession(User user) {
+        if (user == null || user.getSessionToken() == null || user.getSessionToken().isBlank()) return;
         LocalDateTime lastSeenAt = user.getSessionLastSeenAt();
         if (lastSeenAt == null || lastSeenAt.isBefore(LocalDateTime.now().minusSeconds(30))) {
-            userMapper.touchSession(phone, sessionToken, LocalDateTime.now());
+            userMapper.touchSession(user.getPhone(), user.getSessionToken(), LocalDateTime.now());
         }
     }
 
