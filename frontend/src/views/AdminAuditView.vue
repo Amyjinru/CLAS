@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminAuditMerchant, adminGetMerchantLogs, adminListMerchants, currentUser } from '../api/clas'
 import { ElMessage } from 'element-plus'
@@ -12,6 +12,7 @@ const auditLogs = ref([])
 const selectedMerchant = ref(null)
 const auditDialogVisible = ref(false)
 const detailVisible = ref(false)
+const tableMaxHeight = ref(520)
 
 const filters = reactive({
   status: '',
@@ -147,7 +148,20 @@ function maskBankAccount(value) {
   return value.length > 4 ? `**** **** ${value.slice(-4)}` : value
 }
 
-onMounted(load)
+function updateTableMaxHeight() {
+  // 表格在视口内独立滚动，横向滑块不再被长列表推到页面底部。
+  tableMaxHeight.value = Math.max(280, window.innerHeight - 330)
+}
+
+onMounted(() => {
+  updateTableMaxHeight()
+  window.addEventListener('resize', updateTableMaxHeight)
+  load()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateTableMaxHeight)
+})
 </script>
 
 <template>
@@ -186,8 +200,10 @@ onMounted(load)
       </div>
 
       <el-table
+        class="merchant-table"
         :data="filteredMerchants"
         v-loading="loading"
+        :max-height="tableMaxHeight"
         stripe
         empty-text="暂无匹配商家"
         size="small"
@@ -362,6 +378,23 @@ onMounted(load)
 
 .audit-card {
   border-radius: 8px;
+}
+
+.merchant-table {
+  width: 100%;
+}
+
+/* 保持横向滑块可见，方便在查看任意一行时访问右侧字段。 */
+.merchant-table :deep(.el-scrollbar__bar.is-horizontal) {
+  bottom: 3px;
+  height: 10px;
+  opacity: 1 !important;
+  right: 210px;
+}
+
+.merchant-table :deep(.el-scrollbar__thumb) {
+  background: color-mix(in srgb, var(--color-primary) 58%, #8b5e3c);
+  min-width: 46px;
 }
 
 .toolbar {
