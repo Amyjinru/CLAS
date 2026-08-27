@@ -5,6 +5,7 @@ import com.clas.common.JwtUtil;
 import com.clas.entity.User;
 import com.clas.mapper.UserMapper;
 import com.clas.mapper.UserRoleMapper;
+import com.clas.service.UserService;
 import com.clas.entity.UserRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,11 +20,13 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final UserMapper userMapper;
     private final JwtUtil jwtUtil;
     private final UserRoleMapper userRoleMapper;
+    private final UserService userService;
 
-    public AuthInterceptor(UserMapper userMapper, UserRoleMapper userRoleMapper, JwtUtil jwtUtil) {
+    public AuthInterceptor(UserMapper userMapper, UserRoleMapper userRoleMapper, JwtUtil jwtUtil, UserService userService) {
         this.userMapper = userMapper;
         this.jwtUtil = jwtUtil;
         this.userRoleMapper = userRoleMapper;
+        this.userService = userService;
     }
 
     @Override
@@ -64,6 +67,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                 }
                 user.setRole(activeRole);
                 UserContext.setUser(user);
+                userService.touchActiveSession(user);
             } else {
                 throw new BusinessException(401, "未登录，请先登录");
             }

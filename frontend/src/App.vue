@@ -1,8 +1,8 @@
 ﻿<script setup>
 import { onMounted, onUnmounted, watch, computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { logout, sessionUser, setSessionUser, switchRole } from './api/clas'
-import { ElMessage } from 'element-plus'
+import { logout, sessionUser, setSessionUser, switchRole, getPendingLoginNotice } from './api/clas'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import ChatSidebar from './components/ChatSidebar.vue'
 import { preferenceState } from './utils/preferences'
 import { api } from './api/client'
@@ -54,17 +54,42 @@ watch(() => route.path, updateUser)
 onMounted(updateUser)
 
 let sessionHeartbeat = null
+let loginNoticeTimer = null
+let latestLoginChallengeId = null
+
+async function checkPendingLoginNotice() {
+  if (!user.value?.token) return
+  try {
+    const notice = await getPendingLoginNotice()
+    if (!notice || notice.challengeId === latestLoginChallengeId) return
+    latestLoginChallengeId = notice.challengeId
+    ElMessageBox.alert(
+      '检测到另一台设备正在请求登录。若非本人操作，请及时修改密码；对方完成验证码校验后，当前会话将退出。',
+      '登录安全提醒',
+      { confirmButtonText: '我知道了', type: 'warning' }
+    )
+  } catch {
+    // 当前会话失效时由统一响应处理跳转登录页。
+  }
+}
+
 function refreshSessionHeartbeat() {
   if (sessionHeartbeat) clearInterval(sessionHeartbeat)
+  if (loginNoticeTimer) clearInterval(loginNoticeTimer)
   sessionHeartbeat = null
+  loginNoticeTimer = null
+  latestLoginChallengeId = null
   if (user.value?.token) {
     // 会话被新设备确认替换后，尽快让当前页面得到服务端的失效结果。
     sessionHeartbeat = setInterval(() => api.get('/user/profile', { silent: true }).catch(() => {}), 1000)
+    checkPendingLoginNotice()
+    loginNoticeTimer = setInterval(checkPendingLoginNotice, 5000)
   }
 }
 watch(() => user.value?.token, refreshSessionHeartbeat, { immediate: true })
 onUnmounted(() => {
   if (sessionHeartbeat) clearInterval(sessionHeartbeat)
+  if (loginNoticeTimer) clearInterval(loginNoticeTimer)
 })
 
 // version_314: logout() 接口退出 + test1: ElMessage 提示

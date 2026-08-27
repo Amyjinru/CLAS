@@ -6,6 +6,7 @@ import com.clas.common.PasswordValidator;
 import com.clas.common.PhoneValidator;
 import com.clas.common.VerificationCodeStore;
 import com.clas.dto.LoginRequest;
+import com.clas.dto.LoginNoticeResponse;
 import com.clas.dto.LoginResponse;
 import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
@@ -22,6 +23,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class UserService {
+    private static final int ACTIVE_SESSION_MINUTES = 3;
+    private static final int LOGIN_CHALLENGE_MINUTES = 10;
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
     private final VerificationCodeStore verificationCodeStore;
@@ -51,13 +54,15 @@ public class UserService {
         }
         if (!passwordMatches) throw new BusinessException("手机号或密码错误");
         if (Boolean.FALSE.equals(user.getEnabled())) throw new BusinessException("账号已被禁用，请联系管理员");
-        if (hasActiveSession(user)) {
+        if (hasActiveSession(user) && !isSameDevice(user, request.deviceId())) {
             if (request.code() == null || request.code().isBlank()) {
+                userMapper.createLoginChallenge(phone, user.getSessionToken(), UUID.randomUUID().toString(),
+                    normalizeDeviceId(request.deviceId()), LocalDateTime.now());
                 throw new BusinessException(409, "账号已在其他设备登录，请使用手机验证码确认登录", "LOGIN_VERIFICATION_REQUIRED");
             }
             verificationCodeStore.verify(phone, "login-session", request.code());
         }
-        return loginResponse(user, defaultRole(phone));
+        return loginResponse(user, defaultRole(phone), request.deviceId());
     }
 
     public LoginResponse register(RegisterRequest request) {
@@ -76,7 +81,7 @@ public class UserService {
         user.setRole("USER");
         userMapper.insert(user);
         grantRole(phone, "USER");
-        return loginResponse(user, "USER");
+        return loginResponse(user, "USER", null);
     }
 
     public void sendRegisterCode(SendCodeRequest request) {
@@ -120,7 +125,7 @@ public class UserService {
         if (samePassword) throw new BusinessException("新密码不能与旧密码相同");
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         userMapper.updateById(user);
-        return loginResponse(user, defaultRole(phone));
+        return loginResponse(user, defaultRole(phone), null);
     }
 
     public LoginResponse switchRole(String phone, String requestedRole) {
@@ -133,7 +138,7 @@ public class UserService {
         if (!legacyIdentity && (identity == null || !"APPROVED".equals(identity.getStatus()))) {
             throw new BusinessException("该身份尚未审核通过或已不可用");
         }
-        return loginResponse(user, role);
+        return loginResponse(user, role, user.getSessionDeviceId());
     }
 
     /**
@@ -143,6 +148,26 @@ public class UserService {
     public void logout(String phone, String sessionToken) {
         if (phone == null || phone.isBlank() || sessionToken == null || sessionToken.isBlank()) return;
         userMapper.clearSessionToken(phone, sessionToken);
+    }
+
+    /** 仅对仍处于当前会话的请求刷新活跃时间，避免轮询请求把旧会话长期判定为在线。 */
+    public void touchActiveSession(User user) {
+        if (user == null || user.getSessionToken() == null || user.getSessionToken().isBlank()) return;
+        LocalDateTime lastSeenAt = user.getSessionLastSeenAt();
+        if (lastSeenAt == null || lastSeenAt.isBefore(LocalDateTime.now().minusSeconds(30))) {
+            userMapper.touchSession(user.getPhone(), user.getSessionToken(), LocalDateTime.now());
+        }
+    }
+
+    /** 供当前在线设备轮询；验证码确认前即可看到另一台设备的登录请求。 */
+    public LoginNoticeResponse getPendingLoginNotice(String phone, String sessionToken) {
+        User user = userMapper.selectById(phone);
+        if (user == null || !sessionToken.equals(user.getSessionToken())
+            || user.getPendingLoginChallengeId() == null || user.getPendingLoginCreatedAt() == null
+            || user.getPendingLoginCreatedAt().isBefore(LocalDateTime.now().minusMinutes(LOGIN_CHALLENGE_MINUTES))) {
+            return null;
+        }
+        return new LoginNoticeResponse(user.getPendingLoginChallengeId(), user.getPendingLoginCreatedAt());
     }
 
     public List<String> rolesOf(String userId) {
@@ -167,10 +192,12 @@ public class UserService {
         }
     }
 
-    private LoginResponse loginResponse(User user, String activeRole) {
+    private LoginResponse loginResponse(User user, String activeRole, String deviceId) {
         String sessionToken = UUID.randomUUID().toString();
-        LocalDateTime sessionExpiresAt = LocalDateTime.now().plusNanos(jwtUtil.getExpirationMs() * 1_000_000L);
-        int updated = userMapper.updateSessionToken(user.getPhone(), sessionToken, sessionExpiresAt);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sessionExpiresAt = now.plusNanos(jwtUtil.getExpirationMs() * 1_000_000L);
+        int updated = userMapper.updateSessionToken(user.getPhone(), sessionToken, sessionExpiresAt,
+            normalizeDeviceId(deviceId), now);
         if (updated != 1) throw new BusinessException("登录状态创建失败，请重试");
         List<String> roles = rolesOf(user.getPhone());
         user.setRole(roles.contains(activeRole) ? activeRole : "USER");
@@ -184,7 +211,20 @@ public class UserService {
 
     private boolean hasActiveSession(User user) {
         return user.getSessionToken() != null && !user.getSessionToken().isBlank()
-            && user.getSessionExpiresAt() != null && user.getSessionExpiresAt().isAfter(LocalDateTime.now());
+            && user.getSessionExpiresAt() != null && user.getSessionExpiresAt().isAfter(LocalDateTime.now())
+            && user.getSessionLastSeenAt() != null
+            && user.getSessionLastSeenAt().isAfter(LocalDateTime.now().minusMinutes(ACTIVE_SESSION_MINUTES));
+    }
+
+    private boolean isSameDevice(User user, String deviceId) {
+        String normalizedDeviceId = normalizeDeviceId(deviceId);
+        return normalizedDeviceId != null && normalizedDeviceId.equals(user.getSessionDeviceId());
+    }
+
+    private String normalizeDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.isBlank()) return null;
+        String normalized = deviceId.trim();
+        return normalized.length() > 100 ? normalized.substring(0, 100) : normalized;
     }
 
     private String defaultRole(String userId) {
