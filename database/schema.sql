@@ -50,7 +50,12 @@ CREATE TABLE `user` (
     avatar VARCHAR(512),
     nickname VARCHAR(50),
     session_token VARCHAR(64),
-    session_expires_at DATETIME
+    session_expires_at DATETIME,
+    session_device_id VARCHAR(100),
+    session_last_seen_at DATETIME,
+    pending_login_challenge_id VARCHAR(64),
+    pending_login_device_id VARCHAR(100),
+    pending_login_created_at DATETIME
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE role_application (

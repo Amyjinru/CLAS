@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { login, register, sendLoginCode, sendRegisterCode, setSessionUser, currentRole, switchRole } from '../api/clas'
+import { login, register, sendLoginCode, sendRegisterCode, setSessionUser, currentRole, switchRole, getDeviceId } from '../api/clas'
 import { passwordChecks, passwordRuleMessage, passwordStrength as calculatePasswordStrength } from '../utils/passwordRules'
 
 const route = useRoute()
@@ -53,7 +53,7 @@ async function submitLogin() {
   loginLoading.value = true
   showMessage('')
   try {
-    const data = await login(loginForm)
+    const data = await login({ ...loginForm, deviceId: getDeviceId() })
     // 将用户信息和 token 一并写入 session
     const sessionData = { ...data.user, roles: data.roles || data.user.roles || [data.user.role], token: data.token }
     setSessionUser(sessionData)

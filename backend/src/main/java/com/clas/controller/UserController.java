@@ -3,6 +3,7 @@ package com.clas.controller;
 import com.clas.common.Result;
 import com.clas.config.UserContext;
 import com.clas.dto.LoginRequest;
+import com.clas.dto.LoginNoticeResponse;
 import com.clas.dto.LoginResponse;
 import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
@@ -12,6 +13,7 @@ import com.clas.entity.User;
 import com.clas.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,6 +60,13 @@ public class UserController {
     public Result<String> sendLoginCode(@Valid @RequestBody SendCodeRequest request) {
         userService.sendLoginCode(request);
         return Result.ok("验证码已发送");
+    }
+
+    @GetMapping("/login-notice")
+    @RequireRole({"USER", "MERCHANT", "ADMIN", "RIDER"})
+    public Result<LoginNoticeResponse> loginNotice() {
+        User user = UserContext.getUser();
+        return Result.ok(user == null ? null : userService.getPendingLoginNotice(user.getPhone(), user.getSessionToken()));
     }
 
     /**

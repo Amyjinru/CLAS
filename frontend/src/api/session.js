@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import { api, unwrap } from './client'
 
+const DEVICE_ID_KEY = 'clas_device_id'
+
 function readStoredUser() {
   try {
     return JSON.parse(localStorage.getItem('clas_user') || 'null')
@@ -21,6 +23,16 @@ export function currentRole() {
 
 export function currentToken() {
   return sessionUser.value?.token || null
+}
+
+/** 浏览器本地设备标识：仅用于辨别同机重登与异机登录，不保存用户资料。 */
+export function getDeviceId() {
+  let deviceId = localStorage.getItem(DEVICE_ID_KEY)
+  if (!deviceId) {
+    deviceId = globalThis.crypto?.randomUUID?.() || `device-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    localStorage.setItem(DEVICE_ID_KEY, deviceId)
+  }
+  return deviceId
 }
 
 export function setSessionUser(data) {

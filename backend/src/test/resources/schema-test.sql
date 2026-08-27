@@ -57,7 +57,12 @@ CREATE TABLE "user" (
     avatar VARCHAR(512),
     nickname VARCHAR(50),
     session_token VARCHAR(64),
-    session_expires_at TIMESTAMP
+    session_expires_at TIMESTAMP,
+    session_device_id VARCHAR(100),
+    session_last_seen_at TIMESTAMP,
+    pending_login_challenge_id VARCHAR(64),
+    pending_login_device_id VARCHAR(100),
+    pending_login_created_at TIMESTAMP
 );
 
 CREATE TABLE role_application (

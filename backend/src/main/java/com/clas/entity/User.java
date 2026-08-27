@@ -24,6 +24,16 @@ public class User {
     private String sessionToken;
     @JsonIgnore
     private LocalDateTime sessionExpiresAt;
+    @JsonIgnore
+    private String sessionDeviceId;
+    @JsonIgnore
+    private LocalDateTime sessionLastSeenAt;
+    @JsonIgnore
+    private String pendingLoginChallengeId;
+    @JsonIgnore
+    private String pendingLoginDeviceId;
+    @JsonIgnore
+    private LocalDateTime pendingLoginCreatedAt;
     @TableField(exist = false)
     private List<String> roles;
 }

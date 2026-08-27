@@ -3,6 +3,7 @@ package com.clas;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -69,6 +70,37 @@ class AuthorizationIsolationIntegrationTest {
             .andExpect(status().isOk());
     }
 
+    @Test
+    void sameDeviceReloginSkipsVerificationWhileAnotherDeviceCreatesNotice() throws Exception {
+        jdbcTemplate.update("UPDATE \"user\" SET session_token = NULL, session_expires_at = NULL, session_device_id = NULL, "
+            + "session_last_seen_at = NULL, pending_login_challenge_id = NULL, pending_login_device_id = NULL, "
+            + "pending_login_created_at = NULL WHERE phone = ?", ADMIN_PHONE);
+
+        String currentToken = loginTokenOnDevice(ADMIN_PHONE, "browser-a");
+        String sameDeviceToken = loginTokenOnDevice(ADMIN_PHONE, "browser-a");
+
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", ADMIN_PHONE,
+                    "password", "Abc123!",
+                    "deviceId", "browser-b"
+                ))))
+            .andExpect(status().isConflict());
+
+        mockMvc.perform(get("/api/user/login-notice")
+                .header("Authorization", "Bearer " + sameDeviceToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.challengeId").isNotEmpty());
+
+        mockMvc.perform(get("/api/admin/users")
+                .header("Authorization", "Bearer " + currentToken))
+            .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/admin/users")
+                .header("Authorization", "Bearer " + sameDeviceToken))
+            .andExpect(status().isOk());
+    }
+
     private String loginToken(String phone) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/user/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -85,6 +117,20 @@ class AuthorizationIsolationIntegrationTest {
             return loginTokenWithCode(phone, "123456");
         }
         org.junit.jupiter.api.Assertions.assertEquals(200, result.getResponse().getStatus());
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+            .path("data").path("token").asText();
+    }
+
+    private String loginTokenOnDevice(String phone, String deviceId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", phone,
+                    "password", "Abc123!",
+                    "deviceId", deviceId
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString())
             .path("data").path("token").asText();
     }
