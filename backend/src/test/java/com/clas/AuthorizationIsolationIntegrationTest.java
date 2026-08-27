@@ -44,12 +44,58 @@ class AuthorizationIsolationIntegrationTest {
         }
     }
 
+    @Test
+    void latestLoginInvalidatesPreviousDeviceToken() throws Exception {
+        String previousDeviceToken = loginToken(ADMIN_PHONE);
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", ADMIN_PHONE,
+                    "password", "Abc123!"
+                ))))
+            .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/user/login/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", ADMIN_PHONE))))
+            .andExpect(status().isOk());
+        String currentDeviceToken = loginTokenWithCode(ADMIN_PHONE, "123456");
+
+        mockMvc.perform(get("/api/admin/users")
+                .header("Authorization", "Bearer " + previousDeviceToken))
+            .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/admin/users")
+                .header("Authorization", "Bearer " + currentDeviceToken))
+            .andExpect(status().isOk());
+    }
+
     private String loginToken(String phone) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/user/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "phone", phone,
                     "password", "Abc123!"
+                ))))
+            .andReturn();
+        if (result.getResponse().getStatus() == 409) {
+            mockMvc.perform(post("/api/user/login/send-code")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of("phone", phone))))
+                .andExpect(status().isOk());
+            return loginTokenWithCode(phone, "123456");
+        }
+        org.junit.jupiter.api.Assertions.assertEquals(200, result.getResponse().getStatus());
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+            .path("data").path("token").asText();
+    }
+
+    private String loginTokenWithCode(String phone, String code) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", phone,
+                    "password", "Abc123!",
+                    "code", code
                 ))))
             .andExpect(status().isOk())
             .andReturn();

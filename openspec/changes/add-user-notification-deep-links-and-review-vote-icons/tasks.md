@@ -15,15 +15,15 @@
 
 ## 3. Review Vote Icons
 
-- [ ] 3.1 Replace review LIKE/DISLIKE text-only controls with thumbs-up and thumbs-down icon controls while keeping counts visible.
-- [ ] 3.2 Apply the same icon treatment to merchant reply and nested reply vote controls.
-- [ ] 3.3 Add accessible labels for icon vote buttons that include action direction and current count.
+- [x] 3.1 Replace review LIKE/DISLIKE text-only controls with thumbs-up and thumbs-down icon controls while keeping counts visible.
+- [x] 3.2 Apply the same icon treatment to merchant reply and nested reply vote controls.
+- [x] 3.3 Add accessible labels for icon vote buttons that include action direction and current count.
 - [ ] 3.4 Verify vote API calls, count refresh, selected/disabled states, and permission behavior remain unchanged.
 
 ## 4. Verification
 
 - [x] 4.1 Add or update backend tests for typed notification creation and legacy notification compatibility.
 - [ ] 4.2 Add or update frontend tests if the project has a frontend test harness for notification route resolution and vote icon rendering.
-- [ ] 4.3 Run backend tests with `mvn test`.
+- [x] 4.3 Run backend tests with `mvn test`.
 - [x] 4.4 Run frontend build with `npm run build`.
 - [ ] 4.5 Manually verify user flows: merchant reply notification click-through, review reply notification click-through, legacy notification fallback, and review vote icon behavior.

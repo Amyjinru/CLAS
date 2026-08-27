@@ -53,6 +53,12 @@ public class UserController {
         return Result.ok("验证码已发送");
     }
 
+    @PostMapping("/login/send-code")
+    public Result<String> sendLoginCode(@Valid @RequestBody SendCodeRequest request) {
+        userService.sendLoginCode(request);
+        return Result.ok("验证码已发送");
+    }
+
     /**
      * 忘记密码 — 验证码校验 + 密码重置 + 自动登录。
      */

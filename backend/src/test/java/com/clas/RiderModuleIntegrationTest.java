@@ -308,8 +308,24 @@ class RiderModuleIntegrationTest {
                     "phone", phone,
                     "password", "Abc123!"
                 ))))
-            .andExpect(status().isOk())
             .andReturn();
+        if (result.getResponse().getStatus() == 409) {
+            mockMvc.perform(post("/api/user/login/send-code")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of("phone", phone))))
+                .andExpect(status().isOk());
+            result = mockMvc.perform(post("/api/user/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of(
+                        "phone", phone,
+                        "password", "Abc123!",
+                        "code", "123456"
+                    ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        } else {
+            org.junit.jupiter.api.Assertions.assertEquals(200, result.getResponse().getStatus());
+        }
         return objectMapper.readTree(result.getResponse().getContentAsString())
             .path("data").path("token").asText();
     }

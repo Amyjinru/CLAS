@@ -54,7 +54,9 @@ CREATE TABLE "user" (
     role VARCHAR(20) NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     avatar VARCHAR(512),
-    nickname VARCHAR(50)
+    nickname VARCHAR(50),
+    session_token VARCHAR(64),
+    session_expires_at TIMESTAMP
 );
 
 CREATE TABLE role_application (
