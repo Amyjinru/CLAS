@@ -8,6 +8,7 @@ import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
 import com.clas.config.RequireRole;
 import com.clas.dto.SendCodeRequest;
+import com.clas.entity.User;
 import com.clas.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -71,5 +72,17 @@ public class UserController {
     @RequireRole({"USER", "MERCHANT", "ADMIN", "RIDER"})
     public Result<LoginResponse> switchRole(@Valid @RequestBody com.clas.dto.RoleSwitchRequest request) {
         return Result.ok(userService.switchRole(UserContext.getUserId(), request.role()));
+    }
+
+    /**
+     * 退出登录：清除服务端会话，使该账号其它设备可免验证码直接登录。
+     */
+    @PostMapping("/logout")
+    public Result<String> logout() {
+        User user = UserContext.getUser();
+        if (user != null) {
+            userService.logout(user.getPhone(), user.getSessionToken());
+        }
+        return Result.ok("已退出登录");
     }
 }
