@@ -6,6 +6,7 @@ import com.clas.common.PasswordValidator;
 import com.clas.common.PhoneValidator;
 import com.clas.common.VerificationCodeStore;
 import com.clas.dto.DemoLoginRequest;
+import com.clas.dto.DemoAccessRequest;
 import com.clas.dto.LoginRequest;
 import com.clas.dto.LoginNoticeResponse;
 import com.clas.dto.LoginResponse;
@@ -17,6 +18,8 @@ import com.clas.entity.UserRole;
 import com.clas.mapper.UserMapper;
 import com.clas.mapper.UserRoleMapper;
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -35,6 +38,9 @@ public class UserService {
 
     @Value("${clas.demo-accounts.enabled:false}")
     private boolean demoAccountsEnabled;
+
+    @Value("${clas.demo-accounts.access-password:}")
+    private String demoAccessPassword;
 
     public UserService(UserMapper userMapper, UserRoleMapper userRoleMapper, VerificationCodeStore verificationCodeStore,
                        BCryptPasswordEncoder passwordEncoder, com.clas.common.JwtUtil jwtUtil) {
@@ -71,11 +77,11 @@ public class UserService {
     }
 
     /**
-     * 快捷登录只在测试配置启用，避免演示账号入口进入正式部署环境。
+     * 快捷登录仅在显式启用演示配置后可用。
      * 已存在有效会话时仍要求验证码，保证与常规登录一致的单设备保护。
      */
     public LoginResponse demoLogin(DemoLoginRequest request) {
-        if (!demoAccountsEnabled) throw new BusinessException(404, "演示账号入口未启用", "DEMO_LOGIN_DISABLED");
+        verifyDemoAccess(request.accessPassword());
         String phone = PhoneValidator.normalizeAndValidate(request.phone());
         User user = userMapper.selectById(phone);
         if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
@@ -90,6 +96,10 @@ public class UserService {
             verificationCodeStore.verify(phone, "login-session", request.code());
         }
         return loginResponse(user, defaultRole(phone), request.deviceId());
+    }
+
+    public void verifyDemoAccess(DemoAccessRequest request) {
+        verifyDemoAccess(request.password());
     }
 
     public LoginResponse register(RegisterRequest request) {
@@ -241,6 +251,20 @@ public class UserService {
             && user.getSessionExpiresAt() != null && user.getSessionExpiresAt().isAfter(LocalDateTime.now())
             && user.getSessionLastSeenAt() != null
             && user.getSessionLastSeenAt().isAfter(LocalDateTime.now().minusMinutes(ACTIVE_SESSION_MINUTES));
+    }
+
+    /**
+     * 演示入口密码仅由运行环境注入，避免将演示权限写入前端或仓库。
+     */
+    private void verifyDemoAccess(String password) {
+        if (!demoAccountsEnabled || demoAccessPassword == null || demoAccessPassword.isBlank()) {
+            throw new BusinessException(404, "演示权限未启用", "DEMO_LOGIN_DISABLED");
+        }
+        byte[] expected = demoAccessPassword.getBytes(StandardCharsets.UTF_8);
+        byte[] provided = (password == null ? "" : password).getBytes(StandardCharsets.UTF_8);
+        if (!MessageDigest.isEqual(expected, provided)) {
+            throw new BusinessException(403, "演示访问密码错误", "DEMO_ACCESS_DENIED");
+        }
     }
 
     private boolean isSameDevice(User user, String deviceId) {

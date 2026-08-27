@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { demoLogin, login, register, sendLoginCode, sendRegisterCode, setSessionUser, currentRole, switchRole, getDeviceId } from '../api/clas'
+import { demoLogin, verifyDemoAccess, login, register, sendLoginCode, sendRegisterCode, setSessionUser, currentRole, switchRole, getDeviceId } from '../api/clas'
 import { passwordChecks, passwordRuleMessage, passwordStrength as calculatePasswordStrength } from '../utils/passwordRules'
 
 const route = useRoute()
@@ -40,8 +40,10 @@ const loginCodeCooldown = ref(0)
 const portalPickerVisible = ref(false)
 const loginSession = ref(null)
 const portalLabels = { USER: '普通用户端', MERCHANT: '商家端', RIDER: '骑手端', ADMIN: '管理端' }
-const demoAccessAvailable = import.meta.env.DEV
 const accessPickerVisible = ref(false)
+const demoAccessPassword = ref('')
+const demoAccessUnlocked = ref(false)
+const demoAccessVerifying = ref(false)
 const demoLoginCode = ref('')
 const demoVerificationAccount = ref(null)
 const demoLoginLoadingPhone = ref('')
@@ -102,8 +104,27 @@ async function completeLogin(data, targetRole = '') {
 
 function closeAccessPicker() {
   accessPickerVisible.value = false
+  demoAccessPassword.value = ''
+  demoAccessUnlocked.value = false
   demoVerificationAccount.value = null
   demoLoginCode.value = ''
+}
+
+async function unlockDemoAccess() {
+  if (!demoAccessPassword.value) {
+    showMessage('请输入演示访问密码', 'error')
+    return
+  }
+  demoAccessVerifying.value = true
+  try {
+    await verifyDemoAccess({ password: demoAccessPassword.value })
+    demoAccessUnlocked.value = true
+    showMessage('演示权限验证通过，请选择身份', 'success')
+  } catch (error) {
+    showMessage(error.response?.data?.message || '演示访问密码错误', 'error')
+  } finally {
+    demoAccessVerifying.value = false
+  }
 }
 
 async function loginWithDemoAccount(account) {
@@ -113,7 +134,8 @@ async function loginWithDemoAccount(account) {
     const data = await demoLogin({
       phone: account.phone,
       code: demoVerificationAccount.value?.phone === account.phone ? demoLoginCode.value : '',
-      deviceId: getDeviceId()
+      deviceId: getDeviceId(),
+      accessPassword: demoAccessPassword.value
     })
     await completeLogin(data, account.role)
     closeAccessPicker()
@@ -334,7 +356,7 @@ function switchTab(tab) {
             :key="step"
           >{{ step }}</span>
           <button
-            v-if="activeTab === 'login' && demoAccessAvailable"
+            v-if="activeTab === 'login'"
             type="button"
             class="permission-trigger"
             :aria-expanded="accessPickerVisible"
@@ -594,7 +616,18 @@ function switchTab(tab) {
       </div>
     </el-dialog>
     <el-dialog v-model="accessPickerVisible" title="获得权限" width="min(680px, calc(100% - 32px))" @closed="closeAccessPicker">
-      <p class="demo-access-copy">本地演示环境可直接进入不同端口；手机号按钮不会展示或传递账号密码。</p>
+      <template v-if="!demoAccessUnlocked">
+        <p class="demo-access-copy">请输入演示访问密码，验证通过后才可选择体验身份。</p>
+        <div class="demo-access-gate">
+          <label for="demo-access-password">演示访问密码</label>
+          <div class="demo-access-gate-row">
+            <input id="demo-access-password" v-model="demoAccessPassword" type="password" autocomplete="off" placeholder="请输入密码" @keyup.enter="unlockDemoAccess" />
+            <button type="button" class="demo-confirm-button" :disabled="demoAccessVerifying" @click="unlockDemoAccess">{{ demoAccessVerifying ? '验证中' : '验证并继续' }}</button>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+      <p class="demo-access-copy">请选择要进入的身份端口。手机号按钮不会展示或传递账号密码。</p>
       <div class="demo-access-grid">
         <article v-for="account in demoAccounts" :key="account.role" class="demo-access-card">
           <span class="demo-role-badge">{{ account.label }}</span>
@@ -619,6 +652,7 @@ function switchTab(tab) {
           <button type="button" class="demo-confirm-button" :disabled="!demoLoginCode" @click="loginWithDemoAccount(demoVerificationAccount)">确认登录</button>
         </div>
       </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -834,6 +868,19 @@ function switchTab(tab) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+
+.demo-access-gate {
+  display: grid;
+  gap: 9px;
+  padding: 18px;
+  border: 1px solid rgba(116, 82, 32, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #fffdf8, #fff7df);
+}
+
+.demo-access-gate label { color: var(--text-primary); font-size: 14px; font-weight: 800; }
+.demo-access-gate-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+.demo-access-gate-row input { min-width: 0; min-height: 42px; padding: 0 12px; border: 1px solid rgba(116, 82, 32, 0.24); border-radius: 10px; background: #fff; color: var(--text-primary); font: inherit; }
 
 .demo-access-card {
   display: grid;
@@ -1689,6 +1736,10 @@ input:focus-visible,
   }
 
   .demo-access-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-access-gate-row {
     grid-template-columns: 1fr;
   }
 

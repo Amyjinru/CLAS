@@ -47,6 +47,9 @@ jwt:
 clas:
   verification:
     fixed-code: ${CLAS_VERIFICATION_FIXEDCODE:}
+  demo-accounts:
+    enabled: ${CLAS_DEMO_ACCOUNTS_ENABLED:false}
+    access-password: ${CLAS_DEMO_ACCESS_PASSWORD:}
 
 app:
   cors:

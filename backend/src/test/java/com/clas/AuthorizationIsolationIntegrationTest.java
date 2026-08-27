@@ -14,12 +14,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@TestPropertySource(properties = "clas.demo-accounts.access-password=test-only-demo-access")
 class AuthorizationIsolationIntegrationTest {
     private static final String ADMIN_PHONE = "13800000003";
 
@@ -107,13 +109,21 @@ class AuthorizationIsolationIntegrationTest {
         jdbcTemplate.update("UPDATE \"user\" SET session_token = NULL, session_expires_at = NULL, session_device_id = NULL, "
             + "session_last_seen_at = NULL, pending_login_challenge_id = NULL, pending_login_device_id = NULL, "
             + "pending_login_created_at = NULL WHERE phone = ?", riderPhone);
-        mockMvc.perform(post("/api/user/demo-login")
+        mockMvc.perform(post("/api/user/demo-access/verify")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "deviceId", "demo-a"))))
+                .content(objectMapper.writeValueAsString(Map.of("password", "wrong-password"))))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/user/demo-access/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("password", "test-only-demo-access"))))
             .andExpect(status().isOk());
         mockMvc.perform(post("/api/user/demo-login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "deviceId", "demo-b"))))
+                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "deviceId", "demo-a", "accessPassword", "test-only-demo-access"))))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/user/demo-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "deviceId", "demo-b", "accessPassword", "test-only-demo-access"))))
             .andExpect(status().isConflict());
         mockMvc.perform(post("/api/user/login/send-code")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -121,7 +131,7 @@ class AuthorizationIsolationIntegrationTest {
             .andExpect(status().isOk());
         mockMvc.perform(post("/api/user/demo-login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "code", "123456", "deviceId", "demo-b"))))
+                .content(objectMapper.writeValueAsString(Map.of("phone", riderPhone, "code", "123456", "deviceId", "demo-b", "accessPassword", "test-only-demo-access"))))
             .andExpect(status().isOk());
     }
 

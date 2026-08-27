@@ -69,9 +69,20 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
 
       - name: Cleanup zombie Java processes & Deploy
+        env:
+          DEMO_ACCESS_PASSWORD: ${{ secrets.DEMO_ACCESS_PASSWORD }}
         run: |
-          sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@8.141.112.182 "
+          test -n "$DEMO_ACCESS_PASSWORD" || { echo 'DEMO_ACCESS_PASSWORD secret is required'; exit 1; }
+          printf '%s\n' "$DEMO_ACCESS_PASSWORD" | sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@8.141.112.182 "
             set -e
+            read -r demo_access_password
+            env_file=/etc/clas/clas.env
+            tmp_env=\$(mktemp)
+            grep -vE '^(CLAS_DEMO_ACCOUNTS_ENABLED|CLAS_DEMO_ACCESS_PASSWORD)=' \"\$env_file\" > \"\$tmp_env\" || true
+            printf 'CLAS_DEMO_ACCOUNTS_ENABLED=true\\nCLAS_DEMO_ACCESS_PASSWORD=%s\\n' \"\$demo_access_password\" >> \"\$tmp_env\"
+            install -m 600 \"\$tmp_env\" \"\$env_file\"
+            rm -f \"\$tmp_env\"
+
             echo '>>> 清理残留的非 systemd Java 进程...'
             old_pids=\$(ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | awk '{print \$2}')
             if [ -n \"\$old_pids\" ]; then

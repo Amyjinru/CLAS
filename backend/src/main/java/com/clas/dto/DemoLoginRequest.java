@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 public record DemoLoginRequest(
     @NotBlank String phone,
     String code,
-    String deviceId
+    String deviceId,
+    @NotBlank String accessPassword
 ) {
 }

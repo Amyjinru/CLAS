@@ -6,6 +6,7 @@ import com.clas.dto.LoginRequest;
 import com.clas.dto.LoginNoticeResponse;
 import com.clas.dto.LoginResponse;
 import com.clas.dto.DemoLoginRequest;
+import com.clas.dto.DemoAccessRequest;
 import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
 import com.clas.config.RequireRole;
@@ -36,6 +37,12 @@ public class UserController {
     @PostMapping("/demo-login")
     public Result<LoginResponse> demoLogin(@Valid @RequestBody DemoLoginRequest request) {
         return Result.ok(userService.demoLogin(request));
+    }
+
+    @PostMapping("/demo-access/verify")
+    public Result<String> verifyDemoAccess(@Valid @RequestBody DemoAccessRequest request) {
+        userService.verifyDemoAccess(request);
+        return Result.ok("演示权限验证通过");
     }
 
     @PostMapping("/register")
