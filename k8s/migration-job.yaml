@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clas-db-migrate
+  namespace: clas
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: migrate
+          image: ghcr.io/amyjinru/clas-backend:REQUIRED_TAG
+          command: ["/bin/bash", "/opt/clas/database/bootstrap-and-migrate.sh"]
+          envFrom:
+            - configMapRef: {name: clas-config}
+            - secretRef: {name: clas-secrets}
+          env:
+            - name: MYSQL_USER
+              value: root

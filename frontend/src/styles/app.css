@@ -1,0 +1,975 @@
+/* ═══════════════════════════════════════════════
+   CLAS 全局样式 —「暖食」Warm Editorial
+   配合 theme.css 变量体系使用
+   ═══════════════════════════════════════════════ */
+
+/* ─── 通用按钮增强 ─── */
+button,
+.button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 16px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  transition-property: background-color, transform, box-shadow;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.02em;
+}
+button:hover,
+.button:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+button:active,
+.button:active {
+  transform: scale(0.97) translateY(0);
+}
+button.secondary,
+.button.secondary {
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+button.secondary:hover,
+.button.secondary:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--text-primary);
+}
+button:disabled {
+  background: var(--clas-warm-100);
+  color: var(--clas-warm-300);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ─── 表单元素 ─── */
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  font-family: var(--font-body);
+  transition: border-color var(--transition-fast);
+  background: var(--bg-card);
+}
+input:focus,
+textarea:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ─── 链接 ─── */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+/* ─── 基础布局 ─── */
+.shell {
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+main {
+  margin: 0 auto;
+  max-width: 1080px;
+  padding: 24px;
+  width: 100%;
+}
+
+/* ─── 用户端宽屏布局 ─── */
+.user-page {
+  width: 100%;
+}
+
+.user-page-grid-2 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.user-page-grid-3 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.user-page-split {
+  align-items: start;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.user-page-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+@media (min-width: 1024px) {
+  main {
+    max-width: 1280px;
+    padding: 28px 36px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  .user-page-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .user-page-grid-2,
+  .user-page-grid-3,
+  .user-page-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── 顶栏 ─── */
+.topbar {
+  align-items: center;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 14px 28px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: var(--shadow-xs);
+  backdrop-filter: blur(12px);
+}
+.brand {
+  color: var(--color-primary) !important;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-decoration: none !important;
+}
+.brand:hover {
+  color: var(--color-primary-hover) !important;
+}
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 14px;
+  align-items: center;
+}
+nav a {
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  transition-property: color, background-color;
+  transition-duration: var(--transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+}
+nav a:hover,
+nav a.router-link-active {
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
+}
+
+/* ─── Hero / 面板 / 通用容器 ─── */
+.hero,
+.panel,
+.toolbar,
+.checkout {
+  background: var(--bg-card);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+.hero {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(250,247,242,0.75) 0%, rgba(255,244,204,0.70) 50%, rgba(252,250,245,0.78) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -5%;
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.06) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.hero h1,
+.panel h1 {
+  margin: 0 0 8px;
+  position: relative;
+}
+.narrow {
+  max-width: 420px;
+}
+
+/* ─── 工具栏 ─── */
+.toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* 操作区统一为可换行的紧凑布局，避免多按钮在卡片和表格中彼此遮挡。 */
+:where(.header-actions, .hero-actions, .card-actions, .row-actions, .detail-actions, .form-actions, .dialog-actions, .contact-actions, .delivery-actions, .pending-actions, .cart-actions, .order-panel-foot, .shop-actions, .redeem-box) {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:where(.header-actions, .hero-actions, .card-actions, .row-actions, .detail-actions, .form-actions, .dialog-actions, .contact-actions, .delivery-actions, .pending-actions, .cart-actions, .order-panel-foot, .shop-actions, .redeem-box) > :where(.el-button, button, .button, a.button) + :where(.el-button, button, .button, a.button) {
+  margin-left: 0;
+}
+
+.action-primary {
+  flex: 0 0 auto;
+}
+
+.action-secondary {
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+/* ─── 网格 & 卡片 ─── */
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+.card,
+.row {
+  background: var(--bg-card);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition-property: box-shadow, transform;
+  transition-duration: var(--transition-base);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.card:hover,
+.row:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.thumb {
+  align-items: center;
+  background: var(--color-primary-light);
+  border-radius: var(--radius-md);
+  color: #B8970E;
+  display: flex;
+  font-weight: 900;
+  height: 92px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.list {
+  display: grid;
+  gap: 12px;
+}
+.row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.row h2,
+.card h2 {
+  font-size: var(--text-h3);
+  font-weight: 600;
+  line-height: var(--leading-h3);
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+.row p,
+.card p,
+.panel p {
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  max-width: 65ch;
+}
+.row-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.message {
+  min-height: 24px;
+}
+.checkout {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  position: sticky;
+  bottom: 0;
+  box-shadow: var(--shadow-lg);
+}
+
+/* ─── 页面标题装饰 ─── */
+.page-title {
+  font-size: clamp(22px, 5vw, var(--text-h2));
+  font-weight: 800;
+  line-height: var(--leading-h2);
+  color: var(--text-primary);
+  margin: 0 0 24px 0;
+  letter-spacing: 0.04em;
+  position: relative;
+  padding-left: 16px;
+}
+.page-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  background: linear-gradient(180deg, var(--color-primary), #FFE566);
+  border-radius: var(--radius-full);
+}
+
+/* ─── 统计卡片 ─── */
+.stat-card {
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden;
+}
+.stat-card .el-card__body {
+  padding: 28px 24px !important;
+  text-align: center;
+}
+.stat-value {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.stat-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 6px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ─── 图表卡片 ─── */
+.chart-card {
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+}
+.chart-card .el-card__body {
+  padding: 16px 8px 8px 8px;
+}
+
+/* ─── 管理页面通用容器 ─── */
+.admin-page {
+  max-width: 1400px;
+}
+
+/* ─── 入场动画 ─── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-in  { animation: fadeInUp 0.5s var(--transition-base) both; }
+.animate-scale { animation: scaleIn 0.4s var(--transition-base) both; }
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+
+/* ─── 路由级入场动画：按页面类型差异化 ─── */
+.route-stage {
+  display: block;
+  width: 100%;
+  transform-origin: 50% 24px;
+}
+
+.page-none-enter-active,
+.page-none-leave-active {
+  transition: none;
+}
+
+.page-lift-enter-active,
+.page-market-enter-active,
+.page-slide-enter-active,
+.page-focus-enter-active,
+.page-workbench-enter-active,
+.page-admin-enter-active,
+.page-pop-enter-active {
+  animation-duration: 0.26s;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.page-lift-leave-active,
+.page-market-leave-active,
+.page-slide-leave-active,
+.page-focus-leave-active,
+.page-workbench-leave-active,
+.page-admin-leave-active,
+.page-pop-leave-active {
+  animation: pageFadeAway 0.16s ease-in both;
+}
+
+.page-lift-enter-active {
+  animation-name: routeLiftIn;
+}
+
+.page-market-enter-active {
+  animation-name: routeMarketIn;
+}
+
+.page-slide-enter-active {
+  animation-name: routeSlideIn;
+}
+
+.page-focus-enter-active {
+  animation-name: routeFocusIn;
+}
+
+.page-workbench-enter-active {
+  animation-name: routeWorkbenchIn;
+}
+
+.page-admin-enter-active {
+  animation-name: routeAdminIn;
+}
+
+.page-pop-enter-active {
+  animation-name: routePopIn;
+  animation-duration: 0.24s;
+  animation-timing-function: var(--ease-out);
+}
+
+.page-market-enter-active :where(.hero, .toolbar, .panel),
+.page-market-enter-active :where(.card, .row, .el-card) {
+  animation: marketItemIn 0.24s var(--ease-out) both;
+}
+
+.page-market-enter-active :where(.card, .row, .el-card):nth-of-type(2n) {
+  animation-delay: 0.05s;
+}
+
+.page-market-enter-active :where(.card, .row, .el-card):nth-of-type(3n) {
+  animation-delay: 0.1s;
+}
+
+.page-slide-enter-active :where(.toolbar, .panel, .checkout, .el-table, .el-card) {
+  animation: slidePanelIn 0.24s var(--ease-out) 0.04s both;
+}
+
+.page-focus-enter-active :where(.hero, .panel, .el-card, .detail-card, .merchant-detail) {
+  animation: focusSurfaceIn 0.26s var(--ease-out) 0.04s both;
+}
+
+.page-workbench-enter-active :where(.stat-card, .chart-card, .el-card, .panel) {
+  animation: workbenchTileIn 0.24s var(--ease-out) both;
+}
+
+.page-workbench-enter-active :where(.stat-card, .chart-card, .el-card, .panel):nth-of-type(2n) {
+  animation-delay: 0.06s;
+}
+
+.page-workbench-enter-active :where(.stat-card, .chart-card, .el-card, .panel):nth-of-type(3n) {
+  animation-delay: 0.12s;
+}
+
+.page-admin-enter-active :where(.admin-page, .el-card, .el-table, .toolbar) {
+  animation: adminScanSurface 0.22s var(--ease-out) 0.04s both;
+}
+
+.page-pop-enter-active :where(.panel, .el-card, .el-form, .review-card) {
+  animation: popSurfaceIn 0.24s var(--ease-out) 0.04s both;
+}
+
+@keyframes routeLiftIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: saturate(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: saturate(1);
+  }
+}
+
+@keyframes routeMarketIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.992);
+    clip-path: inset(16px 0 0 0 round 18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    clip-path: inset(0 0 0 0 round 0);
+  }
+}
+
+@keyframes routeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes routeFocusIn {
+  from {
+    opacity: 0;
+    transform: scale(0.975);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes routeWorkbenchIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) rotateX(4deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0);
+  }
+}
+
+@keyframes routeAdminIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes routePopIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.004);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pageFadeAway {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes marketItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slidePanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes focusSurfaceIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes workbenchTileIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes adminScanSurface {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes popSurfaceIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── 无障碍 — Skip Link ─── */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 10000;
+  padding: 10px 20px;
+  background: var(--color-primary);
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: top 0.1s ease-out;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* ─── 无障碍 — 聚焦环 ─── */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ─── 动效可访问性 — 尊重用户偏好 ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── 微交互 ─── */
+
+/* 开关切换 */
+.el-switch .el-switch__core {
+  transition: transform 150ms ease-out;
+}
+.el-switch.is-checked .el-switch__core {
+  transform: translateX(6px);
+}
+
+/* 复选框勾选弹跳 */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  animation: scaleIn 0.2s ease-out both;
+}
+
+/* 通知徽标弹性出现 */
+.el-badge__content {
+  animation: scaleIn 0.25s ease-out both;
+}
+
+/* 表单验证抖动 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-3px); }
+  30%, 70% { transform: translateX(3px); }
+}
+.el-form-item.is-error .el-input__wrapper {
+  animation: shake 0.4s ease-out;
+  border-color: var(--clas-danger);
+  box-shadow: 0 0 0 1px var(--clas-danger) inset;
+}
+
+/* 表单验证成功脉冲 */
+@keyframes successPulse {
+  0% { box-shadow: 0 0 0 0 rgba(101, 163, 13, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(101, 163, 13, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(101, 163, 13, 0); }
+}
+.el-form-item.is-success .el-input__wrapper {
+  animation: successPulse 0.6s ease-out;
+}
+
+/* ─── 移动端安全区域 ─── */
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* 底部固定元素避让 iPhone 指示条 */
+.checkout,
+.tabs {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+/* 小屏 (iPhone SE/6/7/8) 适配 */
+@media (max-width: 375px) {
+  main {
+    padding: 10px;
+  }
+  .hero {
+    padding: 24px 16px;
+  }
+  .card,
+  .row {
+    padding: 14px;
+  }
+  .page-title {
+    padding-left: 10px;
+  }
+}
+
+/* ═══════════ 底部装饰页脚 — 透明底，图案由 shell 层提供 ═══════════ */
+.app-footer {
+  width: 100%;
+  min-height: 160px;
+  position: relative;
+  z-index: 0;
+  background: transparent;
+  border-top: 1px solid rgba(255, 181, 167, 0.25);
+  margin-top: auto;
+  pointer-events: none;
+}
+
+.footer-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.footer-brand {
+  font-family: Georgia, 'Times New Roman', 'Noto Serif SC', serif;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #E8A89A;
+  text-shadow: 0 1px 2px rgba(255, 181, 167, 0.3);
+}
+
+.footer-tagline {
+  font-size: 12px;
+  color: #D4B896;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.footer-copy {
+  font-size: 10.5px;
+  color: #CCBBAA;
+  letter-spacing: 0.04em;
+  font-weight: 400;
+}
+
+/* 暗色模式 — 底部页脚 */
+:root[data-theme='dark'] .app-footer {
+  background-color: #1E1B18;
+  border-top-color: rgba(255, 181, 167, 0.12);
+}
+
+:root[data-theme='dark'] .footer-overlay {
+  background:
+    linear-gradient(180deg,
+      rgba(30, 27, 24, 0.55) 0%,
+      rgba(30, 27, 24, 0.78) 35%,
+      rgba(30, 27, 24, 0.90) 70%,
+      rgba(30, 27, 24, 0.96) 100%
+    );
+}
+
+:root[data-theme='dark'] .footer-brand {
+  color: #C48B80;
+  text-shadow: 0 1px 2px rgba(255, 181, 167, 0.15);
+}
+
+:root[data-theme='dark'] .footer-tagline {
+  color: #9B8470;
+}
+
+:root[data-theme='dark'] .footer-copy {
+  color: #7A7065;
+}
+
+@media (max-width: 640px) {
+  .app-footer {
+    min-height: 130px;
+    background-size: 280px 187px;
+  }
+  .footer-brand {
+    font-size: 18px;
+  }
+  .footer-tagline {
+    font-size: 11px;
+  }
+}
+
+/* ─── 响应式 ─── */
+@media (max-width: 768px) {
+  .topbar,
+  .hero,
+  .row,
+  .checkout {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .hero {
+    padding: 32px 20px;
+    border-radius: var(--radius-lg);
+  }
+  main {
+    padding: 14px;
+  }
+  .stat-value {
+    font-size: 28px;
+  }
+
+  :where(.header-actions, .hero-actions, .card-actions, .row-actions, .detail-actions, .form-actions, .dialog-actions, .contact-actions, .delivery-actions, .pending-actions, .cart-actions, .order-panel-foot, .shop-actions, .redeem-box) {
+    align-items: stretch;
+  }
+
+  :where(.header-actions, .hero-actions, .card-actions, .row-actions, .detail-actions, .form-actions, .dialog-actions, .contact-actions, .delivery-actions, .pending-actions, .cart-actions, .order-panel-foot, .shop-actions, .redeem-box) > :where(.el-button, button, .button, a.button) {
+    flex: 1 1 132px;
+  }
+}
+
+@media (max-width: 640px) {
+  nav {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  nav a {
+    flex: 0 0 auto;
+  }
+
+  .el-card__header {
+    padding: 16px 18px !important;
+  }
+
+  .el-card__body {
+    padding: 18px !important;
+  }
+}

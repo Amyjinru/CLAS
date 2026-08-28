@@ -1,0 +1,1 @@
+function e(e,t={}){let{symbol:n=!1,decimals:r=2}=t,i=(Number(e||0)/100).toFixed(r);return n?`¥${i}`:i}function t(e){return e?new Date(e).toLocaleString(`zh-CN`,{hour12:!1}):`-`}function n(e){return e?String(e).replace(`T`,` `):``}function r(e){return e==null?`-`:e<1e3?`${e}m`:`${(e/1e3).toFixed(1)}km`}export{e as i,t as n,r,n as t};

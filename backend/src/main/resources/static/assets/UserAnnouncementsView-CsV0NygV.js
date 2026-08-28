@@ -1,0 +1,1 @@
+import{C as e,N as t,T as n,_ as r}from"./element-r533nVL1.js";import{t as i}from"./BackButton-6DvW_La_.js";import{t as a}from"./AnnouncementList-6L4f2V7R.js";var o={__name:`UserAnnouncementsView`,setup(o){return(o,s)=>(t(),e(r,null,[n(i,{to:`/home`,label:`返回首页`}),n(a,{title:`平台公告`,description:`查看平台最新通知与活动信息。`})],64))}};export{o as default};

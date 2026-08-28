@@ -1,0 +1,20 @@
+[Unit]
+Description=CLAS Spring Boot backend
+After=network.target mysql.service redis-server.service
+Wants=mysql.service redis-server.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/clas/backend
+EnvironmentFile=-/etc/clas/clas.env
+ExecStart=/usr/bin/java -Xms256m -Xmx512m -XX:+ExitOnOutOfMemoryError -jar /opt/clas/backend/target/clas-backend-0.1.0.jar
+Restart=always
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+SuccessExitStatus=143
+StandardOutput=append:/var/log/clas/backend.log
+StandardError=append:/var/log/clas/backend.log
+
+[Install]
+WantedBy=multi-user.target

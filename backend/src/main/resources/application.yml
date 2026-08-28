@@ -1,0 +1,58 @@
+server:
+  port: 8080
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 50MB
+  application:
+    name: clas-backend
+  config:
+    import: optional:classpath:application-local.yml
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:clas}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+amap:
+  web-service-key: ${AMAP_WEB_SERVICE_KEY:}
+
+rider:
+  identity-encryption-key: ${RIDER_IDENTITY_ENCRYPTION_KEY:}
+
+dashscope:
+  api-key: ${DASHSCOPE_API_KEY:}
+  base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+  text-model: ${DASHSCOPE_TEXT_MODEL:qwen3.6-flash}
+  image-model: ${DASHSCOPE_IMAGE_MODEL:qwen3.5-flash}
+
+content-moderation:
+  forbidden-words: ${FORBIDDEN_WORDS:}
+  chat-api-timeout-ms: ${CHAT_MODERATION_TIMEOUT_MS:3000}
+
+jwt:
+  secret: ${JWT_SECRET:}
+
+clas:
+  verification:
+    fixed-code: ${CLAS_VERIFICATION_FIXEDCODE:}
+  demo-accounts:
+    enabled: ${CLAS_DEMO_ACCOUNTS_ENABLED:false}
+    access-password: ${CLAS_DEMO_ACCESS_PASSWORD:}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}

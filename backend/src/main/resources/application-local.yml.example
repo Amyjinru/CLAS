@@ -1,0 +1,26 @@
+# 复制本文件为 application-local.yml，并填写你的本地配置。
+# application-local.yml 已被 .gitignore 忽略，不会提交到仓库。
+spring:
+  datasource:
+    username: root
+    password: 在这里填写MySQL密码
+
+jwt:
+  secret: 在这里填写JWT签名密钥（至少32字符的随机字符串）
+
+rider:
+  identity-encryption-key: 在这里填写至少32字符的RIDER_IDENTITY_ENCRYPTION_KEY
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+
+# 阿里云百炼内容安全审核。未填写时仅启用本地违禁词过滤。
+dashscope:
+  api-key: 在这里填写DASHSCOPE_API_KEY
+  base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  text-model: qwen3.6-flash
+  image-model: qwen3.5-flash
+
+content-moderation:
+  forbidden-words: ""

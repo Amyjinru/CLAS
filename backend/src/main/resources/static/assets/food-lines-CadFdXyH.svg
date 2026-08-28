@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <style>
+      .food-path {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2.5;
+      }
+    </style>
+  </defs>
+
+  <!-- ═══════ 🍔 汉堡 — 左上 (translate 80,55 scale 1.1) ═══════ -->
+  <g transform="translate(80, 55) scale(1.1)">
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;0.55;0.55;0" keyTimes="0;0.05;0.2;0.8;1" dur="20s" repeatCount="indefinite"/>
+      <!-- 上层面包 -->
+      <path class="food-path" stroke="#F4A261" stroke-dasharray="250" stroke-dashoffset="250"
+        d="M10,50 Q10,20 50,15 Q90,10 110,25 Q130,40 125,55">
+        <animate attributeName="stroke-dashoffset" values="250;0;0;250" keyTimes="0;0.25;0.8;1" dur="5s" repeatCount="indefinite"/>
+      </path>
+      <!-- 生菜 -->
+      <path class="food-path" stroke="#76C893" stroke-dasharray="130" stroke-dashoffset="130"
+        d="M17,53 Q35,43 55,48 Q75,38 95,46 Q115,40 120,53">
+        <animate attributeName="stroke-dashoffset" values="130;0;0;130" keyTimes="0;0.3;0.8;1" dur="5s" repeatCount="indefinite"/>
+      </path>
+      <!-- 肉饼 -->
+      <path class="food-path" stroke="#F4A261" stroke-dasharray="110" stroke-dashoffset="110"
+        d="M15,60 L122,60">
+        <animate attributeName="stroke-dashoffset" values="110;0;0;110" keyTimes="0;0.35;0.8;1" dur="5s" repeatCount="indefinite"/>
+      </path>
+      <path class="food-path" stroke="#F4A261" stroke-dasharray="110" stroke-dashoffset="110"
+        d="M15,68 L122,68">
+        <animate attributeName="stroke-dashoffset" values="110;0;0;110" keyTimes="0;0.4;0.8;1" dur="5s" repeatCount="indefinite"/>
+      </path>
+      <!-- 下层面包 -->
+      <path class="food-path" stroke="#F4A261" stroke-dasharray="200" stroke-dashoffset="200"
+        d="M12,60 Q10,68 12,78 Q40,90 65,92 Q95,90 122,82 Q128,72 125,62">
+        <animate attributeName="stroke-dashoffset" values="200;0;0;200" keyTimes="0;0.45;0.8;1" dur="5s" repeatCount="indefinite"/>
+      </path>
+      <!-- 芝麻 -->
+      <ellipse cx="55" cy="29" rx="2.5" ry="2" fill="#FFD100">
+        <animate attributeName="opacity" values="0;0;0.7;0.7;0" keyTimes="0;0.45;0.55;0.8;1" dur="5s" repeatCount="indefinite"/>
+      </ellipse>
+      <ellipse cx="42" cy="35" rx="2.5" ry="2" fill="#FFD100">
+        <animate attributeName="opacity" values="0;0;0.7;0.7;0" keyTimes="0;0.5;0.6;0.8;1" dur="5s" repeatCount="indefinite"/>
+      </ellipse>
+      <ellipse cx="68" cy="27" rx="2.5" ry="2" fill="#FFD100">
+        <animate attributeName="opacity" values="0;0;0.7;0.7;0" keyTimes="0;0.55;0.65;0.8;1" dur="5s" repeatCount="indefinite"/>
+      </ellipse>
+    </g>
+  </g>
+
+  <!-- ═══════ 🍟 薯条 — 右上 ═══════ -->
+  <g transform="translate(620, 60) scale(1.1)">
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0.5;0.5;0" keyTimes="0;0.24;0.26;0.45;0.8;1" dur="20s" repeatCount="indefinite"/>
+      <!-- 薯条盒 -->
+      <path class="food-path" stroke="#FFD100" stroke-dasharray="240" stroke-dashoffset="240"
+        d="M10,30 L5,85 L95,85 L90,30 Z">
+        <animate attributeName="stroke-dashoffset" values="240;0;0;240" keyTimes="0;0.3;0.75;1" dur="6.7s" repeatCount="indefinite"/>
+      </path>
+      <!-- 盒子折线 -->
+      <path class="food-path" stroke="#FFD100" stroke-dasharray="90" stroke-dashoffset="90"
+        d="M10,30 L50,48 L90,30">
+        <animate attributeName="stroke-dashoffset" values="90;0;0;90" keyTimes="0;0.4;0.75;1" dur="6.7s" repeatCount="indefinite"/>
+      </path>
+      <!-- 薯条 -->
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="60" stroke-dashoffset="60"
+        d="M22,30 L22,8 L28,8">
+        <animate attributeName="stroke-dashoffset" values="60;0;0;60" keyTimes="0;0.45;0.75;1" dur="6.7s" repeatCount="indefinite"/>
+      </path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="60" stroke-dashoffset="60"
+        d="M38,30 L35,5 L42,5">
+        <animate attributeName="stroke-dashoffset" values="60;0;0;60" keyTimes="0;0.5;0.75;1" dur="6.7s" repeatCount="indefinite"/>
+      </path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="60" stroke-dashoffset="60"
+        d="M54,30 L50,1 L58,1">
+        <animate attributeName="stroke-dashoffset" values="60;0;0;60" keyTimes="0;0.55;0.75;1" dur="6.7s" repeatCount="indefinite"/>
+      </path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="60" stroke-dashoffset="60"
+        d="M70,30 L66,6 L74,6">
+        <animate attributeName="stroke-dashoffset" values="60;0;0;60" keyTimes="0;0.6;0.75;1" dur="6.7s" repeatCount="indefinite"/>
+      </path>
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="50" stroke-dashoffset="50"
+        d="M82,30 L82,10 L88,10">
+        <animate attributeName="stroke-dashoffset" values="50;0;0;50" keyTimes="0;0.65;0.75;1" dur="6.7s" repeatCount="indefinite"/>
+      </path>
+      <!-- M -->
+      <path class="food-path" stroke="#E6BC00" stroke-dasharray="40" stroke-dashoffset="40"
+        d="M38,60 L42,50 L46,60 L50,50 L54,60 L58,50 L62,60">
+        <animate attributeName="stroke-dashoffset" values="40;0;0;40" keyTimes="0;0.7;0.75;1" dur="6.7s" repeatCount="indefinite"/>
+      </path>
+    </g>
+  </g>
+
+  <!-- ═══════ 🧋 奶茶 — 左下 ═══════ -->
+  <g transform="translate(55, 410) scale(1.15)">
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0.5;0.5;0" keyTimes="0;0.49;0.51;0.68;0.95;1" dur="20s" repeatCount="indefinite"/>
+      <!-- 杯身 -->
+      <path class="food-path" stroke="#A8DADC" stroke-dasharray="220" stroke-dashoffset="220"
+        d="M18,15 L12,95 Q12,105 50,108 Q88,105 88,95 L82,15 Z">
+        <animate attributeName="stroke-dashoffset" values="220;0;0;220" keyTimes="0;0.25;0.7;1" dur="8.3s" repeatCount="indefinite"/>
+      </path>
+      <!-- 杯口 -->
+      <path class="food-path" stroke="#5FD4B4" stroke-dasharray="75" stroke-dashoffset="75"
+        d="M15,15 Q50,5 85,15">
+        <animate attributeName="stroke-dashoffset" values="75;0;0;75" keyTimes="0;0.35;0.7;1" dur="8.3s" repeatCount="indefinite"/>
+      </path>
+      <!-- 吸管 -->
+      <path class="food-path" stroke="#FFB5A7" stroke-width="2" stroke-dasharray="45" stroke-dashoffset="45"
+        d="M60,15 L60,-15 L68,-15">
+        <animate attributeName="stroke-dashoffset" values="45;0;0;45" keyTimes="0;0.45;0.7;1" dur="8.3s" repeatCount="indefinite"/>
+      </path>
+      <!-- 装饰横纹 -->
+      <path class="food-path" stroke="#A8DADC" stroke-dasharray="75" stroke-dashoffset="75" opacity="0.6"
+        d="M14,40 Q50,30 86,40">
+        <animate attributeName="stroke-dashoffset" values="75;0;0;75" keyTimes="0;0.5;0.7;1" dur="8.3s" repeatCount="indefinite"/>
+      </path>
+      <path class="food-path" stroke="#A8DADC" stroke-dasharray="75" stroke-dashoffset="75" opacity="0.4"
+        d="M13,55 Q50,45 87,55">
+        <animate attributeName="stroke-dashoffset" values="75;0;0;75" keyTimes="0;0.55;0.7;1" dur="8.3s" repeatCount="indefinite"/>
+      </path>
+      <!-- 珍珠 -->
+      <circle cx="30" cy="80" r="5" fill="#5C4033"><animate attributeName="opacity" values="0;0;0.6;0.6;0" keyTimes="0;0.55;0.6;0.7;1" dur="8.3s" repeatCount="indefinite"/></circle>
+      <circle cx="50" cy="70" r="5" fill="#5C4033"><animate attributeName="opacity" values="0;0;0.6;0.6;0" keyTimes="0;0.58;0.63;0.7;1" dur="8.3s" repeatCount="indefinite"/></circle>
+      <circle cx="40" cy="88" r="4.5" fill="#5C4033"><animate attributeName="opacity" values="0;0;0.6;0.6;0" keyTimes="0;0.6;0.65;0.7;1" dur="8.3s" repeatCount="indefinite"/></circle>
+      <circle cx="65" cy="78" r="4.5" fill="#5C4033"><animate attributeName="opacity" values="0;0;0.6;0.6;0" keyTimes="0;0.62;0.67;0.7;1" dur="8.3s" repeatCount="indefinite"/></circle>
+      <circle cx="55" cy="90" r="5" fill="#5C4033"><animate attributeName="opacity" values="0;0;0.6;0.6;0" keyTimes="0;0.64;0.69;0.7;1" dur="8.3s" repeatCount="indefinite"/></circle>
+    </g>
+  </g>
+
+  <!-- ═══════ 🍩 甜甜圈 — 右下 ═══════ -->
+  <g transform="translate(580, 430) scale(1.2)">
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0.55;0.55;0" keyTimes="0;0.74;0.76;0.9;0.98;1" dur="20s" repeatCount="indefinite"/>
+      <!-- 外圈 -->
+      <circle class="food-path" stroke="#FFB5A7" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283">
+        <animate attributeName="stroke-dashoffset" values="283;0;0;283" keyTimes="0;0.4;0.7;1" dur="9.1s" repeatCount="indefinite"/>
+      </circle>
+      <!-- 内圈 -->
+      <circle class="food-path" stroke="#FFB5A7" cx="50" cy="50" r="16" stroke-dasharray="101" stroke-dashoffset="101">
+        <animate attributeName="stroke-dashoffset" values="101;0;0;101" keyTimes="0;0.5;0.7;1" dur="9.1s" repeatCount="indefinite"/>
+      </circle>
+      <!-- 糖霜波浪 -->
+      <path class="food-path" stroke="#F28482" stroke-dasharray="120" stroke-dashoffset="120"
+        d="M8,35 Q20,22 35,30 Q48,18 58,28 Q72,20 80,32 Q88,18 92,35">
+        <animate attributeName="stroke-dashoffset" values="120;0;0;120" keyTimes="0;0.55;0.7;1" dur="9.1s" repeatCount="indefinite"/>
+      </path>
+      <path class="food-path" stroke="#F28482" stroke-dasharray="120" stroke-dashoffset="120"
+        d="M7,50 Q20,55 30,48 Q42,57 52,48 Q65,55 75,47 Q85,55 93,50">
+        <animate attributeName="stroke-dashoffset" values="120;0;0;120" keyTimes="0;0.6;0.7;1" dur="9.1s" repeatCount="indefinite"/>
+      </path>
+      <path class="food-path" stroke="#F28482" stroke-dasharray="120" stroke-dashoffset="120"
+        d="M8,65 Q22,72 35,62 Q48,75 58,62 Q72,72 82,61 Q90,70 93,63">
+        <animate attributeName="stroke-dashoffset" values="120;0;0;120" keyTimes="0;0.65;0.7;1" dur="9.1s" repeatCount="indefinite"/>
+      </path>
+      <!-- 糖粒 -->
+      <circle cx="20" cy="25" r="3" fill="#FFD100"><animate attributeName="opacity" values="0;0;0.7;0.7;0" keyTimes="0;0.65;0.7;0.8;1" dur="9.1s" repeatCount="indefinite"/></circle>
+      <circle cx="35" cy="70" r="2.5" fill="#A8DADC"><animate attributeName="opacity" values="0;0;0.7;0.7;0" keyTimes="0;0.67;0.72;0.8;1" dur="9.1s" repeatCount="indefinite"/></circle>
+      <circle cx="70" cy="25" r="3" fill="#FFB5A7"><animate attributeName="opacity" values="0;0;0.7;0.7;0" keyTimes="0;0.69;0.74;0.8;1" dur="9.1s" repeatCount="indefinite"/></circle>
+      <circle cx="75" cy="68" r="2.5" fill="#FEC89A"><animate attributeName="opacity" values="0;0;0.7;0.7;0" keyTimes="0;0.71;0.76;0.8;1" dur="9.1s" repeatCount="indefinite"/></circle>
+      <circle cx="50" cy="22" r="2.5" fill="#F28482"><animate attributeName="opacity" values="0;0;0.7;0.7;0" keyTimes="0;0.73;0.78;0.8;1" dur="9.1s" repeatCount="indefinite"/></circle>
+    </g>
+  </g>
+
+  <!-- ═══ 流动装饰线 ═══ -->
+  <path d="M0,380 Q200,360 400,385 Q600,410 800,380" fill="none" stroke="#FFD100" stroke-width="1.2">
+    <animate attributeName="opacity" values="0.15;0.35;0.2;0.38;0.18" dur="12s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-8; 0,4; 0,-5; 0,0" dur="12s" repeatCount="indefinite"/>
+  </path>
+  <path d="M0-20 Q200,0 400,-15 Q600,-30 800,-10" fill="none" stroke="#A8DADC" stroke-width="1">
+    <animate attributeName="opacity" values="0.12;0.32;0.18;0.30;0.15" dur="14s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,6; 0,-3; 0,5; 0,0" dur="14s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- 顶部中央波纹 -->
+  <path d="M300,5 Q320,15 340,5 Q360,18 380,5 Q400,15 420,5" fill="none" stroke="#FFB5A7" stroke-width="1.2">
+    <animate attributeName="opacity" values="0.1;0.35;0.18;0.38;0.12" dur="10s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-4; 0,3; 0,-2; 0,0" dur="10s" repeatCount="indefinite"/>
+  </path>
+</svg>

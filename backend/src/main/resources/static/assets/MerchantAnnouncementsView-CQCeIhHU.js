@@ -1,0 +1,1 @@
+import{E as e,P as t,v as n,w as r}from"./element-BmMK9c5E.js";import{t as i}from"./BackButton-Utq5kVEt.js";import{t as a}from"./AnnouncementList-mTmGoQFS.js";var o={__name:`MerchantAnnouncementsView`,setup(o){return(o,s)=>(t(),r(n,null,[e(i,{to:`/merchant-console`,label:`返回商家工作台`}),e(a,{title:`平台公告`,description:`商家端可查看平台发布的运营通知与规则说明。`})],64))}};export{o as default};
