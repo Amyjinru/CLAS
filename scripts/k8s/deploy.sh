@@ -7,6 +7,7 @@ IMAGE_TAG="${CLAS_IMAGE_TAG:-${1:-}}"
 PUBLIC_URL="${CLAS_PUBLIC_URL:-http://8.141.112.182}"
 ARTIFACT_DIR="${CLAS_DEPLOY_ARTIFACT_DIR:-$PROJECT_ROOT/artifacts/k8s-diagnostics}"
 DATABASE_RESTORE_FILE="${CLAS_DATABASE_RESTORE_FILE:-}"
+STOP_LEGACY_NGINX="${CLAS_STOP_LEGACY_NGINX:-false}"
 
 if [[ -z "$IMAGE_TAG" || "$IMAGE_TAG" == "latest" || ! "$IMAGE_TAG" =~ ^[0-9a-f]{7,64}$ ]]; then
   echo 'CLAS_IMAGE_TAG must be a Git SHA (7-64 lowercase hexadecimal characters), never latest.' >&2
@@ -76,9 +77,19 @@ kubectl apply -f "$rendered_dir/migration-job.yaml"
 kubectl -n "$NAMESPACE" wait --for=condition=complete job/clas-db-migrate --timeout=300s
 kubectl apply -f "$rendered_dir/backend.yaml"
 kubectl apply -f "$rendered_dir/frontend.yaml"
-kubectl apply -f "$PROJECT_ROOT/k8s/ingress.yaml"
 kubectl -n "$NAMESPACE" rollout status deployment/backend --timeout=300s
 kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=180s
+
+if [[ "$STOP_LEGACY_NGINX" == "true" ]]; then
+  if ! command -v systemctl >/dev/null; then
+    echo 'CLAS_STOP_LEGACY_NGINX requires systemd on the deployment host.' >&2
+    exit 2
+  fi
+  systemctl disable --now nginx
+fi
+
+kubectl apply -f "$PROJECT_ROOT/k8s/ingress.yaml"
+sleep 5
 curl -fsS --retry 5 --retry-delay 3 "$PUBLIC_URL/api/health"
 
 echo "Deployment succeeded with image tag: $IMAGE_TAG"

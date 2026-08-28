@@ -107,7 +107,8 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     env:
-      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+      SERVER_HOST: 8.141.112.182
+      SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
       GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
       GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
       MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
@@ -118,28 +119,66 @@ jobs:
       FORBIDDEN_WORDS: ${{ secrets.FORBIDDEN_WORDS }}
       CLAS_DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
       CLAS_IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
-      CLAS_DEPLOY_ARTIFACT_DIR: ${{ github.workspace }}/k8s-diagnostics
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Configure kubeconfig
+      - name: Prepare secret deployment input
         run: |
-          test -n "$KUBECONFIG_B64" || { echo 'KUBECONFIG_B64 is required'; exit 1; }
-          echo "$KUBECONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kubeconfig"
-          chmod 600 "$RUNNER_TEMP/kubeconfig"
-          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+          test -n "$SSH_PASSWORD" || { echo 'SSH_PASSWORD is required'; exit 1; }
+          test -n "$GHCR_USERNAME" || { echo 'GHCR_USERNAME is required'; exit 1; }
+          test -n "$GHCR_TOKEN" || { echo 'GHCR_PULL_TOKEN is required'; exit 1; }
+          test -n "$MYSQL_PASSWORD" || { echo 'MYSQL_PASSWORD is required'; exit 1; }
+          test -n "$JWT_SECRET" || { echo 'JWT_SECRET is required'; exit 1; }
+          test -n "$RIDER_IDENTITY_ENCRYPTION_KEY" || { echo 'RIDER_IDENTITY_ENCRYPTION_KEY is required'; exit 1; }
+          umask 077
+          cat > "$RUNNER_TEMP/clas-deploy.env" <<EOF
+          GHCR_USERNAME=$GHCR_USERNAME
+          GHCR_TOKEN=$GHCR_TOKEN
+          MYSQL_PASSWORD=$MYSQL_PASSWORD
+          JWT_SECRET=$JWT_SECRET
+          RIDER_IDENTITY_ENCRYPTION_KEY=$RIDER_IDENTITY_ENCRYPTION_KEY
+          AMAP_WEB_SERVICE_KEY=$AMAP_WEB_SERVICE_KEY
+          DASHSCOPE_API_KEY=$DASHSCOPE_API_KEY
+          FORBIDDEN_WORDS=$FORBIDDEN_WORDS
+          CLAS_DEMO_ACCESS_PASSWORD=$CLAS_DEMO_ACCESS_PASSWORD
+          CLAS_IMAGE_TAG=$CLAS_IMAGE_TAG
+          CLAS_STOP_LEGACY_NGINX=true
+          EOF
 
-      - name: Deploy tested image version
-        run: bash scripts/k8s/deploy.sh
+      - name: Install SSH client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
+      - name: Deploy tested image version through server-local k3s API
+        run: |
+          deploy_env="/tmp/clas-deploy.env"
+          sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
+          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          deploy_env="/tmp/clas-deploy.env"
+          trap 'rm -f "$deploy_env"' EXIT
+          set -a
+          . /etc/clas/clas.env
+          . "$deploy_env"
+          set +a
+          if [ ! -d /opt/clas-k8s/.git ]; then
+            git clone --origin upstream https://github.com/Amyjinru/CLAS.git /opt/clas-k8s
+          fi
+          cd /opt/clas-k8s
+          git fetch upstream main
+          git checkout --detach "$CLAS_IMAGE_TAG"
+          test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"
+          bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
+          REMOTE
+
+      - name: Collect server deployment diagnostics
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/k8s-diagnostics"
+          sshpass -p "$SSH_PASSWORD" scp -r -o StrictHostKeyChecking=no \
+            "root@${SERVER_HOST}:/opt/clas-k8s/artifacts/k8s-diagnostics/." "$RUNNER_TEMP/k8s-diagnostics/" || true
 
       - name: Upload deployment diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: k3s-diagnostics-${{ github.sha }}
-          path: k8s-diagnostics/
+          path: ${{ runner.temp }}/k8s-diagnostics/
           if-no-files-found: warn
