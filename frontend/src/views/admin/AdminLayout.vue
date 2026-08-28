@@ -1,22 +1,23 @@
 ﻿<script setup>
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { Bicycle, ChatDotRound, ChatLineSquare, Checked, DataAnalysis, Document, Notification, Star, User, WarningFilled } from '@element-plus/icons-vue'
 import { sessionUser } from '../../api/clas'
 
 const router = useRouter()
 const route = useRoute()
 
 const menuItems = [
-  { path: '/admin/dashboard', label: '仪表盘', icon: 'DataAnalysis' },
-  { path: '/admin/orders',     label: '订单管理', icon: 'Document' },
-  { path: '/admin/order-refund-disputes', label: '订单争议', icon: 'WarningFilled' },
-  { path: '/admin/users',      label: '用户管理', icon: 'User' },
-  { path: '/admin/audit',      label: '商家审核', icon: 'Checked' },
-  { path: '/admin/riders',     label: '骑手运营', icon: 'Bicycle' },
-  { path: '/admin/reviews',    label: '评价管理', icon: 'Star' },
-  { path: '/admin/appeals',    label: '申诉管理', icon: 'ChatLineSquare' },
-  { path: '/admin/announcements', label: '公告管理', icon: 'Notification' },
-  { path: '/admin/messages', label: '信息管理', icon: 'ChatDotRound' }
+  { path: '/admin/dashboard', label: '仪表盘', icon: DataAnalysis },
+  { path: '/admin/orders',     label: '订单管理', icon: Document },
+  { path: '/admin/order-refund-disputes', label: '订单争议', icon: WarningFilled },
+  { path: '/admin/users',      label: '用户管理', icon: User },
+  { path: '/admin/audit',      label: '商家审核', icon: Checked },
+  { path: '/admin/riders',     label: '骑手运营', icon: Bicycle },
+  { path: '/admin/reviews',    label: '评价管理', icon: Star },
+  { path: '/admin/appeals',    label: '申诉管理', icon: ChatLineSquare },
+  { path: '/admin/announcements', label: '公告管理', icon: Notification },
+  { path: '/admin/messages', label: '信息管理', icon: ChatDotRound }
 ]
 
 const activeMenu = computed(() => route.path)

@@ -152,14 +152,12 @@ async function load() {
   }
   loading.value = true
   try {
-    merchants.value = await listMerchants({
-      ...params
-    })
-    try {
-      announcements.value = await listAnnouncements()
-    } catch {
-      announcements.value = []
-    }
+    const [merchantList, announcementList] = await Promise.all([
+      listMerchants({ ...params }),
+      listAnnouncements().catch(() => [])
+    ])
+    merchants.value = merchantList
+    announcements.value = announcementList
   } finally {
     loading.value = false
   }
@@ -385,13 +383,14 @@ watch(
   }
 )
 
-onMounted(async () => {
+onMounted(() => {
   unsubscribeLocation = subscribeCurrentLocation((location) => {
     currentLocation.value = cloneLocation(location)
   })
-  await loadAddresses()
-  await autoLocate()
-  await Promise.all([load(), loadActiveOrders()])
+
+  // 商家与订单先渲染；地址和第三方定位在后台补充，避免高德脚本阻塞首屏。
+  void Promise.all([load(), loadActiveOrders()]).catch(() => {})
+  void loadAddresses().then(() => autoLocate())
 })
 
 onUnmounted(() => {

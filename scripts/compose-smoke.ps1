@@ -13,10 +13,10 @@ function Assert-HttpOk([string]$Uri, [string]$Name) {
     }
 }
 
-Assert-HttpOk 'http://127.0.0.1:8088/' '前端入口'
+Assert-HttpOk 'http://127.0.0.1:8088/' 'frontend entry'
 $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8088/api/health' -TimeoutSec 15
 if ($health.code -ne 200 -or $health.data -ne 'ok') {
-    Write-Error '[FAIL] 后端健康检查返回异常'
+    Write-Error '[FAIL] backend health check returned unexpected payload'
     exit 1
 }
-Write-Host '[PASS] 后端健康检查'
+Write-Host '[PASS] backend health check'

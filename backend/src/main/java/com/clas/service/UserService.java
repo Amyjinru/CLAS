@@ -81,7 +81,8 @@ public class UserService {
             }
             verificationCodeStore.verify(phone, "login-session", request.code());
         }
-        return loginResponse(user, defaultRole(phone), request.deviceId());
+        List<String> roles = rolesOf(phone, user);
+        return loginResponse(user, defaultRole(roles), request.deviceId(), roles);
     }
 
     /**
@@ -107,7 +108,8 @@ public class UserService {
             }
             verificationCodeStore.verify(phone, "login-session", request.code());
         }
-        return loginResponse(user, defaultRole(phone), request.deviceId());
+        List<String> roles = rolesOf(phone, user);
+        return loginResponse(user, defaultRole(roles), request.deviceId(), roles);
     }
 
     public void verifyDemoAccess(DemoAccessRequest request) {
@@ -130,7 +132,7 @@ public class UserService {
         user.setRole("USER");
         userMapper.insert(user);
         grantRole(phone, "USER");
-        return loginResponse(user, "USER", null);
+        return loginResponse(user, "USER", null, List.of("USER"));
     }
 
     public void sendRegisterCode(SendCodeRequest request) {
@@ -174,20 +176,19 @@ public class UserService {
         if (samePassword) throw new BusinessException("新密码不能与旧密码相同");
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         userMapper.updateById(user);
-        return loginResponse(user, defaultRole(phone), null);
+        List<String> roles = rolesOf(phone, user);
+        return loginResponse(user, defaultRole(roles), null, roles);
     }
 
     public LoginResponse switchRole(String phone, String requestedRole) {
         String role = requestedRole == null ? "" : requestedRole.trim().toUpperCase();
         User user = userMapper.selectById(phone);
         if (user == null || Boolean.FALSE.equals(user.getEnabled())) throw new BusinessException("账号已被禁用或不存在");
-        UserRole identity = userRoleMapper.selectOne(new LambdaQueryWrapper<UserRole>()
-            .eq(UserRole::getUserId, phone).eq(UserRole::getRole, role));
-        boolean legacyIdentity = identity == null && role.equals(user.getRole());
-        if (!legacyIdentity && (identity == null || !"APPROVED".equals(identity.getStatus()))) {
+        List<String> roles = rolesOf(phone, user);
+        if (!roles.contains(role)) {
             throw new BusinessException("该身份尚未审核通过或已不可用");
         }
-        return loginResponse(user, role, user.getSessionDeviceId());
+        return loginResponse(user, role, user.getSessionDeviceId(), roles);
     }
 
     /**
@@ -209,10 +210,8 @@ public class UserService {
     }
 
     /** 供当前在线设备轮询；验证码确认前即可看到另一台设备的登录请求。 */
-    public LoginNoticeResponse getPendingLoginNotice(String phone, String sessionToken) {
-        User user = userMapper.selectById(phone);
-        if (user == null || !sessionToken.equals(user.getSessionToken())
-            || user.getPendingLoginChallengeId() == null || user.getPendingLoginCreatedAt() == null
+    public LoginNoticeResponse getPendingLoginNotice(User user) {
+        if (user == null || user.getPendingLoginChallengeId() == null || user.getPendingLoginCreatedAt() == null
             || user.getPendingLoginCreatedAt().isBefore(LocalDateTime.now().minusMinutes(LOGIN_CHALLENGE_MINUTES))) {
             return null;
         }
@@ -220,10 +219,13 @@ public class UserService {
     }
 
     public List<String> rolesOf(String userId) {
+        return rolesOf(userId, userMapper.selectById(userId));
+    }
+
+    private List<String> rolesOf(String userId, User legacy) {
         List<String> roles = userRoleMapper.selectList(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId)).stream()
             .filter(identity -> "APPROVED".equals(identity.getStatus()))
             .map(UserRole::getRole).toList();
-        User legacy = userMapper.selectById(userId);
         if (roles.isEmpty() && legacy != null) return java.util.stream.Stream.of("USER", legacy.getRole()).distinct().toList();
         return roles.contains("USER") ? roles : java.util.stream.Stream.concat(java.util.stream.Stream.of("USER"), roles.stream()).toList();
     }
@@ -241,14 +243,13 @@ public class UserService {
         }
     }
 
-    private LoginResponse loginResponse(User user, String activeRole, String deviceId) {
+    private LoginResponse loginResponse(User user, String activeRole, String deviceId, List<String> roles) {
         String sessionToken = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime sessionExpiresAt = now.plusNanos(jwtUtil.getExpirationMs() * 1_000_000L);
         int updated = userMapper.updateSessionToken(user.getPhone(), sessionToken, sessionExpiresAt,
             normalizeDeviceId(deviceId), now);
         if (updated != 1) throw new BusinessException("登录状态创建失败，请重试");
-        List<String> roles = rolesOf(user.getPhone());
         user.setRole(roles.contains(activeRole) ? activeRole : "USER");
         user.setRoles(roles);
         user.setSessionToken(sessionToken);
@@ -297,8 +298,7 @@ public class UserService {
         return normalized.length() > 100 ? normalized.substring(0, 100) : normalized;
     }
 
-    private String defaultRole(String userId) {
-        List<String> roles = rolesOf(userId);
+    private String defaultRole(List<String> roles) {
         if (roles.contains("ADMIN")) return "ADMIN";
         if (roles.contains("MERCHANT")) return "MERCHANT";
         if (roles.contains("RIDER")) return "RIDER";

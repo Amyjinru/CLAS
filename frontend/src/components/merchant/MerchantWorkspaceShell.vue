@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Shop } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { toggleMerchantManualClosed, uploadMerchantLogo } from '../../api/clas'
 import MerchantProfileEditDialog from './MerchantProfileEditDialog.vue'

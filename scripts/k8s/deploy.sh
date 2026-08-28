@@ -42,6 +42,9 @@ kubectl -n "$NAMESPACE" create secret docker-registry ghcr-pull-secret \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl apply -f "$PROJECT_ROOT/k8s/configmap.yaml"
+kubectl -n "$NAMESPACE" create configmap clas-database-scripts \
+  --from-file="$PROJECT_ROOT/database" \
+  --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f "$PROJECT_ROOT/k8s/mysql.yaml"
 kubectl apply -f "$PROJECT_ROOT/k8s/redis.yaml"
 kubectl -n "$NAMESPACE" rollout status deployment/mysql --timeout=300s

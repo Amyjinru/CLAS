@@ -1,0 +1,41 @@
+{
+  "executedAt": "2026-08-28T18:05:00+08:00",
+  "environment": {
+    "os": "Windows 10.0.26200",
+    "docker": "Docker Desktop",
+    "composeEntry": "http://127.0.0.1:8088"
+  },
+  "workarounds": [
+    "Docker Hub TLS x509 via scripts/pull-base-images.ps1",
+    "database/*.sh forced LF via .gitattributes",
+    "migrate service uses mysql:8.4.4 client image instead of backend image mariadb client"
+  ],
+  "build": {
+    "command": "docker compose --env-file .env build --pull=false",
+    "result": "PASS",
+    "images": ["clas-backend:local", "clas-frontend:local"]
+  },
+  "startup": {
+    "command": "docker compose --env-file .env up -d",
+    "result": "PASS",
+    "services": {
+      "mysql": "healthy",
+      "redis": "healthy",
+      "migrate": "exited 0 (schema baseline registered)",
+      "backend": "healthy",
+      "frontend": "running on 8088"
+    }
+  },
+  "smoke": {
+    "command": ".\\scripts\\compose-smoke.ps1",
+    "result": "PASS",
+    "checks": [
+      {"name": "frontend entry", "uri": "http://127.0.0.1:8088/", "status": 200},
+      {"name": "backend health", "uri": "http://127.0.0.1:8088/api/health", "code": 200, "data": "ok"}
+    ]
+  },
+  "blocked": [
+    "k3s install and public 80 cutover on 8.141.112.182",
+    "main branch GitHub Actions success/failure run evidence (needs secrets + main push)"
+  ]
+}

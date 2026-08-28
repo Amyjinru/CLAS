@@ -9,8 +9,6 @@ spec:
   template:
     spec:
       restartPolicy: Never
-      imagePullSecrets:
-        - name: ghcr-pull-secret
       containers:
         - name: migrate
           image: ghcr.io/amyjinru/clas-database:REQUIRED_TAG
@@ -20,3 +18,11 @@ spec:
           env:
             - name: MYSQL_USER
               value: root
+          volumeMounts:
+            - name: database-scripts
+              mountPath: /opt/clas/database
+              readOnly: true
+      volumes:
+        - name: database-scripts
+          configMap:
+            name: clas-database-scripts

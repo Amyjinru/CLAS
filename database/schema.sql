@@ -568,7 +568,8 @@ CREATE TABLE user_penalty (
     admin_id VARCHAR(20) NOT NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
-    INDEX idx_penalty_user (user_id, active)
+    INDEX idx_penalty_user (user_id, active),
+    INDEX idx_penalty_user_type_active_end (user_id, penalty_type, active, end_time)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE appeal (

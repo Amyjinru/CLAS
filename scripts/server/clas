@@ -92,15 +92,47 @@ install_runtime() {
     chmod 600 /etc/clas/clas.env
   fi
 
+  set -a
+  # shellcheck disable=SC1091
+  . /etc/clas/clas.env
+  set +a
+
   cp "$APP_DIR/scripts/server/clas-backend.service" /etc/systemd/system/"$SERVICE_NAME".service
   systemctl daemon-reload
   systemctl enable "$SERVICE_NAME"
 
+  local nginx_config="$APP_DIR/scripts/server/clas-nginx.conf"
+  local rendered_nginx_config=""
+  if [ -n "${CLAS_SERVER_NAME:-}" ] || [ -n "${CLAS_TLS_CERTIFICATE:-}" ] || [ -n "${CLAS_TLS_CERTIFICATE_KEY:-}" ]; then
+    if [[ ! "${CLAS_SERVER_NAME:-}" =~ ^[A-Za-z0-9.-]+$ ]]; then
+      echo "CLAS_SERVER_NAME must be a valid domain or IP address." >&2
+      exit 1
+    fi
+    if [[ ! "${CLAS_TLS_CERTIFICATE:-}" =~ ^/[A-Za-z0-9._/-]+$ ]] || [ ! -r "$CLAS_TLS_CERTIFICATE" ]; then
+      echo "CLAS_TLS_CERTIFICATE must point to a readable absolute certificate path." >&2
+      exit 1
+    fi
+    if [[ ! "${CLAS_TLS_CERTIFICATE_KEY:-}" =~ ^/[A-Za-z0-9._/-]+$ ]] || [ ! -r "$CLAS_TLS_CERTIFICATE_KEY" ]; then
+      echo "CLAS_TLS_CERTIFICATE_KEY must point to a readable absolute private-key path." >&2
+      exit 1
+    fi
+    rendered_nginx_config="$(mktemp)"
+    sed \
+      -e "s|__CLAS_SERVER_NAME__|$CLAS_SERVER_NAME|g" \
+      -e "s|__CLAS_TLS_CERTIFICATE__|$CLAS_TLS_CERTIFICATE|g" \
+      -e "s|__CLAS_TLS_CERTIFICATE_KEY__|$CLAS_TLS_CERTIFICATE_KEY|g" \
+      "$APP_DIR/scripts/server/clas-nginx-https.conf" > "$rendered_nginx_config"
+    nginx_config="$rendered_nginx_config"
+  fi
+
   if [ -d /etc/nginx/sites-available ]; then
-    cp "$APP_DIR/scripts/server/clas-nginx.conf" /etc/nginx/sites-available/clas
+    cp "$nginx_config" /etc/nginx/sites-available/clas
     ln -sfn /etc/nginx/sites-available/clas /etc/nginx/sites-enabled/default
   else
-    cp "$APP_DIR/scripts/server/clas-nginx.conf" /etc/nginx/conf.d/clas.conf
+    cp "$nginx_config" /etc/nginx/conf.d/clas.conf
+  fi
+  if [ -n "$rendered_nginx_config" ]; then
+    rm -f "$rendered_nginx_config"
   fi
   nginx -t
   systemctl reload nginx
