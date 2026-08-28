@@ -190,6 +190,20 @@ jobs:
           git fetch upstream main
           git checkout --detach "$CLAS_IMAGE_TAG"
           test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"
+          pull_image() {
+            local image="$1"
+            for attempt in 1 2 3; do
+              if timeout 180 k3s ctr -n k8s.io images pull \
+                --user "${GHCR_USERNAME}:${GHCR_TOKEN}" "$image"; then
+                return 0
+              fi
+              echo "Image pull attempt ${attempt} failed: ${image}" >&2
+            done
+            return 1
+          }
+          pull_image "ghcr.io/amyjinru/clas-database:${CLAS_IMAGE_TAG}"
+          pull_image "ghcr.io/amyjinru/clas-backend:${CLAS_IMAGE_TAG}"
+          pull_image "ghcr.io/amyjinru/clas-frontend:${CLAS_IMAGE_TAG}"
           bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
           REMOTE
 
