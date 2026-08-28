@@ -667,6 +667,68 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void adminAccountRestrictionsHaveDistinctScopesAndAccountBanCanBeRestored() throws Exception {
+        String adminAuth = auth(ADMIN_PHONE);
+        String userAuth = auth(USER_PHONE);
+
+        MvcResult mute = mockMvc.perform(post("/api/admin/users/{phone}/penalties", USER_PHONE)
+                .header("Authorization", adminAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE, "penaltyType", "MUTE", "reason", "测试交流封禁", "durationHours", 1
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.penaltyType").value("MUTE"))
+            .andReturn();
+        Long muteId = objectMapper.readTree(mute.getResponse().getContentAsString()).path("data").path("id").asLong();
+
+        mockMvc.perform(post("/api/chat/consult/1")
+                .header("Authorization", userAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"我要咨询\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("您已被禁言，暂时无法发表评论或评价"));
+        mockMvc.perform(post("/api/admin/penalties/{id}/revoke", muteId).header("Authorization", adminAuth))
+            .andExpect(status().isOk());
+
+        MvcResult accountOnly = mockMvc.perform(post("/api/admin/users/{phone}/penalties", USER_PHONE)
+                .header("Authorization", adminAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE, "penaltyType", "SERVICE_STOP", "reason", "测试仅保留账户"
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+        Long accountOnlyId = objectMapper.readTree(accountOnly.getResponse().getContentAsString()).path("data").path("id").asLong();
+
+        mockMvc.perform(get("/api/user/profile").header("Authorization", userAuth))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/cart/me").header("Authorization", userAuth))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.errorCode").value("ACCOUNT_ONLY_RESTRICTED"));
+        mockMvc.perform(post("/api/admin/penalties/{id}/revoke", accountOnlyId).header("Authorization", adminAuth))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/admin/users/{phone}/penalties", USER_PHONE)
+                .header("Authorization", adminAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "userId", USER_PHONE, "penaltyType", "BAN", "reason", "测试账户封禁", "durationHours", 1
+                ))))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", USER_PHONE, "password", STRONG_PASSWORD))))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.errorCode").value("ACCOUNT_BANNED"));
+        mockMvc.perform(post("/api/admin/users/{phone}/account-ban/restore", USER_PHONE)
+                .header("Authorization", adminAuth))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/api/user/profile").header("Authorization", userAuth))
+            .andExpect(status().isOk());
+    }
+
+    @Test
     void adminMerchantListRequiresAdminRole() throws Exception {
         // 管理员接口必须同时拦截未登录用户和非 ADMIN 角色用户。
         String userToken = loginToken(USER_PHONE);
@@ -1678,8 +1740,8 @@ class ModuleIntegrationTest {
             .andExpect(jsonPath("$.data[0].merchantName").isNotEmpty())
             .andExpect(jsonPath("$.data[0].products[0].name").isNotEmpty());
         org.junit.jupiter.api.Assertions.assertTrue(
-            MybatisQueryCounter.count() <= 6,
-            "订单列表应批量加载明细、商品和商家，当前查询次数: " + MybatisQueryCounter.count()
+            MybatisQueryCounter.count() <= 7,
+            "订单列表应批量加载明细、商品和商家（含一次账户限制鉴权），当前查询次数: " + MybatisQueryCounter.count()
         );
 
         MybatisQueryCounter.reset();
@@ -1688,8 +1750,8 @@ class ModuleIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
         org.junit.jupiter.api.Assertions.assertTrue(
-            MybatisQueryCounter.count() <= 8,
-            "评价列表应批量加载用户、图片、回复和投票，当前查询次数: " + MybatisQueryCounter.count()
+            MybatisQueryCounter.count() <= 9,
+            "评价列表应批量加载用户、图片、回复和投票（含一次账户限制鉴权），当前查询次数: " + MybatisQueryCounter.count()
         );
     }
 

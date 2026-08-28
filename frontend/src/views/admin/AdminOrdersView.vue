@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { getAdminOrderTimeline, listAdminOrders } from '../../api/admin'
+import { exportAdminOrders, getAdminOrderTimeline, listAdminOrders } from '../../api/admin'
 import { ElMessage } from 'element-plus'
 import MoneyText from '../../components/MoneyText.vue'
 import StatusTag from '../../components/StatusTag.vue'
@@ -72,14 +72,19 @@ function resetFilters() {
   reset({ status: '', deliveryStatus: '', keyword: '', dateRange: [] }).catch(() => ElMessage.error('加载订单列表失败'))
 }
 
-function exportCSV() {
-  const params = new URLSearchParams()
-  if (filters.status) params.set('status', filters.status)
-  if (filters.deliveryStatus) params.set('deliveryStatus', filters.deliveryStatus)
-  if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim())
-  if (filters.dateRange && filters.dateRange[0]) params.set('startDate', filters.dateRange[0])
-  if (filters.dateRange && filters.dateRange[1]) params.set('endDate', filters.dateRange[1])
-  window.open('/api/admin/export/orders?' + params.toString(), '_blank')
+async function exportCSV() {
+  try {
+    await exportAdminOrders({
+      status: filters.status || undefined,
+      deliveryStatus: filters.deliveryStatus || undefined,
+      keyword: filters.keyword.trim() || undefined,
+      startDate: filters.dateRange?.[0],
+      endDate: filters.dateRange?.[1]
+    })
+    ElMessage.success('CSV 导出成功')
+  } catch {
+    ElMessage.error('CSV 导出失败')
+  }
 }
 
 async function openTimeline(order) {

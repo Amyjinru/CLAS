@@ -6,6 +6,7 @@ import com.clas.entity.User;
 import com.clas.mapper.UserMapper;
 import com.clas.mapper.UserRoleMapper;
 import com.clas.service.UserService;
+import com.clas.service.PenaltyService;
 import com.clas.entity.UserRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,12 +22,15 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final JwtUtil jwtUtil;
     private final UserRoleMapper userRoleMapper;
     private final UserService userService;
+    private final PenaltyService penaltyService;
 
-    public AuthInterceptor(UserMapper userMapper, UserRoleMapper userRoleMapper, JwtUtil jwtUtil, UserService userService) {
+    public AuthInterceptor(UserMapper userMapper, UserRoleMapper userRoleMapper, JwtUtil jwtUtil, UserService userService,
+                           PenaltyService penaltyService) {
         this.userMapper = userMapper;
         this.jwtUtil = jwtUtil;
         this.userRoleMapper = userRoleMapper;
         this.userService = userService;
+        this.penaltyService = penaltyService;
     }
 
     @Override
@@ -67,6 +71,9 @@ public class AuthInterceptor implements HandlerInterceptor {
                 }
                 user.setRole(activeRole);
                 UserContext.setUser(user);
+                if (penaltyService.isAccountOnlyRestricted(phone) && !isAccountInformationRequest(request)) {
+                    throw new BusinessException(403, "当前账号仅保留账户信息、处罚记录和申诉入口", "ACCOUNT_ONLY_RESTRICTED");
+                }
                 userService.touchActiveSession(user);
             } else {
                 throw new BusinessException(401, "未登录，请先登录");
@@ -101,5 +108,18 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
         UserContext.clear();
+    }
+
+    private boolean isAccountInformationRequest(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return "/api/user/logout".equals(path)
+            || "/api/user/profile".equals(path)
+            || "/api/user/profile/avatar".equals(path)
+            || "/api/user/password".equals(path)
+            || "/api/user/phone".equals(path)
+            || "/api/user/phone-change/send-code".equals(path)
+            || "/api/user/penalties/mine".equals(path)
+            || "/api/user/appeals".equals(path)
+            || "/api/user/appeals/mine".equals(path);
     }
 }

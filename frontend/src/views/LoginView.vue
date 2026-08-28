@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { demoLogin, verifyDemoAccess, login, register, sendLoginCode, sendRegisterCode, setSessionUser, currentRole, switchRole, getDeviceId } from '../api/clas'
 import { passwordChecks, passwordRuleMessage, passwordStrength as calculatePasswordStrength } from '../utils/passwordRules'
 
@@ -76,6 +77,13 @@ async function submitLogin() {
     if (error.response?.data?.errorCode === 'LOGIN_VERIFICATION_REQUIRED') {
       loginVerificationRequired.value = true
       showMessage('该账号正在另一台设备使用，请获取验证码后确认登录', 'error')
+    } else if (error.response?.data?.errorCode === 'ACCOUNT_BANNED') {
+      const notice = error.response.data.message || '该账号已被封禁，请联系管理员。'
+      showMessage(notice, 'error')
+      await ElMessageBox.alert(notice, '账户封禁提醒', {
+        confirmButtonText: '我知道了',
+        type: 'error'
+      })
     } else {
       showMessage(error.response?.data?.message || '登录失败', 'error')
     }

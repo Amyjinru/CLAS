@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.clas.service.RiderOverdueService;
+import com.clas.service.RiderMetricsService;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -42,6 +44,9 @@ class RiderModuleIntegrationTest {
     private static final long TRACKING_ACCESS_ORDER_ID = 990009L;
     private static final long CAPACITY_ACTIVE_ORDER_ID = 990010L;
     private static final long CAPACITY_CANDIDATE_ORDER_ID = 990011L;
+    private static final long METRIC_ORDER_ID = 990012L;
+    private static final long SEQUENCE_FIRST_ORDER_ID = 990013L;
+    private static final long SEQUENCE_SECOND_ORDER_ID = 990014L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -54,6 +59,9 @@ class RiderModuleIntegrationTest {
 
     @Autowired
     private RiderOverdueService riderOverdueService;
+
+    @Autowired
+    private RiderMetricsService riderMetricsService;
 
     @Test
     void riderCanListAndClaimPreparingOrder() throws Exception {
@@ -566,6 +574,100 @@ class RiderModuleIntegrationTest {
             .andExpect(jsonPath("$.errorCode").value("RIDER_CAPACITY_REACHED"));
         org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM orders WHERE id = ? AND rider_id IS NOT NULL", Integer.class, CAPACITY_CANDIDATE_ORDER_ID));
+    }
+
+    @Test
+    void dailyMetricUsesDeliveryReviewAndOverdueDataExactlyOnce() {
+        LocalDate day = LocalDate.now().minusDays(1);
+        jdbcTemplate.update("DELETE FROM rider_daily_metrics WHERE rider_id = '13800000008' AND metric_date = ?", day);
+        jdbcTemplate.update("DELETE FROM rider_review WHERE order_id = ?", METRIC_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM delivery_exception WHERE order_id = ?", METRIC_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", METRIC_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                rider_commission, coupon_discount, status, delivery_address, delivery_status, refund_status,
+                estimated_minutes, create_time, accepted_at, delivered_at, delivery_completed_at)
+            VALUES (?, '13800000001', 1, '13800000008', 2890, 2590, 300, 200, 0, 'COMPLETED',
+                '软件学院 A 座 302', 'DELIVERED', 'NONE', 30, DATEADD('DAY', -1, CURRENT_TIMESTAMP),
+                DATEADD('DAY', -1, CURRENT_TIMESTAMP), DATEADD('DAY', -1, CURRENT_TIMESTAMP), DATEADD('DAY', -1, CURRENT_TIMESTAMP))
+            """, METRIC_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO rider_review(order_id, user_id, rider_id, score, tags, content, created_at)
+            VALUES (?, '13800000001', '13800000008', 5, '准时', '服务很好', DATEADD('DAY', -1, CURRENT_TIMESTAMP))
+            """, METRIC_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO delivery_exception(order_id, rider_id, exception_type, status, score_deduction, commission_deduction, detail, created_at)
+            VALUES (?, '13800000008', 'OVERDUE', 'OPEN', 5, 40, '测试超时', DATEADD('DAY', -1, CURRENT_TIMESTAMP))
+            """, METRIC_ORDER_ID);
+
+        riderMetricsService.archive(day);
+        riderMetricsService.archive(day);
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM rider_daily_metrics WHERE rider_id = '13800000008' AND metric_date = ?", Integer.class, day));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT completed_orders FROM rider_daily_metrics WHERE rider_id = '13800000008' AND metric_date = ?", Integer.class, day));
+        org.junit.jupiter.api.Assertions.assertEquals(200, jdbcTemplate.queryForObject(
+            "SELECT net_income FROM rider_daily_metrics WHERE rider_id = '13800000008' AND metric_date = ?", Integer.class, day));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT overdue_count FROM rider_daily_metrics WHERE rider_id = '13800000008' AND metric_date = ?", Integer.class, day));
+        org.junit.jupiter.api.Assertions.assertEquals("D", jdbcTemplate.queryForObject(
+            "SELECT grade FROM rider_daily_metrics WHERE rider_id = '13800000008' AND metric_date = ?", String.class, day));
+    }
+
+    @Test
+    void riderCanPersistCompleteDeliverySequenceAndUseRouteFallback() throws Exception {
+        jdbcTemplate.update("""
+            UPDATE orders SET delivery_status = 'CANCELED'
+            WHERE rider_id = '13800000008' AND delivery_status IN ('ASSIGNED_WAITING_MEAL', 'DELIVERING')
+            """);
+        jdbcTemplate.update("DELETE FROM orders WHERE id IN (?, ?)", SEQUENCE_FIRST_ORDER_ID, SEQUENCE_SECOND_ORDER_ID);
+        jdbcTemplate.update("UPDATE merchant SET longitude = 116.397428, latitude = 39.909230 WHERE id = 1");
+        jdbcTemplate.update("""
+            UPDATE rider_profile SET online_status = TRUE, accepting_orders = TRUE,
+                current_longitude = 116.397600, current_latitude = 39.909400,
+                location_updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = '13800000008'
+            """);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_longitude, delivery_latitude, delivery_status,
+                refund_status, estimated_minutes, prepare_minutes_snapshot, promise_end_at, create_time, accepted_at, rider_assigned_at)
+            VALUES (?, '13800000001', 1, '13800000008', 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 116.398000, 39.910000, 'ASSIGNED_WAITING_MEAL', 'NONE', 15, 5,
+                DATEADD('MINUTE', 20, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, SEQUENCE_FIRST_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_longitude, delivery_latitude, delivery_status,
+                refund_status, estimated_minutes, promise_end_at, create_time, accepted_at, rider_assigned_at, picked_up_at)
+            VALUES (?, '13800000001', 1, '13800000008', 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 B 座 202', 116.401000, 39.913000, 'DELIVERING', 'NONE', 15,
+                DATEADD('MINUTE', 15, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, SEQUENCE_SECOND_ORDER_ID);
+
+        String riderAuth = "Bearer " + switchRole(loginToken("13800000008"), "RIDER");
+        mockMvc.perform(put("/api/rider/deliveries/sequence").header("Authorization", riderAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("orderIds", java.util.List.of(SEQUENCE_FIRST_ORDER_ID)))) )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("DELIVERY_FORBIDDEN"));
+
+        mockMvc.perform(put("/api/rider/deliveries/sequence").header("Authorization", riderAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("orderIds", java.util.List.of(SEQUENCE_SECOND_ORDER_ID, SEQUENCE_FIRST_ORDER_ID)))) )
+            .andExpect(status().isOk());
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT delivery_sequence FROM orders WHERE id = ?", Integer.class, SEQUENCE_SECOND_ORDER_ID));
+        org.junit.jupiter.api.Assertions.assertEquals(2, jdbcTemplate.queryForObject(
+            "SELECT delivery_sequence FROM orders WHERE id = ?", Integer.class, SEQUENCE_FIRST_ORDER_ID));
+        mockMvc.perform(get("/api/delivery/orders/{orderId}/tracking", SEQUENCE_SECOND_ORDER_ID)
+                .header("Authorization", riderAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.routeAvailable").value(false))
+            .andExpect(jsonPath("$.data.routeSource").value("STRAIGHT_LINE"))
+            .andExpect(jsonPath("$.data.predictedArrivalAt").exists());
     }
 
     private String switchRole(String token, String role) throws Exception {

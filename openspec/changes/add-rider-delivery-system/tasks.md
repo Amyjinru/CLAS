@@ -62,7 +62,7 @@
 
 ## 8. Verification, delivery evidence, and documentation
 
-- [ ] 8.1 Add unit tests for identity approval, masking/encryption, state transitions, capacity, sequence validation, promise/ETA fallback, metrics, and settlement calculations.
+- [x] 8.1 Add unit tests for identity approval, masking/encryption, state transitions, capacity, sequence validation, promise/ETA fallback, metrics, and settlement calculations.
 - [x] 8.2 Add integration tests for concurrent claim, unrelated tracking access, pre/post-pickup cancellation, one-time tips/reviews, overdue idempotency, and withdrawal approval/rejection.
 - [ ] 8.3 Add end-to-end tests with one user, merchant, administrator, and two riders covering review, claim race, three-task limit, map fallback, delivery, tip, review, overdue deduction, and withdrawal.
 - [ ] 8.4 Run backend tests, frontend build, container startup, and CI; preserve logs and links as acceptance evidence.

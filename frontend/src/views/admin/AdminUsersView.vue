@@ -1,7 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { applyPenalty } from '../../api/profile'
-import { listAdminUsers, toggleUserStatus } from '../../api/admin'
+import { exportAdminUsers, listAdminUsers, applyUserPenalty, restoreAccountBan } from '../../api/admin'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const users = ref([])
@@ -55,23 +54,28 @@ function resetFilters() {
   search()
 }
 
-function exportCSV() {
-  const params = new URLSearchParams()
-  if (filters.role) params.set('role', filters.role)
-  if (filters.enabled !== '' && filters.enabled !== undefined) params.set('enabled', filters.enabled)
-  if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim())
-  window.open('/api/admin/export/users?' + params.toString(), '_blank')
+async function exportCSV() {
+  try {
+    await exportAdminUsers({
+      role: filters.role || undefined,
+      enabled: filters.enabled === '' ? undefined : filters.enabled,
+      keyword: filters.keyword.trim() || undefined
+    })
+    ElMessage.success('CSV 导出成功')
+  } catch {
+    ElMessage.error('CSV 导出失败')
+  }
 }
 
 async function changeStatus(user) {
-  const action = user.enabled ? '禁用' : '启用'
+  const action = '恢复'
   try {
     await ElMessageBox.confirm(`确定要${action}用户「${user.username || user.phone}」吗？`, `${action}用户`, {
       confirmButtonText: action,
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await toggleUserStatus(user.phone, !user.enabled)
+    await restoreAccountBan(user.phone)
     ElMessage.success(`${action}成功`)
     await load()
   } catch (error) {
@@ -79,8 +83,8 @@ async function changeStatus(user) {
   }
 }
 
-async function applyUserPenalty(user, type) {
-  const labels = { MUTE: '禁言', BAN: '封禁', SERVICE_STOP: '停止服务' }
+async function applyRestriction(user, type) {
+  const labels = { MUTE: '封禁交流功能', BAN: '封禁账户', SERVICE_STOP: '仅保留账户信息' }
   try {
     const { value: reason } = await ElMessageBox.prompt(`请输入对 ${user.username || user.phone} 执行${labels[type]}的原因`, '处罚用户', {
       confirmButtonText: '继续',
@@ -97,7 +101,7 @@ async function applyUserPenalty(user, type) {
       })
       durationHours = Number(hours)
     }
-    await applyPenalty(user.phone, {
+    await applyUserPenalty(user.phone, {
       userId: user.phone,
       penaltyType: type,
       reason: reason.trim(),
@@ -122,7 +126,7 @@ onMounted(load)
     <section class="page-head">
       <div>
         <h1>用户管理</h1>
-        <p>筛选用户、启停账号，并对异常用户执行处罚。</p>
+        <p>筛选用户，并按交流、账户保留、账户封禁三级处置异常账号。</p>
       </div>
       <el-button :loading="loading" @click="load">刷新</el-button>
     </section>
@@ -158,18 +162,20 @@ onMounted(load)
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'danger'" size="small">
-              {{ row.enabled ? '正常' : '已禁用' }}
+              {{ row.enabled ? '正常' : '账户已封禁' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="340" fixed="right">
+        <el-table-column label="操作" width="420" fixed="right">
           <template #default="{ row }">
-            <el-button :type="row.enabled ? 'danger' : 'success'" size="small" @click="changeStatus(row)">
-              {{ row.enabled ? '禁用' : '启用' }}
+            <template v-if="row.enabled">
+              <el-button size="small" @click="applyRestriction(row, 'MUTE')">封禁交流</el-button>
+              <el-button size="small" type="warning" @click="applyRestriction(row, 'SERVICE_STOP')">仅保留账户</el-button>
+              <el-button size="small" type="danger" @click="applyRestriction(row, 'BAN')">封禁账户</el-button>
+            </template>
+            <el-button v-else type="success" size="small" @click="changeStatus(row)">
+              恢复账户
             </el-button>
-            <el-button size="small" @click="applyUserPenalty(row, 'MUTE')">禁言</el-button>
-            <el-button size="small" type="warning" @click="applyUserPenalty(row, 'BAN')">封禁</el-button>
-            <el-button size="small" type="danger" @click="applyUserPenalty(row, 'SERVICE_STOP')">停服</el-button>
           </template>
         </el-table-column>
       </el-table>
