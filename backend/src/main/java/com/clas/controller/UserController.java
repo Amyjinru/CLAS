@@ -79,7 +79,7 @@ public class UserController {
     @RequireRole({"USER", "MERCHANT", "ADMIN", "RIDER"})
     public Result<LoginNoticeResponse> loginNotice() {
         User user = UserContext.getUser();
-        return Result.ok(user == null ? null : userService.getPendingLoginNotice(user.getPhone(), user.getSessionToken()));
+        return Result.ok(userService.getPendingLoginNotice(user));
     }
 
     /**

@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Picture, Search } from '@element-plus/icons-vue'
 import {
   getMyMerchant,
   getMerchantProducts,

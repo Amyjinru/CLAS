@@ -1,5 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router'
+import { Comment, Goods, List, Ticket, TrendCharts } from '@element-plus/icons-vue'
 
 const props = defineProps({
   active: {
@@ -11,11 +12,11 @@ const props = defineProps({
 const router = useRouter()
 
 const items = [
-  { key: 'orders', label: '接单管理', icon: 'List', path: '/merchant-console' },
-  { key: 'analytics', label: '经营分析', icon: 'TrendCharts', path: '/merchant/analytics' },
-  { key: 'products', label: '商品管理', icon: 'Goods', path: '/merchant/products' },
-  { key: 'deals', label: '团购管理', icon: 'Ticket', path: '/merchant/deals' },
-  { key: 'messages', label: '客户信息', icon: 'Comment', path: '/merchant/messages' }
+  { key: 'orders', label: '接单管理', icon: List, path: '/merchant-console' },
+  { key: 'analytics', label: '经营分析', icon: TrendCharts, path: '/merchant/analytics' },
+  { key: 'products', label: '商品管理', icon: Goods, path: '/merchant/products' },
+  { key: 'deals', label: '团购管理', icon: Ticket, path: '/merchant/deals' },
+  { key: 'messages', label: '客户信息', icon: Comment, path: '/merchant/messages' }
 ]
 </script>
 

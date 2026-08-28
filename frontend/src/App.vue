@@ -5,7 +5,6 @@ import { logout, sessionUser, setSessionUser, switchRole, getPendingLoginNotice 
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChatSidebar from './components/ChatSidebar.vue'
 import { preferenceState } from './utils/preferences'
-import { api } from './api/client'
 import patternBg from './assets/pattern-bg.svg'
 import foodLines from './assets/food-lines.svg'
 
@@ -53,12 +52,14 @@ function updateUser() {
 watch(() => route.path, updateUser)
 onMounted(updateUser)
 
-let sessionHeartbeat = null
 let loginNoticeTimer = null
 let latestLoginChallengeId = null
+let loginNoticeRequestPending = false
+const LOGIN_NOTICE_POLL_MS = 30_000
 
 async function checkPendingLoginNotice() {
-  if (!user.value?.token) return
+  if (!user.value?.token || loginNoticeRequestPending) return
+  loginNoticeRequestPending = true
   try {
     const notice = await getPendingLoginNotice()
     if (!notice || notice.challengeId === latestLoginChallengeId) return
@@ -70,26 +71,32 @@ async function checkPendingLoginNotice() {
     )
   } catch {
     // 当前会话失效时由统一响应处理跳转登录页。
+  } finally {
+    loginNoticeRequestPending = false
   }
 }
 
-function refreshSessionHeartbeat() {
-  if (sessionHeartbeat) clearInterval(sessionHeartbeat)
+function refreshSessionMonitor() {
   if (loginNoticeTimer) clearInterval(loginNoticeTimer)
-  sessionHeartbeat = null
   loginNoticeTimer = null
   latestLoginChallengeId = null
   if (user.value?.token) {
-    // 会话被新设备确认替换后，尽快让当前页面得到服务端的失效结果。
-    sessionHeartbeat = setInterval(() => api.get('/user/profile', { silent: true }).catch(() => {}), 1000)
     checkPendingLoginNotice()
-    loginNoticeTimer = setInterval(checkPendingLoginNotice, 5000)
+    loginNoticeTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') checkPendingLoginNotice()
+    }, LOGIN_NOTICE_POLL_MS)
   }
 }
-watch(() => user.value?.token, refreshSessionHeartbeat, { immediate: true })
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') checkPendingLoginNotice()
+}
+
+watch(() => user.value?.token, refreshSessionMonitor, { immediate: true })
+onMounted(() => document.addEventListener('visibilitychange', handleVisibilityChange))
 onUnmounted(() => {
-  if (sessionHeartbeat) clearInterval(sessionHeartbeat)
   if (loginNoticeTimer) clearInterval(loginNoticeTimer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 // version_314: logout() 接口退出 + test1: ElMessage 提示

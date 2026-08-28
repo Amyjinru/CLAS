@@ -83,11 +83,15 @@ public class PenaltyService {
     @Transactional
     public UserPenalty activeAccountBan(String userId) {
         expireOutdatedPenalties(userId);
-        return findActivePenalty(userId, BAN);
+        return selectActivePenalty(userId, BAN);
     }
 
     public UserPenalty findActivePenalty(String userId, String type) {
         expireOutdatedPenalties(userId);
+        return selectActivePenalty(userId, type);
+    }
+
+    private UserPenalty selectActivePenalty(String userId, String type) {
         LocalDateTime now = LocalDateTime.now();
         return userPenaltyMapper.selectOne(new LambdaQueryWrapper<UserPenalty>()
             .eq(UserPenalty::getUserId, userId)

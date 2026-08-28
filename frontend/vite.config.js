@@ -1,8 +1,15 @@
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    Components({
+      resolvers: [ElementPlusResolver()]
+    })
+  ],
   build: {
     target: 'es2022',
     cssMinify: true,
@@ -14,9 +21,6 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules/vue') || id.includes('node_modules/vue-router') || id.includes('node_modules/pinia')) {
             return 'vue'
-          }
-          if (id.includes('node_modules/element-plus') || id.includes('node_modules/@element-plus/icons-vue')) {
-            return 'element'
           }
           if (id.includes('node_modules/echarts')) {
             return 'charts'

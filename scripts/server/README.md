@@ -25,6 +25,20 @@ MYSQL_PASSWORD=123456
 AMAP_WEB_SERVICE_KEY=
 ```
 
+## HTTPS
+
+Production login traffic should use HTTPS. After a domain resolves to the server and a certificate has been issued,
+set all three values in `/etc/clas/clas.env`:
+
+```bash
+CLAS_SERVER_NAME=clas.example.com
+CLAS_TLS_CERTIFICATE=/etc/letsencrypt/live/clas.example.com/fullchain.pem
+CLAS_TLS_CERTIFICATE_KEY=/etc/letsencrypt/live/clas.example.com/privkey.pem
+```
+
+Running `clas install` or `clas deploy` then renders the HTTPS Nginx configuration, keeps the local HTTP health endpoint,
+and redirects other HTTP traffic to HTTPS. If all three values are empty, deployment retains the HTTP-only fallback.
+
 `clas deploy` performs these steps:
 
 1. Install or refresh systemd and nginx configuration.
