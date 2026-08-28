@@ -8,7 +8,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.clas.service.RiderOverdueService;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,6 +35,13 @@ class RiderModuleIntegrationTest {
     private static final long EXPIRED_REFUND_ORDER_ID = 990004L;
     private static final long DELIVERY_CYCLE_ORDER_ID = 990003L;
     private static final long RIDER_MERCHANT_CONTACT_ORDER_ID = 990004L;
+    private static final long RIDER_TIP_ORDER_ID = 990005L;
+    private static final long OVERDUE_ORDER_ID = 990006L;
+    private static final long CANCEL_BEFORE_PICKUP_ORDER_ID = 990007L;
+    private static final long CANCEL_AFTER_PICKUP_ORDER_ID = 990008L;
+    private static final long TRACKING_ACCESS_ORDER_ID = 990009L;
+    private static final long CAPACITY_ACTIVE_ORDER_ID = 990010L;
+    private static final long CAPACITY_CANDIDATE_ORDER_ID = 990011L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -38,6 +51,9 @@ class RiderModuleIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RiderOverdueService riderOverdueService;
 
     @Test
     void riderCanListAndClaimPreparingOrder() throws Exception {
@@ -103,17 +119,26 @@ class RiderModuleIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[*].orderId").value(org.hamcrest.Matchers.hasItem((int) CONCURRENT_CLAIM_ORDER_ID)));
 
-        mockMvc.perform(post("/api/rider/tasks/{orderId}/claim", CONCURRENT_CLAIM_ORDER_ID).header("Authorization", firstRider))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.riderId").value("13800000004"))
-            .andExpect(jsonPath("$.data.deliveryStatus").value("ASSIGNED_WAITING_MEAL"));
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> firstResult = executor.submit(() -> claimAtSameTime(firstRider, start));
+            Future<Integer> secondResult = executor.submit(() -> claimAtSameTime(secondRider, start));
+            start.countDown();
 
-        mockMvc.perform(post("/api/rider/tasks/{orderId}/claim", CONCURRENT_CLAIM_ORDER_ID).header("Authorization", secondRider))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("配送任务已被领取或不可用"));
+            int firstStatus = firstResult.get(10, TimeUnit.SECONDS);
+            int secondStatus = secondResult.get(10, TimeUnit.SECONDS);
+            org.junit.jupiter.api.Assertions.assertEquals(1, java.util.List.of(firstStatus, secondStatus).stream()
+                .filter(statusCode -> statusCode == 200).count());
+            org.junit.jupiter.api.Assertions.assertEquals(1, java.util.List.of(firstStatus, secondStatus).stream()
+                .filter(statusCode -> statusCode == 400).count());
+        } finally {
+            executor.shutdownNow();
+        }
 
-        org.junit.jupiter.api.Assertions.assertEquals("13800000004", jdbcTemplate.queryForObject(
-            "SELECT rider_id FROM orders WHERE id = ?", String.class, CONCURRENT_CLAIM_ORDER_ID));
+        String assignedRider = jdbcTemplate.queryForObject(
+            "SELECT rider_id FROM orders WHERE id = ?", String.class, CONCURRENT_CLAIM_ORDER_ID);
+        org.junit.jupiter.api.Assertions.assertTrue(java.util.List.of("13800000004", "13800000005").contains(assignedRider));
     }
 
     @Test
@@ -211,6 +236,10 @@ class RiderModuleIntegrationTest {
         mockMvc.perform(post("/api/order/{orderId}/rider-review", DELIVERY_CYCLE_ORDER_ID).header("Authorization", userAuth).contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("score", 5, "tags", "准时", "content", "送达及时"))))
             .andExpect(status().isOk());
+        mockMvc.perform(post("/api/order/{orderId}/rider-review", DELIVERY_CYCLE_ORDER_ID).header("Authorization", userAuth).contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("score", 5, "tags", "准时", "content", "重复提交"))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("该订单已评价骑手"));
         mockMvc.perform(get("/api/order/{orderId}/timeline", DELIVERY_CYCLE_ORDER_ID).header("Authorization", adminAuth))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(7)))
             .andExpect(jsonPath("$.data[*].eventType").value(org.hamcrest.Matchers.hasItem("USER_CONFIRMED_RECEIPT")));
@@ -346,6 +375,199 @@ class RiderModuleIntegrationTest {
             .andExpect(jsonPath("$.data[1].content").value("预计两分钟出餐。"));
     }
 
+    @Test
+    void userTipIsIdempotentAndCreatesOnlyOneSettlement() throws Exception {
+        jdbcTemplate.update("DELETE FROM rider_tip WHERE order_id = ?", RIDER_TIP_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM rider_settlement WHERE order_id = ?", RIDER_TIP_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", RIDER_TIP_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_status, refund_status, estimated_minutes,
+                create_time, accepted_at, delivered_at, delivery_completed_at)
+            VALUES (?, '13800000001', 1, '13800000004', 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 'DELIVERED', 'NONE', 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, RIDER_TIP_ORDER_ID);
+
+        String userAuth = "Bearer " + switchRole(loginToken("13800000001"), "USER");
+        String request = objectMapper.writeValueAsString(Map.of("amount", 200, "idempotencyKey", "tip-990005"));
+        mockMvc.perform(post("/api/order/{orderId}/rider-tip", RIDER_TIP_ORDER_ID).header("Authorization", userAuth)
+                .contentType(MediaType.APPLICATION_JSON).content(request))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.amount").value(200));
+        mockMvc.perform(post("/api/order/{orderId}/rider-tip", RIDER_TIP_ORDER_ID).header("Authorization", userAuth)
+                .contentType(MediaType.APPLICATION_JSON).content(request))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.amount").value(200));
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM rider_tip WHERE order_id = ?", Integer.class, RIDER_TIP_ORDER_ID));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM rider_settlement WHERE order_id = ? AND source_type = 'TIP'", Integer.class, RIDER_TIP_ORDER_ID));
+    }
+
+    @Test
+    void overdueScanCreatesOneExceptionAndOneDeductionOnly() {
+        jdbcTemplate.update("DELETE FROM delivery_exception WHERE order_id = ?", OVERDUE_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM rider_settlement WHERE order_id = ?", OVERDUE_ORDER_ID);
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", OVERDUE_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                rider_commission, coupon_discount, status, delivery_address, delivery_status, refund_status,
+                estimated_minutes, promise_end_at, create_time, accepted_at)
+            VALUES (?, '13800000001', 1, '13800000004', 2890, 2590, 300, 200, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 'DELIVERING', 'NONE', 30, DATEADD('MINUTE', -1, CURRENT_TIMESTAMP),
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, OVERDUE_ORDER_ID);
+
+        riderOverdueService.scan();
+        riderOverdueService.scan();
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM delivery_exception WHERE order_id = ? AND exception_type = 'OVERDUE'", Integer.class, OVERDUE_ORDER_ID));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM rider_settlement WHERE order_id = ? AND source_type = 'OVERDUE_DEDUCTION'", Integer.class, OVERDUE_ORDER_ID));
+        org.junit.jupiter.api.Assertions.assertEquals(-40, jdbcTemplate.queryForObject(
+            "SELECT amount FROM rider_settlement WHERE order_id = ? AND source_type = 'OVERDUE_DEDUCTION'", Integer.class, OVERDUE_ORDER_ID));
+    }
+
+    @Test
+    void userCanCancelBeforePickupButMustUseAfterSalesAfterPickup() throws Exception {
+        jdbcTemplate.update("DELETE FROM orders WHERE id IN (?, ?)", CANCEL_BEFORE_PICKUP_ORDER_ID, CANCEL_AFTER_PICKUP_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_status, refund_status, estimated_minutes,
+                create_time, accepted_at, rider_assigned_at)
+            VALUES (?, '13800000001', 1, '13800000004', 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 'ASSIGNED_WAITING_MEAL', 'NONE', 30, CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, CANCEL_BEFORE_PICKUP_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_status, refund_status, estimated_minutes,
+                create_time, accepted_at, rider_assigned_at, picked_up_at)
+            VALUES (?, '13800000001', 1, '13800000004', 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 'DELIVERING', 'NONE', 30, CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, CANCEL_AFTER_PICKUP_ORDER_ID);
+
+        String userAuth = "Bearer " + switchRole(loginToken("13800000001"), "USER");
+        mockMvc.perform(post("/api/order/cancel/{orderId}", CANCEL_BEFORE_PICKUP_ORDER_ID).header("Authorization", userAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("CANCELED"))
+            .andExpect(jsonPath("$.data.deliveryStatus").value("CANCELED"));
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM orders WHERE id = ? AND rider_id IS NOT NULL", Integer.class, CANCEL_BEFORE_PICKUP_ORDER_ID));
+
+        mockMvc.perform(post("/api/order/cancel/{orderId}", CANCEL_AFTER_PICKUP_ORDER_ID).header("Authorization", userAuth))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("骑手已取餐，订单不能取消，请通过售后申请退款"));
+    }
+
+    @Test
+    void unrelatedUserCannotReadAssignedRiderLocation() throws Exception {
+        jdbcTemplate.update("DELETE FROM orders WHERE id = ?", TRACKING_ACCESS_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_longitude, delivery_latitude, delivery_status,
+                refund_status, estimated_minutes, create_time, accepted_at, rider_assigned_at)
+            VALUES (?, '13800000001', 1, '13800000004', 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 116.398000, 39.910000, 'DELIVERING', 'NONE', 30,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, TRACKING_ACCESS_ORDER_ID);
+
+        String unrelatedUserAuth = "Bearer " + switchRole(loginToken("13800000005"), "USER");
+        mockMvc.perform(get("/api/delivery/orders/{orderId}/tracking", TRACKING_ACCESS_ORDER_ID)
+                .header("Authorization", unrelatedUserAuth))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("DELIVERY_FORBIDDEN"))
+            .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    void withdrawalRejectRestoresBalanceAndApprovalKeepsAuditRecord() throws Exception {
+        jdbcTemplate.update("DELETE FROM rider_withdrawal WHERE rider_id = '13800000004'");
+        jdbcTemplate.update("DELETE FROM user_bank_card WHERE user_id = '13800000004'");
+        jdbcTemplate.update("""
+            INSERT INTO user_bank_card(user_id, bank_name, cardholder_name, card_no_encrypted, card_last4, card_type, is_default, create_time)
+            VALUES ('13800000004', '测试银行', '骑手测试', '**** **** **** 0004', '0004', '借记卡', TRUE, CURRENT_TIMESTAMP)
+            """);
+        Long cardId = jdbcTemplate.queryForObject("SELECT id FROM user_bank_card WHERE user_id = '13800000004'", Long.class);
+        jdbcTemplate.update("UPDATE rider_profile SET withdrawable_balance = 1000, frozen_balance = 0 WHERE user_id = '13800000004'");
+        org.junit.jupiter.api.Assertions.assertEquals(1000, jdbcTemplate.queryForObject(
+            "SELECT withdrawable_balance FROM rider_profile WHERE user_id = '13800000004'", Integer.class));
+
+        String riderAuth = "Bearer " + switchRole(loginToken("13800000004"), "RIDER");
+        String adminAuth = "Bearer " + loginToken("13800000003");
+        MvcResult rejected = mockMvc.perform(post("/api/rider/withdrawals").header("Authorization", riderAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("bankCardId", cardId, "amount", 300))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PENDING"))
+            .andReturn();
+        long rejectedId = objectMapper.readTree(rejected.getResponse().getContentAsString()).path("data").path("id").asLong();
+        mockMvc.perform(patch("/api/rider/admin/withdrawals/{id}", rejectedId).header("Authorization", adminAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"approved\":false,\"reason\":\"银行卡信息待核验\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("REJECTED"));
+        org.junit.jupiter.api.Assertions.assertEquals(1000, jdbcTemplate.queryForObject(
+            "SELECT withdrawable_balance FROM rider_profile WHERE user_id = '13800000004'", Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT frozen_balance FROM rider_profile WHERE user_id = '13800000004'", Integer.class));
+
+        MvcResult approved = mockMvc.perform(post("/api/rider/withdrawals").header("Authorization", riderAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("bankCardId", cardId, "amount", 400))))
+            .andExpect(status().isOk())
+            .andReturn();
+        long approvedId = objectMapper.readTree(approved.getResponse().getContentAsString()).path("data").path("id").asLong();
+        mockMvc.perform(patch("/api/rider/admin/withdrawals/{id}", approvedId).header("Authorization", adminAuth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"approved\":true,\"reason\":\"审核通过\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("APPROVED"));
+        org.junit.jupiter.api.Assertions.assertEquals(600, jdbcTemplate.queryForObject(
+            "SELECT withdrawable_balance FROM rider_profile WHERE user_id = '13800000004'", Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(400, jdbcTemplate.queryForObject(
+            "SELECT frozen_balance FROM rider_profile WHERE user_id = '13800000004'", Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(2, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM rider_withdrawal WHERE rider_id = '13800000004' AND reviewer_id = '13800000003'", Integer.class));
+    }
+
+    @Test
+    void riderAtConfiguredCapacityCannotClaimAnotherTask() throws Exception {
+        jdbcTemplate.update("DELETE FROM orders WHERE id IN (?, ?)", CAPACITY_ACTIVE_ORDER_ID, CAPACITY_CANDIDATE_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, rider_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_status, refund_status, estimated_minutes,
+                create_time, accepted_at, rider_assigned_at)
+            VALUES (?, '13800000001', 1, '13800000008', 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 'ASSIGNED_WAITING_MEAL', 'NONE', 30, CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, CAPACITY_ACTIVE_ORDER_ID);
+        jdbcTemplate.update("""
+            INSERT INTO orders (id, user_id, merchant_id, total_price, subtotal, delivery_fee,
+                coupon_discount, status, delivery_address, delivery_status, refund_status, estimated_minutes,
+                create_time, accepted_at)
+            VALUES (?, '13800000001', 1, 2890, 2590, 300, 0, 'ACCEPTED',
+                '软件学院 A 座 302', 'AVAILABLE', 'NONE', 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, CAPACITY_CANDIDATE_ORDER_ID);
+        jdbcTemplate.update("""
+            UPDATE rider_profile SET online_status = TRUE, accepting_orders = TRUE, max_active_orders = 1,
+                current_longitude = 116.397428, current_latitude = 39.909230, location_updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = '13800000008'
+            """);
+
+        String riderAuth = "Bearer " + switchRole(loginToken("13800000008"), "RIDER");
+        mockMvc.perform(post("/api/rider/tasks/{orderId}/claim", CAPACITY_CANDIDATE_ORDER_ID)
+                .header("Authorization", riderAuth))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("RIDER_CAPACITY_REACHED"));
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM orders WHERE id = ? AND rider_id IS NOT NULL", Integer.class, CAPACITY_CANDIDATE_ORDER_ID));
+    }
+
     private String switchRole(String token, String role) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/user/switch-role")
                 .header("Authorization", "Bearer " + token)
@@ -355,6 +577,13 @@ class RiderModuleIntegrationTest {
             .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString())
             .path("data").path("token").asText();
+    }
+
+    private int claimAtSameTime(String riderAuth, CountDownLatch start) throws Exception {
+        start.await(10, TimeUnit.SECONDS);
+        return mockMvc.perform(post("/api/rider/tasks/{orderId}/claim", CONCURRENT_CLAIM_ORDER_ID)
+                .header("Authorization", riderAuth))
+            .andReturn().getResponse().getStatus();
     }
 
     private String loginToken(String phone) throws Exception {

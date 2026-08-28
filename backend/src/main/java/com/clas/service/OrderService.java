@@ -528,6 +528,7 @@ public class OrderService {
         order.setRiderAssignedAt(null);
         order.setCanceledAt(LocalDateTime.now());
         ordersMapper.updateById(order);
+        ordersMapper.clearRiderAssignment(order.getId());
         lifecycleService.record(order, "ORDER_CANCELED", fromStatus, fromDelivery, "USER", order.getUserId(), "用户取消订单");
         couponService.releaseForOrder(order.getUserCouponId());
         return order;

@@ -142,6 +142,8 @@ $env:FORBIDDEN_WORDS = "额外敏感词1,额外敏感词2"
 
 也可创建仅保存在本机的 `backend/src/main/resources/application-local.yml` 覆盖配置；不要将密码、密钥、身份证明文或真实手机号提交到仓库。
 
+登录页“获得权限”演示入口还需要在服务端启用 `CLAS_DEMO_ACCOUNTS_ENABLED=true`，并通过 `CLAS_DEMO_ACCESS_PASSWORD` 注入访问口令；两项均不得写入源码或提交到仓库。聊天 AI 审核的等待上限可用 `CHAT_MODERATION_TIMEOUT_MS` 配置，默认 3000 毫秒，超时后仅聊天会按本地词库结果降级。
+
 ### 3. 初始化数据库
 
 首次开发或允许重建演示数据时，执行完整脚本：

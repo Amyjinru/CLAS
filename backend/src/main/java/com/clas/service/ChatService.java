@@ -26,15 +26,18 @@ public class ChatService {
     private final ChatMessageMapper chatMessageMapper;
     private final OrderService orderService;
     private final MerchantMapper merchantMapper;
+    private final ContentModerationService contentModerationService;
 
     public ChatService(
         ChatMessageMapper chatMessageMapper,
         OrderService orderService,
-        MerchantMapper merchantMapper
+        MerchantMapper merchantMapper,
+        ContentModerationService contentModerationService
     ) {
         this.chatMessageMapper = chatMessageMapper;
         this.orderService = orderService;
         this.merchantMapper = merchantMapper;
+        this.contentModerationService = contentModerationService;
     }
 
     public ChatMessageResponse send(Long orderId, Long merchantId, String targetUserId, String userId, String role, String content) {
@@ -56,12 +59,13 @@ public class ChatService {
             throw new BusinessException("当前订单状态不支持聊天");
         }
 
+        String text = requireAllowedChatText(content);
         ChatMessage message = new ChatMessage();
         message.setOrderId(orderId);
         message.setMerchantId(order.getMerchantId());
         message.setUserId(order.getUserId());
         message.setSenderRole(role);
-        message.setContent(content.trim());
+        message.setContent(text);
         message.setCreatedAt(LocalDateTime.now());
         chatMessageMapper.insert(message);
 
@@ -172,10 +176,7 @@ public class ChatService {
             throw new BusinessException("无效的角色");
         }
 
-        String text = content == null ? "" : content.trim();
-        if (text.isEmpty()) {
-            throw new BusinessException("消息内容不能为空");
-        }
+        String text = requireAllowedChatText(content);
 
         ChatMessage message = new ChatMessage();
         message.setOrderId(null);
@@ -194,6 +195,15 @@ public class ChatService {
             throw new BusinessException("当前用户不是商家");
         }
         return merchant;
+    }
+
+    private String requireAllowedChatText(String content) {
+        String text = content == null ? "" : content.trim();
+        if (text.isEmpty()) {
+            throw new BusinessException("消息内容不能为空");
+        }
+        contentModerationService.assertChatTextAllowed(text);
+        return text;
     }
 
     private Merchant findCurrentMerchant(String userId) {

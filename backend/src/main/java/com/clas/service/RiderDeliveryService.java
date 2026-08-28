@@ -47,6 +47,7 @@ public class RiderDeliveryService {
         order.setRiderId(null); order.setRiderAssignedAt(null); order.setDeliveryStatus("AVAILABLE");
         order.setReassignCount((order.getReassignCount() == null ? 0 : order.getReassignCount()) + 1);
         orders.updateById(order);
+        orders.clearRiderAssignment(order.getId());
         lifecycleService.record(order, "RIDER_ABANDONED", fromStatus, fromDelivery, "RIDER", UserContext.getUserId(), reason);
         notifyOrder(order, "骑手已放弃配送", "骑手暂时无法配送，订单已回到骑手任务池。");
         return order;

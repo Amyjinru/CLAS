@@ -31,15 +31,18 @@ public class RiderContactService {
     private final DeliveryCallSessionMapper calls;
     private final UserMapper users;
     private final RiderAuditLogMapper audits;
+    private final ContentModerationService contentModerationService;
 
     public RiderContactService(OrderService orderService, ChatMessageMapper messages, ChatConversationMapper conversations,
-                               DeliveryCallSessionMapper calls, UserMapper users, RiderAuditLogMapper audits) {
+                               DeliveryCallSessionMapper calls, UserMapper users, RiderAuditLogMapper audits,
+                               ContentModerationService contentModerationService) {
         this.orderService = orderService;
         this.messages = messages;
         this.conversations = conversations;
         this.calls = calls;
         this.users = users;
         this.audits = audits;
+        this.contentModerationService = contentModerationService;
     }
 
     public List<ChatMessageResponse> messages(Long orderId, String userId, String role) {
@@ -52,6 +55,7 @@ public class RiderContactService {
         if (!ACTIVE.contains(order.getDeliveryStatus())) throw new BusinessException("订单送达后骑手聊天仅可查看历史记录");
         String text = content == null ? "" : content.trim();
         if (text.isEmpty()) throw new BusinessException("消息内容不能为空");
+        contentModerationService.assertChatTextAllowed(text);
         LocalDateTime now = LocalDateTime.now();
         ChatConversation conversation = conversations.selectOne(new LambdaQueryWrapper<ChatConversation>()
             .eq(ChatConversation::getOrderId, orderId).eq(ChatConversation::getConversationType, USER_RIDER));

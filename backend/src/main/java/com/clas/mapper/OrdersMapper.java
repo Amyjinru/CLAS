@@ -35,4 +35,7 @@ public interface OrdersMapper extends BaseMapper<Orders> {
           AND rider_id IS NULL
         """)
     int claimForRider(@Param("orderId") Long orderId, @Param("riderId") String riderId);
+
+    @Update("UPDATE orders SET rider_id = NULL, rider_assigned_at = NULL, rider_accepted_at = NULL WHERE id = #{orderId}")
+    int clearRiderAssignment(@Param("orderId") Long orderId);
 }

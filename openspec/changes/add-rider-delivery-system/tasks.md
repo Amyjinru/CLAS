@@ -63,8 +63,8 @@
 ## 8. Verification, delivery evidence, and documentation
 
 - [ ] 8.1 Add unit tests for identity approval, masking/encryption, state transitions, capacity, sequence validation, promise/ETA fallback, metrics, and settlement calculations.
-- [ ] 8.2 Add integration tests for concurrent claim, unrelated tracking access, pre/post-pickup cancellation, one-time tips/reviews, overdue idempotency, and withdrawal approval/rejection.
+- [x] 8.2 Add integration tests for concurrent claim, unrelated tracking access, pre/post-pickup cancellation, one-time tips/reviews, overdue idempotency, and withdrawal approval/rejection.
 - [ ] 8.3 Add end-to-end tests with one user, merchant, administrator, and two riders covering review, claim race, three-task limit, map fallback, delivery, tip, review, overdue deduction, and withdrawal.
 - [ ] 8.4 Run backend tests, frontend build, container startup, and CI; preserve logs and links as acceptance evidence.
-- [ ] 8.5 Update UC16 requirements, overview design, detailed design, traceability table, test report, README role accounts, deployment variables, and final-demo script.
+- [x] 8.5 Update UC16 requirements, overview design, detailed design, traceability table, test report, README role accounts, deployment variables, and final-demo script.
 - [ ] 8.6 Capture dated board/statistics screenshots, representative task/PR/test screenshots, and the final CI success evidence required by the course.
