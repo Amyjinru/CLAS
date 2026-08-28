@@ -1,111 +1,145 @@
-# CLAS 自动部署工作流
-# 推送 dev 分支后自动触发，通过 SSH 连接服务器执行部署。
-#
-# 认证方式: SSH 密码（存储在 GitHub Secrets → SSH_PASSWORD）
-#   本地开发机另配置了 SSH 密钥免密登录，可运行 scripts/deploy.ps1 手动部署。
-#
-# 故障排查:
-#   若部署成功但服务行为未变 → 可能是旧 nohup 进程残留占端口
-#   本工作流已内置清理逻辑，部署前自动杀掉非 systemd 管理的 Java 进程
-
-name: Deploy to Cloud Server
+name: Build, publish and deploy CLAS
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: amyjinru
 
 jobs:
   verify:
-    name: Build and test
+    name: Test gate
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
           cache: maven
 
-      - name: Run backend tests
+      - name: Run backend unit and integration tests
         working-directory: backend
         run: mvn --batch-mode test
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Build frontend
+      - name: Run frontend tests
         working-directory: frontend
         run: |
           npm ci
-          npm run build
+          npm test
 
-      - name: Upload backend test reports
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload verification reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: backend-test-reports
-          path: backend/target/surefire-reports/
+          name: verification-reports-${{ github.sha }}
+          path: |
+            backend/target/surefire-reports/
+            frontend/test-results/
           if-no-files-found: warn
 
-  deploy:
+  publish:
+    name: Build and publish immutable images
     needs: verify
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.version.outputs.image_tag }}
     steps:
-      - name: Network connectivity check
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve image version
+        id: version
+        run: echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
         run: |
-          echo "Testing TCP reachability..."
-          timeout 10 bash -c 'echo >/dev/tcp/8.141.112.182/22 && echo "OK" || echo "UNREACHABLE"'
-        continue-on-error: true
+          image="${REGISTRY}/${IMAGE_OWNER}/clas-backend:${GITHUB_SHA}"
+          docker build --file backend/Dockerfile --tag "$image" .
+          docker push "$image"
+          docker image inspect "$image" --format '{{index .RepoDigests 0}}' | tee backend-image.txt
 
-      - name: Install sshpass
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
-
-      - name: Cleanup zombie Java processes & Deploy
-        env:
-          DEMO_ACCESS_PASSWORD: ${{ secrets.DEMO_ACCESS_PASSWORD }}
+      - name: Build and push frontend image
         run: |
-          test -n "$DEMO_ACCESS_PASSWORD" || { echo 'DEMO_ACCESS_PASSWORD secret is required'; exit 1; }
-          printf '%s\n' "$DEMO_ACCESS_PASSWORD" | sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@8.141.112.182 "
-            set -e
-            read -r demo_access_password
-            env_file=/etc/clas/clas.env
-            tmp_env=\$(mktemp)
-            grep -vE '^(CLAS_DEMO_ACCOUNTS_ENABLED|CLAS_DEMO_ACCESS_PASSWORD)=' \"\$env_file\" > \"\$tmp_env\" || true
-            printf 'CLAS_DEMO_ACCOUNTS_ENABLED=true\\nCLAS_DEMO_ACCESS_PASSWORD=%s\\n' \"\$demo_access_password\" >> \"\$tmp_env\"
-            install -m 600 \"\$tmp_env\" \"\$env_file\"
-            rm -f \"\$tmp_env\"
+          image="${REGISTRY}/${IMAGE_OWNER}/clas-frontend:${GITHUB_SHA}"
+          docker build --file frontend/Dockerfile --tag "$image" .
+          docker push "$image"
+          docker image inspect "$image" --format '{{index .RepoDigests 0}}' | tee frontend-image.txt
 
-            echo '>>> 清理残留的非 systemd Java 进程...'
-            old_pids=\$(ps aux | grep 'java -jar' | grep -v grep | grep -v systemd | awk '{print \$2}')
-            if [ -n \"\$old_pids\" ]; then
-              echo \"Killing: \$old_pids\"
-              kill -9 \$old_pids 2>/dev/null || true
-              sleep 2
-              systemctl restart clas-backend
-              echo '>>> 服务已重启'
-            fi
+      - name: Upload image references
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-references-${{ github.sha }}
+          path: |
+            backend-image.txt
+            frontend-image.txt
 
-            cd /opt/clas
-            echo '>>> 同步代码到 upstream/dev...'
-            git fetch upstream dev
-            git reset --hard upstream/dev
-            git clean -fd
+  deploy:
+    name: Deploy immutable version to k3s
+    needs: publish
+    runs-on: ubuntu-latest
+    env:
+      KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+      GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+      MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      RIDER_IDENTITY_ENCRYPTION_KEY: ${{ secrets.RIDER_IDENTITY_ENCRYPTION_KEY }}
+      AMAP_WEB_SERVICE_KEY: ${{ secrets.AMAP_WEB_SERVICE_KEY }}
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      FORBIDDEN_WORDS: ${{ secrets.FORBIDDEN_WORDS }}
+      CLAS_DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
+      CLAS_IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
+      CLAS_DEPLOY_ARTIFACT_DIR: ${{ github.workspace }}/k8s-diagnostics
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
 
-            echo '>>> 构建并部署...'
-            clas deploy
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
 
-            echo '>>> 健康检查...'
-            sleep 2
-            curl -sf http://127.0.0.1:8080/api/health
-            echo
-            echo '>>> 当前部署版本:'
-            git log -1 --oneline
-          "
+      - name: Configure kubeconfig
+        run: |
+          test -n "$KUBECONFIG_B64" || { echo 'KUBECONFIG_B64 is required'; exit 1; }
+          echo "$KUBECONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kubeconfig"
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Deploy tested image version
+        run: bash scripts/k8s/deploy.sh
+
+      - name: Upload deployment diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k3s-diagnostics-${{ github.sha }}
+          path: k8s-diagnostics/
+          if-no-files-found: warn

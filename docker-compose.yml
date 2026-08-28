@@ -1,0 +1,100 @@
+services:
+  mysql:
+    image: mysql:8.4.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
+      MYSQL_USER: ${MYSQL_USER:?set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [clas]
+
+  redis:
+    image: redis:7.4.2-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [clas]
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: clas-backend:local
+    entrypoint: ["/bin/bash", "/opt/clas/database/bootstrap-and-migrate.sh"]
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [clas]
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: clas-backend:local
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      RIDER_IDENTITY_ENCRYPTION_KEY: ${RIDER_IDENTITY_ENCRYPTION_KEY:?set RIDER_IDENTITY_ENCRYPTION_KEY in .env}
+      AMAP_WEB_SERVICE_KEY: ${AMAP_WEB_SERVICE_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      FORBIDDEN_WORDS: ${FORBIDDEN_WORDS:-}
+      CHAT_MODERATION_TIMEOUT_MS: ${CHAT_MODERATION_TIMEOUT_MS:-3000}
+      CLAS_DEMO_ACCOUNTS_ENABLED: ${CLAS_DEMO_ACCOUNTS_ENABLED:-false}
+      CLAS_DEMO_ACCESS_PASSWORD: ${CLAS_DEMO_ACCESS_PASSWORD:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8088}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+    networks: [clas]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: clas-frontend:local
+    ports:
+      - "8088:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [clas]
+
+networks:
+  clas:
+
+volumes:
+  mysql_data:
+  redis_data:

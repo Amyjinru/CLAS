@@ -120,6 +120,8 @@ Spring Boot REST API
 | Node.js | 22+ |
 | MySQL | 8.0+ |
 | Redis | 6+ |
+| Docker Compose | v2+（容器化启动） |
+| k3s | v1.30+（云端 Kubernetes 部署） |
 
 ### 2. 配置本地环境变量
 
@@ -174,6 +176,28 @@ npm run dev
 ```
 
 前端默认地址为 `http://127.0.0.1:5173`。
+
+### 6. 用 Docker Compose 在新机器启动
+
+这是推荐的可复现启动方式。首先复制模板并填写随机密钥和数据库密码；`.env` 仅保存在本机，禁止提交。
+
+```powershell
+Copy-Item .env.example .env
+# 编辑 .env，至少填写 MYSQL_PASSWORD、MYSQL_ROOT_PASSWORD、JWT_SECRET、RIDER_IDENTITY_ENCRYPTION_KEY
+.\scripts\compose.ps1 up
+.\scripts\compose.ps1 smoke
+```
+
+Compose 会分别运行 `frontend`、`backend`、官方 MySQL 8.4 和 Redis 容器。首次空库启动会执行 `database/schema.sql` 并登记当前迁移基线；已有数据库不会执行完整建表脚本，而是执行未登记的 `migration-*.sql`。本地入口为 `http://127.0.0.1:8088/`。
+
+常用操作：
+
+```powershell
+.\scripts\compose.ps1 logs
+.\scripts\compose.ps1 down
+```
+
+演示数据不会自动导入。确认目标是演示库后，在具备 Bash 的环境中显式执行 `bash database/seed-demo.sh`。
 
 ## 演示账号与推荐演示流程
 
@@ -245,17 +269,37 @@ mvn -f backend/pom.xml -Dtest=RiderModuleIntegrationTest test
 
 测试覆盖登录与权限隔离、订单取消、支付和评价、角色申请、骑手任务领取并发控制、配送生命周期、骑手资料审核、骑手—商家订单沟通等关键场景。
 
-## CI/CD 与部署
+## CI/CD 与 k3s 部署
 
-推送到 `dev` 分支后，GitHub Actions 工作流 `.github/workflows/deploy.yml` 会依次执行：
+推送到 `main` 分支后，GitHub Actions 工作流 `.github/workflows/deploy.yml` 会执行严格门禁：
 
 ```text
-push dev → 后端 Maven 测试 → 前端 npm ci + build → 上传测试报告 → SSH 云端部署 → 健康检查
+push main
+  → 后端 Maven 单元/集成测试
+  → 前端 npm test + build
+  → 构建并推送 GHCR SHA 镜像
+  → k3s 数据库迁移 Job
+  → Deployment rollout
+  → http://8.141.112.182/api/health
 ```
 
-部署工作流需要在仓库 Actions Secrets 中配置 `SSH_PASSWORD`。测试报告会作为构建产物上传；部署端通过 `clas deploy` 完成构建和服务重启，并访问 `/api/health` 进行校验。
+任一测试失败时，镜像构建、GHCR 推送和 k3s 部署均不会执行。前端和后端镜像分别为 `ghcr.io/amyjinru/clas-frontend:<git-sha>` 与 `ghcr.io/amyjinru/clas-backend:<git-sha>`；部署禁止使用 `latest`。工作流无论成功或失败都会上传测试报告、镜像摘要和 k3s 诊断日志。
 
-本地手动部署可参考 `scripts/deploy.ps1`。发布前请确认数据库迁移已完成、所需环境变量已在服务器中配置，并在 Actions 页面确认构建通过。
+首次云端准备使用 root 用户执行：
+
+```bash
+bash scripts/k8s/install-k3s.sh
+```
+
+在 GitHub Actions Secrets 中配置以下值：`KUBECONFIG_B64`（k3s kubeconfig 的 Base64）、`GHCR_USERNAME`、`GHCR_PULL_TOKEN`、`MYSQL_PASSWORD`、`JWT_SECRET`、`RIDER_IDENTITY_ENCRYPTION_KEY`，以及按需配置的 `AMAP_WEB_SERVICE_KEY`、`DASHSCOPE_API_KEY`、`FORBIDDEN_WORDS`、`CLAS_DEMO_ACCESS_PASSWORD`。Secret 不得写入仓库或工作流日志。
+
+手动部署已发布镜像时，配置同名环境变量后执行：
+
+```bash
+CLAS_IMAGE_TAG=<git-sha> bash scripts/k8s/deploy.sh
+```
+
+部署清单位于 `k8s/`：MySQL 使用官方镜像和 PVC，后端使用 `/api/health` 作为 readiness/liveness probe，Ingress 在当前公网 IP `http://8.141.112.182/` 暴露前端。当前入口没有 DNS 域名，故仅提供 HTTP；获得域名后可在 `k8s/ingress.yaml` 增加 Host 与 TLS 配置。
 
 ## 文档与协作
 

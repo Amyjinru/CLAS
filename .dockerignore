@@ -1,0 +1,14 @@
+.git
+.github
+.codex
+.idea
+.vscode
+**/node_modules
+**/target
+frontend/dist
+uploads
+*.log
+.env
+backend/src/main/resources/application-local.yml
+PPT汇报内容.md
+软件工程大作业.pptx
