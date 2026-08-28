@@ -40,6 +40,7 @@ dashscope:
 
 content-moderation:
   forbidden-words: ${FORBIDDEN_WORDS:}
+  chat-api-timeout-ms: ${CHAT_MODERATION_TIMEOUT_MS:3000}
 
 jwt:
   secret: ${JWT_SECRET:}

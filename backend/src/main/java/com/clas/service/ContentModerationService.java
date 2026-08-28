@@ -16,9 +16,12 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class ContentModerationService {
+    private static final Logger log = LoggerFactory.getLogger(ContentModerationService.class);
     private static final List<String> DEFAULT_FORBIDDEN_WORDS = List.of(
         "色情", "涉黄", "赌博", "毒品", "违禁", "诈骗"
     );
@@ -30,6 +33,7 @@ public class ContentModerationService {
     private final String textModel;
     private final String imageModel;
     private final List<String> forbiddenWords;
+    private final Duration chatApiTimeout;
 
     public ContentModerationService(
         ObjectMapper objectMapper,
@@ -37,7 +41,8 @@ public class ContentModerationService {
         @Value("${dashscope.base-url:https://dashscope.aliyuncs.com/compatible-mode/v1}") String baseUrl,
         @Value("${dashscope.text-model:qwen3.6-flash}") String textModel,
         @Value("${dashscope.image-model:qwen3.5-flash}") String imageModel,
-        @Value("${content-moderation.forbidden-words:}") String configuredForbiddenWords
+        @Value("${content-moderation.forbidden-words:}") String configuredForbiddenWords,
+        @Value("${content-moderation.chat-api-timeout-ms:3000}") long chatApiTimeoutMillis
     ) {
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -46,6 +51,7 @@ public class ContentModerationService {
         this.textModel = textModel;
         this.imageModel = imageModel;
         this.forbiddenWords = buildForbiddenWords(configuredForbiddenWords);
+        this.chatApiTimeout = Duration.ofMillis(Math.max(100, chatApiTimeoutMillis));
     }
 
     public void assertTextAllowed(String text, String scene) {
@@ -64,6 +70,34 @@ public class ContentModerationService {
             throw new BusinessException(result.reason().isBlank()
                 ? scene + "未通过内容安全审核"
                 : scene + "未通过内容安全审核：" + result.reason());
+        }
+    }
+
+    public void assertChatTextAllowed(String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        String matched = findForbiddenWord(text);
+        if (matched != null) {
+            throw new BusinessException("聊天消息包含违禁词，发送失败");
+        }
+        if (apiKey.isBlank()) {
+            return;
+        }
+        try {
+            ModerationResult result = moderateText(text, "聊天消息", chatApiTimeout);
+            if (!result.safe()) {
+                throw new BusinessException(result.reason().isBlank()
+                    ? "聊天消息未通过内容安全审核"
+                    : "聊天消息未通过内容安全审核：" + result.reason());
+            }
+        } catch (BusinessException exception) {
+            if (exception.getMessage() != null && exception.getMessage().contains("未通过内容安全审核")) {
+                throw exception;
+            }
+            log.warn("聊天消息 AI 审核不可用，已按本地词库结果放行：{}", exception.getMessage());
+        } catch (RuntimeException exception) {
+            log.warn("聊天消息 AI 审核异常，已按本地词库结果放行：{}", exception.getMessage());
         }
     }
 
@@ -98,11 +132,15 @@ public class ContentModerationService {
     }
 
     private ModerationResult moderateText(String text, String scene) {
+        return moderateText(text, scene, Duration.ofSeconds(15));
+    }
+
+    private ModerationResult moderateText(String text, String scene, Duration timeout) {
         List<Map<String, Object>> messages = List.of(
             Map.of("role", "system", "content", textSystemPrompt()),
             Map.of("role", "user", "content", scene + "：\n" + text)
         );
-        return callDashScope(textModel, messages);
+        return callDashScope(textModel, messages, timeout);
     }
 
     private ModerationResult moderateImage(String imageUrl, String scene) {
@@ -114,10 +152,10 @@ public class ContentModerationService {
             Map.of("role", "system", "content", imageSystemPrompt()),
             Map.of("role", "user", "content", userContent)
         );
-        return callDashScope(imageModel, messages);
+        return callDashScope(imageModel, messages, Duration.ofSeconds(15));
     }
 
-    private ModerationResult callDashScope(String model, List<Map<String, Object>> messages) {
+    private ModerationResult callDashScope(String model, List<Map<String, Object>> messages, Duration timeout) {
         Map<String, Object> payload = Map.of(
             "model", model,
             "messages", messages,
@@ -127,7 +165,7 @@ public class ContentModerationService {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/chat/completions"))
-                .timeout(Duration.ofSeconds(15))
+                .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey)
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
