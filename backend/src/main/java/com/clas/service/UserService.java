@@ -14,6 +14,7 @@ import com.clas.dto.RegisterRequest;
 import com.clas.dto.ResetPasswordRequest;
 import com.clas.dto.SendCodeRequest;
 import com.clas.entity.User;
+import com.clas.entity.UserPenalty;
 import com.clas.entity.UserRole;
 import com.clas.mapper.UserMapper;
 import com.clas.mapper.UserRoleMapper;
@@ -35,6 +36,7 @@ public class UserService {
     private final VerificationCodeStore verificationCodeStore;
     private final BCryptPasswordEncoder passwordEncoder;
     private final com.clas.common.JwtUtil jwtUtil;
+    private final PenaltyService penaltyService;
 
     @Value("${clas.demo-accounts.enabled:false}")
     private boolean demoAccountsEnabled;
@@ -43,16 +45,22 @@ public class UserService {
     private String demoAccessPassword;
 
     public UserService(UserMapper userMapper, UserRoleMapper userRoleMapper, VerificationCodeStore verificationCodeStore,
-                       BCryptPasswordEncoder passwordEncoder, com.clas.common.JwtUtil jwtUtil) {
+                       BCryptPasswordEncoder passwordEncoder, com.clas.common.JwtUtil jwtUtil,
+                       PenaltyService penaltyService) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.verificationCodeStore = verificationCodeStore;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.penaltyService = penaltyService;
     }
 
     public LoginResponse login(LoginRequest request) {
         String phone = PhoneValidator.normalizeAndValidate(request.phone());
+        UserPenalty activeBan = penaltyService.activeAccountBan(phone);
+        if (activeBan != null) {
+            throw accountBanned(activeBan);
+        }
         User user = userMapper.selectById(phone);
         if (user == null) throw new BusinessException("手机号或密码错误");
         String storedPassword = user.getPassword();
@@ -83,6 +91,10 @@ public class UserService {
     public LoginResponse demoLogin(DemoLoginRequest request) {
         verifyDemoAccess(request.accessPassword());
         String phone = PhoneValidator.normalizeAndValidate(request.phone());
+        UserPenalty activeBan = penaltyService.activeAccountBan(phone);
+        if (activeBan != null) {
+            throw accountBanned(activeBan);
+        }
         User user = userMapper.selectById(phone);
         if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
             throw new BusinessException("演示账号不存在或已被禁用");
@@ -265,6 +277,13 @@ public class UserService {
         if (!MessageDigest.isEqual(expected, provided)) {
             throw new BusinessException(403, "演示访问密码错误", "DEMO_ACCESS_DENIED");
         }
+    }
+
+    private BusinessException accountBanned(UserPenalty penalty) {
+        String until = penalty.getEndTime() == null ? "永久" : penalty.getEndTime().toString().replace('T', ' ');
+        return new BusinessException(403,
+            "账号已被封禁，解除时间：" + until + "。原因：" + penalty.getReason(),
+            "ACCOUNT_BANNED");
     }
 
     private boolean isSameDevice(User user, String deviceId) {

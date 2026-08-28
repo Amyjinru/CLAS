@@ -27,20 +27,24 @@ public class ChatService {
     private final OrderService orderService;
     private final MerchantMapper merchantMapper;
     private final ContentModerationService contentModerationService;
+    private final PenaltyService penaltyService;
 
     public ChatService(
         ChatMessageMapper chatMessageMapper,
         OrderService orderService,
         MerchantMapper merchantMapper,
-        ContentModerationService contentModerationService
+        ContentModerationService contentModerationService,
+        PenaltyService penaltyService
     ) {
         this.chatMessageMapper = chatMessageMapper;
         this.orderService = orderService;
         this.merchantMapper = merchantMapper;
         this.contentModerationService = contentModerationService;
+        this.penaltyService = penaltyService;
     }
 
     public ChatMessageResponse send(Long orderId, Long merchantId, String targetUserId, String userId, String role, String content) {
+        penaltyService.assertCanCommunicate(userId);
         if (orderId == null) {
             return sendDirect(merchantId, targetUserId, userId, role, content);
         }
@@ -76,6 +80,7 @@ public class ChatService {
         if (!ROLE_USER.equals(role)) {
             throw new BusinessException("仅用户可发起咨询");
         }
+        penaltyService.assertCanCommunicate(userId);
         return sendDirect(merchantId, userId, userId, role, content);
     }
 

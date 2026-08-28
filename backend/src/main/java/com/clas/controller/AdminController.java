@@ -220,8 +220,11 @@ public class AdminController {
         if (user == null) {
             throw new BusinessException("用户不存在");
         }
-        user.setEnabled(body.getOrDefault("enabled", true));
-        userMapper.updateById(user);
+        if (!body.getOrDefault("enabled", true)) {
+            throw new BusinessException("请使用账户封禁处罚接口，并提供原因和时长");
+        }
+        penaltyService.restoreAccount(phone, UserContext.getUserId());
+        user = userMapper.selectById(phone);
         user.setPassword(null);
         return Result.ok(user);
     }
@@ -323,6 +326,12 @@ public class AdminController {
     public Result<UserPenalty> applyPenalty(@PathVariable String phone, @Valid @RequestBody PenaltyRequest request) {
         PenaltyRequest payload = new PenaltyRequest(phone, request.penaltyType(), request.reason(), request.durationHours());
         return Result.ok(penaltyService.applyPenalty(payload, com.clas.config.UserContext.getUserId()));
+    }
+
+    @PostMapping("/users/{phone}/account-ban/restore")
+    public Result<Void> restoreAccountBan(@PathVariable String phone) {
+        penaltyService.restoreAccount(phone, UserContext.getUserId());
+        return Result.ok();
     }
 
     @PostMapping("/penalties/{id}/revoke")

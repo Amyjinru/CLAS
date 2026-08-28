@@ -32,10 +32,11 @@ public class RiderContactService {
     private final UserMapper users;
     private final RiderAuditLogMapper audits;
     private final ContentModerationService contentModerationService;
+    private final PenaltyService penaltyService;
 
     public RiderContactService(OrderService orderService, ChatMessageMapper messages, ChatConversationMapper conversations,
                                DeliveryCallSessionMapper calls, UserMapper users, RiderAuditLogMapper audits,
-                               ContentModerationService contentModerationService) {
+                               ContentModerationService contentModerationService, PenaltyService penaltyService) {
         this.orderService = orderService;
         this.messages = messages;
         this.conversations = conversations;
@@ -43,6 +44,7 @@ public class RiderContactService {
         this.users = users;
         this.audits = audits;
         this.contentModerationService = contentModerationService;
+        this.penaltyService = penaltyService;
     }
 
     public List<ChatMessageResponse> messages(Long orderId, String userId, String role) {
@@ -51,6 +53,7 @@ public class RiderContactService {
 
     @Transactional
     public ChatMessageResponse send(Long orderId, String userId, String role, String content) {
+        penaltyService.assertCanCommunicate(userId);
         Orders order = authorize(orderId, userId, role);
         if (!ACTIVE.contains(order.getDeliveryStatus())) throw new BusinessException("订单送达后骑手聊天仅可查看历史记录");
         String text = content == null ? "" : content.trim();

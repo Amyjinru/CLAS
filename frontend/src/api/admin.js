@@ -30,6 +30,8 @@ export const auditOrderRefundDispute = (id, payload) => api.patch(`/admin/order-
 export const listAdminUsers = (params) => api.get('/admin/users', { params }).then(unwrap)
 export const exportAdminUsers = (params) => downloadCsv('/admin/export/users', params, 'users.csv')
 export const toggleUserStatus = (id, enabled) => api.put(`/admin/users/${id}/status`, { enabled }).then(unwrap)
+export const applyUserPenalty = (phone, payload) => api.post(`/admin/users/${phone}/penalties`, payload, { silent: true }).then(unwrap)
+export const restoreAccountBan = (phone) => api.post(`/admin/users/${phone}/account-ban/restore`, null, { silent: true }).then(unwrap)
 export const listAdminReviews = (params) => api.get('/admin/reviews', { params, silent: true }).then(unwrap)
 export const exportAdminReviews = (params) => downloadCsv('/admin/export/reviews', params, 'reviews.csv')
 export const deleteAdminReview = (id) => api.delete(`/admin/reviews/${id}`, { silent: true }).then(unwrap)

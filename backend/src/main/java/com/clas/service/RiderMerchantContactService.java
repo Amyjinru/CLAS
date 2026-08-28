@@ -26,15 +26,17 @@ public class RiderMerchantContactService {
     private final ChatMessageMapper messages;
     private final ChatConversationMapper conversations;
     private final ContentModerationService contentModerationService;
+    private final PenaltyService penaltyService;
 
     public RiderMerchantContactService(OrderService orderService, MerchantMapper merchants,
                                        ChatMessageMapper messages, ChatConversationMapper conversations,
-                                       ContentModerationService contentModerationService) {
+                                       ContentModerationService contentModerationService, PenaltyService penaltyService) {
         this.orderService = orderService;
         this.merchants = merchants;
         this.messages = messages;
         this.conversations = conversations;
         this.contentModerationService = contentModerationService;
+        this.penaltyService = penaltyService;
     }
 
     public List<ChatMessageResponse> messages(Long orderId, String actorId, String role) {
@@ -48,6 +50,7 @@ public class RiderMerchantContactService {
 
     @Transactional
     public ChatMessageResponse send(Long orderId, String actorId, String role, String content) {
+        penaltyService.assertCanCommunicate(actorId);
         Orders order = authorize(orderId, actorId, role, true);
         String text = content == null ? "" : content.trim();
         if (text.isEmpty()) throw new BusinessException("消息内容不能为空");

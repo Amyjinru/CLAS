@@ -46,6 +46,14 @@ public class PenaltyService {
         }
     }
 
+    /**
+     * 交流封禁适用于所有用户主动发送的内容：评价、回复、投票和订单/咨询聊天。
+     * 读取历史记录不受影响，避免影响已存在订单的履约追溯。
+     */
+    public void assertCanCommunicate(String userId) {
+        assertCanComment(userId);
+    }
+
     public void assertCanUsePlatform(String userId) {
         if (userId == null) {
             return;
@@ -54,10 +62,28 @@ public class PenaltyService {
         if (stop != null) {
             throw new BusinessException("您的账号已被永久停止服务，无法使用平台功能");
         }
-        UserPenalty ban = findActivePenalty(userId, BAN);
-        if (ban != null) {
-            throw new BusinessException("您的账号已被封禁，暂时无法使用订餐、预约等平台功能");
+    }
+
+    public boolean isAccountOnlyRestricted(String userId) {
+        if (userId == null) {
+            return false;
         }
+        LocalDateTime now = LocalDateTime.now();
+        return userPenaltyMapper.selectOne(new LambdaQueryWrapper<UserPenalty>()
+            .eq(UserPenalty::getUserId, userId)
+            .eq(UserPenalty::getPenaltyType, SERVICE_STOP)
+            .eq(UserPenalty::getActive, true)
+            .and(w -> w.isNull(UserPenalty::getEndTime).or().gt(UserPenalty::getEndTime, now))
+            .last("LIMIT 1")) != null;
+    }
+
+    /**
+     * 账户封禁同时写入 user.enabled。登录前调用此方法可让已到期的封禁自动恢复账号。
+     */
+    @Transactional
+    public UserPenalty activeAccountBan(String userId) {
+        expireOutdatedPenalties(userId);
+        return findActivePenalty(userId, BAN);
     }
 
     public UserPenalty findActivePenalty(String userId, String type) {
@@ -115,7 +141,11 @@ public class PenaltyService {
             penalty.setEndTime(LocalDateTime.now().plusHours(hours));
         }
         userPenaltyMapper.insert(penalty);
-        notificationService.send(request.userId(), "账号处罚通知", "管理员已对您的账号执行 " + type + " 处罚：" + request.reason());
+        if (BAN.equals(type)) {
+            user.setEnabled(false);
+            userMapper.updateById(user);
+        }
+        notificationService.send(request.userId(), "账号处罚通知", "管理员已对您的账号执行 " + penaltyLabel(type) + "：" + request.reason());
         return penalty;
     }
 
@@ -127,7 +157,29 @@ public class PenaltyService {
         }
         penalty.setActive(false);
         userPenaltyMapper.updateById(penalty);
+        if (BAN.equals(penalty.getPenaltyType())) {
+            restoreAccountIfNoActiveBan(penalty.getUserId());
+        }
         notificationService.send(penalty.getUserId(), "处罚已撤销", "管理员已撤销相关处罚记录。");
+    }
+
+    @Transactional
+    public void restoreAccount(String userId, String adminId) {
+        List<UserPenalty> bans = userPenaltyMapper.selectList(new LambdaQueryWrapper<UserPenalty>()
+            .eq(UserPenalty::getUserId, userId)
+            .eq(UserPenalty::getPenaltyType, BAN)
+            .eq(UserPenalty::getActive, true));
+        for (UserPenalty ban : bans) {
+            ban.setActive(false);
+            userPenaltyMapper.updateById(ban);
+        }
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        user.setEnabled(true);
+        userMapper.updateById(user);
+        notificationService.send(userId, "账户封禁已恢复", "管理员已恢复你的账户访问权限。");
     }
 
     private void deactivatePenalties(String userId, String type) {
@@ -148,9 +200,38 @@ public class PenaltyService {
             .eq(UserPenalty::getActive, true)
             .isNotNull(UserPenalty::getEndTime)
             .le(UserPenalty::getEndTime, now));
+        boolean accountBanExpired = false;
         for (UserPenalty item : expired) {
             item.setActive(false);
             userPenaltyMapper.updateById(item);
+            accountBanExpired = accountBanExpired || BAN.equals(item.getPenaltyType());
         }
+        if (accountBanExpired) {
+            restoreAccountIfNoActiveBan(userId);
+        }
+    }
+
+    private void restoreAccountIfNoActiveBan(String userId) {
+        Long activeBanCount = userPenaltyMapper.selectCount(new LambdaQueryWrapper<UserPenalty>()
+            .eq(UserPenalty::getUserId, userId)
+            .eq(UserPenalty::getPenaltyType, BAN)
+            .eq(UserPenalty::getActive, true)
+            .and(w -> w.isNull(UserPenalty::getEndTime).or().gt(UserPenalty::getEndTime, LocalDateTime.now())));
+        if (activeBanCount == 0) {
+            User user = userMapper.selectById(userId);
+            if (user != null && Boolean.FALSE.equals(user.getEnabled())) {
+                user.setEnabled(true);
+                userMapper.updateById(user);
+            }
+        }
+    }
+
+    private String penaltyLabel(String type) {
+        return switch (type) {
+            case MUTE -> "交流封禁";
+            case BAN -> "账户封禁";
+            case SERVICE_STOP -> "仅保留账户信息";
+            default -> type;
+        };
     }
 }
