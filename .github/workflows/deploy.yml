@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force_test_failure:
+        description: "仅用于验收流水线阻断能力，不会发布或部署"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -24,6 +30,12 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v5
+
+      - name: Verify failure gate can stop delivery
+        if: ${{ inputs.force_test_failure }}
+        run: |
+          echo "Intentional verification failure: publish and deploy must not run."
+          exit 1
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -55,7 +67,7 @@ jobs:
 
       - name: Upload verification reports
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: verification-reports-${{ github.sha }}
           path: |
@@ -106,7 +118,7 @@ jobs:
           docker image inspect "$image" --format '{{index .RepoDigests 0}}' | tee database-image.txt
 
       - name: Upload image references
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: image-references-${{ github.sha }}
           path: |
@@ -190,7 +202,7 @@ jobs:
 
       - name: Upload deployment diagnostics
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: k3s-diagnostics-${{ github.sha }}
           path: ${{ runner.temp }}/k8s-diagnostics/
