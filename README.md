@@ -184,6 +184,20 @@ npm run dev
 ```powershell
 Copy-Item .env.example .env
 # 编辑 .env，至少填写 MYSQL_PASSWORD、MYSQL_ROOT_PASSWORD、JWT_SECRET、RIDER_IDENTITY_ENCRYPTION_KEY
+```
+
+若本机访问 Docker Hub 出现 TLS 证书错误（`x509: certificate signed by unknown authority`），先通过镜像加速拉取并标记基础镜像：
+
+```powershell
+.\scripts\pull-base-images.ps1
+docker compose --env-file .env build --pull=false
+docker compose --env-file .env up -d
+.\scripts\compose.ps1 smoke
+```
+
+否则可直接：
+
+```powershell
 .\scripts\compose.ps1 up
 .\scripts\compose.ps1 smoke
 ```
