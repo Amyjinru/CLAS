@@ -23,7 +23,7 @@ for name in "${required[@]}"; do
 done
 
 collect() {
-  "$PROJECT_ROOT/scripts/k8s/collect-diagnostics.sh" "$ARTIFACT_DIR" || true
+  bash "$PROJECT_ROOT/scripts/k8s/collect-diagnostics.sh" "$ARTIFACT_DIR" || true
 }
 trap collect ERR
 
@@ -90,6 +90,6 @@ fi
 
 kubectl apply -f "$PROJECT_ROOT/k8s/ingress.yaml"
 sleep 5
-curl -fsS --retry 5 --retry-delay 3 "$PUBLIC_URL/api/health"
+curl -fsS --retry 20 --retry-all-errors --retry-delay 3 --max-time 10 "$PUBLIC_URL/api/health"
 
 echo "Deployment succeeded with image tag: $IMAGE_TAG"
