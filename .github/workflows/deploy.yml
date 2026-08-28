@@ -149,8 +149,9 @@ jobs:
       - name: Deploy tested image version through server-local k3s API
         run: |
           deploy_env="/tmp/clas-deploy.env"
-          sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
-          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
+          ssh_options="-o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+          sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
+          sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
           trap 'rm -f "$deploy_env"' EXIT
@@ -172,7 +173,7 @@ jobs:
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/k8s-diagnostics"
-          sshpass -p "$SSH_PASSWORD" scp -r -o StrictHostKeyChecking=no \
+          sshpass -p "$SSH_PASSWORD" scp -r -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
             "root@${SERVER_HOST}:/opt/clas-k8s/artifacts/k8s-diagnostics/." "$RUNNER_TEMP/k8s-diagnostics/" || true
 
       - name: Upload deployment diagnostics
