@@ -20,7 +20,16 @@ MYSQL_HOST="${MYSQL_HOST:-127.0.0.1}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-clas}"
 
-MYSQL_ARGS=(--skip-ssl -u "$MYSQL_USER" -h "$MYSQL_HOST" -P "$MYSQL_PORT")
+MYSQL_TLS_OPTION="${MYSQL_TLS_OPTION:-}"
+if [ -z "$MYSQL_TLS_OPTION" ]; then
+  if mysql --version 2>/dev/null | grep -qi 'mariadb'; then
+    MYSQL_TLS_OPTION='--skip-ssl'
+  else
+    MYSQL_TLS_OPTION='--ssl-mode=DISABLED'
+  fi
+fi
+
+MYSQL_ARGS=("$MYSQL_TLS_OPTION" -u "$MYSQL_USER" -h "$MYSQL_HOST" -P "$MYSQL_PORT")
 if [ -n "$MYSQL_PASSWORD" ]; then
   MYSQL_ARGS+=("-p${MYSQL_PASSWORD}")
 fi
