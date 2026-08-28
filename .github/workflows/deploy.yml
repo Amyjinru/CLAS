@@ -148,6 +148,21 @@ jobs:
             frontend-image.txt
             database-image.txt
 
+      - name: Package tested images for server import
+        run: |
+          docker save \
+            "${REGISTRY}/${IMAGE_OWNER}/clas-backend:${GITHUB_SHA}" \
+            "${REGISTRY}/${IMAGE_OWNER}/clas-frontend:${GITHUB_SHA}" \
+            "${REGISTRY}/${IMAGE_OWNER}/clas-database:${GITHUB_SHA}" \
+            | gzip -1 > "clas-images-${GITHUB_SHA}.tar.gz"
+
+      - name: Upload deployable image archive
+        uses: actions/upload-artifact@v6
+        with:
+          name: deployable-images-${{ github.sha }}
+          path: clas-images-${{ github.sha }}.tar.gz
+          retention-days: 7
+
   deploy:
     name: Deploy immutable version to k3s
     needs: publish
@@ -166,6 +181,12 @@ jobs:
       CLAS_DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
       CLAS_IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
     steps:
+      - name: Download deployable image archive
+        uses: actions/download-artifact@v6
+        with:
+          name: deployable-images-${{ github.sha }}
+          path: ${{ runner.temp }}/clas-images
+
       - name: Prepare secret deployment input
         run: |
           test -n "$SSH_PASSWORD" || { echo 'SSH_PASSWORD is required'; exit 1; }
@@ -195,16 +216,19 @@ jobs:
       - name: Deploy tested image version through server-local k3s API
         run: |
           deploy_env="/tmp/clas-deploy.env"
+          image_archive="/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
           ssh_options="-o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
           sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
+          sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-images/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "root@${SERVER_HOST}:$image_archive"
           sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
-          trap 'rm -f "$deploy_env"' EXIT
           set -a
           . /etc/clas/clas.env
           . "$deploy_env"
           set +a
+          image_archive="/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
+          trap 'rm -f "$deploy_env" "$image_archive"' EXIT
           if [ ! -d /opt/clas-k8s/.git ]; then
             git clone --origin upstream https://github.com/Amyjinru/CLAS.git /opt/clas-k8s
           fi
@@ -212,20 +236,8 @@ jobs:
           git fetch upstream main
           git checkout --detach "$CLAS_IMAGE_TAG"
           test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"
-          pull_image() {
-            local image="$1"
-            for attempt in 1 2 3; do
-              if timeout 180 k3s ctr -n k8s.io images pull \
-                --user "${GHCR_USERNAME}:${GHCR_TOKEN}" "$image"; then
-                return 0
-              fi
-              echo "Image pull attempt ${attempt} failed: ${image}" >&2
-            done
-            return 1
-          }
-          pull_image "ghcr.io/amyjinru/clas-database:${CLAS_IMAGE_TAG}"
-          pull_image "ghcr.io/amyjinru/clas-backend:${CLAS_IMAGE_TAG}"
-          pull_image "ghcr.io/amyjinru/clas-frontend:${CLAS_IMAGE_TAG}"
+          test -s "$image_archive"
+          k3s ctr -n k8s.io images import "$image_archive"
           bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
           REMOTE
 
