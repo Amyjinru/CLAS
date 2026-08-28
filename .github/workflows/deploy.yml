@@ -66,24 +66,25 @@ jobs:
         run: npm run build
 
       - name: Run clean Docker Compose smoke test
-        env:
-          MYSQL_DATABASE: clas
-          MYSQL_USER: clas
-          MYSQL_PASSWORD: clas-test-password
-          MYSQL_ROOT_PASSWORD: clas-root-password
-          JWT_SECRET: 0123456789abcdef0123456789abcdef
-          RIDER_IDENTITY_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef
         run: |
-          docker compose up --build --detach --wait --wait-timeout 240
+          {
+            echo "MYSQL_DATABASE=clas"
+            echo "MYSQL_USER=clas"
+            echo "MYSQL_PASSWORD=clas-test-password"
+            echo "MYSQL_ROOT_PASSWORD=clas-root-password"
+            echo "JWT_SECRET=0123456789abcdef0123456789abcdef"
+            echo "RIDER_IDENTITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef"
+          } > ci-compose.env
+          docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240
           pwsh -File scripts/compose-smoke.ps1
 
       - name: Collect Compose diagnostics
         if: always()
-        run: docker compose logs --no-color > compose.log || true
+        run: docker compose --env-file ci-compose.env logs --no-color > compose.log || true
 
       - name: Stop Compose test environment
         if: always()
-        run: docker compose down --volumes --remove-orphans || true
+        run: docker compose --env-file ci-compose.env down --volumes --remove-orphans || true
 
       - name: Upload verification reports
         if: always()
