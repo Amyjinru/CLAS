@@ -299,6 +299,14 @@ bash scripts/k8s/install-k3s.sh
 CLAS_IMAGE_TAG=<git-sha> bash scripts/k8s/deploy.sh
 ```
 
+首次从现网 MySQL 切换时，必须先完成 `mysqldump` 备份；仅在确认导入目标为空 PVC 后，显式指定备份文件恢复，避免误覆盖已有 k3s 数据库：
+
+```bash
+CLAS_IMAGE_TAG=<git-sha> CLAS_DATABASE_RESTORE_FILE=/opt/clas-backups/<时间戳>/clas.sql.gz bash scripts/k8s/deploy.sh
+```
+
+未设置 `CLAS_DATABASE_RESTORE_FILE` 时，部署脚本绝不会导入或覆盖数据库。
+
 部署清单位于 `k8s/`：MySQL 使用官方镜像和 PVC，后端使用 `/api/health` 作为 readiness/liveness probe，Ingress 在当前公网 IP `http://8.141.112.182/` 暴露前端。当前入口没有 DNS 域名，故仅提供 HTTP；获得域名后可在 `k8s/ingress.yaml` 增加 Host 与 TLS 配置。
 
 ## 文档与协作
