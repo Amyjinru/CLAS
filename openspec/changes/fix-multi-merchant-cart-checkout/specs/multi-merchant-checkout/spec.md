@@ -43,3 +43,18 @@ The system SHALL route successful cart checkout directly to a payment page that 
 #### Scenario: Retry after partial outcome
 - **WHEN** some orders are already paid and others remain payable
 - **THEN** retry processes only unpaid orders and does not duplicate stock deduction or coupon use for paid orders
+
+### Requirement: Complete location-aware delivery information
+The checkout SHALL prefer the user's current automatically located or manually selected position over a saved default address, SHALL allow that position to be edited with the same automatic-location and province/city/district selector used by profile addresses, and MUST require an address, contact name, and contact phone before order creation or payment.
+
+#### Scenario: Current position is available
+- **WHEN** checkout opens and a current located or manually selected position exists
+- **THEN** that position is selected as the delivery destination before any saved default address
+
+#### Scenario: User edits a temporary delivery position
+- **WHEN** the user chooses to modify the checkout destination
+- **THEN** the system offers automatic location and manual province/city/district plus detailed street selection and uses the confirmed coordinates for delivery validation
+
+#### Scenario: Required delivery information is incomplete
+- **WHEN** the address, contact name, or contact phone is blank or the temporary destination has no confirmed coordinates
+- **THEN** order creation and payment are blocked with a field-specific message

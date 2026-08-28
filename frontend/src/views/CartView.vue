@@ -7,6 +7,8 @@ import {
 } from '../api/clas'
 import { useCartActions } from '../composables/useCartActions'
 import { isCheckoutReady, preferredProductIds } from '../utils/checkout'
+import { getCurrentLocation, locationFromAddress, setCurrentLocation } from '../utils/locationStore'
+import LocationSelector from '../components/LocationSelector.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -22,6 +24,12 @@ const pendingFoodOrders = ref([])
 const pendingDealOrders = ref([])
 const addresses = ref([])
 const selectedAddressId = ref('')
+const deliveryAddress = ref('')
+const deliveryContactName = ref('')
+const deliveryContactPhone = ref('')
+const checkoutLocation = ref(null)
+const locationDraft = ref(null)
+const locationDialogVisible = ref(false)
 const orderRemark = ref('')
 const claimableCoupons = ref([])
 const submitting = ref(false)
@@ -61,7 +69,12 @@ const canSubmit = computed(() => isCheckoutReady({
   submitting: submitting.value,
   loadingIds: previewLoadingIds.value,
   previews: previews.value,
-  errors: previewErrors.value
+  errors: previewErrors.value,
+  deliveryAddress: deliveryAddress.value,
+  contactName: deliveryContactName.value,
+  contactPhone: deliveryContactPhone.value,
+  deliveryLongitude: checkoutLocation.value?.longitude,
+  deliveryLatitude: checkoutLocation.value?.latitude
 }))
 
 function validItems(group) {
@@ -134,12 +147,12 @@ async function loadMerchantPreview(merchantId) {
   setPreviewLoading(merchantId, true)
   try {
     let couponId = selectedCoupons.value[merchantId] || undefined
-    let preview = await previewOrder(merchantId, selectedAddressId.value || undefined, couponId, productIds)
+    let preview = await previewOrder(merchantId, selectedAddressId.value || undefined, couponId, productIds, checkoutLocation.value)
     if (previewRequests.get(merchantId) !== requestId) return
     if (couponId && !(preview.availableCoupons || []).some((coupon) => String(coupon.id) === String(couponId))) {
       selectedCoupons.value = { ...selectedCoupons.value, [merchantId]: '' }
       couponId = undefined
-      preview = await previewOrder(merchantId, selectedAddressId.value || undefined, couponId, productIds)
+      preview = await previewOrder(merchantId, selectedAddressId.value || undefined, couponId, productIds, checkoutLocation.value)
       if (previewRequests.get(merchantId) !== requestId) return
     }
     previews.value = { ...previews.value, [merchantId]: preview }
@@ -193,12 +206,57 @@ async function load() {
     pendingFoodOrders.value = orderList.filter((entry) => entry.order.status === 'PENDING_PAYMENT')
     pendingDealOrders.value = dealList.filter((entry) => entry.status === 'PENDING_PAYMENT')
     addresses.value = addressList
-    selectedAddressId.value = addresses.value.find((item) => item.isDefault)?.id || addresses.value[0]?.id || ''
+    const fallbackAddress = addresses.value.find((item) => item.isDefault) || addresses.value[0]
+    const currentLocation = getCurrentLocation()
+    if (currentLocation) {
+      selectedAddressId.value = ''
+      applyCheckoutLocation(currentLocation)
+      deliveryContactName.value = fallbackAddress?.contactName || ''
+      deliveryContactPhone.value = fallbackAddress?.phone || ''
+    } else {
+      selectedAddressId.value = fallbackAddress?.id || ''
+      syncDeliveryFields(selectedAddressId.value)
+    }
     message.value = ''
     await loadAllSelectedPreviews()
   } catch {
     message.value = '请先登录后查看购物车'
   }
+}
+
+function syncDeliveryFields(addressId) {
+  const address = addresses.value.find((item) => String(item.id) === String(addressId))
+  if (address) {
+    checkoutLocation.value = locationFromAddress(address)
+    deliveryAddress.value = checkoutLocation.value?.address || ''
+    deliveryContactName.value = address.contactName || ''
+    deliveryContactPhone.value = address.phone || ''
+    return
+  }
+  const currentLocation = getCurrentLocation()
+  applyCheckoutLocation(currentLocation)
+  if (!currentLocation) openLocationDialog()
+}
+
+function applyCheckoutLocation(location) {
+  checkoutLocation.value = location ? { ...location } : null
+  deliveryAddress.value = location?.address || ''
+}
+
+function openLocationDialog() {
+  locationDraft.value = checkoutLocation.value ? { ...checkoutLocation.value } : {
+    province: '', city: '', district: '', street: '', address: '', longitude: null, latitude: null, source: 'manual'
+  }
+  locationDialogVisible.value = true
+}
+
+async function confirmCheckoutLocation(location) {
+  const confirmed = setCurrentLocation(location)
+  if (!confirmed) return
+  selectedAddressId.value = ''
+  applyCheckoutLocation(confirmed)
+  locationDialogVisible.value = false
+  await loadAllSelectedPreviews()
 }
 
 async function submit() {
@@ -207,6 +265,11 @@ async function submit() {
   try {
     const data = await createOrderBatch({
       addressId: selectedAddressId.value || undefined,
+      deliveryAddress: selectedAddressId.value ? undefined : deliveryAddress.value.trim(),
+      deliveryContactName: deliveryContactName.value.trim(),
+      deliveryContactPhone: deliveryContactPhone.value.trim(),
+      deliveryLongitude: selectedAddressId.value ? undefined : checkoutLocation.value?.longitude,
+      deliveryLatitude: selectedAddressId.value ? undefined : checkoutLocation.value?.latitude,
       remark: orderRemark.value.trim() || undefined,
       merchantGroups: selectedGroups.value.map((group) => ({
         merchantId: group.merchantId,
@@ -260,7 +323,10 @@ function pendingProduct(order) {
   return (order.products || []).find((product) => product.id === firstItem?.productId) || null
 }
 
-watch(selectedAddressId, loadAllSelectedPreviews)
+watch(selectedAddressId, async (addressId) => {
+  syncDeliveryFields(addressId)
+  await loadAllSelectedPreviews()
+})
 onMounted(async () => { await loadClaimableCoupons(); await load() })
 </script>
 
@@ -329,9 +395,17 @@ onMounted(async () => { await loadClaimableCoupons(); await load() })
 
       <aside v-if="items.length" class="cart-sidebar">
         <footer class="checkout-panel">
-          <label class="field-block"><span>配送地址（可选）</span><select v-model="selectedAddressId"><option value="">暂不选择配送地址</option><option v-for="address in addresses" :key="address.id" :value="address.id">{{ address.contactName }} · {{ address.address }}</option></select></label>
-          <p v-if="!addresses.length" class="address-hint">尚未添加常用地址，可继续提交订单，后续与商家确认配送信息。</p>
-          <p v-else-if="!selectedAddressId" class="address-hint">未选择地址，仍可继续提交订单。</p>
+          <label class="field-block"><span>配送地址</span><select v-model="selectedAddressId"><option value="">当前定位/手动选择的地址</option><option v-for="address in addresses" :key="address.id" :value="address.id">{{ address.contactName }} · {{ address.address }}</option></select></label>
+          <div class="current-delivery-address">
+            <div>
+              <strong>{{ deliveryAddress || '尚未选择配送位置' }}</strong>
+              <small>{{ selectedAddressId ? '已保存的收货地址' : (checkoutLocation?.source === 'auto' ? '当前自动定位' : '当前手动选择') }}</small>
+            </div>
+            <el-button type="primary" plain @click="openLocationDialog">{{ deliveryAddress ? '修改地址' : '选择地址' }}</el-button>
+          </div>
+          <p v-if="!addresses.length" class="address-hint">没有常用地址也可以下单，请先定位或手动选择省市区。</p>
+          <label class="field-block"><span>联系人</span><input v-model.trim="deliveryContactName" maxlength="50" placeholder="请输入联系人姓名" /></label>
+          <label class="field-block"><span>联系电话</span><input v-model.trim="deliveryContactPhone" maxlength="20" inputmode="tel" placeholder="请输入联系电话" /></label>
           <label class="field-block"><span>订单备注</span><textarea v-model="orderRemark" rows="2" placeholder="所有店铺共用（可选）" /></label>
           <section v-for="group in selectedGroups" :key="`summary-${group.merchantId}`" class="merchant-summary">
             <h3>{{ group.merchantName }}</h3>
@@ -351,11 +425,15 @@ onMounted(async () => { await loadClaimableCoupons(); await load() })
         </footer>
       </aside>
     </div>
+    <el-dialog v-model="locationDialogVisible" title="选择配送位置" width="min(760px, 94vw)" destroy-on-close>
+      <LocationSelector v-if="locationDialogVisible" v-model="locationDraft" @confirm="confirmCheckoutLocation" />
+    </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.cart-page{width:100%}.cart-header h1{margin:0;font-size:26px}.cart-header p,.section-title span,.merchant-header span{color:var(--text-secondary);font-size:13px}.cart-main{min-width:0}.section-title{align-items:baseline;display:flex;gap:10px;margin:24px 0 12px}.section-title.compact{margin-top:8px}.section-title h2{font-size:18px;margin:0}.pending-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.pending-card{background:var(--color-primary-light);border:1px solid var(--color-primary-soft);border-radius:var(--radius-lg);padding:16px 18px}.pending-card p{color:var(--text-secondary);font-size:13px;margin:6px 0 0}.pending-content{align-items:center;display:flex;gap:12px;min-width:0}.pending-thumb,.cart-thumb{align-items:center;background:var(--bg-card);border-radius:var(--radius-sm);color:var(--color-primary);display:flex;flex:0 0 auto;font-size:20px;font-weight:700;height:64px;justify-content:center;overflow:hidden;width:72px}.pending-thumb img,.cart-thumb img{height:100%;object-fit:cover;width:100%}.pending-thumb.deal-thumb img{object-fit:contain}.pending-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}.pay-btn,.cancel-btn{border-radius:var(--radius-sm);font-size:13px;padding:8px 14px;text-decoration:none}.pay-btn{background:var(--color-primary);color:var(--text-primary);font-weight:600}.cancel-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);cursor:pointer}.cart-items{display:flex;flex-direction:column;gap:14px;margin-top:24px}.merchant-group{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);overflow:hidden}.merchant-header{align-items:center;background:var(--color-primary-light);display:flex;justify-content:space-between;padding:14px 18px}.cart-item{align-items:center;border-top:1px solid var(--border-color);display:grid;gap:16px;grid-template-columns:auto 88px minmax(0,1fr) auto;padding:18px}.cart-thumb{background:var(--color-primary-light);height:78px;width:88px}.cart-item.selected{background:var(--bg-page)}.cart-item.invalid{opacity:.68}.item-main{align-items:center;display:flex;justify-content:space-between;min-width:0}.item-info h3{font-size:16px;margin:0 0 5px}.item-info p{color:var(--text-muted);font-size:13px;margin:0}.item-info .invalid-tip,.checkout-tip{color:var(--clas-warning)}.item-price{color:var(--clas-amber-600);font-size:18px;margin-left:18px;white-space:nowrap}.cart-actions{align-items:center;display:flex;gap:10px}.quantity-field{align-items:center;color:var(--text-secondary);display:flex;font-size:13px;gap:6px}.quantity-field input{background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);padding:6px;text-align:center;width:62px}.delete-btn{background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--clas-error);cursor:pointer;padding:7px 12px}.delete-btn:disabled,.submit-btn:disabled{cursor:not-allowed;opacity:.55}.invalid-actions{align-items:center;display:flex;justify-content:space-between}.invalid-actions p{color:var(--clas-warning);margin:0}.cart-empty{color:var(--text-muted);padding:48px 0;text-align:center}.cart-message{color:var(--clas-warning)}.cart-sidebar{min-width:0}.checkout-panel{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:14px;padding:20px;position:sticky;top:88px}.field-block{display:flex;flex-direction:column;gap:7px}.field-block>span{color:var(--text-secondary);font-size:13px;font-weight:600}.field-block select,.field-block textarea{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font:inherit;padding:9px 10px;width:100%}.field-block textarea{resize:vertical}.address-hint{background:var(--color-primary-light);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:12px;line-height:1.6;margin:-6px 0 0;padding:8px 10px}.merchant-summary{border-top:1px solid var(--border-color);padding-top:13px}.merchant-summary h3{font-size:14px;margin:0 0 10px}.compact-field{margin-bottom:10px}.breakdown-row{color:var(--text-secondary);display:flex;font-size:13px;justify-content:space-between;margin-top:6px}.breakdown-row.discount{color:var(--clas-success)}.checkout-tip{font-size:13px;margin:8px 0 0}.claimable-coupons{background:var(--clas-warning-light);border-radius:var(--radius-sm);padding:10px 12px}.claimable-coupons p{color:var(--text-secondary);font-size:13px;margin:0 0 8px}.claimable-coupons div{align-items:center;display:flex;font-size:13px;justify-content:space-between}.claimable-coupons div+div{margin-top:6px}button.compact{font-size:12px;padding:4px 10px}.checkout-total{align-items:flex-end;border-top:1px solid var(--border-color);display:flex;flex-direction:column;gap:4px;padding-top:14px}.checkout-total span{color:var(--text-secondary);font-size:13px}.checkout-total strong{color:var(--clas-amber-600);font-size:26px}.submit-btn{background:var(--color-primary);border:0;border-radius:var(--radius-sm);color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:700;min-height:44px}
+.cart-page{width:100%}.cart-header h1{margin:0;font-size:26px}.cart-header p,.section-title span,.merchant-header span{color:var(--text-secondary);font-size:13px}.cart-main{min-width:0}.section-title{align-items:baseline;display:flex;gap:10px;margin:24px 0 12px}.section-title.compact{margin-top:8px}.section-title h2{font-size:18px;margin:0}.pending-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.pending-card{background:var(--color-primary-light);border:1px solid var(--color-primary-soft);border-radius:var(--radius-lg);padding:16px 18px}.pending-card p{color:var(--text-secondary);font-size:13px;margin:6px 0 0}.pending-content{align-items:center;display:flex;gap:12px;min-width:0}.pending-thumb,.cart-thumb{align-items:center;background:var(--bg-card);border-radius:var(--radius-sm);color:var(--color-primary);display:flex;flex:0 0 auto;font-size:20px;font-weight:700;height:64px;justify-content:center;overflow:hidden;width:72px}.pending-thumb img,.cart-thumb img{height:100%;object-fit:cover;width:100%}.pending-thumb.deal-thumb img{object-fit:contain}.pending-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}.pay-btn,.cancel-btn{border-radius:var(--radius-sm);font-size:13px;padding:8px 14px;text-decoration:none}.pay-btn{background:var(--color-primary);color:var(--text-primary);font-weight:600}.cancel-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);cursor:pointer}.cart-items{display:flex;flex-direction:column;gap:14px;margin-top:24px}.merchant-group{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);overflow:hidden}.merchant-header{align-items:center;background:var(--color-primary-light);display:flex;justify-content:space-between;padding:14px 18px}.cart-item{align-items:center;border-top:1px solid var(--border-color);display:grid;gap:16px;grid-template-columns:auto 88px minmax(0,1fr) auto;padding:18px}.cart-thumb{background:var(--color-primary-light);height:78px;width:88px}.cart-item.selected{background:var(--bg-page)}.cart-item.invalid{opacity:.68}.item-main{align-items:center;display:flex;justify-content:space-between;min-width:0}.item-info h3{font-size:16px;margin:0 0 5px}.item-info p{color:var(--text-muted);font-size:13px;margin:0}.item-info .invalid-tip,.checkout-tip{color:var(--clas-warning)}.item-price{color:var(--clas-amber-600);font-size:18px;margin-left:18px;white-space:nowrap}.cart-actions{align-items:center;display:flex;gap:10px}.quantity-field{align-items:center;color:var(--text-secondary);display:flex;font-size:13px;gap:6px}.quantity-field input{background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);padding:6px;text-align:center;width:62px}.delete-btn{background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--clas-error);cursor:pointer;padding:7px 12px}.delete-btn:disabled,.submit-btn:disabled{cursor:not-allowed;opacity:.55}.invalid-actions{align-items:center;display:flex;justify-content:space-between}.invalid-actions p{color:var(--clas-warning);margin:0}.cart-empty{color:var(--text-muted);padding:48px 0;text-align:center}.cart-message{color:var(--clas-warning)}.cart-sidebar{min-width:0}.checkout-panel{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:14px;padding:20px;position:sticky;top:88px}.field-block{display:flex;flex-direction:column;gap:7px}.field-block>span{color:var(--text-secondary);font-size:13px;font-weight:600}.field-block input,.field-block select,.field-block textarea{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font:inherit;padding:9px 10px;width:100%}.field-block textarea{resize:vertical}.address-hint{background:var(--color-primary-light);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:12px;line-height:1.6;margin:-6px 0 0;padding:8px 10px}.merchant-summary{border-top:1px solid var(--border-color);padding-top:13px}.merchant-summary h3{font-size:14px;margin:0 0 10px}.compact-field{margin-bottom:10px}.breakdown-row{color:var(--text-secondary);display:flex;font-size:13px;justify-content:space-between;margin-top:6px}.breakdown-row.discount{color:var(--clas-success)}.checkout-tip{font-size:13px;margin:8px 0 0}.claimable-coupons{background:var(--clas-warning-light);border-radius:var(--radius-sm);padding:10px 12px}.claimable-coupons p{color:var(--text-secondary);font-size:13px;margin:0 0 8px}.claimable-coupons div{align-items:center;display:flex;font-size:13px;justify-content:space-between}.claimable-coupons div+div{margin-top:6px}button.compact{font-size:12px;padding:4px 10px}.checkout-total{align-items:flex-end;border-top:1px solid var(--border-color);display:flex;flex-direction:column;gap:4px;padding-top:14px}.checkout-total span{color:var(--text-secondary);font-size:13px}.checkout-total strong{color:var(--clas-amber-600);font-size:26px}.submit-btn{background:var(--color-primary);border:0;border-radius:var(--radius-sm);color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:700;min-height:44px}
+.current-delivery-address{align-items:flex-start;background:var(--color-primary-light);border:1px solid var(--color-primary-soft);border-radius:var(--radius-sm);display:flex;gap:12px;justify-content:space-between;padding:11px 12px}.current-delivery-address>div{display:flex;flex:1;flex-direction:column;gap:5px;min-width:0}.current-delivery-address strong{font-size:13px;line-height:1.5;overflow-wrap:anywhere}.current-delivery-address small{color:var(--text-secondary)}
 @media(max-width:900px){.pending-grid{grid-template-columns:1fr}.cart-item{grid-template-columns:auto 78px minmax(0,1fr)}.cart-thumb{height:70px;width:78px}.cart-actions{grid-column:3;justify-content:flex-end}}
 @media(max-width:640px){.cart-item{align-items:flex-start;gap:12px;grid-template-columns:auto 64px minmax(0,1fr)}.cart-thumb{height:60px;width:64px}.item-main{align-items:flex-start;flex-direction:column;gap:8px}.item-price{margin-left:0}.cart-actions{flex-wrap:wrap;grid-column:3;justify-content:flex-start}.quantity-field{font-size:0}.quantity-field input{font-size:13px}}
 </style>

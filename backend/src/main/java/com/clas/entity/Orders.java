@@ -25,6 +25,8 @@ public class Orders {
     private Long userCouponId;
     private String status;
     private String deliveryAddress;
+    private String deliveryContactName;
+    private String deliveryContactPhone;
     private BigDecimal deliveryLongitude;
     private BigDecimal deliveryLatitude;
     private Integer distanceMeters;

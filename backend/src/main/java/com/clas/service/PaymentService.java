@@ -66,6 +66,7 @@ public class PaymentService {
             }
             throw new BusinessException("订单当前不可支付，状态：" + order.getStatus());
         }
+        orderService.assertReadyForPayment(order);
 
         return paymentRepository.findSuccessfulByOrderId(order.getId())
             .map(payment -> {

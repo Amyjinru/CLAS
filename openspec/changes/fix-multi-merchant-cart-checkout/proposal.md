@@ -9,6 +9,7 @@ The current cart submits every item from the first merchant, provides no selecti
 - Create one order per selected merchant in a single transaction and route directly to an aggregate payment page.
 - Add aggregate payment status and payment submission while preserving existing single-order APIs.
 - Classify paid, not-yet-delivered orders under “待收货/使用” consistently in the order list and personal-center count.
+- Require complete delivery address, contact, and phone data before payment; prefer the user's current located/manually selected position and reuse the profile address location selector for checkout edits.
 
 ## Capabilities
 
@@ -24,4 +25,4 @@ The current cart submits every item from the first merchant, provides no selecti
 - Backend cart, order, and payment DTOs, controllers, and services.
 - Frontend cart, payment, order list, personal center, API wrappers, and router.
 - Integration tests for selected-item checkout, rollback, aggregate payment, and status filtering.
-- No new third-party dependencies or required database migration.
+- No new third-party dependencies. Orders persist contact snapshots through an additive database migration.

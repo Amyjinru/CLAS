@@ -223,6 +223,8 @@ CREATE TABLE orders (
     user_coupon_id BIGINT,
     status VARCHAR(20) NOT NULL,
     delivery_address VARCHAR(255),
+    delivery_contact_name VARCHAR(50),
+    delivery_contact_phone VARCHAR(20),
     delivery_longitude DECIMAL(10,6),
     delivery_latitude DECIMAL(10,6),
     distance_meters INT,

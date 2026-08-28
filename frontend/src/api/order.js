@@ -1,10 +1,13 @@
 import { api, unwrap } from './client'
 
-export const previewOrder = (merchantId, addressId, userCouponId, productIds) =>
+export const previewOrder = (merchantId, addressId, userCouponId, productIds, location) =>
   api.get('/order/preview', {
     params: {
       merchantId,
       addressId,
+      deliveryAddress: addressId ? undefined : location?.address,
+      deliveryLongitude: addressId ? undefined : location?.longitude,
+      deliveryLatitude: addressId ? undefined : location?.latitude,
       userCouponId,
       productIds: productIds?.length ? productIds.join(',') : undefined
     }

@@ -32,3 +32,10 @@
 
 - [x] 6.1 Reproduce and fix the GitHub Actions Java toolchain mismatch
 - [x] 6.2 Start the backend and frontend locally and verify the changed user flows in a real browser
+
+## 7. Location-aware checkout follow-up
+
+- [x] 7.1 Prefer the current location store in checkout and reuse the profile location selector for automatic or province/city/district address edits
+- [x] 7.2 Submit temporary destination coordinates and enforce address, contact, and phone completeness during order creation and payment
+- [x] 7.3 Add frontend and backend regression coverage for location-aware required delivery information
+- [x] 7.4 Run backend tests and frontend tests/build, fixing regressions

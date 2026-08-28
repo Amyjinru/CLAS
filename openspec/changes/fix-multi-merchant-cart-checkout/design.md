@@ -38,6 +38,10 @@ The cart response includes `merchantName`, loaded in bulk with the product data.
 
 A shared utility accepts an order and returns true only for `PAID` or `ACCEPTED`, not delivered, not canceled/rejected/refunded, and without an active refund. `OrdersView` and `ProfileView` both use it; unused deal vouchers retain their existing personal-center count.
 
+### Checkout reuses the canonical location selector
+
+Checkout initializes from the current location store before falling back to the default saved address. Editing a temporary delivery location opens the same `LocationSelector` used by profile addresses, including automatic geolocation, province/city/district selection, detailed street input, and geocoding. Temporary address coordinates are submitted and validated like saved-address coordinates so previews and order creation use the actual destination. Contact name and phone remain editable order snapshots and are mandatory before order creation or payment.
+
 ## Risks / Trade-offs
 
 - [Risk] Frequent selection changes can issue stale preview requests. → Track a per-merchant request sequence and ignore late responses.

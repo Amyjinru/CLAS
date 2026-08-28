@@ -72,7 +72,11 @@ public class OrderController {
             request.deliveryAddress(),
             request.remark(),
             request.userCouponId(),
-            request.productIds()
+            request.productIds(),
+            request.deliveryContactName(),
+            request.deliveryContactPhone(),
+            request.deliveryLongitude(),
+            request.deliveryLatitude()
         )));
     }
 
@@ -87,10 +91,16 @@ public class OrderController {
     public Result<OrderPreviewResponse> preview(
         @RequestParam Long merchantId,
         @RequestParam(required = false) Long addressId,
+        @RequestParam(required = false) String deliveryAddress,
+        @RequestParam(required = false) java.math.BigDecimal deliveryLongitude,
+        @RequestParam(required = false) java.math.BigDecimal deliveryLatitude,
         @RequestParam(required = false) Long userCouponId,
         @RequestParam(required = false) List<Long> productIds
     ) {
-        return Result.ok(orderService.previewCheckout(currentUserId(), merchantId, addressId, userCouponId, productIds));
+        return Result.ok(orderService.previewCheckout(
+            currentUserId(), merchantId, addressId, deliveryAddress,
+            deliveryLongitude, deliveryLatitude, userCouponId, productIds
+        ));
     }
 
     @GetMapping("/list/{userId}")

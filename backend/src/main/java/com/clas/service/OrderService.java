@@ -144,6 +144,8 @@ public class OrderService {
         order.setRemark(trimToNull(request.remark()));
         order.setStatus(STATUS_PENDING_PAYMENT);
         order.setDeliveryAddress(deliverySnapshot.address());
+        order.setDeliveryContactName(deliverySnapshot.contactName());
+        order.setDeliveryContactPhone(deliverySnapshot.contactPhone());
         order.setDeliveryLongitude(deliverySnapshot.longitude());
         order.setDeliveryLatitude(deliverySnapshot.latitude());
         order.setDistanceMeters(deliverySnapshot.distanceMeters());
@@ -218,14 +220,27 @@ public class OrderService {
                 request.deliveryAddress(),
                 request.remark(),
                 group.userCouponId(),
-                group.productIds()
+                group.productIds(),
+                request.deliveryContactName(),
+                request.deliveryContactPhone(),
+                request.deliveryLongitude(),
+                request.deliveryLatitude()
             )))
             .toList();
         int totalAmount = orders.stream().mapToInt(entry -> entry.order().getTotalPrice()).sum();
         return new CreateOrderBatchResponse(orders, totalAmount);
     }
 
-    public OrderPreviewResponse previewCheckout(String userId, Long merchantId, Long addressId, Long userCouponId, List<Long> selectedProductIds) {
+    public OrderPreviewResponse previewCheckout(
+        String userId,
+        Long merchantId,
+        Long addressId,
+        String deliveryAddress,
+        BigDecimal deliveryLongitude,
+        BigDecimal deliveryLatitude,
+        Long userCouponId,
+        List<Long> selectedProductIds
+    ) {
         Merchant merchant = requireMerchant(merchantId);
         List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, userId));
@@ -235,7 +250,10 @@ public class OrderService {
             : productMapper.selectBatchIds(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, product -> product));
         List<Cart> merchantCartItems = selectCartItems(
-            new CreateOrderRequest(userId, merchantId, addressId, null, null, userCouponId, selectedProductIds),
+            new CreateOrderRequest(
+                userId, merchantId, addressId, deliveryAddress, null, userCouponId,
+                selectedProductIds, null, null, deliveryLongitude, deliveryLatitude
+            ),
             cartItems,
             products
         );
@@ -266,10 +284,11 @@ public class OrderService {
             ? "当前商家购物车为空"
             : (minOrderGap > 0 ? "未达到起送价，还差 ¥" + String.format("%.2f", minOrderGap / 100.0) : "可以提交订单"));
 
-        if (addressId != null && canCheckout) {
+        if ((addressId != null || deliveryAddress != null) && canCheckout) {
             try {
                 DeliverySnapshot snapshot = resolveDeliverySnapshot(new CreateOrderRequest(
-                    userId, merchantId, addressId, null, null, userCouponId
+                    userId, merchantId, addressId, deliveryAddress, null, userCouponId,
+                    null, "预览联系人", "预览电话", deliveryLongitude, deliveryLatitude
                 ));
                 distanceMeters = snapshot.distanceMeters();
                 deliveryFee = calculateDeliveryFee(merchant, distanceMeters);
@@ -313,7 +332,11 @@ public class OrderService {
     }
 
     public OrderPreviewResponse previewCheckout(String userId, Long merchantId, Long addressId, Long userCouponId) {
-        return previewCheckout(userId, merchantId, addressId, userCouponId, null);
+        return previewCheckout(userId, merchantId, addressId, null, null, null, userCouponId, null);
+    }
+
+    public OrderPreviewResponse previewCheckout(String userId, Long merchantId, Long addressId, Long userCouponId, List<Long> selectedProductIds) {
+        return previewCheckout(userId, merchantId, addressId, null, null, null, userCouponId, selectedProductIds);
     }
 
     public List<OrderResponse> listForUser(String userId) {
@@ -906,15 +929,33 @@ public class OrderService {
     }
 
     private DeliverySnapshot resolveDeliverySnapshot(CreateOrderRequest request) {
+        String addressText;
+        String contactName;
+        String contactPhone;
+        BigDecimal longitude;
+        BigDecimal latitude;
         if (request.addressId() == null) {
-            return new DeliverySnapshot(request.deliveryAddress(), null, null, null, null, 30);
-        }
-        UserAddress address = userAddressMapper.selectById(request.addressId());
-        if (address == null || !request.userId().equals(address.getUserId())) {
-            throw new BusinessException("地址不存在或无权操作");
-        }
-        if (!GeoUtils.hasCoordinate(address.getLongitude(), address.getLatitude())) {
-            throw new BusinessException("该地址缺少地图坐标");
+            addressText = requireDeliveryValue(request.deliveryAddress(), "请填写配送地址", 255);
+            contactName = requireDeliveryValue(request.deliveryContactName(), "请填写联系人", 50);
+            contactPhone = requireDeliveryValue(request.deliveryContactPhone(), "请填写联系电话", 20);
+            longitude = request.deliveryLongitude();
+            latitude = request.deliveryLatitude();
+            if (!GeoUtils.hasCoordinate(longitude, latitude)) {
+                throw new BusinessException("请通过自动定位或手动选择确认配送位置");
+            }
+        } else {
+            UserAddress address = userAddressMapper.selectById(request.addressId());
+            if (address == null || !request.userId().equals(address.getUserId())) {
+                throw new BusinessException("地址不存在或无权操作");
+            }
+            if (!GeoUtils.hasCoordinate(address.getLongitude(), address.getLatitude())) {
+                throw new BusinessException("该地址缺少地图坐标");
+            }
+            addressText = address.getAddress();
+            contactName = firstNonBlank(request.deliveryContactName(), address.getContactName());
+            contactPhone = firstNonBlank(request.deliveryContactPhone(), address.getPhone());
+            longitude = address.getLongitude();
+            latitude = address.getLatitude();
         }
         Merchant merchant = merchantMapper.selectById(request.merchantId());
         if (merchant == null) {
@@ -925,8 +966,8 @@ public class OrderService {
         }
 
         int distanceMeters = GeoUtils.distanceMeters(
-            address.getLatitude(),
-            address.getLongitude(),
+            latitude,
+            longitude,
             merchant.getLatitude(),
             merchant.getLongitude()
         );
@@ -938,8 +979,8 @@ public class OrderService {
         Optional<AmapRouteService.RouteEstimate> route = amapRouteService.estimateDriving(
             merchant.getLongitude(),
             merchant.getLatitude(),
-            address.getLongitude(),
-            address.getLatitude()
+            longitude,
+            latitude
         );
         Integer routeDistanceMeters = route.map(AmapRouteService.RouteEstimate::distanceMeters).orElse(null);
         int estimatedMinutes = route
@@ -948,13 +989,40 @@ public class OrderService {
             .orElseGet(() -> estimateMinutes(distanceMeters));
 
         return new DeliverySnapshot(
-            address.getAddress(),
-            address.getLongitude(),
-            address.getLatitude(),
+            addressText,
+            contactName,
+            contactPhone,
+            longitude,
+            latitude,
             distanceMeters,
             routeDistanceMeters,
             estimatedMinutes
         );
+    }
+
+    public void assertReadyForPayment(Orders order) {
+        requireDeliveryValue(order.getDeliveryAddress(), "请先完善配送地址", 255);
+        requireDeliveryValue(order.getDeliveryContactName(), "请先完善联系人", 50);
+        requireDeliveryValue(order.getDeliveryContactPhone(), "请先完善联系电话", 20);
+        if (!GeoUtils.hasCoordinate(order.getDeliveryLongitude(), order.getDeliveryLatitude())) {
+            throw new BusinessException("请先通过自动定位或手动选择确认配送位置");
+        }
+    }
+
+    private String firstNonBlank(String preferred, String fallback) {
+        String normalized = trimToNull(preferred);
+        return normalized == null ? trimToNull(fallback) : normalized;
+    }
+
+    private String requireDeliveryValue(String value, String message, int maxLength) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            throw new BusinessException(message);
+        }
+        if (normalized.length() > maxLength) {
+            throw new BusinessException(message + "，且不能超过 " + maxLength + " 个字符");
+        }
+        return normalized;
     }
 
     private int estimateMinutes(int distanceMeters) {
@@ -1027,6 +1095,8 @@ public class OrderService {
 
     private record DeliverySnapshot(
         String address,
+        String contactName,
+        String contactPhone,
         BigDecimal longitude,
         BigDecimal latitude,
         Integer distanceMeters,

@@ -841,7 +841,8 @@ class ModuleIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", otherUserId,
-                    "merchantId", 1
+                    "merchantId", 1,
+                    "addressId", 1
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.order.userId").value(USER_PHONE))
@@ -897,7 +898,8 @@ class ModuleIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
-                    "merchantId", 1
+                    "merchantId", 1,
+                    "addressId", 1
                 ))))
             .andExpect(status().isOk())
             .andReturn();
@@ -956,7 +958,8 @@ class ModuleIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
-                    "merchantId", 1
+                    "merchantId", 1,
+                    "addressId", 1
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.order.status").value("PENDING_PAYMENT"))
@@ -1000,7 +1003,8 @@ class ModuleIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
-                    "merchantId", 1
+                    "merchantId", 1,
+                    "addressId", 1
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.order.status").value("PENDING_PAYMENT"))
@@ -1127,6 +1131,7 @@ class ModuleIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(Map.of(
                         "merchantId", 1,
+                        "addressId", 1,
                         "productIds", new long[]{firstSelectedProductId}
                     ))))
                 .andExpect(status().isOk())
@@ -1221,7 +1226,8 @@ class ModuleIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
-                    "merchantId", 1
+                    "merchantId", 1,
+                    "addressId", 1
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.order.createTime").isString())
@@ -1518,6 +1524,7 @@ class ModuleIntegrationTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
                     "merchantId", 1,
+                    "addressId", 1,
                     "userCouponId", userCouponId
                 ))))
             .andExpect(status().isOk())
@@ -1554,6 +1561,7 @@ class ModuleIntegrationTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
                     "merchantId", 1,
+                    "addressId", 1,
                     "userCouponId", userCouponId
                 ))))
             .andExpect(status().isOk())
@@ -1618,7 +1626,8 @@ class ModuleIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
-                    "merchantId", 1
+                    "merchantId", 1,
+                    "addressId", 1
                 ))))
             .andExpect(status().isOk())
             .andReturn();
@@ -1900,7 +1909,8 @@ class ModuleIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "userId", USER_PHONE,
-                    "merchantId", 1
+                    "merchantId", 1,
+                    "addressId", 1
                 ))))
             .andExpect(status().isOk())
             .andReturn();
