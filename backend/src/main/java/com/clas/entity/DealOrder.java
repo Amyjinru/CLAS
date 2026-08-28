@@ -1,6 +1,7 @@
 package com.clas.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
@@ -21,4 +22,13 @@ public class DealOrder {
     private LocalDateTime expireTime;
     private LocalDateTime createTime;
     private LocalDateTime usedTime;
+
+    @TableField(exist = false)
+    private String dealTitle;
+
+    @TableField(exist = false)
+    private String merchantName;
+
+    @TableField(exist = false)
+    private String merchantLogo;
 }

@@ -135,6 +135,20 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void dealOrderListIncludesCardDisplayFields() throws Exception {
+        String userAuth = auth(USER_PHONE);
+        mockMvc.perform(post("/api/deals/1/buy")
+                .header("Authorization", userAuth))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/deals/mine")
+                .header("Authorization", userAuth))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].dealTitle").isNotEmpty())
+            .andExpect(jsonPath("$.data[0].merchantName").isNotEmpty());
+    }
+
+    @Test
     void userRegisterWorksAndHidesPassword() throws Exception {
         // 注册成功时默认角色应为 USER，响应中不能把明文密码带回前端。
         mockMvc.perform(post("/api/user/register/send-code")
@@ -836,7 +850,10 @@ class ModuleIntegrationTest {
         mockMvc.perform(get("/api/order/me")
                 .header("Authorization", auth(USER_PHONE)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+            .andExpect(jsonPath("$.data[0].merchantName").isNotEmpty())
+            .andExpect(jsonPath("$.data[0].products[0].name").isNotEmpty())
+            .andExpect(jsonPath("$.data[0].products[0].image").isNotEmpty());
 
         mockMvc.perform(get("/api/order/list/" + otherUserId)
                 .header("Authorization", auth(USER_PHONE)))
@@ -1648,10 +1665,12 @@ class ModuleIntegrationTest {
         mockMvc.perform(get("/api/order/list/" + USER_PHONE)
                 .header("Authorization", userAuth))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+            .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)))
+            .andExpect(jsonPath("$.data[0].merchantName").isNotEmpty())
+            .andExpect(jsonPath("$.data[0].products[0].name").isNotEmpty());
         org.junit.jupiter.api.Assertions.assertTrue(
-            MybatisQueryCounter.count() <= 4,
-            "订单列表应批量加载明细，当前查询次数: " + MybatisQueryCounter.count()
+            MybatisQueryCounter.count() <= 6,
+            "订单列表应批量加载明细、商品和商家，当前查询次数: " + MybatisQueryCounter.count()
         );
 
         MybatisQueryCounter.reset();

@@ -74,7 +74,7 @@ const voucherCount = computed(() => dealOrders.value.length + coupons.value.leng
 const roleNames = { MERCHANT: '商家', RIDER: '骑手' }
 
 const summaryCards = computed(() => [
-  { label: '订单', value: orders.value.length, targetTab: 'orders' },
+  { label: '订单', value: orders.value.length + dealOrders.value.length, targetTab: 'orders' },
   { label: '购物车', value: cartItems.value.length + pendingPaymentOrders.value.length + pendingDealOrders.value.length, targetTab: 'cart' },
   { label: '收藏', value: favorites.value.length, targetTab: 'favorites' },
   { label: '券包', value: voucherCount.value, targetTab: 'vouchers' },
@@ -82,7 +82,7 @@ const summaryCards = computed(() => [
 ])
 
 const orderModules = computed(() => [
-  { label: '全部订单', count: orders.value.length, to: '/orders', description: '查看所有外卖订单' },
+  { label: '全部订单', count: orders.value.length + dealOrders.value.length, to: '/orders', description: '查看外卖与团购订单' },
   { label: '待支付', count: pendingPaymentOrders.value.length + pendingDealOrders.value.length, to: '/cart', description: '继续完成支付' },
   { label: '待收货/使用', count: waitingReceiveOrders.value.length + unusedDealOrders.value.length, to: '/orders?tab=receiving', description: '外卖配送与团购到店履约' },
   { label: '待评价', count: pendingReviewOrders.value.length, to: '/orders?tab=review', description: '给已完成订单评价' },

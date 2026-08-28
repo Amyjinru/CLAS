@@ -2,17 +2,17 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import BackButton from '../components/BackButton.vue'
-import { cancelOrder, completeOrder, getReviewByOrder, listOrders, requestRefund, getOrderMessages } from '../api/clas'
+import { cancelOrder, completeOrder, getReviewByOrder, listMyDealOrders, listOrders, requestRefund, getOrderMessages } from '../api/clas'
 import MoneyText from '../components/MoneyText.vue'
 import StatusTag from '../components/StatusTag.vue'
 import ChatWindow from '../components/ChatWindow.vue'
 import RiderChatWindow from '../components/RiderChatWindow.vue'
 import { useConfirmAction } from '../composables/useConfirmAction'
-import { formatCompactDateTime, formatDistance } from '../utils/formatters'
 import { orderStatusMap } from '../utils/status'
-import { isReceivingOrder } from '../utils/orderReceiving'
+import { isReceivingDealOrder, isReceivingOrder } from '../utils/orderReceiving'
 
 const orders = ref([])
+const dealOrders = ref([])
 const message = ref('')
 const reviewedOrderIds = ref(new Set())
 const { confirmAction } = useConfirmAction()
@@ -26,13 +26,6 @@ const refundReason = ref('')
 const refundSubmitting = ref(false)
 const route = useRoute()
 const activeTab = ref(route.query.tab || 'all')
-
-const refundStatusLabel = {
-  PENDING: '待商家审核',
-  APPROVED: '已通过',
-  REJECTED: '平台已维持商家处理',
-  DISPUTE_PENDING: '平台争议审核中'
-}
 
 const refundReasonOptions = [
   '行程变化，无法收货',
@@ -51,6 +44,14 @@ const deliveryLabel = {
   DELIVERED: '已送达'
 }
 
+const dealStatusLabel = {
+  PENDING_PAYMENT: '待支付',
+  UNUSED: '待使用',
+  USED: '已使用',
+  EXPIRED: '已过期',
+  REFUNDED: '已退款'
+}
+
 const orderTabs = [
   { label: '全部订单', name: 'all' },
   { label: '待收货/使用', name: 'receiving' },
@@ -58,22 +59,30 @@ const orderTabs = [
   { label: '退款/售后', name: 'after-sale' }
 ]
 
-const filteredOrders = computed(() => {
+const visibleEntries = computed(() => {
+  let foodEntries = orders.value
+  let dealEntries = dealOrders.value
   if (activeTab.value === 'receiving') {
-    return orders.value.filter((entry) => isReceivingOrder(entry.order))
+    foodEntries = foodEntries.filter((entry) => isReceivingOrder(entry.order))
+    dealEntries = dealEntries.filter(isReceivingDealOrder)
+  } else if (activeTab.value === 'review') {
+    foodEntries = foodEntries.filter((entry) => entry.order.status === 'COMPLETED' && !hasReview(entry.order.id))
+    dealEntries = []
+  } else if (activeTab.value === 'after-sale') {
+    foodEntries = foodEntries.filter((entry) => entry.order.status === 'REFUND_PENDING' || entry.order.status === 'REFUNDED' || (entry.order.refundStatus && entry.order.refundStatus !== 'NONE'))
+    dealEntries = dealEntries.filter((entry) => entry.status === 'REFUNDED')
   }
-  if (activeTab.value === 'review') {
-    return orders.value.filter((entry) => entry.order.status === 'COMPLETED' && !hasReview(entry.order.id))
-  }
-  if (activeTab.value === 'after-sale') {
-    return orders.value.filter((entry) => entry.order.status === 'REFUND_PENDING' || entry.order.status === 'REFUNDED' || (entry.order.refundStatus && entry.order.refundStatus !== 'NONE'))
-  }
-  return orders.value
+  return [
+    ...foodEntries.map((entry) => ({ key: `food-${entry.order.id}`, kind: 'food', entry, createdAt: entry.order.createTime })),
+    ...dealEntries.map((entry) => ({ key: `deal-${entry.id}`, kind: 'deal', entry, createdAt: entry.createTime }))
+  ].sort((left, right) => String(right.createdAt || '').localeCompare(String(left.createdAt || '')))
 })
 
 async function load() {
   try {
-    orders.value = await listOrders()
+    const [orderList, dealList] = await Promise.all([listOrders(), listMyDealOrders({ silent: true })])
+    orders.value = orderList
+    dealOrders.value = dealList
     const reviewed = await Promise.all(
       orders.value
         .filter((order) => order.order.status === 'COMPLETED')
@@ -90,6 +99,18 @@ async function load() {
   } catch {
     message.value = '请先登录'
   }
+}
+
+function productSummary(order, productId) {
+  return (order.products || []).find((product) => product.id === productId) || null
+}
+
+function itemName(order, item) {
+  return productSummary(order, item.productId)?.name || `商品 #${item.productId}`
+}
+
+function itemImage(order, item) {
+  return productSummary(order, item.productId)?.image || ''
 }
 
 async function complete(order) {
@@ -148,20 +169,8 @@ function canRequestRefund(order) {
   return deliveredAt && Date.now() <= new Date(deliveredAt).getTime() + 15 * 60 * 1000
 }
 
-function refundWindowHint(order) {
-  if (order.deliveryStatus !== 'DELIVERED' || order.refundStatus && order.refundStatus !== 'NONE') return ''
-  const deliveredAt = order.deliveryCompletedAt || order.deliveredAt
-  const remaining = Math.ceil((new Date(deliveredAt).getTime() + 15 * 60 * 1000 - Date.now()) / 60000)
-  return remaining > 0 ? `已送达，退款申请剩余约 ${remaining} 分钟` : '已超过送达后 15 分钟退款申请时限'
-}
-
 function hasReview(orderId) {
   return reviewedOrderIds.value.has(orderId)
-}
-
-function distanceText(distance) {
-  if (!distance) return ''
-  return formatDistance(distance)
 }
 
 function openChat(order) {
@@ -234,95 +243,89 @@ watch(() => route.query.tab, (tab) => {
       </el-tabs>
     </section>
 
-    <section class="user-page-grid-2 orders-list">
-      <article class="row order-card" v-for="order in filteredOrders" :key="order.order.id">
-        <div class="order-body">
-          <h2>订单 {{ order.order.id }}</h2>
-          <p><StatusTag :status="order.order.status" :map="orderStatusMap" /> · {{ deliveryLabel[order.order.deliveryStatus] || order.order.deliveryStatus }} · <MoneyText :amount="order.order.totalPrice" /></p>
-          <p v-if="order.order.subtotal != null">
-            商品 <MoneyText :amount="order.order.subtotal" />
-            · 配送费 <MoneyText :amount="order.order.deliveryFee || 0" />
-            <span v-if="order.order.couponDiscount > 0">
-              · 优惠 <MoneyText :amount="order.order.couponDiscount" negative />
-            </span>
-          </p>
-          <p v-if="order.order.remark" class="order-note">备注：{{ order.order.remark }}</p>
-          <p v-if="order.order.rejectReason" class="order-note warn">拒单理由：{{ order.order.rejectReason }}</p>
-          <p v-if="order.order.refundReason" class="order-note">退款申请：{{ order.order.refundReason }}</p>
-          <p v-if="order.order.refundStatus && order.order.refundStatus !== 'NONE'" class="order-note">
-            退款进度：{{ refundStatusLabel[order.order.refundStatus] || order.order.refundStatus }}
-            <span v-if="order.order.refundRequestedAt"> · 申请于 {{ formatCompactDateTime(order.order.refundRequestedAt).slice(0, 16) }}</span>
-            <span v-if="order.order.refundResolvedAt"> · 处理于 {{ formatCompactDateTime(order.order.refundResolvedAt).slice(0, 16) }}</span>
-          </p>
-          <p v-if="order.order.refundRejectReason" class="order-note warn">
-            退款拒绝理由：{{ order.order.refundRejectReason }}
-          </p>
-          <p v-if="refundWindowHint(order.order)" class="order-note warn">{{ refundWindowHint(order.order) }}</p>
-          <p v-if="order.order.deliveryAddress">
-            送至 {{ order.order.deliveryAddress }} · 约 {{ order.order.estimatedMinutes }} 分钟
-            <span v-if="order.order.routeDistanceMeters"> · 路线 {{ distanceText(order.order.routeDistanceMeters) }}</span>
-            <span v-else-if="order.order.distanceMeters"> · 直线 {{ distanceText(order.order.distanceMeters) }}</span>
-          </p>
-          <p>{{ order.items.length }} 件商品</p>
-        </div>
-        <div class="row-actions">
-          <RouterLink
-            v-if="order.order.status === 'PENDING_PAYMENT'"
-            class="button"
-            :to="`/payment/${order.order.id}`"
-          >
-            去支付
+    <section class="orders-list">
+      <article v-for="display in visibleEntries" :key="display.key" class="order-card">
+        <template v-if="display.kind === 'food'">
+          <header class="store-header">
+            <div class="store-identity">
+              <img v-if="display.entry.merchantLogo" :src="display.entry.merchantLogo" :alt="display.entry.merchantName || '店铺'" />
+              <span v-else class="store-logo-placeholder">{{ (display.entry.merchantName || '店').slice(0, 1) }}</span>
+              <strong>{{ display.entry.merchantName || `店铺 #${display.entry.order.merchantId}` }}</strong>
+            </div>
+            <StatusTag :status="display.entry.order.status" :map="orderStatusMap" />
+          </header>
+
+          <RouterLink class="order-goods" :to="`/order/${display.entry.order.id}`">
+            <div v-for="item in display.entry.items" :key="item.id" class="goods-row">
+              <div class="goods-image">
+                <img v-if="itemImage(display.entry, item)" :src="itemImage(display.entry, item)" :alt="itemName(display.entry, item)" loading="lazy" />
+                <span v-else>{{ itemName(display.entry, item).slice(0, 1) }}</span>
+              </div>
+              <div class="goods-info">
+                <h2>{{ itemName(display.entry, item) }}</h2>
+                <p>× {{ item.quantity }}</p>
+              </div>
+              <MoneyText class="goods-price" :amount="item.price * item.quantity" />
+            </div>
           </RouterLink>
-          <button
-            v-if="['PENDING_PAYMENT', 'PAID'].includes(order.order.status)"
-            class="secondary"
-            @click="cancel(order)"
-          >
-            取消订单
-          </button>
-          <button v-if="order.order.status === 'ACCEPTED'" @click="complete(order)">确认完成</button>
-          <button
-            v-if="canRequestRefund(order.order)"
-            class="secondary"
-            type="button"
-            @click="openRefundDialog(order)"
-          >
-            申请退款
-          </button>
-          <button
-            v-if="['PAID', 'ACCEPTED'].includes(order.order.status)"
-            class="secondary"
-            @click="openChat(order)"
-          >
-            联系商家
-          </button>
-          <button
-            v-if="hasLiveRiderDelivery(order.order)"
-            class="secondary"
-            @click="openRiderChat(order)"
-          >
-            联系骑手
-          </button>
-          <button
-            v-if="order.order.status === 'COMPLETED' && chatHasHistory.has(order.order.id)"
-            class="secondary"
-            @click="openChat(order)"
-          >
-            查看聊天记录
-          </button>
-          <RouterLink
-            v-if="order.order.status === 'COMPLETED' && !hasReview(order.order.id)"
-            class="button secondary"
-            :to="`/review/${order.order.id}`"
-          >
-            去评价
+
+          <div class="order-summary">
+            <span>订单 #{{ display.entry.order.id }} · {{ deliveryLabel[display.entry.order.deliveryStatus] || display.entry.order.deliveryStatus }}</span>
+            <strong>实付 <MoneyText :amount="display.entry.order.totalPrice" /></strong>
+          </div>
+          <div v-if="display.entry.order.remark || display.entry.order.rejectReason || display.entry.order.refundReason" class="order-notes">
+            <p v-if="display.entry.order.remark" class="order-note">备注：{{ display.entry.order.remark }}</p>
+            <p v-if="display.entry.order.rejectReason" class="order-note warn">拒单理由：{{ display.entry.order.rejectReason }}</p>
+            <p v-if="display.entry.order.refundReason" class="order-note">退款申请：{{ display.entry.order.refundReason }}</p>
+          </div>
+          <div class="row-actions">
+            <RouterLink v-if="display.entry.order.status === 'PENDING_PAYMENT'" class="button" :to="`/payment/${display.entry.order.id}`">去支付</RouterLink>
+            <button v-if="['PENDING_PAYMENT', 'PAID'].includes(display.entry.order.status)" class="secondary" @click="cancel(display.entry)">取消订单</button>
+            <button v-if="display.entry.order.status === 'ACCEPTED'" @click="complete(display.entry)">确认完成</button>
+            <button v-if="canRequestRefund(display.entry.order)" class="secondary" type="button" @click="openRefundDialog(display.entry)">申请退款</button>
+            <button v-if="['PAID', 'ACCEPTED'].includes(display.entry.order.status)" class="secondary" @click="openChat(display.entry)">联系商家</button>
+            <button v-if="hasLiveRiderDelivery(display.entry.order)" class="secondary" @click="openRiderChat(display.entry)">联系骑手</button>
+            <button v-if="display.entry.order.status === 'COMPLETED' && chatHasHistory.has(display.entry.order.id)" class="secondary" @click="openChat(display.entry)">查看聊天记录</button>
+            <RouterLink v-if="display.entry.order.status === 'COMPLETED' && !hasReview(display.entry.order.id)" class="button secondary" :to="`/review/${display.entry.order.id}`">去评价</RouterLink>
+            <span v-if="display.entry.order.status === 'COMPLETED' && hasReview(display.entry.order.id)" class="tag">已评价</span>
+          </div>
+        </template>
+
+        <template v-else>
+          <header class="store-header">
+            <div class="store-identity">
+              <img v-if="display.entry.merchantLogo" :src="display.entry.merchantLogo" :alt="display.entry.merchantName || '店铺'" />
+              <span v-else class="store-logo-placeholder">{{ (display.entry.merchantName || '店').slice(0, 1) }}</span>
+              <strong>{{ display.entry.merchantName || `店铺 #${display.entry.merchantId}` }}</strong>
+            </div>
+            <span class="deal-status">{{ dealStatusLabel[display.entry.status] || display.entry.status }}</span>
+          </header>
+          <RouterLink class="order-goods" :to="`/deal-order/${display.entry.id}`">
+            <div class="goods-row">
+              <div class="goods-image deal-image">
+                <img v-if="display.entry.merchantLogo" :src="display.entry.merchantLogo" :alt="display.entry.dealTitle || '团购券'" loading="lazy" />
+                <span v-else>券</span>
+              </div>
+              <div class="goods-info">
+                <h2>{{ display.entry.dealTitle || `团购套餐 #${display.entry.dealId}` }}</h2>
+                <p>到店团购券 · 1 份</p>
+              </div>
+              <MoneyText class="goods-price" :amount="display.entry.payAmount" />
+            </div>
           </RouterLink>
-          <span v-if="order.order.status === 'COMPLETED' && hasReview(order.order.id)" class="tag">已评价</span>
-        </div>
+          <div class="order-summary">
+            <span>团购订单 #{{ display.entry.id }}</span>
+            <strong>实付 <MoneyText :amount="display.entry.payAmount" /></strong>
+          </div>
+          <div class="row-actions">
+            <RouterLink v-if="display.entry.status === 'PENDING_PAYMENT'" class="button" :to="`/payment/deal/${display.entry.id}`">去支付</RouterLink>
+            <RouterLink class="button secondary" :to="`/deal-order/${display.entry.id}`">查看券详情</RouterLink>
+          </div>
+        </template>
       </article>
     </section>
 
-    <el-empty v-if="!filteredOrders.length && !message" description="暂无订单" />
+    <el-empty v-if="!visibleEntries.length && !message" description="暂无订单" />
 
     <!-- Chat overlay -->
     <div v-if="chatOrder" class="order-overlay" @click.self="closeChat">
@@ -389,23 +392,155 @@ watch(() => route.query.tab, (tab) => {
 }
 
 .orders-list {
+  display: grid;
   gap: 16px;
+  grid-template-columns: 1fr;
 }
 
 .order-card {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 16px;
-  height: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
-.order-body {
+.store-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  min-height: 54px;
+  padding: 10px 16px;
+}
+
+.store-identity {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  min-width: 0;
+}
+
+.store-identity img,
+.store-logo-placeholder {
+  border-radius: 50%;
+  height: 30px;
+  object-fit: cover;
+  width: 30px;
+}
+
+.store-logo-placeholder {
+  align-items: center;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  display: flex;
+  font-weight: 700;
+  justify-content: center;
+}
+
+.store-identity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deal-status {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.order-goods {
+  color: inherit;
+  display: block;
+  padding: 4px 16px;
+  text-decoration: none;
+}
+
+.goods-row {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  padding: 12px 0;
+}
+
+.goods-row + .goods-row {
+  border-top: 1px solid var(--border-light);
+}
+
+.goods-image {
+  align-items: center;
+  background: var(--color-primary-light);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary);
+  display: flex;
+  font-size: 24px;
+  font-weight: 700;
+  height: 72px;
+  justify-content: center;
+  overflow: hidden;
+  width: 82px;
+}
+
+.goods-image img {
+  height: 100%;
+  object-fit: cover;
   width: 100%;
+}
+
+.deal-image img {
+  object-fit: contain;
+}
+
+.goods-info {
+  min-width: 0;
+}
+
+.goods-info h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+.goods-info p {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.goods-price {
+  align-self: start;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.order-summary {
+  align-items: center;
+  background: var(--bg-page);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 11px 16px;
+}
+
+.order-summary span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.order-summary strong {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.order-notes {
+  padding: 8px 16px 0;
 }
 
 .order-card .row-actions {
-  justify-content: flex-start;
-  width: 100%;
+  border-top: 1px solid var(--border-light);
+  justify-content: flex-end;
+  padding: 12px 16px;
 }
 
 .order-note {
@@ -447,6 +582,15 @@ watch(() => route.query.tab, (tab) => {
 @media (max-width: 768px) {
   .orders-list {
     grid-template-columns: 1fr;
+  }
+
+  .goods-row {
+    grid-template-columns: 70px minmax(0, 1fr) auto;
+  }
+
+  .goods-image {
+    height: 64px;
+    width: 70px;
   }
 }
 

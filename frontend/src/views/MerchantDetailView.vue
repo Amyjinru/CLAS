@@ -2,7 +2,7 @@
 import BackButton from '../components/BackButton.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { addFavorite, createOrder, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listGroupedProducts, listProducts, removeFavorite } from '../api/clas'
+import { addFavorite, getCart, getDeliveryEstimate, getMerchant, listAddresses, listFavorites, listGroupedProducts, listProducts, removeFavorite } from '../api/clas'
 import LocationSelector from '../components/LocationSelector.vue'
 import MerchantRouteMap from '../components/MerchantRouteMap.vue'
 import MerchantReviewSection from '../components/MerchantReviewSection.vue'
@@ -24,7 +24,6 @@ const cartItems = ref([])
 const cartOpen = ref(false)
 const loading = ref(false)
 const loadError = ref('')
-const submitting = ref(false)
 const favoriteLoading = ref(false)
 const favoriteMerchantIds = ref(new Set())
 const currentLocation = ref(getCurrentLocation())
@@ -301,30 +300,14 @@ async function removeCartItem(item) {
   if (ok) await load()
 }
 
-async function submitOrder() {
+function submitOrder() {
   if (!merchantCartItems.value.length) return
   if (!businessStatus.value.open) {
     message.value = `商家已休息，${businessStatus.value.nextOpenText}`
     return
   }
-  submitting.value = true
-  message.value = ''
-  try {
-    const addresses = await listAddresses()
-    const address = addresses.find((item) => item.isDefault) || addresses[0]
-    if (!address?.id) {
-      message.value = '请先在个人中心添加配送地址'
-      return
-    }
-    const data = await createOrder({ merchantId: merchantId.value, addressId: address.id })
-    cartOpen.value = false
-    await load()
-    router.push(`/payment/${data.order.id}`)
-  } catch (error) {
-    message.value = error.response?.data?.message || '提交失败'
-  } finally {
-    submitting.value = false
-  }
+  cartOpen.value = false
+  router.push({ path: '/cart', query: { merchantId: merchantId.value } })
 }
 
 function confirmLocation(location) {
@@ -632,10 +615,10 @@ watch(
           </div>
           <div class="cart-panel-actions">
             <button
-              :disabled="!merchantCartItems.length || submitting || !businessStatus.open"
+              :disabled="!merchantCartItems.length || !businessStatus.open"
               @click="submitOrder"
             >
-              {{ submitting ? '提交中...' : (businessStatus.open ? '提交订单' : businessStatus.nextOpenText) }}
+              {{ businessStatus.open ? '去结算' : businessStatus.nextOpenText }}
             </button>
             <RouterLink class="button secondary" to="/orders" @click="closeCart">
               我的订单

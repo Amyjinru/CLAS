@@ -17,6 +17,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -252,6 +256,19 @@ public class DealService {
             .eq(DealOrder::getUserId, UserContext.getUserId())
             .orderByDesc(DealOrder::getId));
         orders.forEach(this::refreshExpiredStatus);
+        Set<Long> dealIds = orders.stream().map(DealOrder::getDealId).collect(Collectors.toSet());
+        Map<Long, GroupDeal> dealsById = dealIds.isEmpty() ? Map.of() : groupDealMapper.selectBatchIds(dealIds).stream()
+            .collect(Collectors.toMap(GroupDeal::getId, Function.identity()));
+        Set<Long> merchantIds = orders.stream().map(DealOrder::getMerchantId).collect(Collectors.toSet());
+        Map<Long, Merchant> merchantsById = merchantIds.isEmpty() ? Map.of() : merchantMapper.selectBatchIds(merchantIds).stream()
+            .collect(Collectors.toMap(Merchant::getId, Function.identity()));
+        orders.forEach(order -> {
+            GroupDeal deal = dealsById.get(order.getDealId());
+            Merchant merchant = merchantsById.get(order.getMerchantId());
+            order.setDealTitle(deal == null ? null : deal.getTitle());
+            order.setMerchantName(merchant == null ? null : merchant.getMerchantName());
+            order.setMerchantLogo(merchant == null ? null : merchant.getLogo());
+        });
         return orders;
     }
 

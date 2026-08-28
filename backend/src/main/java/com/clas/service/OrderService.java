@@ -9,6 +9,7 @@ import com.clas.dto.CreateOrderBatchRequest;
 import com.clas.dto.CreateOrderBatchResponse;
 import com.clas.dto.CreateOrderRequest;
 import com.clas.dto.OrderPreviewResponse;
+import com.clas.dto.OrderProductSummary;
 import com.clas.dto.OrderResponse;
 import com.clas.entity.Cart;
 import com.clas.entity.Merchant;
@@ -716,15 +717,13 @@ public class OrderService {
                 new LambdaQueryWrapper<OrderItem>().in(OrderItem::getOrderId, orderIds))
             .stream()
             .collect(Collectors.groupingBy(OrderItem::getOrderId));
-        return orders.stream()
-            .map(order -> new OrderResponse(order, itemsByOrderId.getOrDefault(order.getId(), List.of())))
-            .toList();
+        return enrichResponses(orders, itemsByOrderId, false);
     }
 
     private OrderResponse withItems(Orders order) {
         List<OrderItem> orderItems = orderItemMapper.selectList(
             new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId()));
-        return new OrderResponse(order, orderItems);
+        return enrichResponses(List.of(order), Map.of(order.getId(), orderItems), false).get(0);
     }
 
     private List<OrderResponse> withItemsForMerchant(List<Orders> orders) {
@@ -736,19 +735,53 @@ public class OrderService {
                 new LambdaQueryWrapper<OrderItem>().in(OrderItem::getOrderId, orderIds))
             .stream()
             .collect(Collectors.groupingBy(OrderItem::getOrderId));
-        return orders.stream()
-            .map(order -> new OrderResponse(
-                order,
-                itemsByOrderId.getOrDefault(order.getId(), List.of()),
-                customerCallUrl(order)
-            ))
-            .toList();
+        return enrichResponses(orders, itemsByOrderId, true);
     }
 
     private OrderResponse withItemsForMerchant(Orders order) {
         List<OrderItem> orderItems = orderItemMapper.selectList(
             new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId()));
-        return new OrderResponse(order, orderItems, customerCallUrl(order));
+        return enrichResponses(List.of(order), Map.of(order.getId(), orderItems), true).get(0);
+    }
+
+    private List<OrderResponse> enrichResponses(
+        List<Orders> orders,
+        Map<Long, List<OrderItem>> itemsByOrderId,
+        boolean includeCustomerCallUrl
+    ) {
+        Set<Long> productIds = itemsByOrderId.values().stream()
+            .flatMap(List::stream)
+            .map(OrderItem::getProductId)
+            .collect(Collectors.toSet());
+        Map<Long, Product> productsById = productIds.isEmpty()
+            ? Map.of()
+            : productMapper.selectBatchIds(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, product -> product));
+        Set<Long> merchantIds = orders.stream().map(Orders::getMerchantId).collect(Collectors.toSet());
+        Map<Long, Merchant> merchantsById = merchantIds.isEmpty()
+            ? Map.of()
+            : merchantMapper.selectBatchIds(merchantIds).stream()
+                .collect(Collectors.toMap(Merchant::getId, merchant -> merchant));
+
+        return orders.stream().map(order -> {
+            List<OrderItem> items = itemsByOrderId.getOrDefault(order.getId(), List.of());
+            List<OrderProductSummary> products = items.stream()
+                .map(OrderItem::getProductId)
+                .distinct()
+                .map(productsById::get)
+                .filter(java.util.Objects::nonNull)
+                .map(product -> new OrderProductSummary(product.getId(), product.getName(), product.getImage()))
+                .toList();
+            Merchant merchant = merchantsById.get(order.getMerchantId());
+            return new OrderResponse(
+                order,
+                items,
+                includeCustomerCallUrl ? customerCallUrl(order) : null,
+                merchant == null ? null : merchant.getMerchantName(),
+                merchant == null ? null : merchant.getLogo(),
+                products
+            );
+        }).toList();
     }
 
     private String customerCallUrl(Orders order) {

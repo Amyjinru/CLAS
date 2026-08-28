@@ -1,13 +1,15 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   cancelOrder, claimCoupon, clearInvalidCart, createOrderBatch, getCart, listAddresses,
   listClaimableCoupons, listMyDealOrders, listOrders, previewOrder
 } from '../api/clas'
 import { useCartActions } from '../composables/useCartActions'
+import { isCheckoutReady, preferredProductIds } from '../utils/checkout'
 
 const router = useRouter()
+const route = useRoute()
 const { cartMessage, actionProductId, updateQuantity, removeItem } = useCartActions()
 const items = ref([])
 const selectedProductIds = ref(new Set())
@@ -54,14 +56,13 @@ const hasCartContent = computed(() => items.value.length > 0 || hasPendingPaymen
 const aggregateTotal = computed(() => selectedGroups.value.reduce(
   (sum, group) => sum + (previews.value[group.merchantId]?.totalPrice || 0), 0
 ))
-const canSubmit = computed(() => {
-  if (!selectedAddressId.value || !selectedGroups.value.length || submitting.value) return false
-  return selectedGroups.value.every((group) => (
-    !previewLoadingIds.value.has(group.merchantId)
-    && previews.value[group.merchantId]?.canCheckout
-    && !previewErrors.value[group.merchantId]
-  ))
-})
+const canSubmit = computed(() => isCheckoutReady({
+  groups: selectedGroups.value,
+  submitting: submitting.value,
+  loadingIds: previewLoadingIds.value,
+  previews: previews.value,
+  errors: previewErrors.value
+}))
 
 function validItems(group) {
   return group.items.filter((item) => item.valid !== false)
@@ -186,7 +187,7 @@ async function load() {
       getCart(), listOrders(), listMyDealOrders(), listAddresses()
     ])
     items.value = cartItems
-    replaceSelection([])
+    replaceSelection(preferredProductIds(cartItems, route.query.merchantId))
     previews.value = {}
     selectedCoupons.value = {}
     pendingFoodOrders.value = orderList.filter((entry) => entry.order.status === 'PENDING_PAYMENT')
@@ -194,6 +195,7 @@ async function load() {
     addresses.value = addressList
     selectedAddressId.value = addresses.value.find((item) => item.isDefault)?.id || addresses.value[0]?.id || ''
     message.value = ''
+    await loadAllSelectedPreviews()
   } catch {
     message.value = '请先登录后查看购物车'
   }
@@ -204,7 +206,7 @@ async function submit() {
   submitting.value = true
   try {
     const data = await createOrderBatch({
-      addressId: selectedAddressId.value,
+      addressId: selectedAddressId.value || undefined,
       remark: orderRemark.value.trim() || undefined,
       merchantGroups: selectedGroups.value.map((group) => ({
         merchantId: group.merchantId,
@@ -253,6 +255,11 @@ async function cancelPendingFood(order) {
   await load()
 }
 
+function pendingProduct(order) {
+  const firstItem = order.items?.[0]
+  return (order.products || []).find((product) => product.id === firstItem?.productId) || null
+}
+
 watch(selectedAddressId, loadAllSelectedPreviews)
 onMounted(async () => { await loadClaimableCoupons(); await load() })
 </script>
@@ -269,11 +276,23 @@ onMounted(async () => { await loadClaimableCoupons(); await load() })
           <div class="section-title"><h2>待支付</h2><span>此前未完成支付的订单</span></div>
           <div class="pending-grid">
             <article v-for="order in pendingFoodOrders" :key="`food-${order.order.id}`" class="pending-card">
-              <div><strong>外卖订单 #{{ order.order.id }}</strong><p>{{ order.items.length }} 件商品 · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p></div>
+              <div class="pending-content">
+                <div class="pending-thumb">
+                  <img v-if="pendingProduct(order)?.image" :src="pendingProduct(order).image" :alt="pendingProduct(order)?.name || '订单商品'" />
+                  <span v-else>{{ (pendingProduct(order)?.name || '餐').slice(0, 1) }}</span>
+                </div>
+                <div><strong>{{ order.merchantName || `店铺 #${order.order.merchantId}` }}</strong><p>{{ pendingProduct(order)?.name || `外卖订单 #${order.order.id}` }} · {{ order.items.length }} 件 · ¥{{ (order.order.totalPrice / 100).toFixed(2) }}</p></div>
+              </div>
               <div class="pending-actions"><RouterLink class="pay-btn" :to="`/payment/${order.order.id}`">去支付</RouterLink><button class="cancel-btn" type="button" @click="cancelPendingFood(order)">取消订单</button></div>
             </article>
             <article v-for="deal in pendingDealOrders" :key="`deal-${deal.id}`" class="pending-card">
-              <div><strong>团购券订单 #{{ deal.id }}</strong><p>团购商品 #{{ deal.dealId }} · ¥{{ (deal.payAmount / 100).toFixed(2) }}</p></div>
+              <div class="pending-content">
+                <div class="pending-thumb deal-thumb">
+                  <img v-if="deal.merchantLogo" :src="deal.merchantLogo" :alt="deal.dealTitle || '团购套餐'" />
+                  <span v-else>券</span>
+                </div>
+                <div><strong>{{ deal.merchantName || `店铺 #${deal.merchantId}` }}</strong><p>{{ deal.dealTitle || `团购商品 #${deal.dealId}` }} · ¥{{ (deal.payAmount / 100).toFixed(2) }}</p></div>
+              </div>
               <div class="pending-actions"><RouterLink class="pay-btn" :to="`/payment/deal/${deal.id}`">去支付</RouterLink></div>
             </article>
           </div>
@@ -288,6 +307,10 @@ onMounted(async () => { await loadClaimableCoupons(); await load() })
             </header>
             <div v-for="item in group.items" :key="item.productId" class="cart-item" :class="{ invalid: item.valid === false, selected: selectedProductIds.has(item.productId) }">
               <el-checkbox :model-value="selectedProductIds.has(item.productId)" :disabled="item.valid === false" :aria-label="`选择 ${item.productName}`" @change="toggleItem(item, $event)" />
+              <div class="cart-thumb">
+                <img v-if="item.image" :src="item.image" :alt="item.productName" loading="lazy" />
+                <span v-else>{{ item.productName?.slice(0, 1) || '品' }}</span>
+              </div>
               <div class="item-main">
                 <div class="item-info"><h3>{{ item.productName }}</h3><p>库存 {{ item.stock }} · 单价 ¥{{ (item.price / 100).toFixed(2) }}</p><p v-if="item.valid === false" class="invalid-tip">{{ item.invalidReason || '商品不可购买' }}</p></div>
                 <strong class="item-price">¥{{ (item.subtotal / 100).toFixed(2) }}</strong>
@@ -306,7 +329,9 @@ onMounted(async () => { await loadClaimableCoupons(); await load() })
 
       <aside v-if="items.length" class="cart-sidebar">
         <footer class="checkout-panel">
-          <label class="field-block"><span>配送地址</span><select v-model="selectedAddressId"><option value="">请选择配送地址</option><option v-for="address in addresses" :key="address.id" :value="address.id">{{ address.contactName }} · {{ address.address }}</option></select></label>
+          <label class="field-block"><span>配送地址（可选）</span><select v-model="selectedAddressId"><option value="">暂不选择配送地址</option><option v-for="address in addresses" :key="address.id" :value="address.id">{{ address.contactName }} · {{ address.address }}</option></select></label>
+          <p v-if="!addresses.length" class="address-hint">尚未添加常用地址，可继续提交订单，后续与商家确认配送信息。</p>
+          <p v-else-if="!selectedAddressId" class="address-hint">未选择地址，仍可继续提交订单。</p>
           <label class="field-block"><span>订单备注</span><textarea v-model="orderRemark" rows="2" placeholder="所有店铺共用（可选）" /></label>
           <section v-for="group in selectedGroups" :key="`summary-${group.merchantId}`" class="merchant-summary">
             <h3>{{ group.merchantName }}</h3>
@@ -322,7 +347,7 @@ onMounted(async () => { await loadClaimableCoupons(); await load() })
           </section>
           <div v-if="claimableCoupons.length" class="claimable-coupons"><p>可领取优惠券</p><div v-for="coupon in claimableCoupons" :key="coupon.id"><span>{{ coupon.title }}</span><button type="button" class="secondary compact" @click="handleClaimCoupon(coupon.id)">领取</button></div></div>
           <div class="checkout-total"><span>已选 {{ selectedItemCount }} 件 · 应付合计</span><strong>¥{{ (aggregateTotal / 100).toFixed(2) }}</strong></div>
-          <button class="submit-btn" :disabled="!canSubmit" @click="submit">{{ submitting ? '正在提交...' : '提交订单并付款' }}</button>
+          <button class="submit-btn" :disabled="!canSubmit" @click="submit">{{ submitting ? '正在提交...' : '提交订单并选择付款方式' }}</button>
         </footer>
       </aside>
     </div>
@@ -330,7 +355,7 @@ onMounted(async () => { await loadClaimableCoupons(); await load() })
 </template>
 
 <style scoped>
-.cart-page{width:100%}.cart-header h1{margin:0;font-size:26px}.cart-header p,.section-title span,.merchant-header span{color:var(--text-secondary);font-size:13px}.cart-main{min-width:0}.section-title{align-items:baseline;display:flex;gap:10px;margin:24px 0 12px}.section-title.compact{margin-top:8px}.section-title h2{font-size:18px;margin:0}.pending-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.pending-card{background:var(--color-primary-light);border:1px solid var(--color-primary-soft);border-radius:var(--radius-lg);padding:16px 18px}.pending-card p{color:var(--text-secondary);font-size:13px;margin:6px 0 0}.pending-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}.pay-btn,.cancel-btn{border-radius:var(--radius-sm);font-size:13px;padding:8px 14px;text-decoration:none}.pay-btn{background:var(--color-primary);color:var(--text-primary);font-weight:600}.cancel-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);cursor:pointer}.cart-items{display:flex;flex-direction:column;gap:14px;margin-top:24px}.merchant-group{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);overflow:hidden}.merchant-header{align-items:center;background:var(--color-primary-light);display:flex;justify-content:space-between;padding:14px 18px}.cart-item{align-items:center;border-top:1px solid var(--border-color);display:grid;gap:16px;grid-template-columns:auto minmax(0,1fr) auto;padding:18px}.cart-item.selected{background:var(--bg-page)}.cart-item.invalid{opacity:.68}.item-main{align-items:center;display:flex;justify-content:space-between;min-width:0}.item-info h3{font-size:16px;margin:0 0 5px}.item-info p{color:var(--text-muted);font-size:13px;margin:0}.item-info .invalid-tip,.checkout-tip{color:var(--clas-warning)}.item-price{color:var(--clas-amber-600);font-size:18px;margin-left:18px;white-space:nowrap}.cart-actions{align-items:center;display:flex;gap:10px}.quantity-field{align-items:center;color:var(--text-secondary);display:flex;font-size:13px;gap:6px}.quantity-field input{background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);padding:6px;text-align:center;width:62px}.delete-btn{background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--clas-error);cursor:pointer;padding:7px 12px}.delete-btn:disabled,.submit-btn:disabled{cursor:not-allowed;opacity:.55}.invalid-actions{align-items:center;display:flex;justify-content:space-between}.invalid-actions p{color:var(--clas-warning);margin:0}.cart-empty{color:var(--text-muted);padding:48px 0;text-align:center}.cart-message{color:var(--clas-warning)}.cart-sidebar{min-width:0}.checkout-panel{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:14px;padding:20px;position:sticky;top:88px}.field-block{display:flex;flex-direction:column;gap:7px}.field-block>span{color:var(--text-secondary);font-size:13px;font-weight:600}.field-block select,.field-block textarea{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font:inherit;padding:9px 10px;width:100%}.field-block textarea{resize:vertical}.merchant-summary{border-top:1px solid var(--border-color);padding-top:13px}.merchant-summary h3{font-size:14px;margin:0 0 10px}.compact-field{margin-bottom:10px}.breakdown-row{color:var(--text-secondary);display:flex;font-size:13px;justify-content:space-between;margin-top:6px}.breakdown-row.discount{color:var(--clas-success)}.checkout-tip{font-size:13px;margin:8px 0 0}.claimable-coupons{background:var(--clas-warning-light);border-radius:var(--radius-sm);padding:10px 12px}.claimable-coupons p{color:var(--text-secondary);font-size:13px;margin:0 0 8px}.claimable-coupons div{align-items:center;display:flex;font-size:13px;justify-content:space-between}.claimable-coupons div+div{margin-top:6px}button.compact{font-size:12px;padding:4px 10px}.checkout-total{align-items:flex-end;border-top:1px solid var(--border-color);display:flex;flex-direction:column;gap:4px;padding-top:14px}.checkout-total span{color:var(--text-secondary);font-size:13px}.checkout-total strong{color:var(--clas-amber-600);font-size:26px}.submit-btn{background:var(--color-primary);border:0;border-radius:var(--radius-sm);color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:700;min-height:44px}
-@media(max-width:900px){.pending-grid{grid-template-columns:1fr}.cart-item{grid-template-columns:auto minmax(0,1fr)}.cart-actions{grid-column:2;justify-content:flex-end}}
-@media(max-width:640px){.cart-item{align-items:flex-start}.item-main{align-items:flex-start;flex-direction:column;gap:8px}.item-price{margin-left:0}.cart-actions{flex-wrap:wrap;justify-content:flex-start}}
+.cart-page{width:100%}.cart-header h1{margin:0;font-size:26px}.cart-header p,.section-title span,.merchant-header span{color:var(--text-secondary);font-size:13px}.cart-main{min-width:0}.section-title{align-items:baseline;display:flex;gap:10px;margin:24px 0 12px}.section-title.compact{margin-top:8px}.section-title h2{font-size:18px;margin:0}.pending-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.pending-card{background:var(--color-primary-light);border:1px solid var(--color-primary-soft);border-radius:var(--radius-lg);padding:16px 18px}.pending-card p{color:var(--text-secondary);font-size:13px;margin:6px 0 0}.pending-content{align-items:center;display:flex;gap:12px;min-width:0}.pending-thumb,.cart-thumb{align-items:center;background:var(--bg-card);border-radius:var(--radius-sm);color:var(--color-primary);display:flex;flex:0 0 auto;font-size:20px;font-weight:700;height:64px;justify-content:center;overflow:hidden;width:72px}.pending-thumb img,.cart-thumb img{height:100%;object-fit:cover;width:100%}.pending-thumb.deal-thumb img{object-fit:contain}.pending-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}.pay-btn,.cancel-btn{border-radius:var(--radius-sm);font-size:13px;padding:8px 14px;text-decoration:none}.pay-btn{background:var(--color-primary);color:var(--text-primary);font-weight:600}.cancel-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);cursor:pointer}.cart-items{display:flex;flex-direction:column;gap:14px;margin-top:24px}.merchant-group{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);overflow:hidden}.merchant-header{align-items:center;background:var(--color-primary-light);display:flex;justify-content:space-between;padding:14px 18px}.cart-item{align-items:center;border-top:1px solid var(--border-color);display:grid;gap:16px;grid-template-columns:auto 88px minmax(0,1fr) auto;padding:18px}.cart-thumb{background:var(--color-primary-light);height:78px;width:88px}.cart-item.selected{background:var(--bg-page)}.cart-item.invalid{opacity:.68}.item-main{align-items:center;display:flex;justify-content:space-between;min-width:0}.item-info h3{font-size:16px;margin:0 0 5px}.item-info p{color:var(--text-muted);font-size:13px;margin:0}.item-info .invalid-tip,.checkout-tip{color:var(--clas-warning)}.item-price{color:var(--clas-amber-600);font-size:18px;margin-left:18px;white-space:nowrap}.cart-actions{align-items:center;display:flex;gap:10px}.quantity-field{align-items:center;color:var(--text-secondary);display:flex;font-size:13px;gap:6px}.quantity-field input{background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);padding:6px;text-align:center;width:62px}.delete-btn{background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--clas-error);cursor:pointer;padding:7px 12px}.delete-btn:disabled,.submit-btn:disabled{cursor:not-allowed;opacity:.55}.invalid-actions{align-items:center;display:flex;justify-content:space-between}.invalid-actions p{color:var(--clas-warning);margin:0}.cart-empty{color:var(--text-muted);padding:48px 0;text-align:center}.cart-message{color:var(--clas-warning)}.cart-sidebar{min-width:0}.checkout-panel{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:14px;padding:20px;position:sticky;top:88px}.field-block{display:flex;flex-direction:column;gap:7px}.field-block>span{color:var(--text-secondary);font-size:13px;font-weight:600}.field-block select,.field-block textarea{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font:inherit;padding:9px 10px;width:100%}.field-block textarea{resize:vertical}.address-hint{background:var(--color-primary-light);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:12px;line-height:1.6;margin:-6px 0 0;padding:8px 10px}.merchant-summary{border-top:1px solid var(--border-color);padding-top:13px}.merchant-summary h3{font-size:14px;margin:0 0 10px}.compact-field{margin-bottom:10px}.breakdown-row{color:var(--text-secondary);display:flex;font-size:13px;justify-content:space-between;margin-top:6px}.breakdown-row.discount{color:var(--clas-success)}.checkout-tip{font-size:13px;margin:8px 0 0}.claimable-coupons{background:var(--clas-warning-light);border-radius:var(--radius-sm);padding:10px 12px}.claimable-coupons p{color:var(--text-secondary);font-size:13px;margin:0 0 8px}.claimable-coupons div{align-items:center;display:flex;font-size:13px;justify-content:space-between}.claimable-coupons div+div{margin-top:6px}button.compact{font-size:12px;padding:4px 10px}.checkout-total{align-items:flex-end;border-top:1px solid var(--border-color);display:flex;flex-direction:column;gap:4px;padding-top:14px}.checkout-total span{color:var(--text-secondary);font-size:13px}.checkout-total strong{color:var(--clas-amber-600);font-size:26px}.submit-btn{background:var(--color-primary);border:0;border-radius:var(--radius-sm);color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:700;min-height:44px}
+@media(max-width:900px){.pending-grid{grid-template-columns:1fr}.cart-item{grid-template-columns:auto 78px minmax(0,1fr)}.cart-thumb{height:70px;width:78px}.cart-actions{grid-column:3;justify-content:flex-end}}
+@media(max-width:640px){.cart-item{align-items:flex-start;gap:12px;grid-template-columns:auto 64px minmax(0,1fr)}.cart-thumb{height:60px;width:64px}.item-main{align-items:flex-start;flex-direction:column;gap:8px}.item-price{margin-left:0}.cart-actions{flex-wrap:wrap;grid-column:3;justify-content:flex-start}.quantity-field{font-size:0}.quantity-field input{font-size:13px}}
 </style>
