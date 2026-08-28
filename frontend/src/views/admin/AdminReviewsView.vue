@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import {
   deleteAdminReview,
+  exportAdminReviews,
   listAdminReviews,
   listReviewDeleteRequests,
   processReviewDeleteRequest,
@@ -128,11 +129,16 @@ function resetReviewFilters() {
   searchReviews()
 }
 
-function exportCSV() {
-  const params = new URLSearchParams()
-  if (reviewFilters.reportStatus) params.set('reportStatus', reviewFilters.reportStatus)
-  if (reviewFilters.keyword.trim()) params.set('keyword', reviewFilters.keyword.trim())
-  window.open('/api/admin/export/reviews?' + params.toString(), '_blank')
+async function exportCSV() {
+  try {
+    await exportAdminReviews({
+      reportStatus: reviewFilters.reportStatus || undefined,
+      keyword: reviewFilters.keyword.trim() || undefined
+    })
+    ElMessage.success('CSV 导出成功')
+  } catch {
+    ElMessage.error('CSV 导出失败')
+  }
 }
 
 async function refreshAll() {

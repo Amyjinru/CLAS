@@ -383,6 +383,7 @@ public class AdminController {
     @GetMapping("/export/orders")
     public void exportOrders(
         @RequestParam(required = false) String status,
+        @RequestParam(required = false) String deliveryStatus,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
         @RequestParam(required = false) String keyword,
@@ -390,6 +391,7 @@ public class AdminController {
     ) throws IOException {
         LambdaQueryWrapper<Orders> wrapper = new LambdaQueryWrapper<>();
         if (status != null && !status.isBlank()) wrapper.eq(Orders::getStatus, status);
+        if (deliveryStatus != null && !deliveryStatus.isBlank()) wrapper.eq(Orders::getDeliveryStatus, deliveryStatus);
         if (startDate != null) wrapper.ge(Orders::getCreateTime, startDate.atStartOfDay());
         if (endDate != null) wrapper.le(Orders::getCreateTime, endDate.atTime(LocalTime.MAX));
         if (keyword != null && !keyword.isBlank()) {

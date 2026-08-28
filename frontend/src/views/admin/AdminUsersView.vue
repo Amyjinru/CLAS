@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { applyPenalty } from '../../api/profile'
-import { listAdminUsers, toggleUserStatus } from '../../api/admin'
+import { exportAdminUsers, listAdminUsers, toggleUserStatus } from '../../api/admin'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const users = ref([])
@@ -55,12 +55,17 @@ function resetFilters() {
   search()
 }
 
-function exportCSV() {
-  const params = new URLSearchParams()
-  if (filters.role) params.set('role', filters.role)
-  if (filters.enabled !== '' && filters.enabled !== undefined) params.set('enabled', filters.enabled)
-  if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim())
-  window.open('/api/admin/export/users?' + params.toString(), '_blank')
+async function exportCSV() {
+  try {
+    await exportAdminUsers({
+      role: filters.role || undefined,
+      enabled: filters.enabled === '' ? undefined : filters.enabled,
+      keyword: filters.keyword.trim() || undefined
+    })
+    ElMessage.success('CSV 导出成功')
+  } catch {
+    ElMessage.error('CSV 导出失败')
+  }
 }
 
 async function changeStatus(user) {
