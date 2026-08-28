@@ -31,9 +31,8 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: backend/Dockerfile
-    image: clas-backend:local
-    entrypoint: ["/bin/bash", "/opt/clas/database/bootstrap-and-migrate.sh"]
+      dockerfile: database/Dockerfile
+    image: clas-database:local
     environment:
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306

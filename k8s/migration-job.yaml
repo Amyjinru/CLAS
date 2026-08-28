@@ -13,8 +13,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: migrate
-          image: ghcr.io/amyjinru/clas-backend:REQUIRED_TAG
-          command: ["/bin/bash", "/opt/clas/database/bootstrap-and-migrate.sh"]
+          image: ghcr.io/amyjinru/clas-database:REQUIRED_TAG
           envFrom:
             - configMapRef: {name: clas-config}
             - secretRef: {name: clas-secrets}
