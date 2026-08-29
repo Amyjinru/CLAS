@@ -241,9 +241,11 @@ jobs:
           image_archive="/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
           trap 'rm -f "$deploy_env" "$image_archive"' EXIT
           if [ ! -d /opt/clas-k8s/.git ]; then
-            git clone --origin upstream https://github.com/Amyjinru/CLAS.git /opt/clas-k8s
+            git clone --no-checkout --origin upstream https://github.com/Amyjinru/CLAS.git /opt/clas-k8s
           fi
           cd /opt/clas-k8s
+          git sparse-checkout init --no-cone
+          git sparse-checkout set --no-cone '/k8s/**' '/scripts/k8s/**' '/database/**'
           git fetch upstream main
           git checkout --detach "$CLAS_IMAGE_TAG"
           test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"

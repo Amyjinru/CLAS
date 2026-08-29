@@ -327,7 +327,7 @@ CLAS_IMAGE_TAG=<git-sha> CLAS_DATABASE_RESTORE_FILE=/opt/clas-backups/<时间戳
 
 首次从旧 Nginx/systemd 服务切换到 k3s 时，可额外设置 `CLAS_STOP_LEGACY_NGINX=true`。脚本会等待新前后端 Pod 就绪后，才停用旧 Nginx 并启用 Ingress，避免旧服务掩盖健康检查结果。
 
-部署清单位于 `k8s/`：MySQL 使用官方镜像和 `mysql-data` PVC；后端上传的商品图、店铺 Logo、用户头像和评价图片使用独立的 `uploads-data` PVC，挂载到 `/opt/clas/uploads`。两个卷均依赖当前单节点 k3s 的 `local-path` 存储，后端保持单副本；若迁移节点或扩展为多副本写入，应先备份数据并改用对象存储或支持 `ReadWriteMany` 的共享存储。后端使用 `/api/health` 作为 readiness/liveness probe，Ingress 在当前公网 IP `http://8.141.112.182/` 暴露前端。当前入口没有 DNS 域名，故仅提供 HTTP；获得域名后可在 `k8s/ingress.yaml` 增加 Host 与 TLS 配置。
+部署清单位于 `k8s/`：MySQL 使用官方镜像和 `mysql-data` PVC；后端上传的商品图、店铺 Logo、用户头像和评价图片使用独立的 `uploads-data` PVC，挂载到 `/opt/clas/uploads`。两个卷均依赖当前单节点 k3s 的 `local-path` 存储，后端保持单副本；若迁移节点或扩展为多副本写入，应先备份数据并改用对象存储或支持 `ReadWriteMany` 的共享存储。Redis 是验证码等短期数据的易失缓存，不启用 AOF/RDB 持久化。云端部署工作树只稀疏检出 `k8s/`、`scripts/k8s/` 与 `database/`，不会下载 `openspec/`、`docs/` 和测试报告。后端使用 `/api/health` 作为 readiness/liveness probe，Ingress 在当前公网 IP `http://8.141.112.182/` 暴露前端。当前入口没有 DNS 域名，故仅提供 HTTP；获得域名后可在 `k8s/ingress.yaml` 增加 Host 与 TLS 配置。
 
 ## 文档与协作
 
