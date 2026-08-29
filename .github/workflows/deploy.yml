@@ -72,10 +72,21 @@ jobs:
             echo "MYSQL_USER=clas"
             echo "MYSQL_PASSWORD=clas-test-password"
             echo "MYSQL_ROOT_PASSWORD=clas-root-password"
-            echo "JWT_SECRET=0123456789abcdef0123456789abcdef"
-            echo "RIDER_IDENTITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef"
+          echo "JWT_SECRET=0123456789abcdef0123456789abcdef"
+          echo "RIDER_IDENTITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef"
           } > ci-compose.env
-          docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240
+          for attempt in 1 2 3; do
+            if docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Compose 镜像构建或启动连续三次失败" >&2
+              exit 1
+            fi
+            docker compose --env-file ci-compose.env down --volumes --remove-orphans || true
+            echo "Compose 启动第 ${attempt} 次失败，30 秒后重试以应对镜像仓库瞬时故障。" >&2
+            sleep 30
+          done
           pwsh -File scripts/compose-smoke.ps1
 
       - name: Collect Compose diagnostics
