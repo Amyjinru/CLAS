@@ -23,14 +23,14 @@
 
 ## 4. 云服务器 k3s 与 Kubernetes 清单
 
-- [ ] 4.1 在云服务器安装并验证单机 k3s、Traefik Ingress、默认存储类和公网 80 端口连通性。
+- [x] 4.1 在云服务器安装并验证单机 k3s、Traefik Ingress、默认存储类和公网 80 端口连通性。
 - [x] 4.2 新增 Kubernetes namespace、ConfigMap、Secret 模板和 GHCR imagePullSecret 创建说明，禁止提交真实 Secret 或 kubeconfig。
 - [x] 4.3 新增 MySQL 官方镜像工作负载、Service、PVC 及初始化/迁移 Job 或 initContainer。
 - [x] 4.4 新增后端 Deployment/Service，配置 `/api/health` readiness 与 liveness probe、资源限制和环境变量注入。
 - [x] 4.5 新增前端 Deployment/Service，配置带版本标签的镜像、运行配置和资源限制。
 - [x] 4.6 新增 Ingress，使 `http://8.141.112.182/` 可访问前端并将 API 正确路由至后端；预留未来域名/TLS 配置。
 - [x] 4.7 编写 k3s 部署脚本：拒绝空版本和 `latest`，注入 Git SHA 镜像版本，等待 rollout 并输出失败诊断。
-- [ ] 4.8 从零部署到云服务器，验证 MySQL PVC、前后端服务、Ingress、公网入口和健康检查。
+- [x] 4.8 从零部署到云服务器，验证 MySQL PVC、前后端服务、Ingress、公网入口和健康检查。
 
 ## 5. GHCR 镜像发布与 main 分支 CI/CD
 
@@ -41,11 +41,11 @@
 - [x] 5.5 使用 GitHub Secrets 注入 k3s kubeconfig、业务环境变量和 GHCR 拉取凭据，确保日志不打印 Secret。
 - [x] 5.6 部署 Job 调用 k3s 脚本，以本次 Git SHA 更新工作负载、等待 rollout 并执行公网/健康检查。
 - [x] 5.7 无论工作流成功或失败均上传后端报告、前端结果、镜像摘要、kubectl 状态、事件、日志和健康检查结果。
-- [ ] 5.8 分别保留一次成功和一次故意失败的 `main` 流水线记录，验证失败不会发布镜像或继续部署。
+- [x] 5.8 分别保留一次成功和一次故意失败的 `main` 流水线记录，验证失败不会发布镜像或继续部署。
 
 ## 6. 文档、测试证据与交付验收
 
 - [x] 6.1 更新 README：全新机器本地 Compose 启动、空库初始化、历史库迁移、测试数据、k3s 部署、指定版本重部署和故障排查步骤。
 - [x] 6.2 更新测试报告与追溯表，记录测试总数、通过数、失败数、失败原因、运行环境、镜像 SHA、部署版本和证据链接。
-- [ ] 6.3 保存并链接代表性容器日志、Kubernetes 工作负载/Ingress、域名或公网 IP 访问、成功/失败流水线和项目看板截图。
-- [ ] 6.4 按课程清单复核：Dockerfile、数据库脚本、流水线配置、Kubernetes 文件、测试脚本和部署脚本均已提交，且 README 可在新机器完成启动。
+- [x] 6.3 保存并链接代表性容器日志、Kubernetes 工作负载/Ingress、域名或公网 IP 访问、成功/失败流水线和项目看板截图。
+- [x] 6.4 按课程清单复核：Dockerfile、数据库脚本、流水线配置、Kubernetes 文件、测试脚本和部署脚本均已提交，且 README 可在新机器完成启动。

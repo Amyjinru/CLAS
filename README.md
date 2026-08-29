@@ -305,7 +305,7 @@ push main
 bash scripts/k8s/install-k3s.sh
 ```
 
-在 GitHub Actions Secrets 中配置以下值：`KUBECONFIG_B64`（k3s kubeconfig 的 Base64）、`GHCR_USERNAME`、`GHCR_PULL_TOKEN`、`MYSQL_PASSWORD`、`JWT_SECRET`、`RIDER_IDENTITY_ENCRYPTION_KEY`，以及按需配置的 `AMAP_WEB_SERVICE_KEY`、`DASHSCOPE_API_KEY`、`FORBIDDEN_WORDS`、`CLAS_DEMO_ACCESS_PASSWORD`。Secret 不得写入仓库或工作流日志。
+在 GitHub Actions Secrets 中配置以下值：`SSH_PASSWORD`（云服务器部署账户密码）、`GHCR_USERNAME`、`GHCR_PULL_TOKEN`、`MYSQL_PASSWORD`、`JWT_SECRET`、`RIDER_IDENTITY_ENCRYPTION_KEY`，以及按需配置的 `AMAP_WEB_SERVICE_KEY`、`DASHSCOPE_API_KEY`、`FORBIDDEN_WORDS`、`CLAS_DEMO_ACCESS_PASSWORD`。部署 Job 经 SSH 调用服务器本机 k3s，不再使用 kubeconfig Secret；镜像仍发布至 GHCR，并以 Git SHA 版本归档导入服务器。Secret 不得写入仓库或工作流日志。
 
 手动部署已发布镜像时，配置同名环境变量后执行：
 
