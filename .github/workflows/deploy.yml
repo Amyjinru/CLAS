@@ -3,6 +3,10 @@ name: Build, publish and deploy CLAS
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'openspec/**'
+      - '**/*.md'
   workflow_dispatch:
     inputs:
       force_test_failure:
@@ -24,6 +28,33 @@ env:
   IMAGE_OWNER: amyjinru
 
 jobs:
+  changes:
+    name: Classify delivery scope
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.scope.outputs.deploy }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - name: Classify changed files
+        id: scope
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          deploy=false
+          while IFS= read -r file; do
+            case "$file" in
+              backend/src/test/*|tests/*|*.test.js|*.test.ts|*.spec.js|*.spec.ts) ;;
+              backend/*|frontend/*|database/*|k8s/*|scripts/k8s/*|docker-compose.yml|.github/workflows/deploy.yml) deploy=true; break ;;
+            esac
+          done < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
   verify:
     name: Test gate
     runs-on: ubuntu-latest
@@ -110,7 +141,8 @@ jobs:
 
   publish:
     name: Build and publish immutable images
-    needs: verify
+    needs: [verify, changes]
+    if: ${{ needs.changes.outputs.deploy == 'true' }}
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.version.outputs.image_tag }}
