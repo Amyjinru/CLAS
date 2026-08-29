@@ -20,7 +20,16 @@ MYSQL_HOST="${MYSQL_HOST:-127.0.0.1}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-clas}"
 
-MYSQL_ARGS=(-u "$MYSQL_USER" -h "$MYSQL_HOST" -P "$MYSQL_PORT")
+MYSQL_TLS_OPTION="${MYSQL_TLS_OPTION:-}"
+if [ -z "$MYSQL_TLS_OPTION" ]; then
+  if mysql --version 2>/dev/null | grep -qi 'mariadb'; then
+    MYSQL_TLS_OPTION='--skip-ssl'
+  else
+    MYSQL_TLS_OPTION='--ssl-mode=DISABLED'
+  fi
+fi
+
+MYSQL_ARGS=("$MYSQL_TLS_OPTION" -u "$MYSQL_USER" -h "$MYSQL_HOST" -P "$MYSQL_PORT")
 if [ -n "$MYSQL_PASSWORD" ]; then
   MYSQL_ARGS+=("-p${MYSQL_PASSWORD}")
 fi
@@ -61,12 +70,23 @@ fi
 IFS=$'\n' MIGRATIONS=($(printf '%s\n' "${MIGRATIONS[@]}" | sort)); unset IFS
 
 # ---- 获取已执行的迁移列表 ----
-APPLIED=$(mysql "${MYSQL_ARGS[@]}" "$MYSQL_DATABASE" -N \
+# 不使用 `echo "$APPLIED" | grep -q`。在 pipefail 模式下，历史记录较多时
+# grep 提前退出会令 echo 收到 SIGPIPE，从而把已执行迁移误判成待执行。
+declare -A APPLIED_MIGRATIONS=()
+while IFS= read -r filename; do
+  if [ -n "$filename" ]; then
+    APPLIED_MIGRATIONS["$filename"]=1
+  fi
+done < <(mysql "${MYSQL_ARGS[@]}" "$MYSQL_DATABASE" -N \
   -e "SELECT filename FROM migration_history" 2>/dev/null || true)
+
+is_applied() {
+  [[ -n "${APPLIED_MIGRATIONS[$1]:-}" ]]
+}
 
 PENDING=0
 for migration in "${MIGRATIONS[@]}"; do
-  if echo "$APPLIED" | grep -qFx "$migration"; then
+  if is_applied "$migration"; then
     skip "$migration"
   else
     PENDING=$((PENDING + 1))
@@ -83,7 +103,7 @@ log "发现 ${CYAN}${PENDING}${RESET} 个未执行的迁移，开始执行..."
 
 FAILED=0
 for migration in "${MIGRATIONS[@]}"; do
-  if echo "$APPLIED" | grep -qFx "$migration"; then
+  if is_applied "$migration"; then
     continue
   fi
 
