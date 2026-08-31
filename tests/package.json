@@ -1,0 +1,14 @@
+{
+  "name": "clas-acceptance-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:api": "vitest run --config vitest.config.js api",
+    "test:e2e": "playwright test --config playwright.config.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "vitest": "^3.2.4"
+  }
+}

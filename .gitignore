@@ -9,6 +9,8 @@ backend/src/main/resources/application-local.yml
 uploads/
 logo/
 artifacts/
+tests/playwright-report/
+tests/test-results/
 k8s-diagnostics/
 
 # 前端环境变量（含 API Key，严禁提交）

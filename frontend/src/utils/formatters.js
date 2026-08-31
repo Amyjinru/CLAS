@@ -34,7 +34,13 @@ export function parseBusinessMinutes(hoursText) {
   const [startText, endText] = hoursText.split('-').map(s => s.trim())
   const toMinutes = (t) => {
     const parts = t.split(':').map(Number)
-    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null
+    if (
+      parts.length !== 2
+      || !Number.isInteger(parts[0])
+      || !Number.isInteger(parts[1])
+      || parts[0] < 0 || parts[0] > 23
+      || parts[1] < 0 || parts[1] > 59
+    ) return null
     return parts[0] * 60 + parts[1]
   }
   const start = toMinutes(startText)

@@ -11,12 +11,14 @@ export default defineConfig({
     baseURL: 'http://8.141.112.182',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
+    video: 'off'
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
+      // Use the locally installed Chrome in developer machines and CI runners
+      // that provision it, avoiding a second browser download.
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' }
     }
   ]
 })
