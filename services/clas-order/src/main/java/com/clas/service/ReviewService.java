@@ -17,6 +17,7 @@ import com.clas.entity.ReviewUserHidden;
 import com.clas.entity.ReviewVote;
 import com.clas.mapper.DeletedReviewBackupMapper;
 import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import com.clas.client.IamClient;
 import com.clas.dto.InternalUserSummary;
 import com.clas.mapper.OrdersMapper;
@@ -57,6 +58,7 @@ public class ReviewService {
     private final OrderService orderService;
     private final OrdersMapper ordersMapper;
     private final CatalogClient catalogClient;
+    private final MerchantClient merchantClient;
     private final MerchantContextService merchantContextService;
     private final NotificationBridge notificationBridge;
     private final CommentPenaltyService commentPenaltyService;
@@ -76,6 +78,7 @@ public class ReviewService {
         OrderService orderService,
         OrdersMapper ordersMapper,
         CatalogClient catalogClient,
+        MerchantClient merchantClient,
         MerchantContextService merchantContextService,
         NotificationBridge notificationBridge,
         CommentPenaltyService commentPenaltyService,
@@ -94,6 +97,7 @@ public class ReviewService {
         this.orderService = orderService;
         this.ordersMapper = ordersMapper;
         this.catalogClient = catalogClient;
+        this.merchantClient = merchantClient;
         this.merchantContextService = merchantContextService;
         this.notificationBridge = notificationBridge;
         this.commentPenaltyService = commentPenaltyService;
@@ -108,21 +112,21 @@ public class ReviewService {
         commentPenaltyService.assertCanComment(request.userId());
         Orders order = orderService.requireOrder(request.orderId());
         if (!request.userId().equals(order.getUserId())) {
-            throw new BusinessException("只能评价自己的订单");
+            throw new BusinessException("?????????");
         }
         if (!"COMPLETED".equals(order.getStatus())) {
-            throw new BusinessException("订单完成后才能评价");
+            throw new BusinessException("?????????");
         }
         Long count = reviewMapper.selectCount(new LambdaQueryWrapper<Review>()
             .eq(Review::getOrderId, request.orderId()));
         if (count > 0) {
-            throw new BusinessException("该订单已评价");
+            throw new BusinessException("??????");
         }
         List<String> images = request.images() == null ? List.of() : request.images();
         if (images.size() > MAX_IMAGES) {
-            throw new BusinessException("评价图片最多上传 " + MAX_IMAGES + " 张");
+            throw new BusinessException("???????? " + MAX_IMAGES + " ?");
         }
-        contentModerationService.assertTextAllowed(request.content(), "评价内容");
+        contentModerationService.assertTextAllowed(request.content(), "????");
         Review review = new Review();
         review.setOrderId(request.orderId());
         review.setUserId(request.userId());
@@ -131,7 +135,7 @@ public class ReviewService {
         review.setReportStatus("NONE");
         review.setCreatedAt(LocalDateTime.now());
         reviewMapper.insert(review);
-        lifecycleService.record(order, "MERCHANT_REVIEWED", order.getStatus(), order.getDeliveryStatus(), "USER", request.userId(), "用户完成商家评价");
+        lifecycleService.record(order, "MERCHANT_REVIEWED", order.getStatus(), order.getDeliveryStatus(), "USER", request.userId(), "????????");
         saveImages(review.getId(), images);
         recalculateMerchantScore(order.getMerchantId());
         return review;
@@ -226,9 +230,9 @@ public class ReviewService {
     }
 
     public MerchantRatingResponse getMerchantRating(Long merchantId) {
-        var merchant = catalogClient.getMerchant(merchantId);
+        var merchant = merchantClient.getMerchant(merchantId);
         if (merchant == null) {
-            throw new BusinessException("商家不存在");
+            throw new BusinessException("?????");
         }
         List<Review> reviews = listRawByMerchantId(merchantId);
         return new MerchantRatingResponse(merchantId, merchant.getScore(), (long) reviews.size());
@@ -240,10 +244,10 @@ public class ReviewService {
         if (request.parentReplyId() != null) {
             ReviewReply parent = reviewReplyMapper.selectById(request.parentReplyId());
             if (parent == null || !parent.getReviewId().equals(reviewId) || Boolean.TRUE.equals(parent.getDeleted())) {
-                throw new BusinessException("回复目标不存在");
+                throw new BusinessException("???????");
             }
         }
-        contentModerationService.assertTextAllowed(request.content(), "评论内容");
+        contentModerationService.assertTextAllowed(request.content(), "????");
         ReviewReply reply = new ReviewReply();
         reply.setReviewId(reviewId);
         reply.setParentReplyId(request.parentReplyId());
@@ -262,7 +266,7 @@ public class ReviewService {
     public ReviewVote vote(Long targetId, String targetType, String voteType, String userId) {
         commentPenaltyService.assertCanComment(userId);
         if (!"LIKE".equals(voteType) && !"DISLIKE".equals(voteType)) {
-            throw new BusinessException("投票类型只能是 LIKE 或 DISLIKE");
+            throw new BusinessException("??????? LIKE ? DISLIKE");
         }
         validateVoteTarget(targetId, targetType);
         ReviewVote existing = reviewVoteMapper.selectOne(new LambdaQueryWrapper<ReviewVote>()
@@ -320,7 +324,7 @@ public class ReviewService {
         Orders order = orderService.requireOrder(review.getOrderId());
         Long merchantId = merchantContextService.getCurrentMerchantId();
         if (!merchantId.equals(order.getMerchantId())) {
-            throw new BusinessException("只能为自己店铺的评价发起删除申请");
+            throw new BusinessException("????????????????");
         }
         ReviewDeleteRequest request = createDeleteRequest(
             reviewId,
@@ -330,7 +334,7 @@ public class ReviewService {
             "MERCHANT",
             null
         );
-        notificationBridge.notifyAdmins("商家申请删除评价", "商家 #" + merchantId + " 申请删除评价 #" + reviewId + "：" + reason);
+        notificationBridge.notifyAdmins("????????", "?? #" + merchantId + " ?????? #" + reviewId + "?" + reason);
         return request;
     }
 
@@ -338,7 +342,7 @@ public class ReviewService {
     public void approveDeleteRequest(Long requestId, String adminId, boolean approve, String remarks) {
         ReviewDeleteRequest request = reviewDeleteRequestMapper.selectById(requestId);
         if (request == null) {
-            throw new BusinessException("删除申请不存在");
+            throw new BusinessException("???????");
         }
         request.setAdminId(adminId);
         request.setAdminRemarks(remarks);
@@ -363,10 +367,10 @@ public class ReviewService {
     public void deleteReply(Long replyId, String userId) {
         ReviewReply reply = reviewReplyMapper.selectById(replyId);
         if (reply == null || Boolean.TRUE.equals(reply.getDeleted())) {
-            throw new BusinessException("回复不存在");
+            throw new BusinessException("?????");
         }
         if (!reply.getUserId().equals(userId)) {
-            throw new BusinessException("只能删除自己的回复");
+            throw new BusinessException("?????????");
         }
         reply.setDeleted(true);
         reviewReplyMapper.updateById(reply);
@@ -376,7 +380,7 @@ public class ReviewService {
     public void adminDeleteReply(Long replyId) {
         ReviewReply reply = reviewReplyMapper.selectById(replyId);
         if (reply == null || Boolean.TRUE.equals(reply.getDeleted())) {
-            throw new BusinessException("回复不存在");
+            throw new BusinessException("?????");
         }
         reply.setDeleted(true);
         reviewReplyMapper.updateById(reply);
@@ -385,7 +389,7 @@ public class ReviewService {
     public Review report(Long reviewId, String reason, String userId) {
         Review review = requireReview(reviewId);
         if (review.getUserId().equals(userId)) {
-            throw new BusinessException("不能举报自己的评价");
+            throw new BusinessException("?????????");
         }
         Orders order = orderService.requireOrder(review.getOrderId());
         createDeleteRequest(reviewId, null, order.getMerchantId(), reason, "USER", userId);
@@ -393,8 +397,8 @@ public class ReviewService {
         review.setReportStatus("PENDING");
         reviewMapper.updateById(review);
         notificationBridge.notifyAdmins(
-            "用户举报评价",
-            "用户 " + userId + " 举报评价 #" + reviewId + "：" + reason
+            "??????",
+            "?? " + userId + " ???? #" + reviewId + "?" + reason
         );
         return review;
     }
@@ -402,10 +406,10 @@ public class ReviewService {
     public ReviewDeleteRequest reportReply(Long replyId, String reason, String userId) {
         ReviewReply reply = reviewReplyMapper.selectById(replyId);
         if (reply == null || Boolean.TRUE.equals(reply.getDeleted())) {
-            throw new BusinessException("回复不存在");
+            throw new BusinessException("?????");
         }
         if (reply.getUserId().equals(userId)) {
-            throw new BusinessException("不能举报自己的评论");
+            throw new BusinessException("?????????");
         }
         Review review = requireReview(reply.getReviewId());
         Orders order = orderService.requireOrder(review.getOrderId());
@@ -418,8 +422,8 @@ public class ReviewService {
             userId
         );
         notificationBridge.notifyAdmins(
-            "用户举报评论",
-            "用户 " + userId + " 举报评价 #" + review.getId() + " 下的回复 #" + replyId + "：" + reason
+            "??????",
+            "?? " + userId + " ???? #" + review.getId() + " ???? #" + replyId + "?" + reason
         );
         return request;
     }
@@ -428,7 +432,7 @@ public class ReviewService {
         Review review = requireReview(reviewId);
         String nextStatus = status == null || status.isBlank() ? "RESOLVED" : status;
         if (!"RESOLVED".equals(nextStatus) && !"REJECTED".equals(nextStatus) && !"PENDING".equals(nextStatus)) {
-            throw new BusinessException("举报状态只能是 PENDING、RESOLVED 或 REJECTED");
+            throw new BusinessException("??????? PENDING?RESOLVED ? REJECTED");
         }
         review.setReportStatus(nextStatus);
         reviewMapper.updateById(review);
@@ -557,8 +561,8 @@ public class ReviewService {
         for (String recipientId : recipientIds) {
             notificationBridge.send(new NotificationBridge.NotificationTarget(
                 recipientId,
-                "评价收到新回复",
-                "您的订单 " + review.getOrderId() + " 评价收到新回复。",
+                "???????",
+                "???? " + review.getOrderId() + " ????????",
                 "REVIEW_REPLY",
                 "REPLY",
                 reply.getId(),
@@ -582,16 +586,16 @@ public class ReviewService {
             case "REPLY" -> {
                 ReviewReply reply = reviewReplyMapper.selectById(targetId);
                 if (reply == null || Boolean.TRUE.equals(reply.getDeleted())) {
-                    throw new BusinessException("回复不存在");
+                    throw new BusinessException("?????");
                 }
             }
             case "MERCHANT_REPLY" -> {
                 Review review = requireReview(targetId);
                 if (review.getMerchantReply() == null || review.getMerchantReply().isBlank()) {
-                    throw new BusinessException("商家回复不存在");
+                    throw new BusinessException("???????");
                 }
             }
-            default -> throw new BusinessException("不支持的投票目标");
+            default -> throw new BusinessException("????????");
         }
     }
 
@@ -652,7 +656,7 @@ public class ReviewService {
             wrapper.eq(ReviewDeleteRequest::getReplyId, replyId);
         }
         if (reviewDeleteRequestMapper.selectCount(wrapper) > 0) {
-            throw new BusinessException("该评论已有待审核的删评申请");
+            throw new BusinessException("?????????????");
         }
     }
 
@@ -731,7 +735,7 @@ public class ReviewService {
 
     private String displayName(InternalUserSummary user) {
         if (user == null) {
-            return "匿名用户";
+            return "????";
         }
         if (user.username() != null && !user.username().isBlank()) {
             return user.username();
@@ -745,20 +749,20 @@ public class ReviewService {
 
     private void recalculateMerchantScore(Long merchantId) {
         List<Review> reviews = listRawByMerchantId(merchantId);
-        if (catalogClient.getMerchant(merchantId) == null) {
+        if (merchantClient.getMerchant(merchantId) == null) {
             return;
         }
         BigDecimal score = reviews.isEmpty()
             ? BigDecimal.ZERO
             : BigDecimal.valueOf(reviews.stream().mapToInt(Review::getScore).average().orElse(0))
                 .setScale(2, RoundingMode.HALF_UP);
-        catalogClient.updateMerchantScore(merchantId, score);
+        merchantClient.updateMerchantScore(merchantId, score);
     }
 
     private Review requireReview(Long reviewId) {
         Review review = reviewMapper.selectById(reviewId);
         if (review == null) {
-            throw new BusinessException("评价不存在");
+            throw new BusinessException("?????");
         }
         return review;
     }

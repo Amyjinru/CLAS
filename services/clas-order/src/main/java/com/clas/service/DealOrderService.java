@@ -2,6 +2,7 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import com.clas.client.IamClient;
 import com.clas.common.BusinessException;
 import com.clas.config.UserContext;
@@ -33,6 +34,7 @@ public class DealOrderService {
     public static final String STATUS_REFUNDED = "REFUNDED";
 
     private final CatalogClient catalogClient;
+    private final MerchantClient merchantClient;
     private final IamClient iamClient;
     private final MerchantContextService merchantContextService;
     private final NotificationBridge notificationBridge;
@@ -41,6 +43,7 @@ public class DealOrderService {
 
     public DealOrderService(
         CatalogClient catalogClient,
+        MerchantClient merchantClient,
         IamClient iamClient,
         MerchantContextService merchantContextService,
         NotificationBridge notificationBridge,
@@ -48,6 +51,7 @@ public class DealOrderService {
         DealRedeemLogMapper dealRedeemLogMapper
     ) {
         this.catalogClient = catalogClient;
+        this.merchantClient = merchantClient;
         this.iamClient = iamClient;
         this.merchantContextService = merchantContextService;
         this.notificationBridge = notificationBridge;
@@ -60,11 +64,11 @@ public class DealOrderService {
         iamClient.assertCanUsePlatform(UserContext.getUserId());
         GroupDeal deal = catalogClient.getDeal(dealId);
         if (deal == null || !"ON_SALE".equals(deal.getStatus())) {
-            throw new BusinessException("团购券不存在或已下架");
+            throw new BusinessException("??????????");
         }
         assertMerchantOpenNow(deal.getMerchantId());
         if (deal.getStock() <= 0) {
-            throw new BusinessException("团购券库存不足");
+            throw new BusinessException("???????");
         }
 
         DealOrder order = new DealOrder();
@@ -77,9 +81,9 @@ public class DealOrderService {
         order.setCreateTime(LocalDateTime.now());
         dealOrderMapper.insert(order);
         try {
-            sendDealOrderNotification(order, "团购券待支付", "您有一笔团购订单待支付，请尽快完成支付。");
+            sendDealOrderNotification(order, "??????", "????????????????????");
         } catch (RuntimeException ignored) {
-            // 通知失败不应影响下单与跳转支付。
+            // ????????????????
         }
         return order;
     }
@@ -91,11 +95,11 @@ public class DealOrderService {
             if (STATUS_UNUSED.equals(order.getStatus()) || STATUS_USED.equals(order.getStatus())) {
                 return getDealPaymentStatus(dealOrderId, userId);
             }
-            throw new BusinessException("团购订单当前不可支付，状态：" + order.getStatus());
+            throw new BusinessException("??????????????" + order.getStatus());
         }
         GroupDeal deal = catalogClient.getDeal(order.getDealId());
         if (deal == null || !"ON_SALE".equals(deal.getStatus())) {
-            throw new BusinessException("团购券不存在或已下架");
+            throw new BusinessException("??????????");
         }
 
         String method = payMethod == null || payMethod.isBlank() ? "MOCK" : payMethod;
@@ -113,14 +117,14 @@ public class DealOrderService {
         }
 
         try {
-            Thread.sleep(100); // 模拟支付延迟（生产环境应异步处理）
+            Thread.sleep(100); // ?????????????????
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new BusinessException("模拟支付被中断");
+            throw new BusinessException("???????");
         }
 
         if (!catalogClient.deductDealStock(deal.getId())) {
-            throw new BusinessException("团购券库存不足");
+            throw new BusinessException("???????");
         }
 
         LocalDateTime paidTime = LocalDateTime.now();
@@ -132,12 +136,12 @@ public class DealOrderService {
         try {
             sendDealOrderNotification(
                 order,
-                "团购券购买成功",
-                "券码 " + order.getVoucherCode() + " 已生成，有效期至 "
-                    + order.getExpireTime().toLocalDate() + "，可到店核销。"
+                "???????",
+                "?? " + order.getVoucherCode() + " ???????? "
+                    + order.getExpireTime().toLocalDate() + "???????"
             );
         } catch (RuntimeException ignored) {
-            // 通知失败不应影响支付结果。
+            // ?????????????
         }
         return new PaymentResponse(
             null,
@@ -172,10 +176,10 @@ public class DealOrderService {
     public DealOrder requireUserDealOrder(Long dealOrderId, String userId) {
         DealOrder order = dealOrderMapper.selectById(dealOrderId);
         if (order == null) {
-            throw new BusinessException("团购订单不存在");
+            throw new BusinessException("???????");
         }
         if (!order.getUserId().equals(userId)) {
-            throw new BusinessException("无权访问该团购订单");
+            throw new BusinessException("?????????");
         }
         return order;
     }
@@ -188,7 +192,7 @@ public class DealOrderService {
         Set<Long> dealIds = orders.stream().map(DealOrder::getDealId).collect(Collectors.toSet());
         Map<Long, GroupDeal> dealsById = dealIds.isEmpty() ? Map.of() : catalogClient.getDeals(dealIds);
         Set<Long> merchantIds = orders.stream().map(DealOrder::getMerchantId).collect(Collectors.toSet());
-        Map<Long, Merchant> merchantsById = merchantIds.isEmpty() ? Map.of() : catalogClient.getMerchants(merchantIds);
+        Map<Long, Merchant> merchantsById = merchantIds.isEmpty() ? Map.of() : merchantClient.getMerchants(merchantIds);
         orders.forEach(order -> {
             GroupDeal deal = dealsById.get(order.getDealId());
             Merchant merchant = merchantsById.get(order.getMerchantId());
@@ -202,22 +206,22 @@ public class DealOrderService {
     @Transactional
     public DealOrder redeem(String voucherCode) {
         if (voucherCode == null || voucherCode.isBlank()) {
-            throw new BusinessException("券码不能为空");
+            throw new BusinessException("??????");
         }
         DealOrder order = dealOrderMapper.selectOne(new LambdaQueryWrapper<DealOrder>()
             .eq(DealOrder::getVoucherCode, voucherCode.trim()));
         if (order == null) {
-            throw new BusinessException("券码不存在");
+            throw new BusinessException("?????");
         }
         if (!merchantContextService.getCurrentMerchantId().equals(order.getMerchantId())) {
-            throw new BusinessException("只能核销自己店铺的团购券");
+            throw new BusinessException("????????????");
         }
         refreshExpiredStatus(order);
         if (STATUS_EXPIRED.equals(order.getStatus())) {
-            throw new BusinessException("该团购券已过期");
+            throw new BusinessException("???????");
         }
         if (!STATUS_UNUSED.equals(order.getStatus())) {
-            throw new BusinessException("该团购券已核销或已失效");
+            throw new BusinessException("???????????");
         }
         order.setStatus(STATUS_USED);
         order.setUsedTime(LocalDateTime.now());
@@ -231,7 +235,7 @@ public class DealOrderService {
         log.setRedeemedAt(order.getUsedTime());
         dealRedeemLogMapper.insert(log);
 
-        sendDealOrderNotification(order, "团购券已核销", "券码 " + order.getVoucherCode() + " 已成功核销。");
+        sendDealOrderNotification(order, "??????", "?? " + order.getVoucherCode() + " ??????");
         return order;
     }
 
@@ -240,15 +244,15 @@ public class DealOrderService {
         DealOrder order = requireUserDealOrder(dealOrderId, userId);
         refreshExpiredStatus(order);
         if (!STATUS_UNUSED.equals(order.getStatus())) {
-            throw new BusinessException("仅未使用的团购券可申请退款");
+            throw new BusinessException("?????????????");
         }
         if (order.getExpireTime() != null && order.getExpireTime().isBefore(LocalDateTime.now())) {
-            throw new BusinessException("团购券已过期，无法退款");
+            throw new BusinessException("???????????");
         }
         catalogClient.restoreDealStock(order.getDealId());
         order.setStatus(STATUS_REFUNDED);
         dealOrderMapper.updateById(order);
-        sendDealOrderNotification(order, "团购券已退款", "券码 " + order.getVoucherCode() + " 已退款。");
+        sendDealOrderNotification(order, "??????", "?? " + order.getVoucherCode() + " ????");
         return order;
     }
 
@@ -287,12 +291,12 @@ public class DealOrderService {
     }
 
     private void assertMerchantOpenNow(Long merchantId) {
-        Merchant merchant = catalogClient.getMerchant(merchantId);
+        Merchant merchant = merchantClient.getMerchant(merchantId);
         if (merchant == null) {
-            throw new BusinessException("商家不存在");
+            throw new BusinessException("?????");
         }
         if (Boolean.TRUE.equals(merchant.getManualClosed())) {
-            throw new BusinessException("商家已打烊");
+            throw new BusinessException("?????");
         }
         String businessHours = trimToNull(merchant.getBusinessHours());
         if (businessHours == null) {
@@ -307,7 +311,7 @@ public class DealOrderService {
             LocalTime end = LocalTime.parse(parts[1].trim());
             LocalTime now = LocalTime.now();
             if (!isWithinBusinessHours(now, start, end)) {
-                throw new BusinessException("商家已休息，当前营业时间：" + businessHours);
+                throw new BusinessException("?????????????" + businessHours);
             }
         } catch (DateTimeParseException exception) {
             return;

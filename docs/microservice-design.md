@@ -1,15 +1,14 @@
 # CLAS 微服务划分、接口与数据归属方案
 
-> 状态：设计已完成；商品目录服务已独立实现，其余领域仍处于单体迁移阶段。
+> 状态：目标架构蓝图；当前可运行实现为 `services/clas-iam`、`services/clas-catalog`、`services/clas-order` 与 `services/clas-compat`。本文件的 12 服务划分是后续演进目标，不应与当前四服务部署混用。
 > 基线：提交 `15355196f0a18fdaa9e79b88da3480ef09c4fab9` 及其后的 `main`。
 > 本文定义从当前单体应用演进到微服务的目标蓝图，不改变当前生产运行方式。
 
 ## 1. 当前状态与约束
 
-当前生产形态是 **Vue 前端 + 单个 Spring Boot `backend` + MySQL + Redis**。k3s 清单中只有一个
-`backend` Deployment，因此它不是已经完整拆分完成的微服务系统。商品目录服务的独立代码位于
-`services/catalog-service`，部署清单位于 `k8s/catalog-service.yaml`；下图中的其余服务仍是稳定的领域边界和后续可独立
-部署单元。迁移期间仍可先在同一代码仓、同一 MySQL 实例中按 schema 隔离。
+当前生产证据仍是 **Vue 前端 + 单个 Spring Boot `backend` + MySQL + Redis**。仓库现已提供四服务与网关的
+Kubernetes 清单（`k8s/microservices*.yaml`），但尚无集群 apply/运行证据，不能表述为已完成线上微服务部署。当前目录能力以
+`services/clas-catalog` 实现并由 `services/nginx/clas-gateway.conf` 路由；下图中的其余服务仍是稳定的领域边界和后续可独立部署单元。迁移期间仍可先在同一代码仓、同一 MySQL 实例中按 schema 隔离。
 
 - 每张业务表只有一个主写服务（owner）；其它服务只可通过 API、事件投影或只读副本使用数据。
 - `userId`、`merchantId`、`orderId` 等仅作为跨服务引用，不建立跨服务外键。
@@ -66,7 +65,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | 身份与账户 | 登录、会话、角色、个人资料、地址、银行卡 | `User*Controller`、`AddressController` | 0：先保持模块化 |
 | 商家 | 入驻、审核、商家资料与营业状态 | `MerchantController` | 1 |
-| 商品目录 | 分类、商品、图片、库存查询 | `services/catalog-service` | 已实现 |
+| 商品目录 | 分类、商品、图片、库存查询 | `services/clas-catalog` | 当前四服务实现 |
 | 购物车 | 加减商品、失效校验 | `CartController` | 2 |
 | 订单履约 | 下单、状态机、退款争议、时间线 | `OrderController` | 1 |
 | 支付结算 | 模拟支付、骑手小费、结算、提现 | `PaymentController`、`RiderWithdrawalService` | 2 |

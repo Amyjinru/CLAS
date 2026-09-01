@@ -2,14 +2,13 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.client.MerchantClient;
 import com.clas.dto.ChatMessageResponse;
 import com.clas.entity.ChatConversation;
 import com.clas.entity.ChatMessage;
-import com.clas.entity.Merchant;
 import com.clas.entity.Orders;
 import com.clas.mapper.ChatConversationMapper;
 import com.clas.mapper.ChatMessageMapper;
-import com.clas.mapper.MerchantMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -22,17 +21,17 @@ public class RiderMerchantContactService {
     private static final String RIDER_MERCHANT = "RIDER_MERCHANT";
     private static final Set<String> ACTIVE = Set.of("ASSIGNED_WAITING_MEAL", "DELIVERING");
     private final OrderService orderService;
-    private final MerchantMapper merchants;
+    private final MerchantClient merchantClient;
     private final ChatMessageMapper messages;
     private final ChatConversationMapper conversations;
     private final ContentModerationService contentModerationService;
     private final PenaltyService penaltyService;
 
-    public RiderMerchantContactService(OrderService orderService, MerchantMapper merchants,
+    public RiderMerchantContactService(OrderService orderService, MerchantClient merchantClient,
                                        ChatMessageMapper messages, ChatConversationMapper conversations,
                                        ContentModerationService contentModerationService, PenaltyService penaltyService) {
         this.orderService = orderService;
-        this.merchants = merchants;
+        this.merchantClient = merchantClient;
         this.messages = messages;
         this.conversations = conversations;
         this.contentModerationService = contentModerationService;
@@ -76,9 +75,8 @@ public class RiderMerchantContactService {
         if ("RIDER".equals(role)) {
             if (!Objects.equals(order.getRiderId(), actorId)) throw new BusinessException("无权联系该订单商家");
         } else if ("MERCHANT".equals(role)) {
-            Merchant merchant = merchants.selectOne(new LambdaQueryWrapper<Merchant>()
-                .eq(Merchant::getUserId, actorId).last("LIMIT 1"));
-            if (merchant == null || !Objects.equals(order.getMerchantId(), merchant.getId())) {
+            Long merchantId = merchantClient.getMerchantIdByUser(actorId);
+            if (!Objects.equals(order.getMerchantId(), merchantId)) {
                 throw new BusinessException("无权联系该订单骑手");
             }
         } else {

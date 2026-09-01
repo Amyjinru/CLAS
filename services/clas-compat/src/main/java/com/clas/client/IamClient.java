@@ -4,6 +4,8 @@ import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.common.Result;
 import com.clas.common.client.ServiceEndpoints;
+import com.clas.common.dto.InternalTokenValidationRequest;
+import com.clas.common.dto.InternalValidatedUser;
 import com.clas.dto.InternalAddressResponse;
 import com.clas.dto.InternalNotificationRequest;
 import com.clas.dto.InternalUserSummary;
@@ -15,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpStatusCodeException;
 
 @Component
 public class IamClient {
@@ -86,6 +89,32 @@ public class IamClient {
             new ParameterizedTypeReference<Result<Boolean>>() {}
         );
         return Boolean.TRUE.equals(pending);
+    }
+
+    public InternalValidatedUser validateToken(String token) {
+        try {
+            ResponseEntity<Result<InternalValidatedUser>> response = restTemplate.exchange(
+                serviceEndpoints.iam() + "/internal/iam/v1/auth/validate", HttpMethod.POST,
+                new HttpEntity<>(new InternalTokenValidationRequest(token)),
+                new ParameterizedTypeReference<Result<InternalValidatedUser>>() {}
+            );
+            Result<InternalValidatedUser> body = response.getBody();
+            return body == null ? null : body.data();
+        } catch (HttpStatusCodeException exception) {
+            int status = exception.getStatusCode().value();
+            throw new BusinessException(status,
+                status == 401 ? "登录已过期，请重新登录" : "当前身份尚未审核通过或已不可用");
+        } catch (RestClientException exception) {
+            throw upstreamUnavailable();
+        }
+    }
+
+    public java.util.Map<String, Long> getPublicStats() {
+        java.util.Map<String, Long> stats = exchange(
+            serviceEndpoints.iam() + "/internal/iam/v1/stats/public",
+            HttpMethod.GET, null, new ParameterizedTypeReference<Result<java.util.Map<String, Long>>>() {}
+        );
+        return stats == null ? java.util.Map.of() : stats;
     }
 
     public void sendNotification(InternalNotificationRequest request) {

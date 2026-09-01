@@ -1,4 +1,4 @@
-# Start four microservices + optional Nginx gateway (8080)
+# Start five microservices (iam/merchant/catalog/order/compat) + optional Nginx gateway (8080)
 param(
     [switch]$SkipBuild,
     [switch]$SkipGateway,
@@ -38,12 +38,15 @@ Set-DefaultEnv "MYSQL_PORT" "3306"
 Set-DefaultEnv "MYSQL_DATABASE" "clas"
 Set-DefaultEnv "MYSQL_USER" "root"
 Set-DefaultEnv "JWT_SECRET" "clas-local-integration-secret-2026-hint314!"
+Set-DefaultEnv "CLAS_INTERNAL_API_KEY" "clas-local-internal-api-key-2026-hint314!"
+Set-DefaultEnv "CLAS_MERCHANT_PORT" "8085"
 Set-DefaultEnv "CLAS_IAM_PORT" "8081"
 Set-DefaultEnv "CLAS_CATALOG_PORT" "8082"
 Set-DefaultEnv "CLAS_ORDER_PORT" "8083"
 Set-DefaultEnv "CLAS_COMPAT_PORT" "8084"
 Set-DefaultEnv "CLAS_GATEWAY_PORT" "8080"
 Set-DefaultEnv "CLAS_IAM_HOST" "localhost"
+Set-DefaultEnv "CLAS_MERCHANT_HOST" "localhost"
 Set-DefaultEnv "CLAS_CATALOG_HOST" "localhost"
 Set-DefaultEnv "CLAS_ORDER_HOST" "localhost"
 Set-DefaultEnv "CLAS_COMPAT_HOST" "localhost"
@@ -64,6 +67,7 @@ if (-not $SkipBuild) {
 
 $modules = @(
     @{ Name = "iam"; Jar = "clas-iam/target/clas-iam-0.1.0.jar"; Port = $env:CLAS_IAM_PORT },
+    @{ Name = "merchant"; Jar = "clas-merchant/target/clas-merchant-0.1.0.jar"; Port = $env:CLAS_MERCHANT_PORT },
     @{ Name = "catalog"; Jar = "clas-catalog/target/clas-catalog-0.1.0.jar"; Port = $env:CLAS_CATALOG_PORT },
     @{ Name = "order"; Jar = "clas-order/target/clas-order-0.1.0.jar"; Port = $env:CLAS_ORDER_PORT },
     @{ Name = "compat"; Jar = "clas-compat/target/clas-compat-0.1.0.jar"; Port = $env:CLAS_COMPAT_PORT }
@@ -87,6 +91,7 @@ foreach ($m in $modules) {
     Write-Host "Starting $($m.Name) on port $($m.Port) ..."
     $javaArgs = @("-jar", $jarArg)
     if ($env:JWT_SECRET) { $javaArgs += "--jwt.secret=$($env:JWT_SECRET)" }
+    if ($env:CLAS_INTERNAL_API_KEY) { $javaArgs += "--clas.internal-api-key=$($env:CLAS_INTERNAL_API_KEY)" }
     if ($env:MYSQL_PASSWORD) { $javaArgs += "--spring.datasource.password=$($env:MYSQL_PASSWORD)" }
     if ($Foreground) {
         Start-Process -FilePath "java" -ArgumentList $javaArgs `
@@ -101,8 +106,13 @@ foreach ($m in $modules) {
 }
 
 if (-not $SkipGateway -and -not $Foreground) {
-    $nginx = Get-Command nginx -ErrorAction SilentlyContinue
-    if ($nginx) {
+    $nginxCmd = Get-Command nginx -ErrorAction SilentlyContinue
+    $nginxExe = if ($nginxCmd) { $nginxCmd.Source } else {
+        @(
+            "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\nginxinc.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\nginx-1.31.4\nginx.exe"
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
+    if ($nginxExe) {
         $nginxPrefix = Join-Path $ServicesRoot "nginx"
         $nginxLogs = Join-Path $nginxPrefix "logs"
         New-Item -ItemType Directory -Force -Path $nginxLogs | Out-Null
@@ -110,9 +120,15 @@ if (-not $SkipGateway -and -not $Foreground) {
             New-Item -ItemType Directory -Force -Path (Join-Path $nginxLogs $sub) | Out-Null
         }
         Write-Host "Starting Nginx gateway on port $($env:CLAS_GATEWAY_PORT) ..."
-        & nginx -p $nginxPrefix -c (Join-Path $nginxPrefix "clas-gateway.conf") -t
-        if ($LASTEXITCODE -ne 0) { throw "nginx config test failed" }
-        & nginx -p $nginxPrefix -c (Join-Path $nginxPrefix "clas-gateway.conf")
+        # -p ./ avoids nginx splitting a prefix that contains spaces (e.g. "CLAS 1.2")
+        Push-Location $nginxPrefix
+        try {
+            & $nginxExe -p "./" -c "clas-gateway.conf" -t
+            if ($LASTEXITCODE -ne 0) { throw "nginx config test failed" }
+            Start-Process -FilePath $nginxExe -ArgumentList @("-p", "./", "-c", "clas-gateway.conf") -WorkingDirectory $nginxPrefix -WindowStyle Hidden
+        } finally {
+            Pop-Location
+        }
     } else {
         Write-Host "nginx not found, skip gateway. Use smoke-main-path.ps1 -Direct or install nginx." -ForegroundColor Yellow
     }

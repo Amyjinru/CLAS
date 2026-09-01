@@ -9,7 +9,7 @@ import com.clas.dto.ProductResponse;
 import com.clas.dto.ProductListResponse;
 import com.clas.entity.Product;
 import com.clas.entity.ProductCategory;
-import com.clas.service.MerchantService;
+import com.clas.client.MerchantClient;
 import com.clas.service.ProductService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -19,11 +19,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 public class ProductController {
     private final ProductService productService;
-    private final MerchantService merchantService;
+    private final MerchantClient merchantClient;
 
-    public ProductController(ProductService productService, MerchantService merchantService) {
+    public ProductController(ProductService productService, MerchantClient merchantClient) {
         this.productService = productService;
-        this.merchantService = merchantService;
+        this.merchantClient = merchantClient;
     }
 
     @GetMapping("/api/product/list/{merchantId}")
@@ -38,7 +38,7 @@ public class ProductController {
 
     @GetMapping("/api/product/categories")
     public Result<List<ProductCategory>> listCategories(@RequestParam(required = false) Long merchantId) {
-        Long resolvedMerchantId = merchantId == null ? merchantService.getCurrentMerchantId() : merchantId;
+        Long resolvedMerchantId = merchantId == null ? merchantClient.getCurrentMerchantId() : merchantId;
         return Result.ok(productService.listCategories(resolvedMerchantId));
     }
 
@@ -60,7 +60,7 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long categoryId) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         Page<Product> productPage = productService.getMerchantProducts(merchantId, page, size, keyword, categoryId);
 
         List<ProductResponse> responses = productPage.getRecords().stream()
@@ -84,7 +84,7 @@ public class ProductController {
     @PostMapping("/api/merchant/me/products")
     @RequireRole("MERCHANT")
     public Result<ProductResponse> createMyProduct(@Valid @RequestBody ProductCreateRequest request) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         Product product = productService.createProduct(request, merchantId);
         return Result.ok(productService.toResponse(product));
     }
@@ -99,7 +99,7 @@ public class ProductController {
     @PutMapping("/api/merchant/me/products")
     @RequireRole("MERCHANT")
     public Result<ProductResponse> updateMyProduct(@Valid @RequestBody ProductUpdateRequest request) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         Product product = productService.updateProduct(request, merchantId);
         return Result.ok(productService.toResponse(product));
     }
@@ -109,21 +109,21 @@ public class ProductController {
     @PostMapping("/api/product/categories")
     @RequireRole("MERCHANT")
     public Result<ProductCategory> createCategory(@Valid @RequestBody CategoryRequest request) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         return Result.ok(productService.createCategory(merchantId, request.name(), request.sortOrder()));
     }
 
     @PutMapping("/api/product/categories")
     @RequireRole("MERCHANT")
     public Result<ProductCategory> updateCategory(@Valid @RequestBody CategoryRequest request) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         return Result.ok(productService.updateCategory(merchantId, request.id(), request.name(), request.sortOrder()));
     }
 
     @DeleteMapping("/api/product/categories/{categoryId}")
     @RequireRole("MERCHANT")
     public Result<Void> deleteCategory(@PathVariable Long categoryId) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         productService.deleteCategory(merchantId, categoryId);
         return Result.ok();
     }
@@ -140,7 +140,7 @@ public class ProductController {
     @PatchMapping("/api/merchant/me/products/status")
     @RequireRole("MERCHANT")
     public Result<Void> updateMyProductStatus(@Valid @RequestBody StatusUpdateRequest request) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         productService.updateStatus(request.productId(), request.status(), merchantId);
         return Result.ok();
     }
@@ -155,7 +155,7 @@ public class ProductController {
     @DeleteMapping("/api/merchant/me/products/{productId}")
     @RequireRole("MERCHANT")
     public Result<Void> deleteMyProduct(@PathVariable Long productId) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         productService.deleteProduct(productId, merchantId);
         return Result.ok();
     }

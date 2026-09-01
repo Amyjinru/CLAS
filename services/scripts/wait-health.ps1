@@ -4,6 +4,7 @@ param(
 
 $services = @(
     @{ Name = "iam"; Port = $env:CLAS_IAM_PORT; DefaultPort = 8081 },
+    @{ Name = "merchant"; Port = $env:CLAS_MERCHANT_PORT; DefaultPort = 8085 },
     @{ Name = "catalog"; Port = $env:CLAS_CATALOG_PORT; DefaultPort = 8082 },
     @{ Name = "order"; Port = $env:CLAS_ORDER_PORT; DefaultPort = 8083 },
     @{ Name = "compat"; Port = $env:CLAS_COMPAT_PORT; DefaultPort = 8084 }

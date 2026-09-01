@@ -1,0 +1,194 @@
+# Apply after namespace.yaml, configmap.yaml, secret creation, mysql.yaml and redis.yaml.
+# Replace REQUIRED_TAG with one immutable image tag before applying.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clas-iam
+  namespace: clas
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: clas-iam}}
+  template:
+    metadata: {labels: {app: clas-iam}}
+    spec:
+      imagePullSecrets: [{name: ghcr-pull-secret}]
+      containers:
+        - name: clas-iam
+          image: ghcr.io/amyjinru/clas-iam:REQUIRED_TAG
+          ports: [{containerPort: 8081}]
+          envFrom: [{configMapRef: {name: clas-config}}, {secretRef: {name: clas-secrets}}]
+          env:
+            - {name: CLAS_IAM_HOST, value: clas-iam}
+            - {name: CLAS_MERCHANT_HOST, value: clas-merchant}
+            - {name: CLAS_CATALOG_HOST, value: clas-catalog}
+            - {name: CLAS_ORDER_HOST, value: clas-order}
+            - {name: CLAS_COMPAT_HOST, value: clas-compat}
+          readinessProbe: {httpGet: {path: /api/health, port: 8081}, initialDelaySeconds: 20, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /api/health, port: 8081}, initialDelaySeconds: 45, periodSeconds: 20}
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: clas-iam, namespace: clas}
+spec:
+  type: ClusterIP
+  selector: {app: clas-iam}
+  ports: [{name: http, port: 8081, targetPort: 8081}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: clas-merchant-uploads, namespace: clas}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 2Gi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clas-merchant
+  namespace: clas
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: clas-merchant}}
+  template:
+    metadata: {labels: {app: clas-merchant}}
+    spec:
+      imagePullSecrets: [{name: ghcr-pull-secret}]
+      containers:
+        - name: clas-merchant
+          image: ghcr.io/amyjinru/clas-merchant:REQUIRED_TAG
+          ports: [{containerPort: 8085}]
+          envFrom: [{configMapRef: {name: clas-config}}, {secretRef: {name: clas-secrets}}]
+          env:
+            - {name: CLAS_IAM_HOST, value: clas-iam}
+            - {name: CLAS_MERCHANT_HOST, value: clas-merchant}
+            - {name: CLAS_CATALOG_HOST, value: clas-catalog}
+            - {name: CLAS_ORDER_HOST, value: clas-order}
+            - {name: CLAS_COMPAT_HOST, value: clas-compat}
+          volumeMounts: [{name: uploads, mountPath: /app/uploads}]
+          readinessProbe: {httpGet: {path: /api/health, port: 8085}, initialDelaySeconds: 20, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /api/health, port: 8085}, initialDelaySeconds: 45, periodSeconds: 20}
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
+      volumes: [{name: uploads, persistentVolumeClaim: {claimName: clas-merchant-uploads}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: clas-merchant, namespace: clas}
+spec:
+  type: ClusterIP
+  selector: {app: clas-merchant}
+  ports: [{name: http, port: 8085, targetPort: 8085}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: clas-catalog-uploads, namespace: clas}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 5Gi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clas-catalog
+  namespace: clas
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: clas-catalog}}
+  template:
+    metadata: {labels: {app: clas-catalog}}
+    spec:
+      imagePullSecrets: [{name: ghcr-pull-secret}]
+      containers:
+        - name: clas-catalog
+          image: ghcr.io/amyjinru/clas-catalog:REQUIRED_TAG
+          ports: [{containerPort: 8082}]
+          envFrom: [{configMapRef: {name: clas-config}}, {secretRef: {name: clas-secrets}}]
+          env:
+            - {name: CLAS_IAM_HOST, value: clas-iam}
+            - {name: CLAS_MERCHANT_HOST, value: clas-merchant}
+            - {name: CLAS_CATALOG_HOST, value: clas-catalog}
+            - {name: CLAS_ORDER_HOST, value: clas-order}
+            - {name: CLAS_COMPAT_HOST, value: clas-compat}
+          volumeMounts: [{name: uploads, mountPath: /app/uploads}]
+          readinessProbe: {httpGet: {path: /api/health, port: 8082}, initialDelaySeconds: 20, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /api/health, port: 8082}, initialDelaySeconds: 45, periodSeconds: 20}
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
+      volumes: [{name: uploads, persistentVolumeClaim: {claimName: clas-catalog-uploads}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: clas-catalog, namespace: clas}
+spec:
+  type: ClusterIP
+  selector: {app: clas-catalog}
+  ports: [{name: http, port: 8082, targetPort: 8082}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clas-order
+  namespace: clas
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: clas-order}}
+  template:
+    metadata: {labels: {app: clas-order}}
+    spec:
+      imagePullSecrets: [{name: ghcr-pull-secret}]
+      containers:
+        - name: clas-order
+          image: ghcr.io/amyjinru/clas-order:REQUIRED_TAG
+          ports: [{containerPort: 8083}]
+          envFrom: [{configMapRef: {name: clas-config}}, {secretRef: {name: clas-secrets}}]
+          env:
+            - {name: CLAS_IAM_HOST, value: clas-iam}
+            - {name: CLAS_MERCHANT_HOST, value: clas-merchant}
+            - {name: CLAS_CATALOG_HOST, value: clas-catalog}
+            - {name: CLAS_ORDER_HOST, value: clas-order}
+            - {name: CLAS_COMPAT_HOST, value: clas-compat}
+          readinessProbe: {httpGet: {path: /api/health, port: 8083}, initialDelaySeconds: 20, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /api/health, port: 8083}, initialDelaySeconds: 45, periodSeconds: 20}
+          resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: 750m, memory: 768Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: clas-order, namespace: clas}
+spec:
+  type: ClusterIP
+  selector: {app: clas-order}
+  ports: [{name: http, port: 8083, targetPort: 8083}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clas-compat
+  namespace: clas
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: clas-compat}}
+  template:
+    metadata: {labels: {app: clas-compat}}
+    spec:
+      imagePullSecrets: [{name: ghcr-pull-secret}]
+      containers:
+        - name: clas-compat
+          image: ghcr.io/amyjinru/clas-compat:REQUIRED_TAG
+          ports: [{containerPort: 8084}]
+          envFrom: [{configMapRef: {name: clas-config}}, {secretRef: {name: clas-secrets}}]
+          env:
+            - {name: CLAS_IAM_HOST, value: clas-iam}
+            - {name: CLAS_MERCHANT_HOST, value: clas-merchant}
+            - {name: CLAS_CATALOG_HOST, value: clas-catalog}
+            - {name: CLAS_ORDER_HOST, value: clas-order}
+            - {name: CLAS_COMPAT_HOST, value: clas-compat}
+          readinessProbe: {httpGet: {path: /api/health, port: 8084}, initialDelaySeconds: 20, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /api/health, port: 8084}, initialDelaySeconds: 45, periodSeconds: 20}
+          resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: 750m, memory: 768Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: clas-compat, namespace: clas}
+spec:
+  type: ClusterIP
+  selector: {app: clas-compat}
+  ports: [{name: http, port: 8084, targetPort: 8084}]

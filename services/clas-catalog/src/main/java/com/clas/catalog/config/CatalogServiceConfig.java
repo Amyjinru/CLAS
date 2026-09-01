@@ -8,6 +8,6 @@ import org.springframework.context.annotation.Configuration;
 public class CatalogServiceConfig {
     @Bean
     ServiceIdentity serviceIdentity() {
-        return new ServiceIdentity("clas-catalog", "Merchant and Catalog");
+        return new ServiceIdentity("clas-catalog", "Catalog");
     }
 }

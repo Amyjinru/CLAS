@@ -2,6 +2,7 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import com.clas.client.CompatClient;
 import com.clas.common.BusinessException;
 import com.clas.entity.Merchant;
@@ -19,6 +20,7 @@ public class OrderRefundDisputeService {
     private final OrderRefundDisputeMapper disputes;
     private final OrdersMapper orders;
     private final CatalogClient catalogClient;
+    private final MerchantClient merchantClient;
     private final OrderService orderService;
     private final OrderLifecycleService lifecycle;
     private final CompatClient compatClient;
@@ -28,6 +30,7 @@ public class OrderRefundDisputeService {
         OrderRefundDisputeMapper disputes,
         OrdersMapper orders,
         CatalogClient catalogClient,
+        MerchantClient merchantClient,
         OrderService orderService,
         OrderLifecycleService lifecycle,
         CompatClient compatClient,
@@ -36,6 +39,7 @@ public class OrderRefundDisputeService {
         this.disputes = disputes;
         this.orders = orders;
         this.catalogClient = catalogClient;
+        this.merchantClient = merchantClient;
         this.orderService = orderService;
         this.lifecycle = lifecycle;
         this.compatClient = compatClient;
@@ -46,21 +50,21 @@ public class OrderRefundDisputeService {
     public OrderRefundDispute submit(Long orderId, String userId, String reason) {
         Orders order = orderService.requireUserOrder(orderId, userId);
         if (!"REJECTED".equals(order.getRefundStatus())) {
-            throw new BusinessException("请先等待商家处理退款申请；仅商家拒绝后的订单可提交争议");
+            throw new BusinessException("???????????????????????????");
         }
-        return createPendingDispute(order, reason, "USER", userId, "用户提交退款争议：");
+        return createPendingDispute(order, reason, "USER", userId, "?????????");
     }
 
     @Transactional
     public OrderRefundDispute autoSubmitAfterMerchantReject(Orders order, String merchantActorId) {
         if (!"REJECTED".equals(order.getRefundStatus())) {
-            throw new BusinessException("订单当前不处于商家拒绝退款状态");
+            throw new BusinessException("???????????????");
         }
         String userReason = order.getRefundReason();
         if (userReason == null || userReason.isBlank()) {
-            userReason = "用户未补充退款原因";
+            userReason = "?????????";
         }
-        return createPendingDispute(order, userReason, "MERCHANT", merchantActorId, "商家拒绝退款后自动转入平台争议：");
+        return createPendingDispute(order, userReason, "MERCHANT", merchantActorId, "????????????????");
     }
 
     private OrderRefundDispute createPendingDispute(
@@ -69,7 +73,7 @@ public class OrderRefundDisputeService {
         Long orderId = order.getId();
         if (disputes.selectCount(new LambdaQueryWrapper<OrderRefundDispute>()
             .eq(OrderRefundDispute::getOrderId, orderId).eq(OrderRefundDispute::getStatus, "PENDING")) > 0) {
-            throw new BusinessException("该订单已有待审核的退款争议");
+            throw new BusinessException("?????????????");
         }
         OrderRefundDispute dispute = new OrderRefundDispute();
         dispute.setOrderId(orderId);
@@ -92,10 +96,10 @@ public class OrderRefundDisputeService {
         orders.updateById(order);
         String eventType = "MERCHANT".equals(actorRole) ? "REFUND_DISPUTE_AUTO_SUBMITTED" : "REFUND_DISPUTE_SUBMITTED";
         lifecycle.record(order, eventType, fromStatus, fromDelivery, actorRole, actorId, lifecycleRemarkPrefix + dispute.getUserReason());
-        notifications.notifyAdmins("待处理订单退款争议", "订单 " + orderId + " 的退款争议等待审核。");
-        notifyUser(order, "退款申请已进入平台审核", "订单 " + orderId + " 的退款争议已转交管理员审核。");
-        notifyMerchant(order, "退款争议已进入平台审核", "订单 " + orderId + " 的退款争议已转交管理员审核。");
-        notifyRider(order, "订单退款争议处理中", "订单 " + orderId + " 的配送佣金暂不进入可提现余额。");
+        notifications.notifyAdmins("?????????", "?? " + orderId + " ??????????");
+        notifyUser(order, "???????????", "?? " + orderId + " ??????????????");
+        notifyMerchant(order, "???????????", "?? " + orderId + " ??????????????");
+        notifyRider(order, "?????????", "?? " + orderId + " ???????????????");
         return dispute;
     }
 
@@ -113,14 +117,14 @@ public class OrderRefundDisputeService {
     public OrderRefundDispute audit(Long disputeId, boolean approved, String reason, String adminId) {
         OrderRefundDispute dispute = disputes.selectById(disputeId);
         if (dispute == null) {
-            throw new BusinessException("退款争议不存在");
+            throw new BusinessException("???????");
         }
         if (!"PENDING".equals(dispute.getStatus())) {
-            throw new BusinessException("该退款争议已处理");
+            throw new BusinessException("????????");
         }
         Orders order = orders.selectById(dispute.getOrderId());
         if (order == null || !"DISPUTE_PENDING".equals(order.getRefundStatus())) {
-            throw new BusinessException("订单当前不处于待裁定退款争议状态");
+            throw new BusinessException("????????????????");
         }
 
         String fromStatus = order.getStatus();
@@ -128,18 +132,18 @@ public class OrderRefundDisputeService {
         if (approved) {
             orderService.approveRefundByAdmin(order, adminId, reason.trim());
             dispute.setStatus("APPROVED");
-            notifyMerchant(order, "退款争议已裁定", "订单 " + order.getId() + " 的退款争议已通过，平台将按退款处理。");
+            notifyMerchant(order, "???????", "?? " + order.getId() + " ??????????????????");
         } else {
             order.setStatus(dispute.getOriginalOrderStatus());
             order.setDeliveryStatus(dispute.getOriginalDeliveryStatus());
             order.setRefundStatus("REJECTED");
             order.setRefundResolvedAt(LocalDateTime.now());
-            order.setRefundRejectReason("管理员裁定：" + reason.trim());
+            order.setRefundRejectReason("??????" + reason.trim());
             orders.updateById(order);
-            lifecycle.record(order, "REFUND_DISPUTE_REJECTED", fromStatus, fromDelivery, "ADMIN", adminId, "管理员驳回退款争议：" + reason.trim());
+            lifecycle.record(order, "REFUND_DISPUTE_REJECTED", fromStatus, fromDelivery, "ADMIN", adminId, "??????????" + reason.trim());
             compatClient.releaseCommissionIfEligible(order);
-            notifyUser(order, "退款争议未通过", "订单 " + order.getId() + " 的退款争议未通过：" + reason.trim());
-            notifyMerchant(order, "退款争议已裁定", "订单 " + order.getId() + " 的退款争议未通过。");
+            notifyUser(order, "???????", "?? " + order.getId() + " ?????????" + reason.trim());
+            notifyMerchant(order, "???????", "?? " + order.getId() + " ?????????");
         }
         dispute.setAdminReason(reason.trim());
         dispute.setReviewerId(adminId);
@@ -154,7 +158,7 @@ public class OrderRefundDisputeService {
     }
 
     private void notifyMerchant(Orders order, String title, String content) {
-        Merchant merchant = catalogClient.getMerchant(order.getMerchantId());
+        Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         if (merchant != null) {
             notifications.send(new NotificationBridge.NotificationTarget(
                 merchant.getUserId(), title, content, "ORDER_STATUS", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/merchant-console"));

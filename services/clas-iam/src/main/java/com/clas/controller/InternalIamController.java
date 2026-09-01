@@ -2,10 +2,13 @@ package com.clas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.common.JwtUtil;
 import com.clas.common.PasswordValidator;
 import com.clas.common.PhoneValidator;
 import com.clas.common.Result;
 import com.clas.common.VerificationCodeStore;
+import com.clas.common.dto.InternalTokenValidationRequest;
+import com.clas.common.dto.InternalValidatedUser;
 import com.clas.dto.InternalAddressResponse;
 import com.clas.dto.InternalUserSummary;
 import com.clas.dto.MerchantApplicantRequest;
@@ -20,6 +23,8 @@ import com.clas.mapper.UserMapper;
 import com.clas.service.PenaltyService;
 import com.clas.service.UserService;
 import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +45,7 @@ public class InternalIamController {
     private final PenaltyService penaltyService;
     private final VerificationCodeStore verificationCodeStore;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
     public InternalIamController(
         UserMapper userMapper,
@@ -49,7 +55,8 @@ public class InternalIamController {
         UserService userService,
         PenaltyService penaltyService,
         VerificationCodeStore verificationCodeStore,
-        BCryptPasswordEncoder passwordEncoder
+        BCryptPasswordEncoder passwordEncoder,
+        JwtUtil jwtUtil
     ) {
         this.userMapper = userMapper;
         this.userAddressMapper = userAddressMapper;
@@ -59,6 +66,7 @@ public class InternalIamController {
         this.penaltyService = penaltyService;
         this.verificationCodeStore = verificationCodeStore;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @GetMapping("/users/{userId}")
@@ -68,6 +76,37 @@ public class InternalIamController {
             return Result.ok(null);
         }
         return Result.ok(new InternalUserSummary(user.getPhone(), user.getUsername(), user.getRole(), user.getEnabled()));
+    }
+
+    @PostMapping("/auth/validate")
+    public Result<InternalValidatedUser> validateToken(@RequestBody InternalTokenValidationRequest request) {
+        if (!jwtUtil.isTokenValid(request.token())) {
+            throw new BusinessException(401, "登录已过期，请重新登录");
+        }
+        String userId = jwtUtil.getPhoneFromToken(request.token());
+        User user = userMapper.selectById(userId);
+        if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
+            throw new BusinessException(401, "账号已被禁用或不存在");
+        }
+        String tokenSession = jwtUtil.getSessionTokenFromToken(request.token());
+        if (tokenSession == null || !tokenSession.equals(user.getSessionToken())) {
+            throw new BusinessException(401, "账号已在其他设备登录，请重新登录");
+        }
+        String activeRole = jwtUtil.getRoleFromToken(request.token());
+        List<String> roles = new ArrayList<>(userService.rolesOf(userId));
+        if (user.getRole() != null && !user.getRole().isBlank() && !roles.contains(user.getRole())) {
+            roles.add(user.getRole());
+        }
+        if (activeRole == null || !roles.contains(activeRole)) {
+            throw new BusinessException(403, "当前身份尚未审核通过或已不可用");
+        }
+        if ("ADMIN".equals(activeRole) && !activeRole.equals(user.getRole())) {
+            throw new BusinessException(403, "当前端口身份已失效，请重新登录");
+        }
+        userService.touchActiveSession(user);
+        return Result.ok(new InternalValidatedUser(
+            user.getPhone(), user.getUsername(), activeRole, roles, penaltyService.isAccountOnlyRestricted(userId)
+        ));
     }
 
     @GetMapping("/users/{userId}/roles")
@@ -164,5 +203,10 @@ public class InternalIamController {
             .eq(RoleApplication::getTargetRole, "RIDER")
             .eq(RoleApplication::getStatus, "PENDING"));
         return Result.ok(pending);
+    }
+
+    @GetMapping("/stats/public")
+    public Result<Map<String, Long>> publicStats() {
+        return Result.ok(Map.of("users", userMapper.selectCount(null)));
     }
 }

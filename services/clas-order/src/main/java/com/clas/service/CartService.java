@@ -2,6 +2,7 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import com.clas.client.IamClient;
 import com.clas.common.BusinessException;
 import com.clas.dto.AddCartRequest;
@@ -26,11 +27,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class CartService {
     private final CartMapper cartMapper;
     private final CatalogClient catalogClient;
+    private final MerchantClient merchantClient;
     private final IamClient iamClient;
 
-    public CartService(CartMapper cartMapper, CatalogClient catalogClient, IamClient iamClient) {
+    public CartService(CartMapper cartMapper, CatalogClient catalogClient, MerchantClient merchantClient, IamClient iamClient) {
         this.cartMapper = cartMapper;
         this.catalogClient = catalogClient;
+        this.merchantClient = merchantClient;
         this.iamClient = iamClient;
     }
 
@@ -119,7 +122,7 @@ public class CartService {
             .toList();
         Map<Long, Merchant> merchants = merchantIdList.isEmpty()
             ? Map.of()
-            : catalogClient.getMerchants(merchantIdList);
+            : merchantClient.getMerchants(merchantIdList);
         List<CartItemResponse> items = cartItems.stream()
             .map(item -> {
                 Product product = products.get(item.getProductId());
