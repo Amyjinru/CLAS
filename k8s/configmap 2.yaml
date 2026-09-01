@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clas-config
+  namespace: clas
+data:
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: clas
+  MYSQL_USER: clas
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  CHAT_MODERATION_TIMEOUT_MS: "3000"
+  CLAS_DEMO_ACCOUNTS_ENABLED: "false"
+  CORS_ALLOWED_ORIGINS: "http://8.141.112.182"

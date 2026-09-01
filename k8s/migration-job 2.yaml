@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clas-db-migrate
+  namespace: clas
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: mysql:8.4.4
+          command: ["/bin/bash", "/opt/clas/database/bootstrap-and-migrate.sh"]
+          envFrom:
+            - configMapRef: {name: clas-config}
+            - secretRef: {name: clas-secrets}
+          env:
+            - name: MYSQL_USER
+              value: root
+          volumeMounts:
+            - name: database-scripts
+              mountPath: /opt/clas/database
+              readOnly: true
+      volumes:
+        - name: database-scripts
+          configMap:
+            name: clas-database-scripts

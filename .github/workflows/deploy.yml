@@ -182,7 +182,7 @@ jobs:
 
       - name: Build and push microservice images
         run: |
-          for service in clas-iam clas-catalog clas-order clas-compat; do
+          for service in clas-iam clas-merchant clas-catalog clas-order clas-compat; do
             image="${REGISTRY}/${IMAGE_OWNER}/${service}:${GITHUB_SHA}"
             docker build --file services/Dockerfile --build-arg SERVICE_MODULE="$service" --tag "$image" services
             docker push "$image"
@@ -197,6 +197,7 @@ jobs:
             frontend-image.txt
             database-image.txt
             clas-iam-image.txt
+            clas-merchant-image.txt
             clas-catalog-image.txt
             clas-order-image.txt
             clas-compat-image.txt
@@ -207,6 +208,7 @@ jobs:
             "${REGISTRY}/${IMAGE_OWNER}/clas-frontend:${GITHUB_SHA}" \
             "${REGISTRY}/${IMAGE_OWNER}/clas-database:${GITHUB_SHA}" \
             "${REGISTRY}/${IMAGE_OWNER}/clas-iam:${GITHUB_SHA}" \
+            "${REGISTRY}/${IMAGE_OWNER}/clas-merchant:${GITHUB_SHA}" \
             "${REGISTRY}/${IMAGE_OWNER}/clas-catalog:${GITHUB_SHA}" \
             "${REGISTRY}/${IMAGE_OWNER}/clas-order:${GITHUB_SHA}" \
             "${REGISTRY}/${IMAGE_OWNER}/clas-compat:${GITHUB_SHA}" \
@@ -251,8 +253,11 @@ jobs:
           test -n "$GHCR_TOKEN" || { echo 'GHCR_PULL_TOKEN is required'; exit 1; }
           test -n "$MYSQL_PASSWORD" || { echo 'MYSQL_PASSWORD is required'; exit 1; }
           test -n "$JWT_SECRET" || { echo 'JWT_SECRET is required'; exit 1; }
-          test -n "$CLAS_INTERNAL_API_KEY" || { echo 'CLAS_INTERNAL_API_KEY is required'; exit 1; }
           test -n "$RIDER_IDENTITY_ENCRYPTION_KEY" || { echo 'RIDER_IDENTITY_ENCRYPTION_KEY is required'; exit 1; }
+          if [[ -z "$CLAS_INTERNAL_API_KEY" ]]; then
+            echo 'CLAS_INTERNAL_API_KEY is not configured; deriving a stable, domain-separated key from JWT_SECRET.'
+            CLAS_INTERNAL_API_KEY="$(printf 'clas-internal-api:%s' "$JWT_SECRET" | sha256sum | cut -d ' ' -f 1)"
+          fi
           umask 077
           cat > "$RUNNER_TEMP/clas-deploy.env" <<EOF
           GHCR_USERNAME=$GHCR_USERNAME
