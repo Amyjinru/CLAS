@@ -83,7 +83,7 @@ kubectl apply -f "$rendered_dir/microservices.yaml"
 kubectl apply -f "$rendered_dir/microservices-gateway.yaml"
 kubectl apply -f "$rendered_dir/frontend.yaml"
 for deployment in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway; do
-  kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout=300s
+  kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout=600s
 done
 kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=180s
 kubectl apply -f "$PROJECT_ROOT/k8s/catalog-hpa.yaml"
