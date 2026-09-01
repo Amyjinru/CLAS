@@ -6,6 +6,7 @@ import com.clas.common.PasswordValidator;
 import com.clas.common.PhoneValidator;
 import com.clas.common.Result;
 import com.clas.common.VerificationCodeStore;
+import com.clas.common.dto.InternalUserAuthState;
 import com.clas.dto.InternalAddressResponse;
 import com.clas.dto.InternalUserSummary;
 import com.clas.dto.MerchantApplicantRequest;
@@ -21,6 +22,7 @@ import com.clas.service.PenaltyService;
 import com.clas.service.UserService;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,6 +71,22 @@ public class InternalIamController {
             return Result.ok(null);
         }
         return Result.ok(new InternalUserSummary(user.getPhone(), user.getUsername(), user.getRole(), user.getEnabled()));
+    }
+
+    @GetMapping("/users/{userId}/auth-state")
+    public Result<InternalUserAuthState> authState(@PathVariable String userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            return Result.ok(null);
+        }
+        List<String> roles = new ArrayList<>(userService.rolesOf(userId));
+        if (user.getRole() != null && !user.getRole().isBlank() && !roles.contains(user.getRole())) {
+            roles.add(user.getRole());
+        }
+        return Result.ok(new InternalUserAuthState(
+            user.getPhone(), user.getUsername(), user.getRole(), user.getEnabled(), user.getSessionToken(), roles,
+            penaltyService.isAccountOnlyRestricted(userId)
+        ));
     }
 
     @GetMapping("/users/{userId}/roles")

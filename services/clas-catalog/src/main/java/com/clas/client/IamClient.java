@@ -4,6 +4,7 @@ import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.common.Result;
 import com.clas.common.client.ServiceEndpoints;
+import com.clas.common.dto.InternalUserAuthState;
 import com.clas.dto.InternalAddressResponse;
 import com.clas.dto.InternalNotificationRequest;
 import com.clas.dto.InternalUserSummary;
@@ -30,6 +31,11 @@ public class IamClient {
     public InternalUserSummary getUser(String userId) {
         return exchange(serviceEndpoints.iam() + "/internal/iam/v1/users/" + userId,
             HttpMethod.GET, null, new ParameterizedTypeReference<Result<InternalUserSummary>>() {});
+    }
+
+    public InternalUserAuthState getAuthState(String userId) {
+        return exchange(serviceEndpoints.iam() + "/internal/iam/v1/users/" + userId + "/auth-state",
+            HttpMethod.GET, null, new ParameterizedTypeReference<Result<InternalUserAuthState>>() {});
     }
 
     public List<String> rolesOf(String userId) {
