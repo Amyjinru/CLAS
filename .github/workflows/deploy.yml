@@ -366,6 +366,26 @@ jobs:
           git checkout --detach "$CLAS_IMAGE_TAG"
           test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"
           test -s "$image_archive"
+          if ! timeout 20 kubectl get --raw=/readyz >/dev/null 2>&1; then
+            echo 'k3s API is unhealthy; restarting the local control plane.'
+            systemctl restart k3s
+            api_ready=false
+            for _ in $(seq 1 60); do
+              if timeout 5 kubectl get --raw=/readyz >/dev/null 2>&1; then
+                api_ready=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$api_ready" != true ]; then
+              echo 'k3s API did not recover after restart.' >&2
+              systemctl status k3s --no-pager -n 100 >&2 || true
+              exit 1
+            fi
+          fi
+          # Release resources before importing images or running migrations;
+          # otherwise old Java Pods can immediately wedge this two-core node.
+          bash scripts/k8s/quiesce-apps.sh
           k3s ctr -n k8s.io images import "$image_archive"
           bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
           REMOTE

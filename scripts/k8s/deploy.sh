@@ -28,6 +28,13 @@ collect() {
 trap collect ERR
 
 kubectl apply -f "$PROJECT_ROOT/k8s/namespace.yaml"
+
+# Quiesce the previous application release before doing any other work. This
+# must happen at the start: on the two-core production node, leaving old Java
+# Pods running during migration can starve the k3s API server before the staged
+# zero-replica manifests are applied.
+bash "$PROJECT_ROOT/scripts/k8s/quiesce-apps.sh"
+
 kubectl -n "$NAMESPACE" create secret generic clas-secrets \
   --from-literal=MYSQL_PASSWORD="$MYSQL_PASSWORD" \
   --from-literal=JWT_SECRET="$JWT_SECRET" \
@@ -88,20 +95,9 @@ kubectl -n "$NAMESPACE" delete job clas-db-migrate --ignore-not-found
 kubectl apply -f "$rendered_dir/migration-job.yaml"
 kubectl -n "$NAMESPACE" wait --for=condition=complete job/clas-db-migrate --timeout=300s
 
-# Remove the previous autoscaler before staging zero-replica Deployments;
-# otherwise it can restart catalog while the node is being drained.
-kubectl -n "$NAMESPACE" delete hpa clas-catalog --ignore-not-found
 kubectl apply -f "$rendered_dir/microservices.yaml"
 kubectl apply -f "$rendered_dir/microservices-gateway.yaml"
 kubectl apply -f "$rendered_dir/frontend.yaml"
-
-# Wait for old application Pods to release CPU and memory. Missing Pods are a
-# valid state on the first deployment, so only wait when the selector matches.
-for app in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway frontend; do
-  if kubectl -n "$NAMESPACE" get pod -l "app=$app" -o name | grep -q .; then
-    kubectl -n "$NAMESPACE" wait --for=delete pod -l "app=$app" --timeout=180s
-  fi
-done
 
 for deployment in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway; do
   kubectl -n "$NAMESPACE" scale "deployment/$deployment" --replicas=1
