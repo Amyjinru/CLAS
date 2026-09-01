@@ -9,10 +9,10 @@ import com.clas.entity.Merchant;
 import com.clas.entity.OrderItem;
 import com.clas.entity.Orders;
 import com.clas.entity.Product;
-import com.clas.mapper.MerchantMapper;
+import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import com.clas.mapper.OrderItemMapper;
 import com.clas.mapper.OrdersMapper;
-import com.clas.mapper.ProductMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -25,13 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class RiderDeliveryService {
     private final OrdersMapper orders;
     private final RiderLocationService locations;
-    private final MerchantMapper merchants;
+    private final MerchantClient merchantClient;
     private final NotificationBridge notifications;
     private final RiderSettlementService settlements;
     private final OrderLifecycleService lifecycleService;
     private final OrderItemMapper orderItems;
-    private final ProductMapper products;
-    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantMapper merchants, NotificationBridge notifications, RiderSettlementService settlements, OrderLifecycleService lifecycleService, OrderItemMapper orderItems, ProductMapper products) { this.orders = orders; this.locations = locations; this.merchants = merchants; this.notifications = notifications; this.settlements = settlements; this.lifecycleService = lifecycleService; this.orderItems = orderItems; this.products = products; }
+    private final CatalogClient catalogClient;
+    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantClient merchantClient, NotificationBridge notifications, RiderSettlementService settlements, OrderLifecycleService lifecycleService, OrderItemMapper orderItems, CatalogClient catalogClient) { this.orders = orders; this.locations = locations; this.merchantClient = merchantClient; this.notifications = notifications; this.settlements = settlements; this.lifecycleService = lifecycleService; this.orderItems = orderItems; this.catalogClient = catalogClient; }
 
     @Transactional
     public Orders pickup(Long orderId) { return transition(orderId, "ASSIGNED_WAITING_MEAL", "DELIVERING", true); }
@@ -78,13 +78,11 @@ public class RiderDeliveryService {
     /** 骑手查看「订单详情」：订单 + 商家 + 带商品名的餐品明细。 */
     public RiderOrderDetailResponse detail(Long orderId) {
         Orders order = owned(orderId);
-        Merchant merchant = merchants.selectById(order.getMerchantId());
+        Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         List<OrderItem> items = orderItems.selectList(
             new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
         List<Long> productIds = items.stream().map(OrderItem::getProductId).filter(Objects::nonNull).distinct().toList();
-        Map<Long, String> nameByProductId = productIds.isEmpty()
-            ? Map.of()
-            : products.selectBatchIds(productIds).stream()
+        Map<Long, String> nameByProductId = catalogClient.getProducts(productIds).values().stream()
                 .collect(Collectors.toMap(Product::getId, Product::getName, (a, b) -> a));
         List<RiderOrderDetailResponse.Item> detailItems = items.stream()
             .map(item -> new RiderOrderDetailResponse.Item(
@@ -98,7 +96,7 @@ public class RiderDeliveryService {
     private BusinessException invalid() { return new BusinessException("配送状态不允许此操作", DomainErrorCode.DELIVERY_STATE_INVALID); }
     private void notifyOrder(Orders order, String title, String content) {
         notifications.send(new NotificationBridge.NotificationTarget(order.getUserId(), title, content, "DELIVERY_STATUS", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/order/" + order.getId()));
-        Merchant merchant = merchants.selectById(order.getMerchantId());
+        Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         if (merchant != null) notifications.send(new NotificationBridge.NotificationTarget(merchant.getUserId(), title, "订单 " + order.getId() + "：" + content, "DELIVERY_STATUS", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/merchant-console"));
     }
 }

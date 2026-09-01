@@ -1,6 +1,5 @@
 package com.clas.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.common.GeoUtils;
@@ -9,7 +8,7 @@ import com.clas.dto.DeliveryTrackingResponse;
 import com.clas.entity.Merchant;
 import com.clas.entity.Orders;
 import com.clas.entity.RiderProfile;
-import com.clas.mapper.MerchantMapper;
+import com.clas.client.MerchantClient;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.RiderProfileMapper;
 import java.math.BigDecimal;
@@ -22,12 +21,12 @@ import org.springframework.stereotype.Service;
 public class DeliveryTrackingService {
     private static final Duration LOCATION_STALE_AFTER = Duration.ofMinutes(1);
     private final OrdersMapper orders;
-    private final MerchantMapper merchants;
+    private final MerchantClient merchantClient;
     private final RiderProfileMapper riders;
     private final AmapRouteService amap;
 
-    public DeliveryTrackingService(OrdersMapper orders, MerchantMapper merchants, RiderProfileMapper riders, AmapRouteService amap) {
-        this.orders = orders; this.merchants = merchants; this.riders = riders; this.amap = amap;
+    public DeliveryTrackingService(OrdersMapper orders, MerchantClient merchantClient, RiderProfileMapper riders, AmapRouteService amap) {
+        this.orders = orders; this.merchantClient = merchantClient; this.riders = riders; this.amap = amap;
     }
 
     public DeliveryTrackingResponse tracking(Long orderId) {
@@ -35,7 +34,7 @@ public class DeliveryTrackingService {
         boolean active = "ASSIGNED_WAITING_MEAL".equals(order.getDeliveryStatus()) || "DELIVERING".equals(order.getDeliveryStatus());
         if (!active) return response(order, null, null, false, "NONE", false);
         RiderProfile rider = riders.selectById(order.getRiderId());
-        Merchant merchant = merchants.selectById(order.getMerchantId());
+        Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         Eta eta = estimateEta(order, rider, merchant);
         if (eta.arrival() != null && !eta.arrival().equals(order.getPredictedArrivalAt())) {
             order.setPredictedArrivalAt(eta.arrival());
@@ -82,9 +81,14 @@ public class DeliveryTrackingService {
         boolean authorized = "ADMIN".equals(role)
             || ("USER".equals(role) && userId.equals(order.getUserId()))
             || ("RIDER".equals(role) && userId.equals(order.getRiderId()))
-            || ("MERCHANT".equals(role) && merchants.selectCount(new LambdaQueryWrapper<Merchant>().eq(Merchant::getId, order.getMerchantId()).eq(Merchant::getUserId, userId)) > 0);
+            || ("MERCHANT".equals(role) && ownsMerchant(order.getMerchantId(), userId));
         if (!authorized) throw new BusinessException("无权查看该订单的配送追踪", DomainErrorCode.DELIVERY_FORBIDDEN);
         return order;
+    }
+
+    private boolean ownsMerchant(Long merchantId, String userId) {
+        Merchant merchant = merchantClient.getMerchant(merchantId);
+        return merchant != null && userId.equals(merchant.getUserId());
     }
 
     private record RouteLeg(int minutes, boolean amap) { }

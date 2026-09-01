@@ -4,7 +4,12 @@ import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.common.Result;
 import com.clas.common.client.ServiceEndpoints;
+import com.clas.entity.Product;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +25,22 @@ public class CatalogClient {
     public CatalogClient(RestTemplate restTemplate, ServiceEndpoints serviceEndpoints) {
         this.restTemplate = restTemplate;
         this.serviceEndpoints = serviceEndpoints;
+    }
+
+    public Product getProduct(Long productId) {
+        return get("/products/" + productId, new ParameterizedTypeReference<Result<Product>>() {});
+    }
+
+    public Map<Long, Product> getProducts(Collection<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return Map.of();
+        }
+        String ids = productIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        List<Product> products = get("/products/batch?ids=" + ids, new ParameterizedTypeReference<Result<List<Product>>>() {});
+        if (products == null) {
+            return Map.of();
+        }
+        return products.stream().collect(Collectors.toMap(Product::getId, Function.identity(), (a, b) -> a));
     }
 
     public Map<String, Long> getPublicStats() {

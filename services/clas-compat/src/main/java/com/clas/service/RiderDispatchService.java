@@ -9,7 +9,7 @@ import com.clas.dto.RiderTaskResponse;
 import com.clas.entity.Merchant;
 import com.clas.entity.Orders;
 import com.clas.entity.RiderProfile;
-import com.clas.mapper.MerchantMapper;
+import com.clas.client.MerchantClient;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.RiderProfileMapper;
 import com.clas.entity.RiderAuditLog;
@@ -27,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RiderDispatchService {
     private static final int TASK_RADIUS_METERS = 5000;
     private static final List<String> ACTIVE_STATES = List.of("ASSIGNED_WAITING_MEAL", "DELIVERING");
-    private final OrdersMapper orders; private final MerchantMapper merchants; private final RiderProfileMapper profiles; private final RiderLocationService locations; private final RiderAuditLogMapper audits; private final DeliveryTrackingService tracking; private final NotificationBridge notifications; private final AmapRouteService amap; private final OrderLifecycleService lifecycleService;
-    public RiderDispatchService(OrdersMapper orders, MerchantMapper merchants, RiderProfileMapper profiles, RiderLocationService locations, RiderAuditLogMapper audits, DeliveryTrackingService tracking, NotificationBridge notifications, AmapRouteService amap, OrderLifecycleService lifecycleService) { this.orders = orders; this.merchants = merchants; this.profiles = profiles; this.locations = locations; this.audits = audits; this.tracking = tracking; this.notifications = notifications; this.amap = amap; this.lifecycleService = lifecycleService; }
+    private final OrdersMapper orders; private final MerchantClient merchantClient; private final RiderProfileMapper profiles; private final RiderLocationService locations; private final RiderAuditLogMapper audits; private final DeliveryTrackingService tracking; private final NotificationBridge notifications; private final AmapRouteService amap; private final OrderLifecycleService lifecycleService;
+    public RiderDispatchService(OrdersMapper orders, MerchantClient merchantClient, RiderProfileMapper profiles, RiderLocationService locations, RiderAuditLogMapper audits, DeliveryTrackingService tracking, NotificationBridge notifications, AmapRouteService amap, OrderLifecycleService lifecycleService) { this.orders = orders; this.merchantClient = merchantClient; this.profiles = profiles; this.locations = locations; this.audits = audits; this.tracking = tracking; this.notifications = notifications; this.amap = amap; this.lifecycleService = lifecycleService; }
 
     public List<Orders> activeDeliveries() {
         locations.approvedProfile();
@@ -85,7 +85,7 @@ public class RiderDispatchService {
         if (active >= rider.getMaxActiveOrders()) throw new BusinessException("骑手当前配送单已达上限", DomainErrorCode.RIDER_CAPACITY_REACHED);
         Orders order = orders.selectById(orderId);
         if (order == null || !"ACCEPTED".equals(order.getStatus()) || !"AVAILABLE".equals(order.getDeliveryStatus()) || order.getRiderId() != null) throw unavailable();
-        Merchant merchant = merchants.selectById(order.getMerchantId());
+        Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         if (merchant == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) throw unavailable();
         if (travelDistanceMeters(rider.getCurrentLongitude(), rider.getCurrentLatitude(), merchant.getLongitude(), merchant.getLatitude()) > TASK_RADIUS_METERS) throw unavailable();
         // The conditional UPDATE below is the final authority: concurrent riders can both pass the
@@ -98,7 +98,7 @@ public class RiderDispatchService {
     }
 
     private RiderTaskResponse nearby(Orders order, RiderProfile rider) {
-        Merchant merchant = merchants.selectById(order.getMerchantId());
+        Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         if (merchant == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) return null;
         int distance = travelDistanceMeters(rider.getCurrentLongitude(), rider.getCurrentLatitude(), merchant.getLongitude(), merchant.getLatitude());
         return distance <= TASK_RADIUS_METERS ? RiderTaskResponse.from(order, merchant, distance, "结合当前配送路线、承诺时间与到店距离排序") : null;
@@ -122,7 +122,7 @@ public class RiderDispatchService {
             if (stop != null) route.add(stop);
         }
         int currentDistance = routeDistance(rider.getCurrentLongitude(), rider.getCurrentLatitude(), route);
-        Merchant merchant = merchants.selectById(task.merchantId());
+        Merchant merchant = merchantClient.getMerchant(task.merchantId());
         BigDecimal[] merchantStop = merchant == null ? null : coordinate(merchant.getLongitude(), merchant.getLatitude());
         if (merchantStop != null) route.add(merchantStop);
         Orders candidate = orders.selectById(task.orderId());
@@ -133,7 +133,7 @@ public class RiderDispatchService {
         return routeDistance(rider.getCurrentLongitude(), rider.getCurrentLatitude(), route) - currentDistance;
     }
     private BigDecimal[] merchantCoordinate(Long merchantId) {
-        Merchant merchant = merchants.selectById(merchantId);
+        Merchant merchant = merchantClient.getMerchant(merchantId);
         return merchant == null ? null : coordinate(merchant.getLongitude(), merchant.getLatitude());
     }
     private BigDecimal[] coordinate(BigDecimal longitude, BigDecimal latitude) {
@@ -171,7 +171,7 @@ public class RiderDispatchService {
     private BusinessException unavailable() { return new BusinessException("配送任务已被领取或不可用", DomainErrorCode.DELIVERY_TASK_UNAVAILABLE); }
     private void notifyOrder(Orders order, String title, String content) {
         notifications.send(new NotificationBridge.NotificationTarget(order.getUserId(), title, content, "DELIVERY_STATUS", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/order/" + order.getId()));
-        Merchant merchant = merchants.selectById(order.getMerchantId());
+        Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         if (merchant != null) notifications.send(new NotificationBridge.NotificationTarget(merchant.getUserId(), title, "订单 " + order.getId() + "：" + content, "DELIVERY_STATUS", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/merchant-console"));
     }
 }

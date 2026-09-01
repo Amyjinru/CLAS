@@ -8,7 +8,6 @@ import com.clas.entity.RiderLocationHistory;
 import com.clas.entity.RiderProfile;
 import com.clas.mapper.RiderLocationHistoryMapper;
 import com.clas.mapper.RiderProfileMapper;
-import com.clas.mapper.OrdersMapper;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RiderLocationService {
     private final RiderProfileMapper profiles;
     private final RiderLocationHistoryMapper history;
-    public RiderLocationService(RiderProfileMapper profiles, RiderLocationHistoryMapper history, OrdersMapper orders) { this.profiles = profiles; this.history = history; }
+    public RiderLocationService(RiderProfileMapper profiles, RiderLocationHistoryMapper history) { this.profiles = profiles; this.history = history; }
 
     @Transactional
     public RiderProfileResponse setOnline(boolean online) {
