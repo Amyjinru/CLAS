@@ -293,15 +293,15 @@ mvn -f backend/pom.xml -Dtest=RiderModuleIntegrationTest test
 
 ```text
 push main
-  → 后端 Maven 单元/集成测试
+  → 单体基线与四微服务 Maven 测试
   → 前端 npm test + build
-  → 构建并推送 GHCR SHA 镜像
+  → 构建并推送 GHCR SHA 微服务镜像
   → k3s 数据库迁移 Job
-  → Deployment rollout
+  → 四服务与 API Gateway Deployment rollout
   → http://8.141.112.182/api/health
 ```
 
-任一测试失败时，镜像构建、GHCR 推送和 k3s 部署均不会执行。前端和后端镜像分别为 `ghcr.io/amyjinru/clas-frontend:<git-sha>` 与 `ghcr.io/amyjinru/clas-backend:<git-sha>`；部署禁止使用 `latest`。工作流无论成功或失败都会上传测试报告、镜像摘要和 k3s 诊断日志。
+任一测试失败时，镜像构建、GHCR 推送和 k3s 部署均不会执行。前端和四服务镜像分别为 `ghcr.io/amyjinru/clas-frontend:<git-sha>` 及 `ghcr.io/amyjinru/clas-{iam,catalog,order,compat}:<git-sha>`；部署禁止使用 `latest`。工作流无论成功或失败都会上传测试报告、镜像摘要和 k3s 诊断日志。
 
 首次云端准备使用 root 用户执行：
 
@@ -309,7 +309,7 @@ push main
 bash scripts/k8s/install-k3s.sh
 ```
 
-在 GitHub Actions Secrets 中配置以下值：`SSH_PASSWORD`（云服务器部署账户密码）、`GHCR_USERNAME`、`GHCR_PULL_TOKEN`、`MYSQL_PASSWORD`、`JWT_SECRET`、`RIDER_IDENTITY_ENCRYPTION_KEY`，以及按需配置的 `AMAP_WEB_SERVICE_KEY`、`DASHSCOPE_API_KEY`、`FORBIDDEN_WORDS`、`CLAS_DEMO_ACCESS_PASSWORD`。部署 Job 经 SSH 调用服务器本机 k3s，不再使用 kubeconfig Secret；镜像仍发布至 GHCR，并以 Git SHA 版本归档导入服务器。Secret 不得写入仓库或工作流日志。
+在 GitHub Actions Secrets 中配置以下值：`SSH_PASSWORD`（云服务器部署账户密码）、`GHCR_USERNAME`、`GHCR_PULL_TOKEN`、`MYSQL_PASSWORD`、`JWT_SECRET`、`CLAS_INTERNAL_API_KEY`、`RIDER_IDENTITY_ENCRYPTION_KEY`，以及按需配置的 `AMAP_WEB_SERVICE_KEY`、`DASHSCOPE_API_KEY`、`FORBIDDEN_WORDS`、`CLAS_DEMO_ACCESS_PASSWORD`。部署 Job 经 SSH 调用服务器本机 k3s，不再使用 kubeconfig Secret；镜像仍发布至 GHCR，并以 Git SHA 版本归档导入服务器。Secret 不得写入仓库或工作流日志。
 
 手动部署已发布镜像时，配置同名环境变量后执行：
 

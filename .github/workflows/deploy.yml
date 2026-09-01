@@ -50,7 +50,7 @@ jobs:
           while IFS= read -r file; do
             case "$file" in
               backend/src/test/*|tests/*|*.test.js|*.test.ts|*.spec.js|*.spec.ts) ;;
-              backend/*|frontend/*|database/*|k8s/*|scripts/k8s/*|docker-compose.yml|.github/workflows/deploy.yml) deploy=true; break ;;
+              backend/*|services/*|frontend/*|database/*|k8s/*|scripts/k8s/*|docker-compose.yml|.github/workflows/deploy.yml) deploy=true; break ;;
             esac
           done < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
           echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
@@ -78,6 +78,10 @@ jobs:
       - name: Run backend unit and integration tests
         working-directory: backend
         run: mvn --batch-mode test
+
+      - name: Run microservice unit tests
+        working-directory: services
+        run: mvn --batch-mode clean test
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -135,6 +139,7 @@ jobs:
           name: verification-reports-${{ github.sha }}
           path: |
             backend/target/surefire-reports/
+            services/*/target/surefire-reports/
             frontend/test-results/
             compose.log
           if-no-files-found: warn
@@ -161,13 +166,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push backend image
-        run: |
-          image="${REGISTRY}/${IMAGE_OWNER}/clas-backend:${GITHUB_SHA}"
-          docker build --file backend/Dockerfile --tag "$image" .
-          docker push "$image"
-          docker image inspect "$image" --format '{{index .RepoDigests 0}}' | tee backend-image.txt
-
       - name: Build and push frontend image
         run: |
           image="${REGISTRY}/${IMAGE_OWNER}/clas-frontend:${GITHUB_SHA}"
@@ -182,21 +180,36 @@ jobs:
           docker push "$image"
           docker image inspect "$image" --format '{{index .RepoDigests 0}}' | tee database-image.txt
 
+      - name: Build and push microservice images
+        run: |
+          for service in clas-iam clas-catalog clas-order clas-compat; do
+            image="${REGISTRY}/${IMAGE_OWNER}/${service}:${GITHUB_SHA}"
+            docker build --file services/Dockerfile --build-arg SERVICE_MODULE="$service" --tag "$image" services
+            docker push "$image"
+            docker image inspect "$image" --format '{{index .RepoDigests 0}}' | tee "${service}-image.txt"
+          done
+
       - name: Upload image references
         uses: actions/upload-artifact@v6
         with:
           name: image-references-${{ github.sha }}
           path: |
-            backend-image.txt
             frontend-image.txt
             database-image.txt
+            clas-iam-image.txt
+            clas-catalog-image.txt
+            clas-order-image.txt
+            clas-compat-image.txt
 
       - name: Package tested images for server import
         run: |
           docker save \
-            "${REGISTRY}/${IMAGE_OWNER}/clas-backend:${GITHUB_SHA}" \
             "${REGISTRY}/${IMAGE_OWNER}/clas-frontend:${GITHUB_SHA}" \
             "${REGISTRY}/${IMAGE_OWNER}/clas-database:${GITHUB_SHA}" \
+            "${REGISTRY}/${IMAGE_OWNER}/clas-iam:${GITHUB_SHA}" \
+            "${REGISTRY}/${IMAGE_OWNER}/clas-catalog:${GITHUB_SHA}" \
+            "${REGISTRY}/${IMAGE_OWNER}/clas-order:${GITHUB_SHA}" \
+            "${REGISTRY}/${IMAGE_OWNER}/clas-compat:${GITHUB_SHA}" \
             | gzip -1 > "clas-images-${GITHUB_SHA}.tar.gz"
 
       - name: Upload deployable image archive
@@ -217,6 +230,7 @@ jobs:
       GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
       MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      CLAS_INTERNAL_API_KEY: ${{ secrets.CLAS_INTERNAL_API_KEY }}
       RIDER_IDENTITY_ENCRYPTION_KEY: ${{ secrets.RIDER_IDENTITY_ENCRYPTION_KEY }}
       AMAP_WEB_SERVICE_KEY: ${{ secrets.AMAP_WEB_SERVICE_KEY }}
       DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
@@ -237,6 +251,7 @@ jobs:
           test -n "$GHCR_TOKEN" || { echo 'GHCR_PULL_TOKEN is required'; exit 1; }
           test -n "$MYSQL_PASSWORD" || { echo 'MYSQL_PASSWORD is required'; exit 1; }
           test -n "$JWT_SECRET" || { echo 'JWT_SECRET is required'; exit 1; }
+          test -n "$CLAS_INTERNAL_API_KEY" || { echo 'CLAS_INTERNAL_API_KEY is required'; exit 1; }
           test -n "$RIDER_IDENTITY_ENCRYPTION_KEY" || { echo 'RIDER_IDENTITY_ENCRYPTION_KEY is required'; exit 1; }
           umask 077
           cat > "$RUNNER_TEMP/clas-deploy.env" <<EOF
@@ -244,6 +259,7 @@ jobs:
           GHCR_TOKEN=$GHCR_TOKEN
           MYSQL_PASSWORD=$MYSQL_PASSWORD
           JWT_SECRET=$JWT_SECRET
+          CLAS_INTERNAL_API_KEY=$CLAS_INTERNAL_API_KEY
           RIDER_IDENTITY_ENCRYPTION_KEY=$RIDER_IDENTITY_ENCRYPTION_KEY
           AMAP_WEB_SERVICE_KEY=$AMAP_WEB_SERVICE_KEY
           DASHSCOPE_API_KEY=$DASHSCOPE_API_KEY

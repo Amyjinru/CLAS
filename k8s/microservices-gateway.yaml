@@ -31,7 +31,9 @@ data:
         location ^~ /api/deals/merchant { proxy_pass http://clas-catalog:8082; }
         location ~ ^/api/deals/(mine|redeem-logs|redeem|orders) { proxy_pass http://clas-order:8083; }
         location ~ ^/api/deals/[0-9]+/buy$ { proxy_pass http://clas-order:8083; }
-        location ^~ /api/deals { proxy_pass http://clas-catalog:8082; }
+        # Do not use ^~ here: the two regex locations above must keep taking
+        # precedence for order-owned buy, redeem and redemption-log routes.
+        location /api/deals { proxy_pass http://clas-catalog:8082; }
 
         location ^~ /api/cart { proxy_pass http://clas-order:8083; }
         location ^~ /api/order { proxy_pass http://clas-order:8083; }
