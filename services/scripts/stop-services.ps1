@@ -1,4 +1,4 @@
-# 停止四微服务与 Nginx 网关
+# 停止五微服务与 Nginx 网关
 $ErrorActionPreference = "SilentlyContinue"
 $ServicesRoot = Split-Path $PSScriptRoot -Parent
 $PidDir = Join-Path $ServicesRoot "run"
@@ -17,8 +17,9 @@ foreach ($name in @("iam", "merchant", "catalog", "order", "compat")) {
 $nginxCmd = Get-Command nginx -ErrorAction SilentlyContinue
 $nginxExe = if ($nginxCmd) { $nginxCmd.Source } else {
     @(
-        "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\nginxinc.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\nginx-1.31.4\nginx.exe"
-    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\nginxinc.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\nginx-*\nginx.exe",
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\freenginx.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\freenginx-*\nginx.exe"
+    ) | Get-ChildItem -File -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
 }
 if ($nginxExe -and (Test-Path $NginxPrefix)) {
     Push-Location $NginxPrefix
