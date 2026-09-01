@@ -21,7 +21,7 @@ $nginxExe = if ($nginxCmd) { $nginxCmd.Source } else {
         "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\freenginx.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\freenginx-*\nginx.exe"
     ) | Get-ChildItem -File -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
 }
-if ($nginxExe -and (Test-Path $NginxPrefix)) {
+if ($nginxExe -and (Test-Path $NginxPrefix) -and (Test-Path (Join-Path $NginxPrefix "logs\nginx.pid"))) {
     Push-Location $NginxPrefix
     try { & $nginxExe -p "./" -c "clas-gateway.conf" -s stop } catch { }
     Pop-Location
