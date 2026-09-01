@@ -1,6 +1,8 @@
 package com.clas.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.common.MerchantStatusEnum;
 import com.clas.common.Result;
 import com.clas.dto.MerchantScoreUpdateRequest;
 import com.clas.dto.RoleApplicationRecordResponse;
@@ -8,10 +10,13 @@ import com.clas.dto.StockChangeRequest;
 import com.clas.entity.GroupDeal;
 import com.clas.entity.Merchant;
 import com.clas.entity.Product;
+import com.clas.mapper.MerchantMapper;
+import com.clas.mapper.ProductMapper;
 import com.clas.service.InternalCatalogProductService;
 import com.clas.service.InternalMerchantService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,13 +30,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalCatalogMerchantController {
     private final InternalMerchantService internalMerchantService;
     private final InternalCatalogProductService internalCatalogProductService;
+    private final MerchantMapper merchantMapper;
+    private final ProductMapper productMapper;
 
     public InternalCatalogMerchantController(
         InternalMerchantService internalMerchantService,
-        InternalCatalogProductService internalCatalogProductService
+        InternalCatalogProductService internalCatalogProductService,
+        MerchantMapper merchantMapper,
+        ProductMapper productMapper
     ) {
         this.internalMerchantService = internalMerchantService;
         this.internalCatalogProductService = internalCatalogProductService;
+        this.merchantMapper = merchantMapper;
+        this.productMapper = productMapper;
     }
 
     @GetMapping("/merchants/{merchantId}")
@@ -99,6 +110,15 @@ public class InternalCatalogMerchantController {
     @GetMapping("/users/{userId}/merchant-id")
     public Result<Long> getMerchantIdByUser(@PathVariable String userId) {
         return Result.ok(internalCatalogProductService.getMerchantIdByUserId(userId));
+    }
+
+    @GetMapping("/stats/public")
+    public Result<Map<String, Long>> publicStats() {
+        long merchants = merchantMapper.selectCount(new LambdaQueryWrapper<Merchant>()
+            .eq(Merchant::getStatus, MerchantStatusEnum.OPEN));
+        long products = productMapper.selectCount(new LambdaQueryWrapper<Product>()
+            .eq(Product::getStatus, "ON_SALE"));
+        return Result.ok(Map.of("merchants", merchants, "products", products));
     }
 
     @PostMapping("/merchants/{merchantId}/refresh-average-price")

@@ -20,6 +20,7 @@ import com.clas.mapper.UserMapper;
 import com.clas.service.PenaltyService;
 import com.clas.service.UserService;
 import java.util.List;
+import java.util.Map;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -164,5 +165,10 @@ public class InternalIamController {
             .eq(RoleApplication::getTargetRole, "RIDER")
             .eq(RoleApplication::getStatus, "PENDING"));
         return Result.ok(pending);
+    }
+
+    @GetMapping("/stats/public")
+    public Result<Map<String, Long>> publicStats() {
+        return Result.ok(Map.of("users", userMapper.selectCount(null)));
     }
 }

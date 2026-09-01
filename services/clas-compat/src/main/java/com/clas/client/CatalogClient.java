@@ -116,11 +116,18 @@ public class CatalogClient {
         if (userId == null) {
             throw new BusinessException("未登录，请先登录");
         }
-        Long merchantId = get("/users/" + userId + "/merchant-id", new ParameterizedTypeReference<Result<Long>>() {});
+        Long merchantId = getMerchantIdByUser(userId);
         if (merchantId == null) {
             throw new BusinessException("当前用户未入驻为商家");
         }
         return merchantId;
+    }
+
+    public Long getMerchantIdByUser(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+        return get("/users/" + userId + "/merchant-id", new ParameterizedTypeReference<Result<Long>>() {});
     }
 
     public Merchant requireOpenMerchant(Long merchantId) {
@@ -129,6 +136,11 @@ public class CatalogClient {
             throw new BusinessException("商家不存在或未营业");
         }
         return merchant;
+    }
+
+    public Map<String, Long> getPublicStats() {
+        Map<String, Long> stats = get("/stats/public", new ParameterizedTypeReference<Result<Map<String, Long>>>() {});
+        return stats == null ? Map.of() : stats;
     }
 
     private <T> T get(String path, ParameterizedTypeReference<Result<T>> type) {

@@ -88,6 +88,14 @@ public class IamClient {
         return Boolean.TRUE.equals(pending);
     }
 
+    public java.util.Map<String, Long> getPublicStats() {
+        java.util.Map<String, Long> stats = exchange(
+            serviceEndpoints.iam() + "/internal/iam/v1/stats/public",
+            HttpMethod.GET, null, new ParameterizedTypeReference<Result<java.util.Map<String, Long>>>() {}
+        );
+        return stats == null ? java.util.Map.of() : stats;
+    }
+
     public void sendNotification(InternalNotificationRequest request) {
         try {
             restTemplate.exchange(
