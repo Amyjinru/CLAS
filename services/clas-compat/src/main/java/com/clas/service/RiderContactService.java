@@ -2,8 +2,10 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.client.IamClient;
 import com.clas.dto.ChatMessageResponse;
 import com.clas.dto.DeliveryCallSessionResponse;
+import com.clas.dto.InternalUserSummary;
 import com.clas.entity.ChatConversation;
 import com.clas.entity.ChatMessage;
 import com.clas.entity.DeliveryCallSession;
@@ -12,7 +14,6 @@ import com.clas.entity.RiderAuditLog;
 import com.clas.mapper.ChatConversationMapper;
 import com.clas.mapper.ChatMessageMapper;
 import com.clas.mapper.DeliveryCallSessionMapper;
-import com.clas.mapper.UserMapper;
 import com.clas.mapper.RiderAuditLogMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,19 +30,19 @@ public class RiderContactService {
     private final ChatMessageMapper messages;
     private final ChatConversationMapper conversations;
     private final DeliveryCallSessionMapper calls;
-    private final UserMapper users;
+    private final IamClient iamClient;
     private final RiderAuditLogMapper audits;
     private final ContentModerationService contentModerationService;
     private final PenaltyService penaltyService;
 
     public RiderContactService(OrderService orderService, ChatMessageMapper messages, ChatConversationMapper conversations,
-                               DeliveryCallSessionMapper calls, UserMapper users, RiderAuditLogMapper audits,
+                               DeliveryCallSessionMapper calls, IamClient iamClient, RiderAuditLogMapper audits,
                                ContentModerationService contentModerationService, PenaltyService penaltyService) {
         this.orderService = orderService;
         this.messages = messages;
         this.conversations = conversations;
         this.calls = calls;
-        this.users = users;
+        this.iamClient = iamClient;
         this.audits = audits;
         this.contentModerationService = contentModerationService;
         this.penaltyService = penaltyService;
@@ -77,7 +78,11 @@ public class RiderContactService {
     public DeliveryCallSessionResponse createCall(Long orderId, String riderId) {
         Orders order = authorize(orderId, riderId, "RIDER");
         if (!ACTIVE.contains(order.getDeliveryStatus())) throw new BusinessException("仅配送中的订单可发起隐私电话");
-        String phone = users.selectById(order.getUserId()).getPhone();
+        InternalUserSummary user = iamClient.getUser(order.getUserId());
+        if (user == null || user.userId() == null || user.userId().isBlank()) {
+            throw new BusinessException("订单用户不存在");
+        }
+        String phone = user.userId();
         DeliveryCallSession session = new DeliveryCallSession();
         session.setOrderId(orderId); session.setRiderId(riderId); session.setUserId(order.getUserId());
         session.setMaskedPhone(phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4));
