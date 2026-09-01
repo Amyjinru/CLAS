@@ -33,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       deploy: ${{ steps.scope.outputs.deploy }}
+      services: ${{ steps.scope.outputs.services }}
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -42,18 +43,59 @@ jobs:
         id: scope
         shell: bash
         run: |
+          # 所有可独立构建部署的微服务（不含共享库 clas-common，也不含废弃原型 catalog-service）
+          all_services=(clas-iam clas-merchant clas-catalog clas-order clas-compat)
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo 'deploy=true' >> "$GITHUB_OUTPUT"
+            printf -v joined '%s,' "${all_services[@]}"
+            echo "services=${joined%,}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
           deploy=false
+          # 用关联数组记录受影响的微服务；共享库或跨切面文件命中则全量
+          declare -A affected
+          full_deploy=false
+
           while IFS= read -r file; do
             case "$file" in
-              backend/src/test/*|tests/*|*.test.js|*.test.ts|*.spec.js|*.spec.ts) ;;
-              backend/*|services/*|frontend/*|database/*|k8s/*|scripts/k8s/*|docker-compose.yml|.github/workflows/deploy.yml) deploy=true; break ;;
+              # 纯测试/文档类变更不触发任何构建
+              backend/src/test/*|tests/*|*.test.js|*.test.ts|*.spec.js|*.spec.ts|docs/*|openspec/*|*.md) ;;
+
+              # 共享库变更影响全部微服务
+              services/clas-common/*)
+                full_deploy=true; deploy=true;;
+
+              # 单个微服务目录变更 → 只影响该服务
+              services/clas-iam/*)   affected[clas-iam]=1;   deploy=true;;
+              services/clas-merchant/*) affected[clas-merchant]=1; deploy=true;;
+              services/clas-catalog/*)  affected[clas-catalog]=1;  deploy=true;;
+              services/clas-order/*)    affected[clas-order]=1;    deploy=true;;
+              services/clas-compat/*)   affected[clas-compat]=1;   deploy=true;;
+
+              # 跨切面文件（基础设施/数据库/网关/前端/单体）→ 保守全量部署
+              backend/*|database/*|k8s/*|scripts/k8s/*|frontend/*|docker-compose.yml|.github/workflows/deploy.yml)
+                full_deploy=true; deploy=true;;
             esac
           done < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+
+          if [[ "$full_deploy" == "true" ]]; then
+            affected=()
+            for svc in "${all_services[@]}"; do affected[$svc]=1; done
+          fi
+
+          # 输出逗号分隔的受影响服务列表（若 deploy=false 则为空）
+          services=""
+          for svc in "${all_services[@]}"; do
+            if [[ -n "${affected[$svc]:-}" ]]; then
+              if [[ -z "$services" ]]; then services="$svc"; else services="$services,$svc"; fi
+            fi
+          done
+
           echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "classified services: $services"
 
   verify:
     name: Test gate
@@ -151,6 +193,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.version.outputs.image_tag }}
+    env:
+      # 逗号分隔的受影响微服务列表，由 changes job 输出；空串视为全量（兜底）
+      CHANGED_SERVICES: ${{ needs.changes.outputs.services }}
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -158,6 +203,19 @@ jobs:
       - name: Resolve image version
         id: version
         run: echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve microservice build matrix
+        id: matrix
+        shell: bash
+        run: |
+          all_services=(clas-iam clas-merchant clas-catalog clas-order clas-compat)
+          if [[ -z "$CHANGED_SERVICES" ]]; then
+            # 兜底：未提供列表时全量构建（保持行为可预期）
+            printf -v joined '%s,' "${all_services[@]}"
+            echo "services=${joined%,}" >> "$GITHUB_OUTPUT"
+          else
+            echo "services=$CHANGED_SERVICES" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -181,8 +239,11 @@ jobs:
           docker image inspect "$image" --format '{{index .RepoDigests 0}}' | tee database-image.txt
 
       - name: Build and push microservice images
+        shell: bash
         run: |
-          for service in clas-iam clas-catalog clas-order clas-compat; do
+          IFS=',' read -r -a services <<< "${{ steps.matrix.outputs.services }}"
+          for service in "${services[@]}"; do
+            [ -z "$service" ] && continue
             image="${REGISTRY}/${IMAGE_OWNER}/${service}:${GITHUB_SHA}"
             docker build --file services/Dockerfile --build-arg SERVICE_MODULE="$service" --tag "$image" services
             docker push "$image"
@@ -197,20 +258,25 @@ jobs:
             frontend-image.txt
             database-image.txt
             clas-iam-image.txt
+            clas-merchant-image.txt
             clas-catalog-image.txt
             clas-order-image.txt
             clas-compat-image.txt
+          if-no-files-found: warn
 
       - name: Package tested images for server import
+        shell: bash
         run: |
-          docker save \
-            "${REGISTRY}/${IMAGE_OWNER}/clas-frontend:${GITHUB_SHA}" \
-            "${REGISTRY}/${IMAGE_OWNER}/clas-database:${GITHUB_SHA}" \
-            "${REGISTRY}/${IMAGE_OWNER}/clas-iam:${GITHUB_SHA}" \
-            "${REGISTRY}/${IMAGE_OWNER}/clas-catalog:${GITHUB_SHA}" \
-            "${REGISTRY}/${IMAGE_OWNER}/clas-order:${GITHUB_SHA}" \
-            "${REGISTRY}/${IMAGE_OWNER}/clas-compat:${GITHUB_SHA}" \
-            | gzip -1 > "clas-images-${GITHUB_SHA}.tar.gz"
+          images=(
+            "${REGISTRY}/${IMAGE_OWNER}/clas-frontend:${GITHUB_SHA}"
+            "${REGISTRY}/${IMAGE_OWNER}/clas-database:${GITHUB_SHA}"
+          )
+          IFS=',' read -r -a services <<< "${{ steps.matrix.outputs.services }}"
+          for service in "${services[@]}"; do
+            [ -z "$service" ] && continue
+            images+=("${REGISTRY}/${IMAGE_OWNER}/${service}:${GITHUB_SHA}")
+          done
+          docker save "${images[@]}" | gzip -1 > "clas-images-${GITHUB_SHA}.tar.gz"
 
       - name: Upload deployable image archive
         uses: actions/upload-artifact@v6

@@ -82,7 +82,7 @@ kubectl -n "$NAMESPACE" wait --for=condition=complete job/clas-db-migrate --time
 kubectl apply -f "$rendered_dir/microservices.yaml"
 kubectl apply -f "$rendered_dir/microservices-gateway.yaml"
 kubectl apply -f "$rendered_dir/frontend.yaml"
-for deployment in clas-iam clas-catalog clas-order clas-compat clas-gateway; do
+for deployment in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway; do
   kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout=300s
 done
 kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=180s
