@@ -6,9 +6,9 @@
 
 ## 1. 当前状态与约束
 
-当前生产形态是 **Vue 前端 + 单个 Spring Boot `backend` + MySQL + Redis**。k3s 清单中只有一个
-`backend` Deployment，因此它不是已经完整拆分完成的微服务系统。当前目录能力以 `services/clas-catalog`
-实现并由 `services/nginx/clas-gateway.conf` 路由；下图中的其余服务仍是稳定的领域边界和后续可独立部署单元。迁移期间仍可先在同一代码仓、同一 MySQL 实例中按 schema 隔离。
+当前生产证据仍是 **Vue 前端 + 单个 Spring Boot `backend` + MySQL + Redis**。仓库现已提供四服务与网关的
+Kubernetes 清单（`k8s/microservices*.yaml`），但尚无集群 apply/运行证据，不能表述为已完成线上微服务部署。当前目录能力以
+`services/clas-catalog` 实现并由 `services/nginx/clas-gateway.conf` 路由；下图中的其余服务仍是稳定的领域边界和后续可独立部署单元。迁移期间仍可先在同一代码仓、同一 MySQL 实例中按 schema 隔离。
 
 - 每张业务表只有一个主写服务（owner）；其它服务只可通过 API、事件投影或只读副本使用数据。
 - `userId`、`merchantId`、`orderId` 等仅作为跨服务引用，不建立跨服务外键。

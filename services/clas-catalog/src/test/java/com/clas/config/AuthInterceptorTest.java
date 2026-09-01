@@ -8,7 +8,7 @@ import com.clas.client.IamClient;
 import com.clas.common.BusinessException;
 import com.clas.common.JwtUtil;
 import com.clas.common.client.ServiceEndpoints;
-import com.clas.common.dto.InternalUserAuthState;
+import com.clas.common.dto.InternalValidatedUser;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -26,8 +26,8 @@ class AuthInterceptorTest {
     }
 
     @Test
-    void acceptsActiveIamSession() {
-        AuthInterceptor interceptor = new AuthInterceptor(jwtUtil, iamClient(activeState("session-1")));
+    void acceptsIamValidatedToken() {
+        AuthInterceptor interceptor = new AuthInterceptor(jwtUtil, iamClient(activeUser()));
         String token = jwtUtil.generateToken("13800000000", "USER", "session-1");
 
         assertTrue(interceptor.preHandle(request(token), new MockHttpServletResponse(), new Object()));
@@ -36,8 +36,8 @@ class AuthInterceptorTest {
     }
 
     @Test
-    void rejectsSupersededSession() {
-        AuthInterceptor interceptor = new AuthInterceptor(jwtUtil, iamClient(activeState("new-session")));
+    void propagatesIamSessionRejection() {
+        AuthInterceptor interceptor = new AuthInterceptor(jwtUtil, rejectingIamClient());
         String token = jwtUtil.generateToken("13800000000", "USER", "old-session");
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -45,19 +45,26 @@ class AuthInterceptorTest {
         assertEquals(401, exception.getHttpStatus());
     }
 
-    private IamClient iamClient(InternalUserAuthState state) {
+    private IamClient iamClient(InternalValidatedUser user) {
         return new IamClient((RestTemplate) null, (ServiceEndpoints) null) {
             @Override
-            public InternalUserAuthState getAuthState(String userId) {
-                return state;
+            public InternalValidatedUser validateToken(String token) {
+                return user;
             }
         };
     }
 
-    private InternalUserAuthState activeState(String sessionToken) {
-        return new InternalUserAuthState(
-            "13800000000", "测试用户", "USER", true, sessionToken, List.of("USER"), false
-        );
+    private IamClient rejectingIamClient() {
+        return new IamClient((RestTemplate) null, (ServiceEndpoints) null) {
+            @Override
+            public InternalValidatedUser validateToken(String token) {
+                throw new BusinessException(401, "账号已在其他设备登录，请重新登录");
+            }
+        };
+    }
+
+    private InternalValidatedUser activeUser() {
+        return new InternalValidatedUser("13800000000", "测试用户", "USER", List.of("USER"), false);
     }
 
     private MockHttpServletRequest request(String token) {

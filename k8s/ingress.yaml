@@ -11,6 +11,20 @@ spec:
   rules:
     - http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: clas-gateway
+                port:
+                  number: 8080
+          - path: /uploads
+            pathType: Prefix
+            backend:
+              service:
+                name: clas-gateway
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:

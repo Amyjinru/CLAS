@@ -2,11 +2,13 @@ package com.clas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
+import com.clas.common.JwtUtil;
 import com.clas.common.PasswordValidator;
 import com.clas.common.PhoneValidator;
 import com.clas.common.Result;
 import com.clas.common.VerificationCodeStore;
-import com.clas.common.dto.InternalUserAuthState;
+import com.clas.common.dto.InternalTokenValidationRequest;
+import com.clas.common.dto.InternalValidatedUser;
 import com.clas.dto.InternalAddressResponse;
 import com.clas.dto.InternalUserSummary;
 import com.clas.dto.MerchantApplicantRequest;
@@ -43,6 +45,7 @@ public class InternalIamController {
     private final PenaltyService penaltyService;
     private final VerificationCodeStore verificationCodeStore;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
     public InternalIamController(
         UserMapper userMapper,
@@ -52,7 +55,8 @@ public class InternalIamController {
         UserService userService,
         PenaltyService penaltyService,
         VerificationCodeStore verificationCodeStore,
-        BCryptPasswordEncoder passwordEncoder
+        BCryptPasswordEncoder passwordEncoder,
+        JwtUtil jwtUtil
     ) {
         this.userMapper = userMapper;
         this.userAddressMapper = userAddressMapper;
@@ -62,6 +66,7 @@ public class InternalIamController {
         this.penaltyService = penaltyService;
         this.verificationCodeStore = verificationCodeStore;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @GetMapping("/users/{userId}")
@@ -73,19 +78,34 @@ public class InternalIamController {
         return Result.ok(new InternalUserSummary(user.getPhone(), user.getUsername(), user.getRole(), user.getEnabled()));
     }
 
-    @GetMapping("/users/{userId}/auth-state")
-    public Result<InternalUserAuthState> authState(@PathVariable String userId) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            return Result.ok(null);
+    @PostMapping("/auth/validate")
+    public Result<InternalValidatedUser> validateToken(@RequestBody InternalTokenValidationRequest request) {
+        if (!jwtUtil.isTokenValid(request.token())) {
+            throw new BusinessException(401, "登录已过期，请重新登录");
         }
+        String userId = jwtUtil.getPhoneFromToken(request.token());
+        User user = userMapper.selectById(userId);
+        if (user == null || Boolean.FALSE.equals(user.getEnabled())) {
+            throw new BusinessException(401, "账号已被禁用或不存在");
+        }
+        String tokenSession = jwtUtil.getSessionTokenFromToken(request.token());
+        if (tokenSession == null || !tokenSession.equals(user.getSessionToken())) {
+            throw new BusinessException(401, "账号已在其他设备登录，请重新登录");
+        }
+        String activeRole = jwtUtil.getRoleFromToken(request.token());
         List<String> roles = new ArrayList<>(userService.rolesOf(userId));
         if (user.getRole() != null && !user.getRole().isBlank() && !roles.contains(user.getRole())) {
             roles.add(user.getRole());
         }
-        return Result.ok(new InternalUserAuthState(
-            user.getPhone(), user.getUsername(), user.getRole(), user.getEnabled(), user.getSessionToken(), roles,
-            penaltyService.isAccountOnlyRestricted(userId)
+        if (activeRole == null || !roles.contains(activeRole)) {
+            throw new BusinessException(403, "当前身份尚未审核通过或已不可用");
+        }
+        if ("ADMIN".equals(activeRole) && !activeRole.equals(user.getRole())) {
+            throw new BusinessException(403, "当前端口身份已失效，请重新登录");
+        }
+        userService.touchActiveSession(user);
+        return Result.ok(new InternalValidatedUser(
+            user.getPhone(), user.getUsername(), activeRole, roles, penaltyService.isAccountOnlyRestricted(userId)
         ));
     }
 

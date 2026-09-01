@@ -3,7 +3,7 @@ package com.clas.config;
 import com.clas.client.IamClient;
 import com.clas.common.BusinessException;
 import com.clas.common.JwtUtil;
-import com.clas.common.dto.InternalUserAuthState;
+import com.clas.common.dto.InternalValidatedUser;
 import com.clas.entity.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** Validates JWT claims against IAM; this service never reads IAM-owned tables. */
+/** Uniform external-token validation through IAM; this service never reads IAM-owned tables. */
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
     private final JwtUtil jwtUtil;
@@ -26,15 +26,15 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && !authHeader.trim().isEmpty()) {
-            if (!authHeader.trim().startsWith("Bearer ")) throw new BusinessException(401, "未登录，请先登录");
-            String token = authHeader.trim().substring(7).trim();
+        String authorization = request.getHeader("Authorization");
+        if (authorization != null && !authorization.isBlank()) {
+            if (!authorization.trim().startsWith("Bearer ")) throw new BusinessException(401, "未登录，请先登录");
+            String token = authorization.trim().substring(7).trim();
             if (!jwtUtil.isTokenValid(token)) throw new BusinessException(401, "登录已过期，请重新登录");
-            InternalUserAuthState state = iamClient.getAuthState(jwtUtil.getPhoneFromToken(token));
-            validateState(token, state);
-            UserContext.setUser(toUser(state, jwtUtil.getRoleFromToken(token)));
-            if (state.accountOnlyRestricted()) {
+            InternalValidatedUser user = iamClient.validateToken(token);
+            if (user == null) throw new BusinessException(401, "账号已被禁用或不存在");
+            UserContext.setUser(toUser(user));
+            if (user.accountOnlyRestricted()) {
                 throw new BusinessException(403, "当前账号仅保留账户信息、处罚记录和申诉入口", "ACCOUNT_ONLY_RESTRICTED");
             }
         }
@@ -42,25 +42,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    private void validateState(String token, InternalUserAuthState state) {
-        if (state == null || Boolean.FALSE.equals(state.enabled())) throw new BusinessException(401, "账号已被禁用或不存在");
-        String tokenSession = jwtUtil.getSessionTokenFromToken(token);
-        if (tokenSession == null || !tokenSession.equals(state.sessionToken())) {
-            throw new BusinessException(401, "账号已在其他设备登录，请重新登录");
-        }
-        String activeRole = jwtUtil.getRoleFromToken(token);
-        if (activeRole == null || !state.approvedOrLegacyRoles().contains(activeRole)) {
-            throw new BusinessException(403, "当前身份尚未审核通过或已不可用");
-        }
-        if ("ADMIN".equals(activeRole) && !activeRole.equals(state.primaryRole())) {
-            throw new BusinessException(403, "当前端口身份已失效，请重新登录");
-        }
-    }
-
-    private User toUser(InternalUserAuthState state, String activeRole) {
+    private User toUser(InternalValidatedUser validated) {
         User user = new User();
-        user.setPhone(state.userId()); user.setUsername(state.username()); user.setEnabled(state.enabled());
-        user.setSessionToken(state.sessionToken()); user.setRole(activeRole); user.setRoles(state.approvedOrLegacyRoles());
+        user.setPhone(validated.userId()); user.setUsername(validated.username()); user.setEnabled(true);
+        user.setRole(validated.activeRole()); user.setRoles(validated.roles());
         return user;
     }
 
