@@ -72,19 +72,42 @@ fi
 
 rendered_dir="$(mktemp -d)"
 trap 'rm -rf "$rendered_dir"; collect' ERR
-for manifest in migration-job frontend microservices microservices-gateway; do
+sed "s/REQUIRED_TAG/$IMAGE_TAG/g" \
+  "$PROJECT_ROOT/k8s/migration-job.yaml" > "$rendered_dir/migration-job.yaml"
+for manifest in frontend microservices microservices-gateway; do
+  # A two-core single-node k3s host cannot boot every Spring service at once
+  # without starving the API server. Apply the release at zero replicas, then
+  # start and verify each workload below. The live Deployments finish at the
+  # replica counts declared by the source manifests/HPA.
   sed "s/REQUIRED_TAG/$IMAGE_TAG/g" "$PROJECT_ROOT/k8s/$manifest.yaml" > "$rendered_dir/$manifest.yaml"
+  sed -i.bak 's/^  replicas: 1$/  replicas: 0/' "$rendered_dir/$manifest.yaml"
+  rm -f "$rendered_dir/$manifest.yaml.bak"
 done
 
 kubectl -n "$NAMESPACE" delete job clas-db-migrate --ignore-not-found
 kubectl apply -f "$rendered_dir/migration-job.yaml"
 kubectl -n "$NAMESPACE" wait --for=condition=complete job/clas-db-migrate --timeout=300s
+
+# Remove the previous autoscaler before staging zero-replica Deployments;
+# otherwise it can restart catalog while the node is being drained.
+kubectl -n "$NAMESPACE" delete hpa clas-catalog --ignore-not-found
 kubectl apply -f "$rendered_dir/microservices.yaml"
 kubectl apply -f "$rendered_dir/microservices-gateway.yaml"
 kubectl apply -f "$rendered_dir/frontend.yaml"
+
+# Wait for old application Pods to release CPU and memory. Missing Pods are a
+# valid state on the first deployment, so only wait when the selector matches.
+for app in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway frontend; do
+  if kubectl -n "$NAMESPACE" get pod -l "app=$app" -o name | grep -q .; then
+    kubectl -n "$NAMESPACE" wait --for=delete pod -l "app=$app" --timeout=180s
+  fi
+done
+
 for deployment in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway; do
+  kubectl -n "$NAMESPACE" scale "deployment/$deployment" --replicas=1
   kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout=600s
 done
+kubectl -n "$NAMESPACE" scale deployment/frontend --replicas=1
 kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=180s
 kubectl apply -f "$PROJECT_ROOT/k8s/catalog-hpa.yaml"
 
