@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:catalog;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:catalog-schema.sql
+
+catalog:
+  internal-api-key: catalog-test-key

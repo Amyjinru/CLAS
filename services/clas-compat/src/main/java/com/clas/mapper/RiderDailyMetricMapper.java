@@ -1,0 +1,1 @@
+package com.clas.mapper; import com.baomidou.mybatisplus.core.mapper.BaseMapper; import com.clas.entity.RiderDailyMetric; public interface RiderDailyMetricMapper extends BaseMapper<RiderDailyMetric> {}
