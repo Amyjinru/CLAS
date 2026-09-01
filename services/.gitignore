@@ -1,0 +1,10 @@
+scripts/env.local
+logs/
+run/
+nginx/logs/*.log
+nginx/logs/*.pid
+nginx/logs/client_body_temp/
+nginx/logs/proxy_temp/
+nginx/logs/fastcgi_temp/
+nginx/logs/uwsgi_temp/
+nginx/logs/scgi_temp/

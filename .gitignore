@@ -19,3 +19,8 @@ frontend/.env.local
 
 # 部署环境变量
 scripts/server/clas.env
+services/scripts/env.local
+
+# 本地敏感/临时文件
+.env
+dump.rdb
