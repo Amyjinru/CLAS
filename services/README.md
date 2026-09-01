@@ -1,6 +1,6 @@
 # CLAS 微服务模块
 
-三个**业务**微服务 + **compat** 过渡层（不计入业务服务数量）。
+三个核心业务微服务 + `clas-compat` 第四业务服务。`clas-compat` 目前主写骑手、公告和沟通数据，不应视为纯只读聚合层。
 
 ## 模块
 
@@ -46,3 +46,5 @@ java -jar clas-compat/target/clas-compat-0.1.0.jar
 健康检查：`GET http://localhost:8081/api/health`（各端口对应替换）。
 
 单体基线仍使用仓库根目录 `backend/`。
+
+`services/catalog-service` 是早期独立目录服务原型，未纳入聚合构建、启动脚本或网关。当前唯一有效的目录服务为 `clas-catalog`；请勿部署该原型。
