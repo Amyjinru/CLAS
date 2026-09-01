@@ -66,6 +66,7 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-gateway}}
   template:
     metadata: {labels: {app: clas-gateway}}

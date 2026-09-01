@@ -7,10 +7,14 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-iam}}
   template:
     metadata: {labels: {app: clas-iam}}
     spec:
+      # Kubernetes service-link variables such as CLAS_IAM_PORT contain
+      # tcp://host:port and collide with Spring's integer port properties.
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-iam
@@ -50,10 +54,12 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-merchant}}
   template:
     metadata: {labels: {app: clas-merchant}}
     spec:
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-merchant
@@ -95,10 +101,12 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-catalog}}
   template:
     metadata: {labels: {app: clas-catalog}}
     spec:
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-catalog
@@ -133,10 +141,12 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-order}}
   template:
     metadata: {labels: {app: clas-order}}
     spec:
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-order
@@ -169,10 +179,12 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-compat}}
   template:
     metadata: {labels: {app: clas-compat}}
     spec:
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-compat
