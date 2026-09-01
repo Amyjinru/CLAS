@@ -1,0 +1,26 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: catalog-service
+  datasource:
+    url: jdbc:mysql://${CATALOG_MYSQL_HOST:127.0.0.1}:${CATALOG_MYSQL_PORT:3306}/${CATALOG_MYSQL_DATABASE:catalog_db}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${CATALOG_MYSQL_USER:catalog_service}
+    password: ${CATALOG_MYSQL_PASSWORD:}
+  sql:
+    init:
+      mode: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+catalog:
+  internal-api-key: ${CATALOG_INTERNAL_API_KEY:}

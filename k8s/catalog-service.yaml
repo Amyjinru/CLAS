@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: clas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: catalog-service
+          image: ghcr.io/amyjinru/clas-catalog-service:REQUIRED_TAG
+          ports:
+            - containerPort: 8081
+          env:
+            - name: CATALOG_MYSQL_HOST
+              valueFrom: {configMapKeyRef: {name: clas-config, key: MYSQL_HOST}}
+            - name: CATALOG_MYSQL_PORT
+              valueFrom: {configMapKeyRef: {name: clas-config, key: MYSQL_PORT}}
+            - name: CATALOG_MYSQL_DATABASE
+              value: catalog_db
+            - name: CATALOG_MYSQL_USER
+              value: catalog_service
+            - name: CATALOG_MYSQL_PASSWORD
+              valueFrom: {secretKeyRef: {name: clas-secrets, key: CATALOG_MYSQL_PASSWORD}}
+            - name: CATALOG_INTERNAL_API_KEY
+              valueFrom: {secretKeyRef: {name: clas-secrets, key: CATALOG_INTERNAL_API_KEY}}
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 8081}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 8081}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 150m, memory: 256Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: clas
+spec:
+  selector:
+    app: catalog-service
+  ports:
+    - name: http
+      port: 8081
+      targetPort: 8081
