@@ -24,8 +24,12 @@ data:
         location ^~ /api/role-applications { proxy_pass http://clas-iam:8081; }
         location ^~ /api/notifications { proxy_pass http://clas-iam:8081; }
 
+        location ^~ /api/merchant/me/products { proxy_pass http://clas-catalog:8082; }
+        location ^~ /api/merchant/products { proxy_pass http://clas-catalog:8082; }
+        location ^~ /uploads/merchant-logo/ { proxy_pass http://clas-merchant:8085; }
+        location ^~ /api/merchant { proxy_pass http://clas-merchant:8085; }
+
         location ^~ /uploads/ { proxy_pass http://clas-catalog:8082; }
-        location ^~ /api/merchant { proxy_pass http://clas-catalog:8082; }
         location ^~ /api/product { proxy_pass http://clas-catalog:8082; }
         location ^~ /api/bookings { proxy_pass http://clas-catalog:8082; }
         location ^~ /api/deals/merchant { proxy_pass http://clas-catalog:8082; }

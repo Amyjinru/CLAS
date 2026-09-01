@@ -4,7 +4,7 @@ import com.clas.common.BusinessException;
 import com.clas.common.LocalFileStorage;
 import com.clas.common.Result;
 import com.clas.config.RequireRole;
-import com.clas.service.MerchantService;
+import com.clas.client.MerchantClient;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
@@ -22,17 +22,17 @@ public class ProductImageUploadController {
     private static final Set<String> ALLOWED_EXT = Set.of(".jpg", ".jpeg", ".png");
 
     private final LocalFileStorage localFileStorage;
-    private final MerchantService merchantService;
+    private final MerchantClient merchantClient;
 
-    public ProductImageUploadController(LocalFileStorage localFileStorage, MerchantService merchantService) {
+    public ProductImageUploadController(LocalFileStorage localFileStorage, MerchantClient merchantClient) {
         this.localFileStorage = localFileStorage;
-        this.merchantService = merchantService;
+        this.merchantClient = merchantClient;
     }
 
     @PostMapping("/upload-image")
     @RequireRole("MERCHANT")
     public Result<Map<String, String>> upload(@RequestParam("file") MultipartFile file) {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         if (file == null || file.isEmpty()) {
             throw new BusinessException("请选择要上传的商品图片");
         }

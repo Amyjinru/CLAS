@@ -1,20 +1,12 @@
 package com.clas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.clas.common.BusinessException;
-import com.clas.common.MerchantStatusEnum;
 import com.clas.common.Result;
-import com.clas.dto.MerchantScoreUpdateRequest;
-import com.clas.dto.RoleApplicationRecordResponse;
 import com.clas.dto.StockChangeRequest;
 import com.clas.entity.GroupDeal;
-import com.clas.entity.Merchant;
 import com.clas.entity.Product;
-import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.ProductMapper;
 import com.clas.service.InternalCatalogProductService;
-import com.clas.service.InternalMerchantService;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,42 +19,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/internal/catalog/v1")
-public class InternalCatalogMerchantController {
-    private final InternalMerchantService internalMerchantService;
+public class InternalCatalogController {
     private final InternalCatalogProductService internalCatalogProductService;
-    private final MerchantMapper merchantMapper;
     private final ProductMapper productMapper;
 
-    public InternalCatalogMerchantController(
-        InternalMerchantService internalMerchantService,
+    public InternalCatalogController(
         InternalCatalogProductService internalCatalogProductService,
-        MerchantMapper merchantMapper,
         ProductMapper productMapper
     ) {
-        this.internalMerchantService = internalMerchantService;
         this.internalCatalogProductService = internalCatalogProductService;
-        this.merchantMapper = merchantMapper;
         this.productMapper = productMapper;
-    }
-
-    @GetMapping("/merchants/{merchantId}")
-    public Result<Merchant> getMerchant(@PathVariable Long merchantId) {
-        return Result.ok(internalMerchantService.getById(merchantId));
-    }
-
-    @GetMapping("/merchants/batch")
-    public Result<List<Merchant>> getMerchantsBatch(@RequestParam("ids") String ids) {
-        return Result.ok(internalMerchantService.getByIds(internalMerchantService.parseIds(ids)));
-    }
-
-    @GetMapping("/users/{userId}/merchant-pending")
-    public Result<Boolean> hasPendingMerchantApplication(@PathVariable String userId) {
-        return Result.ok(internalMerchantService.hasPendingApplication(userId));
-    }
-
-    @GetMapping("/users/{userId}/merchant-application-record")
-    public Result<RoleApplicationRecordResponse> getMerchantApplicationRecord(@PathVariable String userId) {
-        return Result.ok(internalMerchantService.getApplicationRecord(userId));
     }
 
     @GetMapping("/products/{productId}")
@@ -107,29 +73,15 @@ public class InternalCatalogMerchantController {
         return Result.ok();
     }
 
-    @GetMapping("/users/{userId}/merchant-id")
-    public Result<Long> getMerchantIdByUser(@PathVariable String userId) {
-        return Result.ok(internalCatalogProductService.getMerchantIdByUserId(userId));
+    @GetMapping("/merchants/product-average-prices")
+    public Result<Map<Long, Integer>> productAveragePrices(@RequestParam("ids") String ids) {
+        return Result.ok(internalCatalogProductService.computeProductAveragePrices(internalCatalogProductService.parseIds(ids)));
     }
 
     @GetMapping("/stats/public")
     public Result<Map<String, Long>> publicStats() {
-        long merchants = merchantMapper.selectCount(new LambdaQueryWrapper<Merchant>()
-            .eq(Merchant::getStatus, MerchantStatusEnum.OPEN));
         long products = productMapper.selectCount(new LambdaQueryWrapper<Product>()
             .eq(Product::getStatus, "ON_SALE"));
-        return Result.ok(Map.of("merchants", merchants, "products", products));
-    }
-
-    @PostMapping("/merchants/{merchantId}/refresh-average-price")
-    public Result<Void> refreshAveragePrice(@PathVariable Long merchantId) {
-        internalCatalogProductService.refreshAveragePrice(merchantId);
-        return Result.ok();
-    }
-
-    @PostMapping("/merchants/{merchantId}/score")
-    public Result<Void> updateMerchantScore(@PathVariable Long merchantId, @RequestBody MerchantScoreUpdateRequest request) {
-        internalMerchantService.updateScore(merchantId, request.score());
-        return Result.ok();
+        return Result.ok(Map.of("products", products));
     }
 }

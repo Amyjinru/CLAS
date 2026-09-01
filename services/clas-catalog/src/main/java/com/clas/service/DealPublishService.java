@@ -11,11 +11,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class DealPublishService {
     private final GroupDealMapper groupDealMapper;
-    private final MerchantService merchantService;
+    private final com.clas.client.MerchantClient merchantClient;
 
-    public DealPublishService(GroupDealMapper groupDealMapper, MerchantService merchantService) {
+    public DealPublishService(GroupDealMapper groupDealMapper, com.clas.client.MerchantClient merchantClient) {
         this.groupDealMapper = groupDealMapper;
-        this.merchantService = merchantService;
+        this.merchantClient = merchantClient;
     }
 
     public List<GroupDeal> list(Long merchantId) {
@@ -38,7 +38,7 @@ public class DealPublishService {
 
     public List<GroupDeal> merchantDeals() {
         return groupDealMapper.selectList(new LambdaQueryWrapper<GroupDeal>()
-            .eq(GroupDeal::getMerchantId, merchantService.getCurrentMerchantId())
+            .eq(GroupDeal::getMerchantId, merchantClient.getCurrentMerchantId())
             .orderByDesc(GroupDeal::getId));
     }
 
@@ -48,7 +48,7 @@ public class DealPublishService {
             throw new BusinessException("团购状态只能是 ON_SALE 或 OFF_SALE");
         }
         GroupDeal deal = new GroupDeal();
-        deal.setMerchantId(merchantService.getCurrentMerchantId());
+        deal.setMerchantId(merchantClient.getCurrentMerchantId());
         deal.setTitle(request.title());
         deal.setDescription(request.description());
         deal.setOriginalPrice(request.originalPrice());
@@ -65,7 +65,7 @@ public class DealPublishService {
         if (deal == null) {
             throw new BusinessException("团购券不存在");
         }
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         if (!merchantId.equals(deal.getMerchantId())) {
             throw new BusinessException("只能修改自己店铺的团购");
         }

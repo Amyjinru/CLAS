@@ -12,7 +12,7 @@
 
     <artifactId>clas-catalog</artifactId>
     <name>clas-catalog</name>
-    <description>Merchant and catalog microservice</description>
+    <description>Product catalog microservice (products, bookings, deals publish)</description>
 
     <dependencies>
         <dependency>

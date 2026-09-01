@@ -2,15 +2,14 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.client.IamClient;
+import com.clas.client.MerchantClient;
 import com.clas.common.BusinessException;
-import com.clas.common.MerchantStatusEnum;
 import com.clas.common.PhoneValidator;
 import com.clas.config.UserContext;
 import com.clas.dto.BookingRequest;
 import com.clas.dto.InternalNotificationRequest;
 import com.clas.entity.Merchant;
 import com.clas.entity.ServiceBooking;
-import com.clas.mapper.MerchantMapper;
 import com.clas.mapper.ServiceBookingMapper;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,19 +32,16 @@ public class BookingService {
     );
 
     private final ServiceBookingMapper bookingMapper;
-    private final MerchantMapper merchantMapper;
-    private final MerchantService merchantService;
+    private final MerchantClient merchantClient;
     private final IamClient iamClient;
 
     public BookingService(
         ServiceBookingMapper bookingMapper,
-        MerchantMapper merchantMapper,
-        MerchantService merchantService,
+        MerchantClient merchantClient,
         IamClient iamClient
     ) {
         this.bookingMapper = bookingMapper;
-        this.merchantMapper = merchantMapper;
-        this.merchantService = merchantService;
+        this.merchantClient = merchantClient;
         this.iamClient = iamClient;
     }
 
@@ -55,10 +51,7 @@ public class BookingService {
         if (request.merchantId() == null) {
             throw new BusinessException("请选择预约商家");
         }
-        Merchant merchant = merchantMapper.selectById(request.merchantId());
-        if (merchant == null || merchant.getStatus() != MerchantStatusEnum.OPEN) {
-            throw new BusinessException("商家不存在或未营业");
-        }
+        Merchant merchant = merchantClient.requireOpenMerchant(request.merchantId());
         String serviceName = normalizeText(request.serviceName(), "请填写预约服务", 100);
         LocalDateTime appointmentTime = request.appointmentTime();
         if (appointmentTime == null || appointmentTime.isBefore(LocalDateTime.now().plusMinutes(10))) {
@@ -113,7 +106,7 @@ public class BookingService {
     }
 
     public List<ServiceBooking> merchantMine() {
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         return bookingMapper.selectList(new LambdaQueryWrapper<ServiceBooking>()
             .eq(ServiceBooking::getMerchantId, merchantId)
             .orderByDesc(ServiceBooking::getAppointmentTime));
@@ -130,7 +123,7 @@ public class BookingService {
         }
         booking.setStatus(STATUS_CANCELED);
         bookingMapper.updateById(booking);
-        Merchant merchant = merchantMapper.selectById(booking.getMerchantId());
+        Merchant merchant = merchantClient.getMerchant(booking.getMerchantId());
         if (merchant != null && merchant.getUserId() != null) {
             iamClient.sendNotification(new InternalNotificationRequest(
                 merchant.getUserId(),
@@ -153,7 +146,7 @@ public class BookingService {
     public ServiceBooking updateStatus(Long id, String status) {
         String normalizedStatus = normalizeStatus(status);
         ServiceBooking booking = bookingMapper.selectById(id);
-        Long merchantId = merchantService.getCurrentMerchantId();
+        Long merchantId = merchantClient.getCurrentMerchantId();
         if (booking == null || !merchantId.equals(booking.getMerchantId())) {
             throw new BusinessException("预约不存在或无权操作");
         }

@@ -2,16 +2,11 @@ package com.clas.client;
 
 import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
-import com.clas.common.MerchantStatusEnum;
 import com.clas.common.Result;
 import com.clas.common.client.ServiceEndpoints;
-import com.clas.config.UserContext;
-import com.clas.dto.MerchantScoreUpdateRequest;
 import com.clas.dto.StockChangeRequest;
 import com.clas.entity.GroupDeal;
-import com.clas.entity.Merchant;
 import com.clas.entity.Product;
-import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -62,22 +57,6 @@ public class CatalogClient {
         postVoid("/products/" + productId + "/restore-stock", new StockChangeRequest(quantity));
     }
 
-    public Merchant getMerchant(Long merchantId) {
-        return get("/merchants/" + merchantId, new ParameterizedTypeReference<Result<Merchant>>() {});
-    }
-
-    public Map<Long, Merchant> getMerchants(Collection<Long> merchantIds) {
-        if (merchantIds.isEmpty()) {
-            return Map.of();
-        }
-        String ids = merchantIds.stream().map(String::valueOf).collect(Collectors.joining(","));
-        List<Merchant> merchants = get("/merchants/batch?ids=" + ids, new ParameterizedTypeReference<Result<List<Merchant>>>() {});
-        if (merchants == null) {
-            return Map.of();
-        }
-        return merchants.stream().collect(Collectors.toMap(Merchant::getId, Function.identity()));
-    }
-
     public GroupDeal getDeal(Long dealId) {
         return get("/deals/" + dealId, new ParameterizedTypeReference<Result<GroupDeal>>() {});
     }
@@ -101,34 +80,6 @@ public class CatalogClient {
 
     public void restoreDealStock(Long dealId) {
         postVoid("/deals/" + dealId + "/restore-stock", null);
-    }
-
-    public void refreshAveragePrice(Long merchantId) {
-        postVoid("/merchants/" + merchantId + "/refresh-average-price", null);
-    }
-
-    public void updateMerchantScore(Long merchantId, BigDecimal score) {
-        postVoid("/merchants/" + merchantId + "/score", new MerchantScoreUpdateRequest(score));
-    }
-
-    public Long getCurrentMerchantId() {
-        String userId = UserContext.getUserId();
-        if (userId == null) {
-            throw new BusinessException("未登录，请先登录");
-        }
-        Long merchantId = get("/users/" + userId + "/merchant-id", new ParameterizedTypeReference<Result<Long>>() {});
-        if (merchantId == null) {
-            throw new BusinessException("当前用户未入驻为商家");
-        }
-        return merchantId;
-    }
-
-    public Merchant requireOpenMerchant(Long merchantId) {
-        Merchant merchant = getMerchant(merchantId);
-        if (merchant == null || merchant.getStatus() != MerchantStatusEnum.OPEN) {
-            throw new BusinessException("商家不存在或未营业");
-        }
-        return merchant;
     }
 
     private <T> T get(String path, ParameterizedTypeReference<Result<T>> type) {
@@ -175,6 +126,6 @@ public class CatalogClient {
     }
 
     private BusinessException upstreamUnavailable() {
-        return new BusinessException(503, "商品/商家服务暂不可用，请稍后重试", DomainErrorCode.UPSTREAM_UNAVAILABLE);
+        return new BusinessException(503, "商品目录服务暂不可用，请稍后重试", DomainErrorCode.UPSTREAM_UNAVAILABLE);
     }
 }

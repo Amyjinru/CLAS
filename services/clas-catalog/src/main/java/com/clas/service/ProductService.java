@@ -22,16 +22,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductService {
     private final ProductMapper productMapper;
     private final ProductCategoryMapper productCategoryMapper;
-    private final MerchantService merchantService;
+    private final com.clas.client.MerchantClient merchantClient;
 
     public ProductService(
         ProductMapper productMapper,
         ProductCategoryMapper productCategoryMapper,
-        MerchantService merchantService
+        com.clas.client.MerchantClient merchantClient
     ) {
         this.productMapper = productMapper;
         this.productCategoryMapper = productCategoryMapper;
-        this.merchantService = merchantService;
+        this.merchantClient = merchantClient;
     }
 
     public List<Product> listByMerchant(Long merchantId) {
@@ -104,7 +104,7 @@ public class ProductService {
         product.setImage(request.imageUrl());
         product.setStatus("ON_SALE");
         productMapper.insert(product);
-        merchantService.refreshAveragePrice(merchantId);
+        merchantClient.refreshAveragePrice(merchantId);
         return product;
     }
 
@@ -135,7 +135,7 @@ public class ProductService {
         }
 
         productMapper.updateById(product);
-        merchantService.refreshAveragePrice(merchantId);
+        merchantClient.refreshAveragePrice(merchantId);
         return product;
     }
 
@@ -152,7 +152,7 @@ public class ProductService {
         }
         product.setStatus(newStatus);
         productMapper.updateById(product);
-        merchantService.refreshAveragePrice(merchantId);
+        merchantClient.refreshAveragePrice(merchantId);
     }
 
     public void deleteProduct(Long productId, Long merchantId) {
@@ -165,7 +165,7 @@ public class ProductService {
         }
         product.setStatus("DELETED");
         productMapper.updateById(product);
-        merchantService.refreshAveragePrice(merchantId);
+        merchantClient.refreshAveragePrice(merchantId);
     }
 
     public List<ProductCategory> listCategories(Long merchantId) {

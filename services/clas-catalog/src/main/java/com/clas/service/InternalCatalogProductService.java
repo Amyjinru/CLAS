@@ -5,24 +5,23 @@ import com.clas.entity.GroupDeal;
 import com.clas.entity.Product;
 import com.clas.mapper.GroupDealMapper;
 import com.clas.mapper.ProductMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
 public class InternalCatalogProductService {
+    private static final String PRODUCT_STATUS_DELETED = "DELETED";
+
     private final ProductMapper productMapper;
     private final GroupDealMapper groupDealMapper;
-    private final MerchantService merchantService;
 
-    public InternalCatalogProductService(
-        ProductMapper productMapper,
-        GroupDealMapper groupDealMapper,
-        MerchantService merchantService
-    ) {
+    public InternalCatalogProductService(ProductMapper productMapper, GroupDealMapper groupDealMapper) {
         this.productMapper = productMapper;
         this.groupDealMapper = groupDealMapper;
-        this.merchantService = merchantService;
     }
 
     public Product getProduct(Long productId) {
@@ -69,13 +68,27 @@ public class InternalCatalogProductService {
         groupDealMapper.restoreStock(dealId);
     }
 
-    public void refreshAveragePrice(Long merchantId) {
-        merchantService.refreshAveragePrice(merchantId);
-    }
-
-    public Long getMerchantIdByUserId(String userId) {
-        var merchant = merchantService.getMerchantByUserId(userId);
-        return merchant == null ? null : merchant.id();
+    public Map<Long, Integer> computeProductAveragePrices(List<Long> merchantIds) {
+        if (merchantIds == null || merchantIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Product> products = productMapper.selectList(new LambdaQueryWrapper<Product>()
+            .in(Product::getMerchantId, merchantIds)
+            .ne(Product::getStatus, PRODUCT_STATUS_DELETED));
+        Map<Long, List<Integer>> pricesByMerchant = new HashMap<>();
+        for (Product product : products) {
+            if (product.getPrice() == null) {
+                continue;
+            }
+            pricesByMerchant
+                .computeIfAbsent(product.getMerchantId(), key -> new java.util.ArrayList<>())
+                .add(product.getPrice());
+        }
+        Map<Long, Integer> averages = new HashMap<>();
+        for (Map.Entry<Long, List<Integer>> entry : pricesByMerchant.entrySet()) {
+            averages.put(entry.getKey(), averageInt(entry.getValue()));
+        }
+        return averages;
     }
 
     public List<Long> parseIds(String ids) {
@@ -87,5 +100,16 @@ public class InternalCatalogProductService {
             .filter(part -> !part.isEmpty())
             .map(Long::valueOf)
             .toList();
+    }
+
+    private int averageInt(List<Integer> values) {
+        if (values == null || values.isEmpty()) {
+            return 0;
+        }
+        long total = 0;
+        for (Integer value : values) {
+            total += value == null ? 0 : value;
+        }
+        return (int) Math.round((double) total / values.size());
     }
 }

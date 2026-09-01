@@ -16,11 +16,12 @@
     <version>0.1.0</version>
     <packaging>pom</packaging>
     <name>clas-services</name>
-    <description>CLAS microservice modules (iam, catalog, order, compat)</description>
+    <description>CLAS microservice modules (iam, merchant, catalog, order, compat)</description>
 
     <modules>
         <module>clas-common</module>
         <module>clas-iam</module>
+        <module>clas-merchant</module>
         <module>clas-catalog</module>
         <module>clas-order</module>
         <module>clas-compat</module>

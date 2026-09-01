@@ -15,11 +15,11 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 @Component
-public class CatalogClient {
+public class MerchantClient {
     private final RestTemplate restTemplate;
     private final ServiceEndpoints serviceEndpoints;
 
-    public CatalogClient(RestTemplate restTemplate, ServiceEndpoints serviceEndpoints) {
+    public MerchantClient(RestTemplate restTemplate, ServiceEndpoints serviceEndpoints) {
         this.restTemplate = restTemplate;
         this.serviceEndpoints = serviceEndpoints;
     }
@@ -35,7 +35,7 @@ public class CatalogClient {
     public Merchant getMerchant(Long merchantId) {
         try {
             ResponseEntity<Result<Merchant>> response = restTemplate.exchange(
-                serviceEndpoints.catalog() + "/internal/catalog/v1/merchants/" + merchantId,
+                serviceEndpoints.merchant() + "/internal/merchant/v1/merchants/" + merchantId,
                 HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<>() {}
@@ -53,7 +53,7 @@ public class CatalogClient {
         }
         try {
             ResponseEntity<Result<List<Merchant>>> response = restTemplate.exchange(
-                serviceEndpoints.catalog() + "/internal/catalog/v1/merchants/batch?ids="
+                serviceEndpoints.merchant() + "/internal/merchant/v1/merchants/batch?ids="
                     + String.join(",", merchantIds.stream().map(String::valueOf).toList()),
                 HttpMethod.GET,
                 null,
@@ -69,7 +69,7 @@ public class CatalogClient {
     public boolean hasPendingMerchantApplication(String userId) {
         try {
             ResponseEntity<Result<Boolean>> response = restTemplate.exchange(
-                serviceEndpoints.catalog() + "/internal/catalog/v1/users/" + userId + "/merchant-pending",
+                serviceEndpoints.merchant() + "/internal/merchant/v1/users/" + userId + "/merchant-pending",
                 HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<>() {}
@@ -84,7 +84,7 @@ public class CatalogClient {
     public RoleApplicationRecordResponse getMerchantApplicationRecord(String userId) {
         try {
             ResponseEntity<Result<RoleApplicationRecordResponse>> response = restTemplate.exchange(
-                serviceEndpoints.catalog() + "/internal/catalog/v1/users/" + userId + "/merchant-application-record",
+                serviceEndpoints.merchant() + "/internal/merchant/v1/users/" + userId + "/merchant-application-record",
                 HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<>() {}

@@ -35,6 +35,7 @@ clas:
     access-password: ${CLAS_DEMO_ACCESS_PASSWORD:}
   services:
     iam: http://${CLAS_IAM_HOST:localhost}:${CLAS_IAM_PORT:8081}
+    merchant: http://${CLAS_MERCHANT_HOST:localhost}:${CLAS_MERCHANT_PORT:8085}
     catalog: http://${CLAS_CATALOG_HOST:localhost}:${CLAS_CATALOG_PORT:8082}
     order: http://${CLAS_ORDER_HOST:localhost}:${CLAS_ORDER_PORT:8083}
     compat: http://${CLAS_COMPAT_HOST:localhost}:${CLAS_COMPAT_PORT:8084}

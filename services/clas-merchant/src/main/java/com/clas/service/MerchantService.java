@@ -1,6 +1,7 @@
 package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.clas.client.CatalogClient;
 import com.clas.client.CompatClient;
 import com.clas.client.IamClient;
 import com.clas.client.OrderClient;
@@ -20,10 +21,8 @@ import com.clas.dto.MerchantResponse;
 import com.clas.dto.SendCodeRequest;
 import com.clas.entity.Merchant;
 import com.clas.entity.MerchantAuditLog;
-import com.clas.entity.Product;
 import com.clas.mapper.MerchantAuditLogMapper;
 import com.clas.mapper.MerchantMapper;
-import com.clas.mapper.ProductMapper;
 import com.clas.config.UserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,12 +41,10 @@ import java.util.stream.Collectors;
 @Service
 public class MerchantService {
     private static final int COMPLETED_ORDER_THRESHOLD = 10;
-    private static final String ORDER_STATUS_COMPLETED = "COMPLETED";
-    private static final String PRODUCT_STATUS_DELETED = "DELETED";
 
     private final MerchantMapper merchantMapper;
     private final MerchantAuditLogMapper merchantAuditLogMapper;
-    private final ProductMapper productMapper;
+    private final CatalogClient catalogClient;
     private final IamClient iamClient;
     private final CompatClient compatClient;
     private final OrderClient orderClient;
@@ -58,7 +55,7 @@ public class MerchantService {
     public MerchantService(
         MerchantMapper merchantMapper,
         MerchantAuditLogMapper merchantAuditLogMapper,
-        ProductMapper productMapper,
+        CatalogClient catalogClient,
         IamClient iamClient,
         CompatClient compatClient,
         OrderClient orderClient,
@@ -68,7 +65,7 @@ public class MerchantService {
     ) {
         this.merchantMapper = merchantMapper;
         this.merchantAuditLogMapper = merchantAuditLogMapper;
-        this.productMapper = productMapper;
+        this.catalogClient = catalogClient;
         this.iamClient = iamClient;
         this.compatClient = compatClient;
         this.orderClient = orderClient;
@@ -669,23 +666,7 @@ public class MerchantService {
     }
 
     private Map<Long, Integer> loadProductAveragePrices(Collection<Long> merchantIds) {
-        List<Product> products = productMapper.selectList(new LambdaQueryWrapper<Product>()
-            .in(Product::getMerchantId, merchantIds)
-            .ne(Product::getStatus, PRODUCT_STATUS_DELETED));
-        Map<Long, List<Integer>> pricesByMerchant = new HashMap<>();
-        for (Product product : products) {
-            if (product.getPrice() == null) {
-                continue;
-            }
-            pricesByMerchant
-                .computeIfAbsent(product.getMerchantId(), key -> new java.util.ArrayList<>())
-                .add(product.getPrice());
-        }
-        Map<Long, Integer> averages = new HashMap<>();
-        for (Map.Entry<Long, List<Integer>> entry : pricesByMerchant.entrySet()) {
-            averages.put(entry.getKey(), averageInt(entry.getValue()));
-        }
-        return averages;
+        return catalogClient.getProductAveragePrices(merchantIds);
     }
 
     private int averageInt(List<Integer> values) {

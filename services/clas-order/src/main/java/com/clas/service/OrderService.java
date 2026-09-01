@@ -2,6 +2,7 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import com.clas.client.CompatClient;
 import com.clas.client.IamClient;
 import com.clas.common.BusinessException;
@@ -53,6 +54,7 @@ public class OrderService {
     private final OrderItemMapper orderItemMapper;
     private final CartMapper cartMapper;
     private final CatalogClient catalogClient;
+    private final MerchantClient merchantClient;
     private final NotificationBridge notificationBridge;
     private final IamClient iamClient;
     private final AmapRouteService amapRouteService;
@@ -65,6 +67,7 @@ public class OrderService {
         OrderItemMapper orderItemMapper,
         CartMapper cartMapper,
         CatalogClient catalogClient,
+        MerchantClient merchantClient,
         NotificationBridge notificationBridge,
         IamClient iamClient,
         AmapRouteService amapRouteService,
@@ -76,6 +79,7 @@ public class OrderService {
         this.orderItemMapper = orderItemMapper;
         this.cartMapper = cartMapper;
         this.catalogClient = catalogClient;
+        this.merchantClient = merchantClient;
         this.notificationBridge = notificationBridge;
         this.iamClient = iamClient;
         this.amapRouteService = amapRouteService;
@@ -481,7 +485,7 @@ public class OrderService {
         ordersMapper.updateById(order);
         lifecycleService.record(order, "ORDER_COMPLETED", fromStatus, fromDelivery, "SYSTEM", null, "????");
         compatClient.makeCommissionWithdrawable(order);
-        catalogClient.refreshAveragePrice(order.getMerchantId());
+        merchantClient.refreshAveragePrice(order.getMerchantId());
         return order;
     }
 
@@ -498,7 +502,7 @@ public class OrderService {
         order.setCompletedAt(LocalDateTime.now());
         ordersMapper.updateById(order);
         lifecycleService.record(order, "USER_CONFIRMED_RECEIPT", fromStatus, fromDelivery, "USER", userId, "??????");
-        catalogClient.refreshAveragePrice(order.getMerchantId());
+        merchantClient.refreshAveragePrice(order.getMerchantId());
         notificationBridge.send(new NotificationBridge.NotificationTarget(
             order.getUserId(),
             "?????",
@@ -773,7 +777,7 @@ public class OrderService {
         Set<Long> merchantIds = orders.stream().map(Orders::getMerchantId).collect(Collectors.toSet());
         Map<Long, Merchant> merchantsById = merchantIds.isEmpty()
             ? Map.of()
-            : catalogClient.getMerchants(merchantIds);
+            : merchantClient.getMerchants(merchantIds);
 
         return orders.stream().map(order -> {
             List<OrderItem> items = itemsByOrderId.getOrDefault(order.getId(), List.of());
@@ -944,7 +948,7 @@ public class OrderService {
             longitude = address.longitude();
             latitude = address.latitude();
         }
-        Merchant merchant = catalogClient.getMerchant(request.merchantId());
+        Merchant merchant = merchantClient.getMerchant(request.merchantId());
         if (merchant == null) {
             throw new BusinessException("?????");
         }
@@ -1031,7 +1035,7 @@ public class OrderService {
     }
 
     private Merchant requireMerchant(Long merchantId) {
-        Merchant merchant = catalogClient.getMerchant(merchantId);
+        Merchant merchant = merchantClient.getMerchant(merchantId);
         if (merchant == null) {
             throw new BusinessException("?????");
         }

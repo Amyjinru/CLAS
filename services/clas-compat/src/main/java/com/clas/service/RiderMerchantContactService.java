@@ -2,7 +2,7 @@ package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
-import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import com.clas.dto.ChatMessageResponse;
 import com.clas.entity.ChatConversation;
 import com.clas.entity.ChatMessage;
@@ -21,17 +21,17 @@ public class RiderMerchantContactService {
     private static final String RIDER_MERCHANT = "RIDER_MERCHANT";
     private static final Set<String> ACTIVE = Set.of("ASSIGNED_WAITING_MEAL", "DELIVERING");
     private final OrderService orderService;
-    private final CatalogClient catalogClient;
+    private final MerchantClient merchantClient;
     private final ChatMessageMapper messages;
     private final ChatConversationMapper conversations;
     private final ContentModerationService contentModerationService;
     private final PenaltyService penaltyService;
 
-    public RiderMerchantContactService(OrderService orderService, CatalogClient catalogClient,
+    public RiderMerchantContactService(OrderService orderService, MerchantClient merchantClient,
                                        ChatMessageMapper messages, ChatConversationMapper conversations,
                                        ContentModerationService contentModerationService, PenaltyService penaltyService) {
         this.orderService = orderService;
-        this.catalogClient = catalogClient;
+        this.merchantClient = merchantClient;
         this.messages = messages;
         this.conversations = conversations;
         this.contentModerationService = contentModerationService;
@@ -75,7 +75,7 @@ public class RiderMerchantContactService {
         if ("RIDER".equals(role)) {
             if (!Objects.equals(order.getRiderId(), actorId)) throw new BusinessException("无权联系该订单商家");
         } else if ("MERCHANT".equals(role)) {
-            Long merchantId = catalogClient.getMerchantIdByUser(actorId);
+            Long merchantId = merchantClient.getMerchantIdByUser(actorId);
             if (!Objects.equals(order.getMerchantId(), merchantId)) {
                 throw new BusinessException("无权联系该订单骑手");
             }

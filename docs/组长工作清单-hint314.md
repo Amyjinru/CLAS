@@ -26,7 +26,8 @@ services/
 ├── pom.xml                 # 父 POM clas-services
 ├── clas-common/            # Result、异常、服务标识
 ├── clas-iam/               # :8081
-├── clas-catalog/           # :8082
+├── clas-merchant/          # :8085 入驻/审核/营业
+├── clas-catalog/           # :8082 商品/预约/团购发布
 ├── clas-order/             # :8083
 └── clas-compat/            # :8084
 ```

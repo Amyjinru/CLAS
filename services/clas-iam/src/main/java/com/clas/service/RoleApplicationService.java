@@ -1,7 +1,7 @@
 package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import com.clas.client.CompatClient;
 import com.clas.common.BusinessException;
 import com.clas.dto.RoleApplicationAuditRequest;
@@ -28,7 +28,7 @@ public class RoleApplicationService {
     private final UserMapper userMapper;
     private final NotificationService notificationService;
     private final UserService userService;
-    private final CatalogClient catalogClient;
+    private final MerchantClient merchantClient;
     private final CompatClient compatClient;
 
     public RoleApplicationService(
@@ -36,14 +36,14 @@ public class RoleApplicationService {
         UserMapper userMapper,
         NotificationService notificationService,
         UserService userService,
-        CatalogClient catalogClient,
+        MerchantClient merchantClient,
         CompatClient compatClient
     ) {
         this.roleApplicationMapper = roleApplicationMapper;
         this.userMapper = userMapper;
         this.notificationService = notificationService;
         this.userService = userService;
-        this.catalogClient = catalogClient;
+        this.merchantClient = merchantClient;
         this.compatClient = compatClient;
     }
 
@@ -56,7 +56,7 @@ public class RoleApplicationService {
         if (userService.rolesOf(userId).stream().anyMatch(role -> RIDER.equals(role) || "MERCHANT".equals(role))) {
             throw new BusinessException("已拥有商家或骑手身份，不能申请其他业务身份");
         }
-        if (catalogClient.hasPendingMerchantApplication(userId)) {
+        if (merchantClient.hasPendingMerchantApplication(userId)) {
             throw new BusinessException("已有待审核的商家申请，暂不能申请骑手身份");
         }
         boolean pending = roleApplicationMapper.exists(new LambdaQueryWrapper<RoleApplication>()
@@ -100,7 +100,7 @@ public class RoleApplicationService {
                 application.getUpdatedAt()
             ));
         }
-        RoleApplicationRecordResponse merchantRecord = catalogClient.getMerchantApplicationRecord(userId);
+        RoleApplicationRecordResponse merchantRecord = merchantClient.getMerchantApplicationRecord(userId);
         if (merchantRecord != null) {
             records.add(merchantRecord);
         }

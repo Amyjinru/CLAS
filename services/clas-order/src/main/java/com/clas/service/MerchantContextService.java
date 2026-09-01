@@ -1,17 +1,17 @@
 package com.clas.service;
 
-import com.clas.client.CatalogClient;
+import com.clas.client.MerchantClient;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MerchantContextService {
-    private final CatalogClient catalogClient;
+    private final MerchantClient merchantClient;
 
-    public MerchantContextService(CatalogClient catalogClient) {
-        this.catalogClient = catalogClient;
+    public MerchantContextService(MerchantClient merchantClient) {
+        this.merchantClient = merchantClient;
     }
 
     public Long getCurrentMerchantId() {
-        return catalogClient.getCurrentMerchantId();
+        return merchantClient.getCurrentMerchantId();
     }
 }
