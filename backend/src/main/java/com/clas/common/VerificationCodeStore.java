@@ -1,6 +1,7 @@
 package com.clas.common;
 
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,14 +19,21 @@ public class VerificationCodeStore {
 
     private final StringRedisTemplate redisTemplate;
     private final String fixedCode;
+    private final Clock clock;
     private final Map<String, CodeEntry> fallbackStore = new ConcurrentHashMap<>();
 
+    @Autowired
     public VerificationCodeStore(
         @Autowired(required = false) StringRedisTemplate redisTemplate,
         @Value("${clas.verification.fixed-code:}") String fixedCode
     ) {
+        this(redisTemplate, fixedCode, Clock.systemUTC());
+    }
+
+    VerificationCodeStore(StringRedisTemplate redisTemplate, String fixedCode, Clock clock) {
         this.redisTemplate = redisTemplate;
         this.fixedCode = fixedCode == null ? "" : fixedCode.trim();
+        this.clock = clock;
     }
 
     public String generateAndStore(String phone, String scene) {
@@ -114,12 +122,12 @@ public class VerificationCodeStore {
         String key = memoryKey(phone, scene);
         CodeEntry existing = fallbackStore.get(key);
         if (existing != null) {
-            long secondsSinceCreate = Instant.now().getEpochSecond() - existing.createdAt.getEpochSecond();
+            long secondsSinceCreate = clock.instant().getEpochSecond() - existing.createdAt.getEpochSecond();
             if (secondsSinceCreate < COOLDOWN_SECONDS) {
                 throw new BusinessException("验证码已发送，请" + (COOLDOWN_SECONDS - secondsSinceCreate) + "秒后再试");
             }
         }
-        fallbackStore.put(key, new CodeEntry(code, Instant.now(), 0));
+        fallbackStore.put(key, new CodeEntry(code, clock.instant(), 0));
     }
 
     private boolean verifyMemory(String phone, String scene, String code) {
@@ -132,7 +140,7 @@ public class VerificationCodeStore {
             fallbackStore.remove(key);
             throw new BusinessException("验证码尝试次数过多，请重新获取");
         }
-        long secondsSinceCreate = Instant.now().getEpochSecond() - entry.createdAt.getEpochSecond();
+        long secondsSinceCreate = clock.instant().getEpochSecond() - entry.createdAt.getEpochSecond();
         if (secondsSinceCreate > TTL_SECONDS) {
             fallbackStore.remove(key);
             throw new BusinessException("验证码已过期，请重新获取");

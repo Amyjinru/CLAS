@@ -609,6 +609,134 @@ class ModuleIntegrationTest {
     }
 
     @Test
+    void forgotPasswordRejectsWrongCodeThenReplacesPasswordAndIssuesNewToken() throws Exception {
+        String phone = "13900000042";
+        String replacementPassword = "New123!!";
+        registerUser(phone, "forgot_password_user", STRONG_PASSWORD);
+
+        mockMvc.perform(post("/api/user/forgot-password/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", phone))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/user/forgot-password/reset")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", phone,
+                    "code", "000000",
+                    "newPassword", replacementPassword,
+                    "confirmPassword", replacementPassword
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("验证码错误")));
+
+        mockMvc.perform(post("/api/user/forgot-password/reset")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "phone", phone,
+                    "code", TEST_CODE,
+                    "newPassword", replacementPassword,
+                    "confirmPassword", replacementPassword
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.token").isString());
+
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("phone", phone, "password", STRONG_PASSWORD))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("手机号或密码错误"));
+        String newToken = loginToken(phone, replacementPassword);
+        mockMvc.perform(get("/api/user/profile").header("Authorization", "Bearer " + newToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.phone").value(phone));
+    }
+
+    @Test
+    void addressesSupportCrudOwnerIsolationAndSingleDefault() throws Exception {
+        String phone = "13900000043";
+        String otherPhone = "13900000044";
+        registerUser(phone, "address_owner", STRONG_PASSWORD);
+        registerUser(otherPhone, "address_other", STRONG_PASSWORD);
+        String token = "Bearer " + loginToken(phone);
+        String otherToken = "Bearer " + loginToken(otherPhone);
+
+        MvcResult first = mockMvc.perform(post("/api/address")
+                .header("Authorization", token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "contactName", "测试收货人", "phone", phone, "address", "测试地址一号",
+                    "longitude", 116.397428, "latitude", 39.90923, "isDefault", true
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.isDefault").value(true))
+            .andReturn();
+        Long firstId = objectMapper.readTree(first.getResponse().getContentAsString()).path("data").path("id").asLong();
+
+        MvcResult second = mockMvc.perform(post("/api/address")
+                .header("Authorization", token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "contactName", "测试收货人二", "phone", phone, "address", "测试地址二号",
+                    "longitude", 116.398428, "latitude", 39.91023, "isDefault", true
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+        Long secondId = objectMapper.readTree(second.getResponse().getContentAsString()).path("data").path("id").asLong();
+
+        mockMvc.perform(get("/api/address/mine").header("Authorization", token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(2));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM user_address WHERE user_id = ? AND is_default = TRUE", Integer.class, phone));
+
+        mockMvc.perform(put("/api/address/" + secondId)
+                .header("Authorization", token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "contactName", "已更新收货人", "phone", phone, "address", "测试地址二号（更新）",
+                    "longitude", 116.399428, "latitude", 39.91123, "isDefault", true
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.address").value("测试地址二号（更新）"));
+
+        mockMvc.perform(delete("/api/address/" + secondId).header("Authorization", otherToken))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("地址不存在或无权操作"));
+        mockMvc.perform(delete("/api/address/" + firstId).header("Authorization", token))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void merchantRefundApprovalIsScopedAndCannotBeRepeated() throws Exception {
+        String otherMerchantPhone = "13900000045";
+        registerMerchant(otherMerchantPhone, "refund_other_merchant", "退款越权测试商家", "13900000046");
+        Long orderId = createPendingOrderForUser();
+        mockMvc.perform(post("/api/order/pay/" + orderId).header("Authorization", auth(USER_PHONE)))
+            .andExpect(status().isOk());
+        merchantAcceptAndDispatch(orderId);
+        mockMvc.perform(post("/api/order/refund/" + orderId)
+                .header("Authorization", auth(USER_PHONE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"退款专项测试\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("REFUND_PENDING"));
+
+        mockMvc.perform(post("/api/order/refund/" + orderId + "/approve")
+                .header("Authorization", auth(otherMerchantPhone)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+        mockMvc.perform(post("/api/order/refund/" + orderId + "/approve")
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("REFUNDED"))
+            .andExpect(jsonPath("$.data.refundStatus").value("APPROVED"));
+        mockMvc.perform(post("/api/order/refund/" + orderId + "/approve")
+                .header("Authorization", auth(MERCHANT_PHONE)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void userBankCardsSupportMultipleMaskedCardsAndOwnerDelete() throws Exception {
         String token = auth(USER_PHONE);
 

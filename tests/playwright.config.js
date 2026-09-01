@@ -8,7 +8,7 @@ export default defineConfig({
   retries: 1,
   reporter: 'html',
   use: {
-    baseURL: 'http://8.141.112.182',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://8.141.112.182',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off'
