@@ -1,0 +1,16 @@
+run_id=20260902-231711
+normal_order_preview=200
+fault_order_preview=503
+fault_error_code=UPSTREAM_UNAVAILABLE
+fault_iam_health=200
+fault_merchant_health=200
+fault_order_health=200
+fault_compat_health=200
+recovery_order_preview=200
+recovery_iam_health=200
+recovery_merchant_health=200
+recovery_catalog_health=200
+recovery_order_health=200
+recovery_compat_health=200
+exit_status=0
+duration_seconds=117

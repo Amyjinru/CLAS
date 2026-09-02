@@ -23,9 +23,9 @@ kubectl -n "$NAMESPACE" get deployment "$DEPLOYMENT" >/dev/null
 mkdir -p "$OUTPUT_DIR"
 
 replicas="$(kubectl -n "$NAMESPACE" get deployment "$DEPLOYMENT" \
-  -o jsonpath="{.metadata.annotations['$STATE_PREFIX/pre-fault-replicas']}" 2>/dev/null || true)"
+  -o go-template="{{ index .metadata.annotations \"$STATE_PREFIX/pre-fault-replicas\" }}" 2>/dev/null || true)"
 hpa_was_present="$(kubectl -n "$NAMESPACE" get deployment "$DEPLOYMENT" \
-  -o jsonpath="{.metadata.annotations['$STATE_PREFIX/hpa-was-present']}" 2>/dev/null || true)"
+  -o go-template="{{ index .metadata.annotations \"$STATE_PREFIX/hpa-was-present\" }}" 2>/dev/null || true)"
 
 if [[ ! "$replicas" =~ ^[1-9][0-9]*$ ]]; then
   replicas=1

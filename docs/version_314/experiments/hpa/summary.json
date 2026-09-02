@@ -1,0 +1,20 @@
+{
+  "runId": "20260902-231711",
+  "result": "aborted_by_safety_guard",
+  "hpaScaleUpObserved": true,
+  "hpaScaleDownObserved": true,
+  "full100VuPlanCompleted": false,
+  "actualMaxVus": 10,
+  "durationSeconds": 125,
+  "requests": 3840,
+  "httpFailureRate": 0.0,
+  "checkPassRate": 1.0,
+  "averageDurationMs": 235.22697578125,
+  "p95DurationMs": 545.958,
+  "maxDurationMs": 2618.063,
+  "initialReplicas": 1,
+  "highestDesiredReplicas": 3,
+  "finalReplicas": 1,
+  "abortReason": "k3s API TLS handshake timeout and cluster-wide probe failures during scale-up",
+  "finalHealth": "recovered"
+}

@@ -50,14 +50,24 @@ PREVIEW_URL="$BASE_URL/api/order/preview?merchantId=$MERCHANT_ID"
 capture_preview() {
   local phase="$1"
   local expected_status="$2"
-  local status
+  local attempts="${3:-1}"
+  local attempt
+  local status=''
 
-  status="$(curl -sS --max-time 10 \
-    -H "Authorization: Bearer $AUTH_TOKEN" \
-    -H "X-Request-Id: resilience-$RUN_ID-$phase" \
-    -o "$OUTPUT_DIR/$phase-response.json" \
-    -w '%{http_code}' \
-    "$PREVIEW_URL")"
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    status="$(curl -sS --max-time 10 \
+      -H "Authorization: Bearer $AUTH_TOKEN" \
+      -H "X-Request-Id: resilience-$RUN_ID-$phase-$attempt" \
+      -o "$OUTPUT_DIR/$phase-response.json" \
+      -w '%{http_code}' \
+      "$PREVIEW_URL")"
+    if [[ "$status" == "$expected_status" ]]; then
+      break
+    fi
+    if (( attempt < attempts )); then
+      sleep 5
+    fi
+  done
   printf '%s\n' "$status" > "$OUTPUT_DIR/$phase-http-status.txt"
   if [[ "$status" != "$expected_status" ]]; then
     echo "$phase request returned HTTP $status; expected $expected_status." >&2
@@ -108,7 +118,7 @@ CLAS_CONFIRM_RECOVERY=restore-clas-catalog \
 RECOVERY_REQUIRED='false'
 
 echo 'Capturing recovered response and service health.'
-capture_preview recovery 200
+capture_preview recovery 200 12
 capture_service_health recovery \
   clas-iam:8081 clas-merchant:8085 clas-catalog:8082 clas-order:8083 clas-compat:8084
 
