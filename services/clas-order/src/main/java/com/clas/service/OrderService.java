@@ -37,6 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -90,6 +91,23 @@ public class OrderService {
 
     @Transactional
     public OrderResponse create(CreateOrderRequest request) {
+        return create(request, null);
+    }
+
+    /**
+     * Creates an order once for an optional client retry key.  The response for a
+     * repeated key is rebuilt from the persisted order and order-item snapshots,
+     * so a retry never consumes the cart a second time.
+     */
+    @Transactional
+    public OrderResponse create(CreateOrderRequest request, String idempotencyKey) {
+        String requestKey = normalizeCreateRequestKey(idempotencyKey);
+        if (requestKey != null) {
+            Orders existing = ordersMapper.findByUserIdAndClientRequestKey(request.userId(), requestKey);
+            if (existing != null) {
+                return storedOrderResponse(existing);
+            }
+        }
         iamClient.assertCanUsePlatform(request.userId());
         Merchant merchant = requireMerchant(request.merchantId());
         assertMerchantOpenNow(merchant);
@@ -148,8 +166,21 @@ public class OrderService {
         order.setDeliveryStatus("WAITING");
         order.setEstimatedMinutes(deliverySnapshot.estimatedMinutes());
         order.setRefundStatus("NONE");
+        order.setClientRequestKey(requestKey);
         order.setCreateTime(LocalDateTime.now());
-        ordersMapper.insert(order);
+        try {
+            ordersMapper.insert(order);
+        } catch (DuplicateKeyException exception) {
+            // A second node may pass the initial read at the same time.  The
+            // database unique key is authoritative; reuse the winning request.
+            if (requestKey != null) {
+                Orders existing = ordersMapper.findByUserIdAndClientRequestKey(request.userId(), requestKey);
+                if (existing != null) {
+                    return storedOrderResponse(existing);
+                }
+            }
+            throw exception;
+        }
         lifecycleService.record(order, "ORDER_CREATED", null, null, "USER", request.userId(), "???????????");
         couponService.reserveForOrder(request.userCouponId(), request.userId(), order.getId());
 
@@ -744,6 +775,12 @@ public class OrderService {
         return enrichResponses(List.of(order), Map.of(order.getId(), orderItems), false).get(0);
     }
 
+    private OrderResponse storedOrderResponse(Orders order) {
+        List<OrderItem> orderItems = orderItemMapper.selectList(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId()));
+        return new OrderResponse(order, orderItems);
+    }
+
     private List<OrderResponse> withItemsForMerchant(List<Orders> orders) {
         if (orders.isEmpty()) {
             return List.of();
@@ -1082,6 +1119,14 @@ public class OrderService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeCreateRequestKey(String idempotencyKey) {
+        String normalized = trimToNull(idempotencyKey);
+        if (normalized != null && normalized.length() > 128) {
+            throw new BusinessException("Idempotency-Key 不能超过 128 个字符", DomainErrorCode.VALIDATION_ERROR);
+        }
+        return normalized;
     }
 
     private record DeliverySnapshot(

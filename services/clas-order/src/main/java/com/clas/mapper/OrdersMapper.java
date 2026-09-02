@@ -3,9 +3,20 @@ package com.clas.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.clas.entity.Orders;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 public interface OrdersMapper extends BaseMapper<Orders> {
+    @Select("""
+        SELECT * FROM orders
+        WHERE user_id = #{userId} AND client_request_key = #{clientRequestKey}
+        LIMIT 1
+        """)
+    Orders findByUserIdAndClientRequestKey(
+        @Param("userId") String userId,
+        @Param("clientRequestKey") String clientRequestKey
+    );
+
     @Update("""
         UPDATE orders SET rider_id = #{riderId}, delivery_status = 'ASSIGNED_WAITING_MEAL',
             rider_assigned_at = CURRENT_TIMESTAMP

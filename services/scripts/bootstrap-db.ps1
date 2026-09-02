@@ -112,7 +112,8 @@ foreach ($name in @(
     "migration-20260825-rider-delivery.sql",
     "migration-20260826-order-lifecycle.sql",
     "migration-20260827-order-refund-dispute.sql",
-    "migration-20260828-order-delivery-contact.sql"
+    "migration-20260828-order-delivery-contact.sql",
+    "migration-20260902-order-create-idempotency.sql"
 )) {
     $file = Join-Path $DbDir $name
     if (Test-Path $file) {

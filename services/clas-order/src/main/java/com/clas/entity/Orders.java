@@ -45,6 +45,7 @@ public class Orders {
     private String remark;
     private String rejectReason;
     private String refundRejectReason;
+    private String clientRequestKey;
     private LocalDateTime createTime;
     private LocalDateTime paidAt;
     private LocalDateTime acceptedAt;

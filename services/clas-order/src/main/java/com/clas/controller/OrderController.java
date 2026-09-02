@@ -63,7 +63,10 @@ public class OrderController {
 
     @PostMapping("/create")
     @RequireRole("USER")
-    public Result<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
+    public Result<OrderResponse> create(
+        @Valid @RequestBody CreateOrderRequest request,
+        @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
+    ) {
         return Result.ok(orderService.create(new CreateOrderRequest(
             currentUserId(),
             request.merchantId(),
@@ -76,7 +79,7 @@ public class OrderController {
             request.deliveryContactPhone(),
             request.deliveryLongitude(),
             request.deliveryLatitude()
-        )));
+        ), idempotencyKey));
     }
 
     @PostMapping("/create-batch")

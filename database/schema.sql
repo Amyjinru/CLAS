@@ -240,6 +240,7 @@ CREATE TABLE orders (
     remark VARCHAR(255),
     reject_reason VARCHAR(255),
     refund_reject_reason VARCHAR(255),
+    client_request_key VARCHAR(128),
     create_time DATETIME NOT NULL,
     paid_at DATETIME,
     accepted_at DATETIME,
@@ -252,7 +253,8 @@ CREATE TABLE orders (
     INDEX idx_orders_rider (rider_id, rider_accepted_at DESC),
     INDEX idx_orders_status (status),
     INDEX idx_orders_create_status (create_time, status),
-    INDEX idx_orders_merchant_create_status (merchant_id, create_time, status)
+    INDEX idx_orders_merchant_create_status (merchant_id, create_time, status),
+    UNIQUE KEY uk_orders_user_client_request (user_id, client_request_key)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE order_refund_dispute (
