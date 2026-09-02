@@ -303,6 +303,11 @@ jobs:
       CLAS_DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
       CLAS_IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
     steps:
+      - name: Check out deployment scripts
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: scripts/k8s
+
       - name: Download deployable image archive
         uses: actions/download-artifact@v6
         with:
@@ -340,12 +345,47 @@ jobs:
       - name: Install SSH client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
 
+      - name: Recover k3s and quiesce the previous release
+        run: |
+          deploy_env="/tmp/clas-deploy.env"
+          recovery_script="/tmp/clas-quiesce-apps.sh"
+          ssh_options="-o StrictHostKeyChecking=no -o ServerAliveInterval=15 -o ServerAliveCountMax=8"
+          sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
+          sshpass -p "$SSH_PASSWORD" scp $ssh_options scripts/k8s/quiesce-apps.sh "root@${SERVER_HOST}:$recovery_script"
+          sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          deploy_env="/tmp/clas-deploy.env"
+          recovery_script="/tmp/clas-quiesce-apps.sh"
+          set -a
+          . /etc/clas/clas.env
+          . "$deploy_env"
+          set +a
+          trap 'rm -f "$recovery_script"' EXIT
+          if ! timeout 20 kubectl get --raw=/readyz >/dev/null 2>&1; then
+            echo 'k3s API is unhealthy; restarting the local control plane.'
+            systemctl restart k3s
+            api_ready=false
+            for _ in $(seq 1 60); do
+              if timeout 5 kubectl get --raw=/readyz >/dev/null 2>&1; then
+                api_ready=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$api_ready" != true ]; then
+              echo 'k3s API did not recover after restart.' >&2
+              systemctl status k3s --no-pager -n 100 >&2 || true
+              exit 1
+            fi
+          fi
+          bash "$recovery_script"
+          REMOTE
+
       - name: Deploy tested image version through server-local k3s API
         run: |
           deploy_env="/tmp/clas-deploy.env"
           image_archive="/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
           ssh_options="-o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
-          sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
           sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-images/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "root@${SERVER_HOST}:$image_archive"
           sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
@@ -366,29 +406,17 @@ jobs:
           git checkout --detach "$CLAS_IMAGE_TAG"
           test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"
           test -s "$image_archive"
-          if ! timeout 20 kubectl get --raw=/readyz >/dev/null 2>&1; then
-            echo 'k3s API is unhealthy; restarting the local control plane.'
-            systemctl restart k3s
-            api_ready=false
-            for _ in $(seq 1 60); do
-              if timeout 5 kubectl get --raw=/readyz >/dev/null 2>&1; then
-                api_ready=true
-                break
-              fi
-              sleep 2
-            done
-            if [ "$api_ready" != true ]; then
-              echo 'k3s API did not recover after restart.' >&2
-              systemctl status k3s --no-pager -n 100 >&2 || true
-              exit 1
-            fi
-          fi
-          # Release resources before importing images or running migrations;
-          # otherwise old Java Pods can immediately wedge this two-core node.
-          bash scripts/k8s/quiesce-apps.sh
           k3s ctr -n k8s.io images import "$image_archive"
           bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
           REMOTE
+
+      - name: Remove temporary server deployment inputs
+        if: always()
+        run: |
+          sshpass -p "$SSH_PASSWORD" ssh \
+            -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
+            "root@${SERVER_HOST}" \
+            "rm -f /tmp/clas-deploy.env /tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz /tmp/clas-quiesce-apps.sh" || true
 
       - name: Collect server deployment diagnostics
         if: always()
