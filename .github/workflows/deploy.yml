@@ -349,7 +349,7 @@ jobs:
         run: |
           deploy_env="/tmp/clas-deploy.env"
           recovery_script="/tmp/clas-quiesce-apps.sh"
-          ssh_options="-o StrictHostKeyChecking=no -o ServerAliveInterval=15 -o ServerAliveCountMax=8"
+          ssh_options="-o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=8"
           sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
           sshpass -p "$SSH_PASSWORD" scp $ssh_options scripts/k8s/quiesce-apps.sh "root@${SERVER_HOST}:$recovery_script"
           sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
@@ -385,7 +385,7 @@ jobs:
         run: |
           deploy_env="/tmp/clas-deploy.env"
           image_archive="/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
-          ssh_options="-o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+          ssh_options="-o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
           sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-images/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "root@${SERVER_HOST}:$image_archive"
           sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail

@@ -26,5 +26,13 @@ if ((${#deployments[@]})); then
 fi
 
 if kubectl -n "$NAMESPACE" get pod -l "$APP_SELECTOR" -o name | grep -q .; then
-  kubectl -n "$NAMESPACE" wait --for=delete pod -l "$APP_SELECTOR" --timeout=180s
+  if ! kubectl -n "$NAMESPACE" wait --for=delete pod -l "$APP_SELECTOR" --timeout=180s; then
+    # A terminating Java Pod can remain stuck while a resource-starved single
+    # node is recovering. It no longer serves traffic after the Deployment was
+    # scaled to zero, so force removal is safe and prevents the next rollout
+    # from being blocked indefinitely.
+    echo 'Timed out waiting for previous application Pods; force deleting remaining Pods.' >&2
+    kubectl -n "$NAMESPACE" delete pod -l "$APP_SELECTOR" --grace-period=0 --force --wait=true
+    kubectl -n "$NAMESPACE" wait --for=delete pod -l "$APP_SELECTOR" --timeout=60s
+  fi
 fi
