@@ -39,6 +39,8 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: root
       MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      # 单体 backend 仍连 clas。隔离/MOVE 只在 k8s migrate Job 开启。
+      CLAS_APPLY_SERVICE_ISOLATION: "false"
     depends_on:
       mysql:
         condition: service_healthy

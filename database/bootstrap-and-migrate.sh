@@ -42,4 +42,5 @@ else
   bash "$SCRIPT_DIR/migrate.sh"
 fi
 
+# 无 CLAS_APPLY_SERVICE_ISOLATION=true 时 apply-service-isolation.sh 直接退出，避免 Compose 单体连空 clas。
 bash "$SCRIPT_DIR/apply-service-isolation.sh"

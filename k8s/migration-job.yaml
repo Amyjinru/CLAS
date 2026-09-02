@@ -18,6 +18,8 @@ spec:
           env:
             - name: MYSQL_USER
               value: root
+            - name: CLAS_APPLY_SERVICE_ISOLATION
+              value: "true"
           volumeMounts:
             - name: database-scripts
               mountPath: /opt/clas/database

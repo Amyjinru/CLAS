@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
-# 集群/容器：用 MYSQL_PASSWORD（及可选 MYSQL_*_PASSWORD）落地账号，并 MOVE 业务表。
+# 集群：用 MYSQL_PASSWORD（及可选 MYSQL_*_PASSWORD）落地账号，并 MOVE 业务表。
+# 默认跳过。Compose 单体冒烟仍把表留在 clas；k8s Job 设置 CLAS_APPLY_SERVICE_ISOLATION=true。
 set -euo pipefail
+
+case "${CLAS_APPLY_SERVICE_ISOLATION:-}" in
+  true|TRUE|1|yes|YES|on|ON) ;;
+  *)
+    echo '[isolate] skipped (set CLAS_APPLY_SERVICE_ISOLATION=true to apply)'
+    exit 0
+    ;;
+esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MYSQL_USER="${MYSQL_USER:-root}"
