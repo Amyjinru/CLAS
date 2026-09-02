@@ -1,0 +1,665 @@
+{
+  "executedAt": "2026-09-02T18:35:16.1793010+08:00",
+  "baseUrl": "http://127.0.0.1:8080",
+  "result": "PASSED",
+  "failure": null,
+  "requests": [
+    {
+      "name": "gateway-health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "requestId": [
+        "order-e2e-health-931fcd5d8a7a4f9a8daa7dbb4931536f",
+        "order-e2e-health-931fcd5d8a7a4f9a8daa7dbb4931536f"
+      ],
+      "elapsedMs": 13,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "status": "ok",
+          "service": "clas-iam",
+          "name": "Identity and Account"
+        },
+        "timestamp": 1788345315076,
+        "requestId": "order-e2e-health-931fcd5d8a7a4f9a8daa7dbb4931536f",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "user-login",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 200,
+      "requestId": [
+        "6ba9723d49eb77d478e9d1ba81f66b0c",
+        "6ba9723d49eb77d478e9d1ba81f66b0c"
+      ],
+      "elapsedMs": 78,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "user": {
+            "phone": "13800000001",
+            "username": "user",
+            "password": "[REDACTED]",
+            "role": "USER",
+            "enabled": true,
+            "avatar": null,
+            "nickname": null,
+            "roles": [
+              "USER"
+            ]
+          },
+          "token": "[REDACTED]",
+          "roles": [
+            "USER"
+          ]
+        },
+        "timestamp": 1788345315183,
+        "requestId": "6ba9723d49eb77d478e9d1ba81f66b0c",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "merchant-login",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 200,
+      "requestId": [
+        "570af1a792201b8316be6df2c5e425c8",
+        "570af1a792201b8316be6df2c5e425c8"
+      ],
+      "elapsedMs": 79,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "user": {
+            "phone": "13800000002",
+            "username": "merchant",
+            "password": "[REDACTED]",
+            "role": "MERCHANT",
+            "enabled": true,
+            "avatar": null,
+            "nickname": null,
+            "roles": [
+              "USER",
+              "MERCHANT"
+            ]
+          },
+          "token": "[REDACTED]",
+          "roles": [
+            "USER",
+            "MERCHANT"
+          ]
+        },
+        "timestamp": 1788345315267,
+        "requestId": "570af1a792201b8316be6df2c5e425c8",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "user-addresses",
+      "method": "GET",
+      "path": "/api/address/mine",
+      "status": 200,
+      "requestId": [
+        "ad53a624a1feaf77229cefb5737f4726",
+        "ad53a624a1feaf77229cefb5737f4726"
+      ],
+      "elapsedMs": 25,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": [
+          {
+            "id": 1,
+            "userId": "13800000001",
+            "contactName": "张同学",
+            "phone": "13800000001",
+            "address": "软件学院 A 座 302",
+            "longitude": 116.398,
+            "latitude": 39.91,
+            "isDefault": true,
+            "createdAt": "2026-09-02T10:34:17",
+            "updatedAt": "2026-09-02T10:34:17"
+          }
+        ],
+        "timestamp": 1788345315289,
+        "requestId": "ad53a624a1feaf77229cefb5737f4726",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "catalog-products",
+      "method": "GET",
+      "path": "/api/product/list/1",
+      "status": 200,
+      "requestId": [
+        "eb34feb8216cf32cc4efcbaca7d543df"
+      ],
+      "elapsedMs": 29,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": [
+          {
+            "id": 1,
+            "merchantId": 1,
+            "categoryId": 1,
+            "name": "鸡胸肉能量碗",
+            "description": "健康低卡能量满满",
+            "price": 2590,
+            "stock": 30,
+            "image": "/images/product-1.jpg",
+            "status": "ON_SALE",
+            "createdAt": "2026-09-02T10:34:17",
+            "updatedAt": "2026-09-02T10:34:17"
+          },
+          {
+            "id": 2,
+            "merchantId": 1,
+            "categoryId": 1,
+            "name": "牛油果沙拉",
+            "description": "新鲜牛油果配时蔬",
+            "price": 2290,
+            "stock": 24,
+            "image": "/images/product-2.jpg",
+            "status": "ON_SALE",
+            "createdAt": "2026-09-02T10:34:17",
+            "updatedAt": "2026-09-02T10:34:17"
+          },
+          {
+            "id": 3,
+            "merchantId": 1,
+            "categoryId": 2,
+            "name": "低糖酸奶杯",
+            "description": "低糖酸奶搭配燕麦",
+            "price": 1290,
+            "stock": 40,
+            "image": "/images/product-3.jpg",
+            "status": "ON_SALE",
+            "createdAt": "2026-09-02T10:34:17",
+            "updatedAt": "2026-09-02T10:34:17"
+          }
+        ],
+        "timestamp": 1788345315333,
+        "requestId": "fb8f0b3a-cef1-4c5c-890b-15fd9cc3d79a",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "cart-add",
+      "method": "POST",
+      "path": "/api/cart/add",
+      "status": 200,
+      "requestId": [
+        "63a01ad566a100ff71df427c644b07b6"
+      ],
+      "elapsedMs": 187,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": [
+          {
+            "id": 1,
+            "userId": "13800000001",
+            "productId": 1,
+            "merchantId": 1,
+            "merchantName": "校园轻食铺",
+            "productName": "鸡胸肉能量碗",
+            "price": 2590,
+            "stock": 30,
+            "image": "/images/product-1.jpg",
+            "quantity": 1,
+            "subtotal": 2590,
+            "valid": true,
+            "invalidReason": null
+          }
+        ],
+        "timestamp": 1788345315524,
+        "requestId": "33d55e7f-a8a0-4779-a82f-9a213b31f74f",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "order-create",
+      "method": "POST",
+      "path": "/api/order/create",
+      "status": 200,
+      "requestId": [
+        "order-e2e-create-3166a564b8da45e092a3f75be4c17cbb"
+      ],
+      "elapsedMs": 151,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "order": {
+            "id": 4,
+            "userId": "13800000001",
+            "merchantId": 1,
+            "riderId": null,
+            "totalPrice": 2890,
+            "subtotal": 2590,
+            "deliveryFee": 300,
+            "riderCommission": null,
+            "reassignCount": null,
+            "deliverySequence": null,
+            "couponDiscount": 0,
+            "userCouponId": null,
+            "status": "PENDING_PAYMENT",
+            "deliveryAddress": "软件学院 A 座 302",
+            "deliveryContactName": "张同学",
+            "deliveryContactPhone": "13800000001",
+            "deliveryLongitude": 116.398,
+            "deliveryLatitude": 39.91,
+            "distanceMeters": 99,
+            "routeDistanceMeters": null,
+            "deliveryStatus": "WAITING",
+            "riderAcceptedAt": null,
+            "estimatedMinutes": 25,
+            "prepareMinutesSnapshot": null,
+            "promiseStartAt": null,
+            "promiseEndAt": null,
+            "predictedArrivalAt": null,
+            "refundReason": null,
+            "refundStatus": "NONE",
+            "refundRequestedAt": null,
+            "refundResolvedAt": null,
+            "remark": "ORDER_E2E_order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb",
+            "rejectReason": null,
+            "refundRejectReason": null,
+            "clientRequestKey": "order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb",
+            "merchantNameSnapshot": "校园轻食铺",
+            "merchantLogoSnapshot": null,
+            "createTime": "2026-09-02T18:35:15.6190202",
+            "paidAt": null,
+            "acceptedAt": null,
+            "riderAssignedAt": null,
+            "pickedUpAt": null,
+            "deliveryCompletedAt": null,
+            "deliveredAt": null,
+            "completedAt": null,
+            "canceledAt": null,
+            "rejectedAt": null
+          },
+          "items": [
+            {
+              "id": 4,
+              "orderId": 4,
+              "productId": 1,
+              "quantity": 1,
+              "price": 2590,
+              "productNameSnapshot": "鸡胸肉能量碗",
+              "productImageSnapshot": "/images/product-1.jpg"
+            }
+          ],
+          "customerCallUrl": null,
+          "merchantName": "校园轻食铺",
+          "merchantLogo": null,
+          "products": [
+            {
+              "id": 1,
+              "name": "鸡胸肉能量碗",
+              "image": "/images/product-1.jpg"
+            }
+          ]
+        },
+        "timestamp": 1788345315677,
+        "requestId": "5f7df154-0c36-4649-b206-ad9882627706",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "order-create-retry",
+      "method": "POST",
+      "path": "/api/order/create",
+      "status": 200,
+      "requestId": [
+        "order-e2e-create-3166a564b8da45e092a3f75be4c17cbb-retry"
+      ],
+      "elapsedMs": 32,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "order": {
+            "id": 4,
+            "userId": "13800000001",
+            "merchantId": 1,
+            "riderId": null,
+            "totalPrice": 2890,
+            "subtotal": 2590,
+            "deliveryFee": 300,
+            "riderCommission": 0,
+            "reassignCount": 0,
+            "deliverySequence": null,
+            "couponDiscount": 0,
+            "userCouponId": null,
+            "status": "PENDING_PAYMENT",
+            "deliveryAddress": "软件学院 A 座 302",
+            "deliveryContactName": "张同学",
+            "deliveryContactPhone": "13800000001",
+            "deliveryLongitude": 116.398,
+            "deliveryLatitude": 39.91,
+            "distanceMeters": 99,
+            "routeDistanceMeters": null,
+            "deliveryStatus": "WAITING",
+            "riderAcceptedAt": null,
+            "estimatedMinutes": 25,
+            "prepareMinutesSnapshot": null,
+            "promiseStartAt": null,
+            "promiseEndAt": null,
+            "predictedArrivalAt": null,
+            "refundReason": null,
+            "refundStatus": "NONE",
+            "refundRequestedAt": null,
+            "refundResolvedAt": null,
+            "remark": "ORDER_E2E_order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb",
+            "rejectReason": null,
+            "refundRejectReason": null,
+            "clientRequestKey": "order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb",
+            "merchantNameSnapshot": "校园轻食铺",
+            "merchantLogoSnapshot": null,
+            "createTime": "2026-09-02T18:35:16",
+            "paidAt": null,
+            "acceptedAt": null,
+            "riderAssignedAt": null,
+            "pickedUpAt": null,
+            "deliveryCompletedAt": null,
+            "deliveredAt": null,
+            "completedAt": null,
+            "canceledAt": null,
+            "rejectedAt": null
+          },
+          "items": [
+            {
+              "id": 4,
+              "orderId": 4,
+              "productId": 1,
+              "quantity": 1,
+              "price": 2590,
+              "productNameSnapshot": "鸡胸肉能量碗",
+              "productImageSnapshot": "/images/product-1.jpg"
+            }
+          ],
+          "customerCallUrl": null,
+          "merchantName": "校园轻食铺",
+          "merchantLogo": null,
+          "products": [
+            {
+              "id": 1,
+              "name": "鸡胸肉能量碗",
+              "image": "/images/product-1.jpg"
+            }
+          ]
+        },
+        "timestamp": 1788345315718,
+        "requestId": "db6c4e70-8096-4d15-b16b-c5d482665bcb",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "order-transition-forbidden",
+      "method": "POST",
+      "path": "/api/order/accept/4",
+      "status": 403,
+      "requestId": [
+        "bbbf1de11ad3f7edc69d5ed6fde6f518"
+      ],
+      "elapsedMs": 25,
+      "response": {
+        "code": 403,
+        "message": "权限不足，无法访问",
+        "data": null,
+        "timestamp": 1788345315746,
+        "requestId": "8b0d7f66-5158-4de9-88d3-2ce4810e9056",
+        "errorCode": "AUTH_FORBIDDEN"
+      }
+    },
+    {
+      "name": "order-pay",
+      "method": "POST",
+      "path": "/api/order/pay/4",
+      "status": 200,
+      "requestId": [
+        "67cd768d4b5d968a1331fc5bc098d2d6"
+      ],
+      "elapsedMs": 228,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "paymentId": 1,
+          "orderId": 4,
+          "amount": 2890,
+          "payMethod": "MOCK",
+          "paymentStatus": "SUCCESS",
+          "orderStatus": "PAID",
+          "createTime": "2026-09-02T18:35:15.8038177",
+          "idempotencyKey": "payment-order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb"
+        },
+        "timestamp": 1788345315975,
+        "requestId": "b4fc2a72-b036-4381-9041-3e0694ad959b",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "refund-request",
+      "method": "POST",
+      "path": "/api/order/refund/4",
+      "status": 200,
+      "requestId": [
+        "585c9fab2935e23f4d9dd3769b12274d"
+      ],
+      "elapsedMs": 52,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "id": 4,
+          "userId": "13800000001",
+          "merchantId": 1,
+          "riderId": null,
+          "totalPrice": 2890,
+          "subtotal": 2590,
+          "deliveryFee": 300,
+          "riderCommission": 0,
+          "reassignCount": 0,
+          "deliverySequence": null,
+          "couponDiscount": 0,
+          "userCouponId": null,
+          "status": "REFUND_PENDING",
+          "deliveryAddress": "软件学院 A 座 302",
+          "deliveryContactName": "张同学",
+          "deliveryContactPhone": "13800000001",
+          "deliveryLongitude": 116.398,
+          "deliveryLatitude": 39.91,
+          "distanceMeters": 99,
+          "routeDistanceMeters": null,
+          "deliveryStatus": "WAITING",
+          "riderAcceptedAt": null,
+          "estimatedMinutes": 25,
+          "prepareMinutesSnapshot": null,
+          "promiseStartAt": null,
+          "promiseEndAt": null,
+          "predictedArrivalAt": null,
+          "refundReason": "ORDER_E2E refund regression",
+          "refundStatus": "PENDING",
+          "refundRequestedAt": "2026-09-02T18:35:16.0069515",
+          "refundResolvedAt": null,
+          "remark": "ORDER_E2E_order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb",
+          "rejectReason": null,
+          "refundRejectReason": null,
+          "clientRequestKey": "order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb",
+          "merchantNameSnapshot": "校园轻食铺",
+          "merchantLogoSnapshot": null,
+          "createTime": "2026-09-02T18:35:16",
+          "paidAt": "2026-09-02T18:35:16",
+          "acceptedAt": null,
+          "riderAssignedAt": null,
+          "pickedUpAt": null,
+          "deliveryCompletedAt": null,
+          "deliveredAt": null,
+          "completedAt": null,
+          "canceledAt": null,
+          "rejectedAt": null
+        },
+        "timestamp": 1788345316029,
+        "requestId": "e6968a21-debc-45c9-9dfe-c7739bb0e44f",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "refund-approve",
+      "method": "POST",
+      "path": "/api/order/refund/4/approve",
+      "status": 200,
+      "requestId": [
+        "113f40b7d83b9c2274b0f198f5e4f8af"
+      ],
+      "elapsedMs": 99,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "id": 4,
+          "userId": "13800000001",
+          "merchantId": 1,
+          "riderId": null,
+          "totalPrice": 2890,
+          "subtotal": 2590,
+          "deliveryFee": 300,
+          "riderCommission": 0,
+          "reassignCount": 0,
+          "deliverySequence": null,
+          "couponDiscount": 0,
+          "userCouponId": null,
+          "status": "REFUNDED",
+          "deliveryAddress": "软件学院 A 座 302",
+          "deliveryContactName": "张同学",
+          "deliveryContactPhone": "13800000001",
+          "deliveryLongitude": 116.398,
+          "deliveryLatitude": 39.91,
+          "distanceMeters": 99,
+          "routeDistanceMeters": null,
+          "deliveryStatus": "WAITING",
+          "riderAcceptedAt": null,
+          "estimatedMinutes": 25,
+          "prepareMinutesSnapshot": null,
+          "promiseStartAt": null,
+          "promiseEndAt": null,
+          "predictedArrivalAt": null,
+          "refundReason": "ORDER_E2E refund regression",
+          "refundStatus": "APPROVED",
+          "refundRequestedAt": "2026-09-02T18:35:16",
+          "refundResolvedAt": "2026-09-02T18:35:16.071337",
+          "remark": "ORDER_E2E_order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb",
+          "rejectReason": null,
+          "refundRejectReason": null,
+          "clientRequestKey": "order-e2e-476ec2dd5e4647c6b78a84afdae4e3eb",
+          "merchantNameSnapshot": "校园轻食铺",
+          "merchantLogoSnapshot": null,
+          "createTime": "2026-09-02T18:35:16",
+          "paidAt": "2026-09-02T18:35:16",
+          "acceptedAt": null,
+          "riderAssignedAt": null,
+          "pickedUpAt": null,
+          "deliveryCompletedAt": null,
+          "deliveredAt": null,
+          "completedAt": null,
+          "canceledAt": null,
+          "rejectedAt": null
+        },
+        "timestamp": 1788345316132,
+        "requestId": "c0f4e31f-db7a-4a6c-9eda-47c8b0e161cf",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "order-timeline",
+      "method": "GET",
+      "path": "/api/order/4/timeline",
+      "status": 200,
+      "requestId": [
+        "9350d8354c42830d632a1f2a77bc73b9"
+      ],
+      "elapsedMs": 34,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": [
+          {
+            "id": 1,
+            "eventType": "ORDER_CREATED",
+            "fromStatus": null,
+            "toStatus": "PENDING_PAYMENT",
+            "fromDeliveryStatus": null,
+            "toDeliveryStatus": "WAITING",
+            "actorRole": "USER",
+            "remark": "???????????",
+            "createdAt": "2026-09-02T18:35:16"
+          },
+          {
+            "id": 2,
+            "eventType": "PAYMENT_SUCCEEDED",
+            "fromStatus": "PENDING_PAYMENT",
+            "toStatus": "PAID",
+            "fromDeliveryStatus": "WAITING",
+            "toDeliveryStatus": "WAITING",
+            "actorRole": "USER",
+            "remark": "支付成功，等待商家接单",
+            "createdAt": "2026-09-02T18:35:16"
+          },
+          {
+            "id": 3,
+            "eventType": "REFUND_REQUESTED",
+            "fromStatus": "PAID",
+            "toStatus": "REFUND_PENDING",
+            "fromDeliveryStatus": "WAITING",
+            "toDeliveryStatus": "WAITING",
+            "actorRole": "USER",
+            "remark": "???????ORDER_E2E refund regression",
+            "createdAt": "2026-09-02T18:35:16"
+          },
+          {
+            "id": 4,
+            "eventType": "REFUND_APPROVED",
+            "fromStatus": "REFUND_PENDING",
+            "toStatus": "REFUNDED",
+            "fromDeliveryStatus": "WAITING",
+            "toDeliveryStatus": "WAITING",
+            "actorRole": "MERCHANT",
+            "remark": "??????",
+            "createdAt": "2026-09-02T18:35:16"
+          }
+        ],
+        "timestamp": 1788345316167,
+        "requestId": "74d4a6c4-7787-479a-9be4-312bb53fe12c",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "order-create-unauthorized",
+      "method": "POST",
+      "path": "/api/order/create",
+      "status": 401,
+      "requestId": [
+        "b17a194894f6a9b606c1d4f6400e466f"
+      ],
+      "elapsedMs": 4,
+      "response": {
+        "code": 401,
+        "message": "未登录，请先登录",
+        "data": null,
+        "timestamp": 1788345316174,
+        "requestId": "00297a14-ff8c-4682-ae43-7a5ac13b35ee",
+        "errorCode": "AUTH_UNAUTHORIZED"
+      }
+    }
+  ]
+}

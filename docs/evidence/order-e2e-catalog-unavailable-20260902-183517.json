@@ -1,0 +1,228 @@
+{
+  "executedAt": "2026-09-02T18:35:17.5671420+08:00",
+  "baseUrl": "http://127.0.0.1:8080",
+  "result": "PASSED",
+  "failure": null,
+  "requests": [
+    {
+      "name": "gateway-health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "requestId": [
+        "order-e2e-health-aafe3dd239334b7ea3a3f1a29b6e4a61",
+        "order-e2e-health-aafe3dd239334b7ea3a3f1a29b6e4a61"
+      ],
+      "elapsedMs": 4,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "status": "ok",
+          "service": "clas-iam",
+          "name": "Identity and Account"
+        },
+        "timestamp": 1788345317129,
+        "requestId": "order-e2e-health-aafe3dd239334b7ea3a3f1a29b6e4a61",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "user-login",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 400,
+      "requestId": [
+        "f2d67eb4bc8487ffca6019962cc460c4",
+        "f2d67eb4bc8487ffca6019962cc460c4"
+      ],
+      "elapsedMs": 69,
+      "response": {
+        "code": 400,
+        "message": "请先获取验证码",
+        "data": null,
+        "timestamp": 1788345317200,
+        "requestId": "f2d67eb4bc8487ffca6019962cc460c4",
+        "errorCode": "BUSINESS_ERROR"
+      }
+    },
+    {
+      "name": "user-login-send-code",
+      "method": "POST",
+      "path": "/api/user/login/send-code",
+      "status": 200,
+      "requestId": [
+        "41c2ba060695d3df434e977cf21e1615",
+        "41c2ba060695d3df434e977cf21e1615"
+      ],
+      "elapsedMs": 13,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": "验证码已发送",
+        "timestamp": 1788345317215,
+        "requestId": "41c2ba060695d3df434e977cf21e1615",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "user-login-verified",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 200,
+      "requestId": [
+        "48cd9baa572e2becbbf2bf18b95f59bd",
+        "48cd9baa572e2becbbf2bf18b95f59bd"
+      ],
+      "elapsedMs": 82,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "user": {
+            "phone": "13800000001",
+            "username": "user",
+            "password": "[REDACTED]",
+            "role": "USER",
+            "enabled": true,
+            "avatar": null,
+            "nickname": null,
+            "roles": [
+              "USER"
+            ]
+          },
+          "token": "[REDACTED]",
+          "roles": [
+            "USER"
+          ]
+        },
+        "timestamp": 1788345317298,
+        "requestId": "48cd9baa572e2becbbf2bf18b95f59bd",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "merchant-login",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 400,
+      "requestId": [
+        "4112728e057c209adf89f7bad86e0781",
+        "4112728e057c209adf89f7bad86e0781"
+      ],
+      "elapsedMs": 92,
+      "response": {
+        "code": 400,
+        "message": "请先获取验证码",
+        "data": null,
+        "timestamp": 1788345317391,
+        "requestId": "4112728e057c209adf89f7bad86e0781",
+        "errorCode": "BUSINESS_ERROR"
+      }
+    },
+    {
+      "name": "merchant-login-send-code",
+      "method": "POST",
+      "path": "/api/user/login/send-code",
+      "status": 200,
+      "requestId": [
+        "3cef34f1038a313da73da2529f45ecc4",
+        "3cef34f1038a313da73da2529f45ecc4"
+      ],
+      "elapsedMs": 12,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": "验证码已发送",
+        "timestamp": 1788345317405,
+        "requestId": "3cef34f1038a313da73da2529f45ecc4",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "merchant-login-verified",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 200,
+      "requestId": [
+        "4a557b204aefe016495bcf386eeffb55",
+        "4a557b204aefe016495bcf386eeffb55"
+      ],
+      "elapsedMs": 81,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "user": {
+            "phone": "13800000002",
+            "username": "merchant",
+            "password": "[REDACTED]",
+            "role": "MERCHANT",
+            "enabled": true,
+            "avatar": null,
+            "nickname": null,
+            "roles": [
+              "USER",
+              "MERCHANT"
+            ]
+          },
+          "token": "[REDACTED]",
+          "roles": [
+            "USER",
+            "MERCHANT"
+          ]
+        },
+        "timestamp": 1788345317487,
+        "requestId": "4a557b204aefe016495bcf386eeffb55",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "user-addresses",
+      "method": "GET",
+      "path": "/api/address/mine",
+      "status": 200,
+      "requestId": [
+        "780bd0fd0ac1b1cb50f2956eb7d6e0d7",
+        "780bd0fd0ac1b1cb50f2956eb7d6e0d7"
+      ],
+      "elapsedMs": 15,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": [
+          {
+            "id": 1,
+            "userId": "13800000001",
+            "contactName": "张同学",
+            "phone": "13800000001",
+            "address": "软件学院 A 座 302",
+            "longitude": 116.398,
+            "latitude": 39.91,
+            "isDefault": true,
+            "createdAt": "2026-09-02T10:34:17",
+            "updatedAt": "2026-09-02T10:34:17"
+          }
+        ],
+        "timestamp": 1788345317503,
+        "requestId": "780bd0fd0ac1b1cb50f2956eb7d6e0d7",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "catalog-unavailable-order-create",
+      "method": "POST",
+      "path": "/api/order/create",
+      "status": 503,
+      "requestId": [
+        "order-e2e-fault-60aa1265146e49669958a23890508005"
+      ],
+      "elapsedMs": 55,
+      "response": {
+        "code": 503,
+        "message": "服务暂不可用，请稍后重试",
+        "requestId": "order-e2e-fault-60aa1265146e49669958a23890508005"
+      }
+    }
+  ]
+}
