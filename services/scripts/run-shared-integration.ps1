@@ -21,6 +21,7 @@ $servicesStarted = $false
 $result = "FAILED"
 $steps = New-Object System.Collections.Generic.List[string]
 $healthSnapshot = @()
+$directSmokeResult = "not run"
 $smokeResult = "not run"
 
 if (-not $EvidencePath) {
@@ -95,7 +96,7 @@ function Write-Evidence {
         "## Health snapshot"
     )) { $content.Add($line) | Out-Null }
     foreach ($line in $healthSnapshot) { $content.Add($line) | Out-Null }
-    foreach ($line in @("", "## Gateway smoke", "- Result: $smokeResult", "", "## Execution steps")) { $content.Add($line) | Out-Null }
+    foreach ($line in @("", "## Direct smoke", "- Result: $directSmokeResult", "", "## Gateway smoke", "- Result: $smokeResult", "", "## Execution steps")) { $content.Add($line) | Out-Null }
     foreach ($step in $steps) { $content.Add("- $step") | Out-Null }
     foreach ($line in @(
         "",
@@ -151,6 +152,9 @@ try {
         & $StartScript -SkipEnvFile
         $healthSnapshot = @(Get-HealthSnapshot)
         Add-Step "Five services and Nginx gateway healthy"
+        & $SmokeScript -Direct
+        $directSmokeResult = "passed"
+        Add-Step "Direct main-path smoke test passed"
         & $SmokeScript -BaseUrl "http://127.0.0.1:8080"
         $smokeResult = "passed"
         Add-Step "Gateway main-path smoke test passed"
