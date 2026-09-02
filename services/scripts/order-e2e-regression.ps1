@@ -46,6 +46,8 @@ function Invoke-Api {
         # Preserve non-2xx response bodies for assertions instead of receiving a
         # disposed HttpResponseMessage in the catch block.
         $parameters.SkipHttpErrorCheck = $true
+    } else {
+        $parameters.UseBasicParsing = $true
     }
     if ($null -ne $Body) {
         $parameters.Body = $Body | ConvertTo-Json -Depth 8 -Compress
@@ -112,10 +114,10 @@ function Login([string]$Phone, [string]$Password, [string]$Name) {
     }
     $result = Invoke-Api -Name $Name -Method POST -Path "/api/user/login" -Body $loginBody
     if (($result.status -eq 409 -and $result.response.errorCode -eq "LOGIN_VERIFICATION_REQUIRED") -or
-        ($result.status -eq 400 -and $result.response.message -match "验证码")) {
-        $sendCode = Invoke-Api -Name "$Name-send-code" -Method POST -Path "/api/user/login/send-code" -Body @{ phone = $Phone }
+        ($result.status -eq 400 -and $result.response.errorCode -eq "BUSINESS_ERROR")) {
+        $sendCode = Invoke-Api -Name ($Name + '-send-code') -Method POST -Path '/api/user/login/send-code' -Body @{ phone = $Phone }
         Assert-Result $sendCode 200 200
-        $result = Invoke-Api -Name "$Name-verified" -Method POST -Path "/api/user/login" -Body $loginBody
+        $result = Invoke-Api -Name ($Name + '-verified') -Method POST -Path '/api/user/login' -Body $loginBody
     }
     Assert-Result $result 200 200
     if (-not $result.response.data.token) { throw "$Name returned no access token" }

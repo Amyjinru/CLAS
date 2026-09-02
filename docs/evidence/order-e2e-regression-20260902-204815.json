@@ -1,0 +1,633 @@
+﻿{
+    "executedAt":  "2026-09-02T20:48:17.0913691+08:00",
+    "baseUrl":  "http://127.0.0.1:8080",
+    "result":  "PASSED",
+    "failure":  null,
+    "requests":  [
+                     {
+                         "name":  "gateway-health",
+                         "method":  "GET",
+                         "path":  "/api/health",
+                         "status":  200,
+                         "requestId":  "order-e2e-health-9d43f956a13a4132bd5a059fc6ee68ae,order-e2e-health-9d43f956a13a4132bd5a059fc6ee68ae",
+                         "elapsedMs":  39,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "status":  "ok",
+                                                       "service":  "clas-iam",
+                                                       "name":  "Identity and Account"
+                                                   },
+                                          "timestamp":  1788353295744,
+                                          "requestId":  "order-e2e-health-9d43f956a13a4132bd5a059fc6ee68ae",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "user-login",
+                         "method":  "POST",
+                         "path":  "/api/user/login",
+                         "status":  200,
+                         "requestId":  "cec6855c56929e3e177822045f3f430b,cec6855c56929e3e177822045f3f430b",
+                         "elapsedMs":  99,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "user":  {
+                                                                    "phone":  "13800000001",
+                                                                    "username":  "user",
+                                                                    "password":  "[REDACTED]",
+                                                                    "role":  "USER",
+                                                                    "enabled":  true,
+                                                                    "avatar":  null,
+                                                                    "nickname":  null,
+                                                                    "roles":  [
+                                                                                  "USER"
+                                                                              ]
+                                                                },
+                                                       "token":  "[REDACTED]",
+                                                       "roles":  [
+                                                                     "USER"
+                                                                 ]
+                                                   },
+                                          "timestamp":  1788353295921,
+                                          "requestId":  "cec6855c56929e3e177822045f3f430b",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "merchant-login",
+                         "method":  "POST",
+                         "path":  "/api/user/login",
+                         "status":  200,
+                         "requestId":  "25f0f5b22e1499aaf3a5e1d2f7e53454,25f0f5b22e1499aaf3a5e1d2f7e53454",
+                         "elapsedMs":  77,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "user":  {
+                                                                    "phone":  "13800000002",
+                                                                    "username":  "merchant",
+                                                                    "password":  "[REDACTED]",
+                                                                    "role":  "MERCHANT",
+                                                                    "enabled":  true,
+                                                                    "avatar":  null,
+                                                                    "nickname":  null,
+                                                                    "roles":  [
+                                                                                  "USER",
+                                                                                  "MERCHANT"
+                                                                              ]
+                                                                },
+                                                       "token":  "[REDACTED]",
+                                                       "roles":  [
+                                                                     "USER",
+                                                                     "MERCHANT"
+                                                                 ]
+                                                   },
+                                          "timestamp":  1788353296005,
+                                          "requestId":  "25f0f5b22e1499aaf3a5e1d2f7e53454",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "user-addresses",
+                         "method":  "GET",
+                         "path":  "/api/address/mine",
+                         "status":  200,
+                         "requestId":  "962f86a20ed3dbfeff1439765d49c15d,962f86a20ed3dbfeff1439765d49c15d",
+                         "elapsedMs":  59,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  [
+                                                       {
+                                                           "id":  1,
+                                                           "userId":  "13800000001",
+                                                           "contactName":  "å¼ åå­¦",
+                                                           "phone":  "13800000001",
+                                                           "address":  "è½¯ä»¶å­¦é¢ A åº§ 302",
+                                                           "longitude":  116.398000,
+                                                           "latitude":  39.910000,
+                                                           "isDefault":  true,
+                                                           "createdAt":  "2026-09-01T10:01:26",
+                                                           "updatedAt":  "2026-09-01T10:01:26"
+                                                       }
+                                                   ],
+                                          "timestamp":  1788353296055,
+                                          "requestId":  "962f86a20ed3dbfeff1439765d49c15d",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "catalog-products",
+                         "method":  "GET",
+                         "path":  "/api/product/list/1",
+                         "status":  200,
+                         "requestId":  "c3fc29f59102aaa630202266199ab2c7",
+                         "elapsedMs":  28,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  [
+                                                       {
+                                                           "id":  1,
+                                                           "merchantId":  1,
+                                                           "categoryId":  1,
+                                                           "name":  "é¸¡è¸èè½éç¢",
+                                                           "description":  "å¥åº·ä½å¡è½éæ»¡æ»¡",
+                                                           "price":  2590,
+                                                           "stock":  30,
+                                                           "image":  "/images/product-1.jpg",
+                                                           "status":  "ON_SALE",
+                                                           "createdAt":  "2026-09-01T10:01:26",
+                                                           "updatedAt":  "2026-09-01T10:01:26"
+                                                       },
+                                                       {
+                                                           "id":  2,
+                                                           "merchantId":  1,
+                                                           "categoryId":  1,
+                                                           "name":  "çæ²¹ææ²æ",
+                                                           "description":  "æ°é²çæ²¹æé\u0085æ¶è¬",
+                                                           "price":  2290,
+                                                           "stock":  24,
+                                                           "image":  "/images/product-2.jpg",
+                                                           "status":  "ON_SALE",
+                                                           "createdAt":  "2026-09-01T10:01:26",
+                                                           "updatedAt":  "2026-09-01T10:01:26"
+                                                       },
+                                                       {
+                                                           "id":  3,
+                                                           "merchantId":  1,
+                                                           "categoryId":  2,
+                                                           "name":  "ä½ç³é\u0085¸å¥¶æ¯",
+                                                           "description":  "ä½ç³é\u0085¸å¥¶æ­é\u0085çéº¦",
+                                                           "price":  1290,
+                                                           "stock":  40,
+                                                           "image":  "/images/product-3.jpg",
+                                                           "status":  "ON_SALE",
+                                                           "createdAt":  "2026-09-01T10:01:26",
+                                                           "updatedAt":  "2026-09-01T10:01:26"
+                                                       }
+                                                   ],
+                                          "timestamp":  1788353296108,
+                                          "requestId":  "f7b2cab9-59c8-4fbc-9e2b-18d6305de2b0",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "cart-add",
+                         "method":  "POST",
+                         "path":  "/api/cart/add",
+                         "status":  200,
+                         "requestId":  "169c139d1ff1c95e2f8460a08765f555",
+                         "elapsedMs":  278,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  [
+                                                       {
+                                                           "id":  1,
+                                                           "userId":  "13800000001",
+                                                           "productId":  1,
+                                                           "merchantId":  1,
+                                                           "merchantName":  "æ ¡å­è½»é£éº",
+                                                           "productName":  "é¸¡è¸èè½éç¢",
+                                                           "price":  2590,
+                                                           "stock":  30,
+                                                           "image":  "/images/product-1.jpg",
+                                                           "quantity":  1,
+                                                           "subtotal":  2590,
+                                                           "valid":  true,
+                                                           "invalidReason":  null
+                                                       }
+                                                   ],
+                                          "timestamp":  1788353296390,
+                                          "requestId":  "0d1d0c6d-7883-42a4-8e28-93cefbca2ce1",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "order-create",
+                         "method":  "POST",
+                         "path":  "/api/order/create",
+                         "status":  200,
+                         "requestId":  "order-e2e-create-6f4bef44165e4c318493aa07c074e937",
+                         "elapsedMs":  176,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "order":  {
+                                                                     "id":  5,
+                                                                     "userId":  "13800000001",
+                                                                     "merchantId":  1,
+                                                                     "riderId":  null,
+                                                                     "totalPrice":  2890,
+                                                                     "subtotal":  2590,
+                                                                     "deliveryFee":  300,
+                                                                     "riderCommission":  null,
+                                                                     "reassignCount":  null,
+                                                                     "deliverySequence":  null,
+                                                                     "couponDiscount":  0,
+                                                                     "userCouponId":  null,
+                                                                     "status":  "PENDING_PAYMENT",
+                                                                     "deliveryAddress":  "è½¯ä»¶å­¦é¢ A åº§ 302",
+                                                                     "deliveryContactName":  "å¼ åå­¦",
+                                                                     "deliveryContactPhone":  "13800000001",
+                                                                     "deliveryLongitude":  116.398000,
+                                                                     "deliveryLatitude":  39.910000,
+                                                                     "distanceMeters":  99,
+                                                                     "routeDistanceMeters":  null,
+                                                                     "deliveryStatus":  "WAITING",
+                                                                     "riderAcceptedAt":  null,
+                                                                     "estimatedMinutes":  25,
+                                                                     "prepareMinutesSnapshot":  null,
+                                                                     "promiseStartAt":  null,
+                                                                     "promiseEndAt":  null,
+                                                                     "predictedArrivalAt":  null,
+                                                                     "refundReason":  null,
+                                                                     "refundStatus":  "NONE",
+                                                                     "refundRequestedAt":  null,
+                                                                     "refundResolvedAt":  null,
+                                                                     "remark":  "ORDER_E2E_order-e2e-d59468bb8c2c430eb1e4f2ea319d7391",
+                                                                     "rejectReason":  null,
+                                                                     "refundRejectReason":  null,
+                                                                     "clientRequestKey":  "order-e2e-d59468bb8c2c430eb1e4f2ea319d7391",
+                                                                     "merchantNameSnapshot":  "æ ¡å­è½»é£éº",
+                                                                     "merchantLogoSnapshot":  null,
+                                                                     "createTime":  "2026-09-02T20:48:16.5018665",
+                                                                     "paidAt":  null,
+                                                                     "acceptedAt":  null,
+                                                                     "riderAssignedAt":  null,
+                                                                     "pickedUpAt":  null,
+                                                                     "deliveryCompletedAt":  null,
+                                                                     "deliveredAt":  null,
+                                                                     "completedAt":  null,
+                                                                     "canceledAt":  null,
+                                                                     "rejectedAt":  null
+                                                                 },
+                                                       "items":  [
+                                                                     {
+                                                                         "id":  1,
+                                                                         "orderId":  5,
+                                                                         "productId":  1,
+                                                                         "quantity":  1,
+                                                                         "price":  2590,
+                                                                         "productNameSnapshot":  "é¸¡è¸èè½éç¢",
+                                                                         "productImageSnapshot":  "/images/product-1.jpg"
+                                                                     }
+                                                                 ],
+                                                       "customerCallUrl":  null,
+                                                       "merchantName":  "æ ¡å­è½»é£éº",
+                                                       "merchantLogo":  null,
+                                                       "products":  [
+                                                                        {
+                                                                            "id":  1,
+                                                                            "name":  "é¸¡è¸èè½éç¢",
+                                                                            "image":  "/images/product-1.jpg"
+                                                                        }
+                                                                    ]
+                                                   },
+                                          "timestamp":  1788353296556,
+                                          "requestId":  "f14adf02-a58c-44b1-b322-a03229daa8d9",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "order-create-retry",
+                         "method":  "POST",
+                         "path":  "/api/order/create",
+                         "status":  200,
+                         "requestId":  "order-e2e-create-6f4bef44165e4c318493aa07c074e937-retry",
+                         "elapsedMs":  40,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "order":  {
+                                                                     "id":  5,
+                                                                     "userId":  "13800000001",
+                                                                     "merchantId":  1,
+                                                                     "riderId":  null,
+                                                                     "totalPrice":  2890,
+                                                                     "subtotal":  2590,
+                                                                     "deliveryFee":  300,
+                                                                     "riderCommission":  0,
+                                                                     "reassignCount":  0,
+                                                                     "deliverySequence":  null,
+                                                                     "couponDiscount":  0,
+                                                                     "userCouponId":  null,
+                                                                     "status":  "PENDING_PAYMENT",
+                                                                     "deliveryAddress":  "è½¯ä»¶å­¦é¢ A åº§ 302",
+                                                                     "deliveryContactName":  "å¼ åå­¦",
+                                                                     "deliveryContactPhone":  "13800000001",
+                                                                     "deliveryLongitude":  116.398000,
+                                                                     "deliveryLatitude":  39.910000,
+                                                                     "distanceMeters":  99,
+                                                                     "routeDistanceMeters":  null,
+                                                                     "deliveryStatus":  "WAITING",
+                                                                     "riderAcceptedAt":  null,
+                                                                     "estimatedMinutes":  25,
+                                                                     "prepareMinutesSnapshot":  null,
+                                                                     "promiseStartAt":  null,
+                                                                     "promiseEndAt":  null,
+                                                                     "predictedArrivalAt":  null,
+                                                                     "refundReason":  null,
+                                                                     "refundStatus":  "NONE",
+                                                                     "refundRequestedAt":  null,
+                                                                     "refundResolvedAt":  null,
+                                                                     "remark":  "ORDER_E2E_order-e2e-d59468bb8c2c430eb1e4f2ea319d7391",
+                                                                     "rejectReason":  null,
+                                                                     "refundRejectReason":  null,
+                                                                     "clientRequestKey":  "order-e2e-d59468bb8c2c430eb1e4f2ea319d7391",
+                                                                     "merchantNameSnapshot":  "æ ¡å­è½»é£éº",
+                                                                     "merchantLogoSnapshot":  null,
+                                                                     "createTime":  "2026-09-02T20:48:17",
+                                                                     "paidAt":  null,
+                                                                     "acceptedAt":  null,
+                                                                     "riderAssignedAt":  null,
+                                                                     "pickedUpAt":  null,
+                                                                     "deliveryCompletedAt":  null,
+                                                                     "deliveredAt":  null,
+                                                                     "completedAt":  null,
+                                                                     "canceledAt":  null,
+                                                                     "rejectedAt":  null
+                                                                 },
+                                                       "items":  [
+                                                                     {
+                                                                         "id":  1,
+                                                                         "orderId":  5,
+                                                                         "productId":  1,
+                                                                         "quantity":  1,
+                                                                         "price":  2590,
+                                                                         "productNameSnapshot":  "é¸¡è¸èè½éç¢",
+                                                                         "productImageSnapshot":  "/images/product-1.jpg"
+                                                                     }
+                                                                 ],
+                                                       "customerCallUrl":  null,
+                                                       "merchantName":  "æ ¡å­è½»é£éº",
+                                                       "merchantLogo":  null,
+                                                       "products":  [
+                                                                        {
+                                                                            "id":  1,
+                                                                            "name":  "é¸¡è¸èè½éç¢",
+                                                                            "image":  "/images/product-1.jpg"
+                                                                        }
+                                                                    ]
+                                                   },
+                                          "timestamp":  1788353296617,
+                                          "requestId":  "2b9ccdfb-f62e-4321-8e99-8634c99d7789",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "order-transition-forbidden",
+                         "method":  "POST",
+                         "path":  "/api/order/accept/5",
+                         "status":  403,
+                         "requestId":  "21df93c916b11fa78bbbf5c5d2c36324",
+                         "elapsedMs":  53,
+                         "response":  {
+                                          "code":  403,
+                                          "message":  "权限不足，无法访问",
+                                          "data":  null,
+                                          "timestamp":  1788353296653,
+                                          "requestId":  "3b9d3c16-2801-49b8-89df-5beef3609e7d",
+                                          "errorCode":  "AUTH_FORBIDDEN"
+                                      }
+                     },
+                     {
+                         "name":  "order-pay",
+                         "method":  "POST",
+                         "path":  "/api/order/pay/5",
+                         "status":  200,
+                         "requestId":  "6615f19d5a9d9ed24d38d5328228109e",
+                         "elapsedMs":  201,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "paymentId":  1,
+                                                       "orderId":  5,
+                                                       "amount":  2890,
+                                                       "payMethod":  "MOCK",
+                                                       "paymentStatus":  "SUCCESS",
+                                                       "orderStatus":  "PAID",
+                                                       "createTime":  "2026-09-02T20:48:16.7217078",
+                                                       "idempotencyKey":  "payment-order-e2e-d59468bb8c2c430eb1e4f2ea319d7391"
+                                                   },
+                                          "timestamp":  1788353296882,
+                                          "requestId":  "87bcf3d5-6c72-41e4-9a06-918c72e59897",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "refund-request",
+                         "method":  "POST",
+                         "path":  "/api/order/refund/5",
+                         "status":  200,
+                         "requestId":  "e7a76b895fe5073bcd0d1cafe9486fec",
+                         "elapsedMs":  45,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "id":  5,
+                                                       "userId":  "13800000001",
+                                                       "merchantId":  1,
+                                                       "riderId":  null,
+                                                       "totalPrice":  2890,
+                                                       "subtotal":  2590,
+                                                       "deliveryFee":  300,
+                                                       "riderCommission":  0,
+                                                       "reassignCount":  0,
+                                                       "deliverySequence":  null,
+                                                       "couponDiscount":  0,
+                                                       "userCouponId":  null,
+                                                       "status":  "REFUND_PENDING",
+                                                       "deliveryAddress":  "è½¯ä»¶å­¦é¢ A åº§ 302",
+                                                       "deliveryContactName":  "å¼ åå­¦",
+                                                       "deliveryContactPhone":  "13800000001",
+                                                       "deliveryLongitude":  116.398000,
+                                                       "deliveryLatitude":  39.910000,
+                                                       "distanceMeters":  99,
+                                                       "routeDistanceMeters":  null,
+                                                       "deliveryStatus":  "WAITING",
+                                                       "riderAcceptedAt":  null,
+                                                       "estimatedMinutes":  25,
+                                                       "prepareMinutesSnapshot":  null,
+                                                       "promiseStartAt":  null,
+                                                       "promiseEndAt":  null,
+                                                       "predictedArrivalAt":  null,
+                                                       "refundReason":  "ORDER_E2E refund regression",
+                                                       "refundStatus":  "PENDING",
+                                                       "refundRequestedAt":  "2026-09-02T20:48:16.9138792",
+                                                       "refundResolvedAt":  null,
+                                                       "remark":  "ORDER_E2E_order-e2e-d59468bb8c2c430eb1e4f2ea319d7391",
+                                                       "rejectReason":  null,
+                                                       "refundRejectReason":  null,
+                                                       "clientRequestKey":  "order-e2e-d59468bb8c2c430eb1e4f2ea319d7391",
+                                                       "merchantNameSnapshot":  "æ ¡å­è½»é£éº",
+                                                       "merchantLogoSnapshot":  null,
+                                                       "createTime":  "2026-09-02T20:48:17",
+                                                       "paidAt":  "2026-09-02T20:48:17",
+                                                       "acceptedAt":  null,
+                                                       "riderAssignedAt":  null,
+                                                       "pickedUpAt":  null,
+                                                       "deliveryCompletedAt":  null,
+                                                       "deliveredAt":  null,
+                                                       "completedAt":  null,
+                                                       "canceledAt":  null,
+                                                       "rejectedAt":  null
+                                                   },
+                                          "timestamp":  1788353296928,
+                                          "requestId":  "80b584a6-73e9-44a2-9628-d3f7dbbe64f8",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "refund-approve",
+                         "method":  "POST",
+                         "path":  "/api/order/refund/5/approve",
+                         "status":  200,
+                         "requestId":  "233c2b888fd25fc6beb56ad157a8ca41",
+                         "elapsedMs":  99,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "id":  5,
+                                                       "userId":  "13800000001",
+                                                       "merchantId":  1,
+                                                       "riderId":  null,
+                                                       "totalPrice":  2890,
+                                                       "subtotal":  2590,
+                                                       "deliveryFee":  300,
+                                                       "riderCommission":  0,
+                                                       "reassignCount":  0,
+                                                       "deliverySequence":  null,
+                                                       "couponDiscount":  0,
+                                                       "userCouponId":  null,
+                                                       "status":  "REFUNDED",
+                                                       "deliveryAddress":  "è½¯ä»¶å­¦é¢ A åº§ 302",
+                                                       "deliveryContactName":  "å¼ åå­¦",
+                                                       "deliveryContactPhone":  "13800000001",
+                                                       "deliveryLongitude":  116.398000,
+                                                       "deliveryLatitude":  39.910000,
+                                                       "distanceMeters":  99,
+                                                       "routeDistanceMeters":  null,
+                                                       "deliveryStatus":  "WAITING",
+                                                       "riderAcceptedAt":  null,
+                                                       "estimatedMinutes":  25,
+                                                       "prepareMinutesSnapshot":  null,
+                                                       "promiseStartAt":  null,
+                                                       "promiseEndAt":  null,
+                                                       "predictedArrivalAt":  null,
+                                                       "refundReason":  "ORDER_E2E refund regression",
+                                                       "refundStatus":  "APPROVED",
+                                                       "refundRequestedAt":  "2026-09-02T20:48:17",
+                                                       "refundResolvedAt":  "2026-09-02T20:48:16.9678045",
+                                                       "remark":  "ORDER_E2E_order-e2e-d59468bb8c2c430eb1e4f2ea319d7391",
+                                                       "rejectReason":  null,
+                                                       "refundRejectReason":  null,
+                                                       "clientRequestKey":  "order-e2e-d59468bb8c2c430eb1e4f2ea319d7391",
+                                                       "merchantNameSnapshot":  "æ ¡å­è½»é£éº",
+                                                       "merchantLogoSnapshot":  null,
+                                                       "createTime":  "2026-09-02T20:48:17",
+                                                       "paidAt":  "2026-09-02T20:48:17",
+                                                       "acceptedAt":  null,
+                                                       "riderAssignedAt":  null,
+                                                       "pickedUpAt":  null,
+                                                       "deliveryCompletedAt":  null,
+                                                       "deliveredAt":  null,
+                                                       "completedAt":  null,
+                                                       "canceledAt":  null,
+                                                       "rejectedAt":  null
+                                                   },
+                                          "timestamp":  1788353297025,
+                                          "requestId":  "999a2d7b-175c-4a5a-8b41-45fc5e1dec62",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "order-timeline",
+                         "method":  "GET",
+                         "path":  "/api/order/5/timeline",
+                         "status":  200,
+                         "requestId":  "18151d8f359c844d4852578434bae34e",
+                         "elapsedMs":  39,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  [
+                                                       {
+                                                           "id":  1,
+                                                           "eventType":  "ORDER_CREATED",
+                                                           "fromStatus":  null,
+                                                           "toStatus":  "PENDING_PAYMENT",
+                                                           "fromDeliveryStatus":  null,
+                                                           "toDeliveryStatus":  "WAITING",
+                                                           "actorRole":  "USER",
+                                                           "remark":  "???????????",
+                                                           "createdAt":  "2026-09-02T20:48:17"
+                                                       },
+                                                       {
+                                                           "id":  2,
+                                                           "eventType":  "PAYMENT_SUCCEEDED",
+                                                           "fromStatus":  "PENDING_PAYMENT",
+                                                           "toStatus":  "PAID",
+                                                           "fromDeliveryStatus":  "WAITING",
+                                                           "toDeliveryStatus":  "WAITING",
+                                                           "actorRole":  "USER",
+                                                           "remark":  "æ¯ä»æåï¼ç­å¾\u0085åå®¶æ¥å",
+                                                           "createdAt":  "2026-09-02T20:48:17"
+                                                       },
+                                                       {
+                                                           "id":  3,
+                                                           "eventType":  "REFUND_REQUESTED",
+                                                           "fromStatus":  "PAID",
+                                                           "toStatus":  "REFUND_PENDING",
+                                                           "fromDeliveryStatus":  "WAITING",
+                                                           "toDeliveryStatus":  "WAITING",
+                                                           "actorRole":  "USER",
+                                                           "remark":  "???????ORDER_E2E refund regression",
+                                                           "createdAt":  "2026-09-02T20:48:17"
+                                                       },
+                                                       {
+                                                           "id":  4,
+                                                           "eventType":  "REFUND_APPROVED",
+                                                           "fromStatus":  "REFUND_PENDING",
+                                                           "toStatus":  "REFUNDED",
+                                                           "fromDeliveryStatus":  "WAITING",
+                                                           "toDeliveryStatus":  "WAITING",
+                                                           "actorRole":  "MERCHANT",
+                                                           "remark":  "??????",
+                                                           "createdAt":  "2026-09-02T20:48:17"
+                                                       }
+                                                   ],
+                                          "timestamp":  1788353297068,
+                                          "requestId":  "1726bab7-487c-43c9-9b2b-98263e8007bd",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "order-create-unauthorized",
+                         "method":  "POST",
+                         "path":  "/api/order/create",
+                         "status":  401,
+                         "requestId":  "92e7e21b310764c8dd74b68084d10522",
+                         "elapsedMs":  3,
+                         "response":  {
+                                          "code":  401,
+                                          "message":  "未登录，请先登录",
+                                          "data":  null,
+                                          "timestamp":  1788353297086,
+                                          "requestId":  "c1695904-7294-435d-a522-bfe804da252b",
+                                          "errorCode":  "AUTH_UNAUTHORIZED"
+                                      }
+                     }
+                 ]
+}

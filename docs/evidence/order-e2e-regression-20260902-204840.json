@@ -1,0 +1,277 @@
+﻿{
+    "executedAt":  "2026-09-02T20:48:41.7502619+08:00",
+    "baseUrl":  "http://127.0.0.1:8080",
+    "result":  "PASSED",
+    "failure":  null,
+    "requests":  [
+                     {
+                         "name":  "gateway-health",
+                         "method":  "GET",
+                         "path":  "/api/health",
+                         "status":  200,
+                         "requestId":  "order-e2e-health-b6c20f68ea0144be86910d763cacd56a,order-e2e-health-b6c20f68ea0144be86910d763cacd56a",
+                         "elapsedMs":  42,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "status":  "ok",
+                                                       "service":  "clas-iam",
+                                                       "name":  "Identity and Account"
+                                                   },
+                                          "timestamp":  1788353320822,
+                                          "requestId":  "order-e2e-health-b6c20f68ea0144be86910d763cacd56a",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "user-login",
+                         "method":  "POST",
+                         "path":  "/api/user/login",
+                         "status":  400,
+                         "requestId":  "578404e837c9342cdc47e521031b3a89,578404e837c9342cdc47e521031b3a89",
+                         "elapsedMs":  385,
+                         "response":  {
+                                          "code":  400,
+                                          "message":  "请先获取验证码",
+                                          "data":  null,
+                                          "timestamp":  1788353321264,
+                                          "requestId":  "578404e837c9342cdc47e521031b3a89",
+                                          "errorCode":  "BUSINESS_ERROR"
+                                      }
+                     },
+                     {
+                         "name":  "user-login-send-code",
+                         "method":  "POST",
+                         "path":  "/api/user/login/send-code",
+                         "status":  200,
+                         "requestId":  "7d89331dbe3ed74c1e3f7e1eb9be1cfb,7d89331dbe3ed74c1e3f7e1eb9be1cfb",
+                         "elapsedMs":  44,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  "éªè¯ç å·²åé",
+                                          "timestamp":  1788353321324,
+                                          "requestId":  "7d89331dbe3ed74c1e3f7e1eb9be1cfb",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "user-login-verified",
+                         "method":  "POST",
+                         "path":  "/api/user/login",
+                         "status":  200,
+                         "requestId":  "c1226be004fafd8ba535e0cfb4f02b06,c1226be004fafd8ba535e0cfb4f02b06",
+                         "elapsedMs":  78,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "user":  {
+                                                                    "phone":  "13800000001",
+                                                                    "username":  "user",
+                                                                    "password":  "[REDACTED]",
+                                                                    "role":  "USER",
+                                                                    "enabled":  true,
+                                                                    "avatar":  null,
+                                                                    "nickname":  null,
+                                                                    "roles":  [
+                                                                                  "USER"
+                                                                              ]
+                                                                },
+                                                       "token":  "[REDACTED]",
+                                                       "roles":  [
+                                                                     "USER"
+                                                                 ]
+                                                   },
+                                          "timestamp":  1788353321406,
+                                          "requestId":  "c1226be004fafd8ba535e0cfb4f02b06",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "merchant-login",
+                         "method":  "POST",
+                         "path":  "/api/user/login",
+                         "status":  400,
+                         "requestId":  "80e1eeb155ae07830c0c279577b3405e,80e1eeb155ae07830c0c279577b3405e",
+                         "elapsedMs":  62,
+                         "response":  {
+                                          "code":  400,
+                                          "message":  "请先获取验证码",
+                                          "data":  null,
+                                          "timestamp":  1788353321483,
+                                          "requestId":  "80e1eeb155ae07830c0c279577b3405e",
+                                          "errorCode":  "BUSINESS_ERROR"
+                                      }
+                     },
+                     {
+                         "name":  "merchant-login-send-code",
+                         "method":  "POST",
+                         "path":  "/api/user/login/send-code",
+                         "status":  200,
+                         "requestId":  "e52b1f455dfc76307281a63fda56c5ba,e52b1f455dfc76307281a63fda56c5ba",
+                         "elapsedMs":  46,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  "éªè¯ç å·²åé",
+                                          "timestamp":  1788353321520,
+                                          "requestId":  "e52b1f455dfc76307281a63fda56c5ba",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "merchant-login-verified",
+                         "method":  "POST",
+                         "path":  "/api/user/login",
+                         "status":  200,
+                         "requestId":  "b2caf280413152ee4cb398803845f644,b2caf280413152ee4cb398803845f644",
+                         "elapsedMs":  74,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  {
+                                                       "user":  {
+                                                                    "phone":  "13800000002",
+                                                                    "username":  "merchant",
+                                                                    "password":  "[REDACTED]",
+                                                                    "role":  "MERCHANT",
+                                                                    "enabled":  true,
+                                                                    "avatar":  null,
+                                                                    "nickname":  null,
+                                                                    "roles":  [
+                                                                                  "USER",
+                                                                                  "MERCHANT"
+                                                                              ]
+                                                                },
+                                                       "token":  "[REDACTED]",
+                                                       "roles":  [
+                                                                     "USER",
+                                                                     "MERCHANT"
+                                                                 ]
+                                                   },
+                                          "timestamp":  1788353321597,
+                                          "requestId":  "b2caf280413152ee4cb398803845f644",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "user-addresses",
+                         "method":  "GET",
+                         "path":  "/api/address/mine",
+                         "status":  200,
+                         "requestId":  "bab104fc8cd8b26d5443670666578be7,bab104fc8cd8b26d5443670666578be7",
+                         "elapsedMs":  19,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  [
+                                                       {
+                                                           "id":  1,
+                                                           "userId":  "13800000001",
+                                                           "contactName":  "å¼ åå­¦",
+                                                           "phone":  "13800000001",
+                                                           "address":  "è½¯ä»¶å­¦é¢ A åº§ 302",
+                                                           "longitude":  116.398000,
+                                                           "latitude":  39.910000,
+                                                           "isDefault":  true,
+                                                           "createdAt":  "2026-09-01T10:01:26",
+                                                           "updatedAt":  "2026-09-01T10:01:26"
+                                                       }
+                                                   ],
+                                          "timestamp":  1788353321618,
+                                          "requestId":  "bab104fc8cd8b26d5443670666578be7",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "catalog-products",
+                         "method":  "GET",
+                         "path":  "/api/product/list/1",
+                         "status":  200,
+                         "requestId":  "a11c801100e84aafe2fac7a0a864ca53",
+                         "elapsedMs":  28,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  [
+                                                       {
+                                                           "id":  1,
+                                                           "merchantId":  1,
+                                                           "categoryId":  1,
+                                                           "name":  "é¸¡è¸èè½éç¢",
+                                                           "description":  "å¥åº·ä½å¡è½éæ»¡æ»¡",
+                                                           "price":  2590,
+                                                           "stock":  30,
+                                                           "image":  "/images/product-1.jpg",
+                                                           "status":  "ON_SALE",
+                                                           "createdAt":  "2026-09-01T10:01:26",
+                                                           "updatedAt":  "2026-09-01T10:01:26"
+                                                       },
+                                                       {
+                                                           "id":  2,
+                                                           "merchantId":  1,
+                                                           "categoryId":  1,
+                                                           "name":  "çæ²¹ææ²æ",
+                                                           "description":  "æ°é²çæ²¹æé\u0085æ¶è¬",
+                                                           "price":  2290,
+                                                           "stock":  24,
+                                                           "image":  "/images/product-2.jpg",
+                                                           "status":  "ON_SALE",
+                                                           "createdAt":  "2026-09-01T10:01:26",
+                                                           "updatedAt":  "2026-09-01T10:01:26"
+                                                       },
+                                                       {
+                                                           "id":  3,
+                                                           "merchantId":  1,
+                                                           "categoryId":  2,
+                                                           "name":  "ä½ç³é\u0085¸å¥¶æ¯",
+                                                           "description":  "ä½ç³é\u0085¸å¥¶æ­é\u0085çéº¦",
+                                                           "price":  1290,
+                                                           "stock":  40,
+                                                           "image":  "/images/product-3.jpg",
+                                                           "status":  "ON_SALE",
+                                                           "createdAt":  "2026-09-01T10:01:26",
+                                                           "updatedAt":  "2026-09-01T10:01:26"
+                                                       }
+                                                   ],
+                                          "timestamp":  1788353321656,
+                                          "requestId":  "3c193634-a6f6-404f-a250-3b7cb3e53c16",
+                                          "errorCode":  null
+                                      }
+                     },
+                     {
+                         "name":  "cart-add",
+                         "method":  "POST",
+                         "path":  "/api/cart/add",
+                         "status":  200,
+                         "requestId":  "85abfb522c6a6ad6e02418a709be8820",
+                         "elapsedMs":  53,
+                         "response":  {
+                                          "code":  200,
+                                          "message":  "success",
+                                          "data":  [
+                                                       {
+                                                           "id":  2,
+                                                           "userId":  "13800000001",
+                                                           "productId":  1,
+                                                           "merchantId":  1,
+                                                           "merchantName":  "æ ¡å­è½»é£éº",
+                                                           "productName":  "é¸¡è¸èè½éç¢",
+                                                           "price":  2590,
+                                                           "stock":  30,
+                                                           "image":  "/images/product-1.jpg",
+                                                           "quantity":  1,
+                                                           "subtotal":  2590,
+                                                           "valid":  true,
+                                                           "invalidReason":  null
+                                                       }
+                                                   ],
+                                          "timestamp":  1788353321716,
+                                          "requestId":  "9f061f3c-0168-4fd7-89f0-0944c1363cf1",
+                                          "errorCode":  null
+                                      }
+                     }
+                 ]
+}
