@@ -43,12 +43,14 @@ public class InternalCatalogController {
 
     @PostMapping("/products/{productId}/deduct-stock")
     public Result<Boolean> deductProductStock(@PathVariable Long productId, @RequestBody StockChangeRequest request) {
-        return Result.ok(internalCatalogProductService.deductProductStock(productId, request.quantity()));
+        return Result.ok(internalCatalogProductService.deductProductStock(
+            productId, request == null ? null : request.quantity()
+        ));
     }
 
     @PostMapping("/products/{productId}/restore-stock")
     public Result<Void> restoreProductStock(@PathVariable Long productId, @RequestBody StockChangeRequest request) {
-        internalCatalogProductService.restoreProductStock(productId, request.quantity());
+        internalCatalogProductService.restoreProductStock(productId, request == null ? null : request.quantity());
         return Result.ok();
     }
 
