@@ -95,7 +95,11 @@ foreach ($m in $modules) {
     $javaArgs = @("-jar", $jarArg)
     if ($env:JWT_SECRET) { $javaArgs += "--jwt.secret=$($env:JWT_SECRET)" }
     if ($env:CLAS_INTERNAL_API_KEY) { $javaArgs += "--clas.internal-api-key=$($env:CLAS_INTERNAL_API_KEY)" }
-    if ($env:MYSQL_PASSWORD) { $javaArgs += "--spring.datasource.password=$($env:MYSQL_PASSWORD)" }
+    $dsPassword = $env:MYSQL_PASSWORD
+    if ($m.Name -eq "order" -and $env:MYSQL_ORDER_PASSWORD) {
+        $dsPassword = $env:MYSQL_ORDER_PASSWORD
+    }
+    if ($dsPassword) { $javaArgs += "--spring.datasource.password=$dsPassword" }
     if ($Foreground) {
         Start-Process -FilePath "java" -ArgumentList $javaArgs `
             -WorkingDirectory $ServicesRoot -NoNewWindow -Wait

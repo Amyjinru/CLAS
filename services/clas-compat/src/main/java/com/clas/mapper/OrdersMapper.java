@@ -2,40 +2,7 @@ package com.clas.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.clas.entity.Orders;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Update;
 
+/** 订单域只读。写入必须走 clas-order `/internal/order/v1` 配送命令。 */
 public interface OrdersMapper extends BaseMapper<Orders> {
-    @Update("""
-        UPDATE orders SET rider_id = #{riderId}, delivery_status = 'ASSIGNED_WAITING_MEAL',
-            rider_assigned_at = CURRENT_TIMESTAMP
-        WHERE id = #{orderId} AND status = 'ACCEPTED' AND delivery_status = 'AVAILABLE' AND rider_id IS NULL
-        """)
-    int claimAvailableTask(@Param("orderId") Long orderId, @Param("riderId") String riderId);
-
-    @Update("""
-        UPDATE orders
-        SET status = #{nextStatus}
-        WHERE id = #{orderId} AND status = #{expectedStatus}
-        """)
-    int updateStatusIfCurrent(
-        @Param("orderId") Long orderId,
-        @Param("expectedStatus") String expectedStatus,
-        @Param("nextStatus") String nextStatus
-    );
-
-    @Update("""
-        UPDATE orders
-        SET rider_id = #{riderId},
-            rider_accepted_at = CURRENT_TIMESTAMP,
-            delivery_status = 'ASSIGNED'
-        WHERE id = #{orderId}
-          AND status = 'ACCEPTED'
-          AND delivery_status = 'PREPARING'
-          AND rider_id IS NULL
-        """)
-    int claimForRider(@Param("orderId") Long orderId, @Param("riderId") String riderId);
-
-    @Update("UPDATE orders SET rider_id = NULL, rider_assigned_at = NULL, rider_accepted_at = NULL WHERE id = #{orderId}")
-    int clearRiderAssignment(@Param("orderId") Long orderId);
 }

@@ -10,6 +10,7 @@ import com.clas.entity.Merchant;
 import com.clas.entity.Orders;
 import com.clas.entity.RiderProfile;
 import com.clas.client.MerchantClient;
+import com.clas.client.OrderClient;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.RiderProfileMapper;
 import com.clas.entity.RiderAuditLog;
@@ -19,7 +20,9 @@ import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RiderDispatchService {
     private static final int TASK_RADIUS_METERS = 5000;
     private static final List<String> ACTIVE_STATES = List.of("ASSIGNED_WAITING_MEAL", "DELIVERING");
-    private final OrdersMapper orders; private final MerchantClient merchantClient; private final RiderProfileMapper profiles; private final RiderLocationService locations; private final RiderAuditLogMapper audits; private final DeliveryTrackingService tracking; private final NotificationBridge notifications; private final AmapRouteService amap; private final OrderLifecycleService lifecycleService;
-    public RiderDispatchService(OrdersMapper orders, MerchantClient merchantClient, RiderProfileMapper profiles, RiderLocationService locations, RiderAuditLogMapper audits, DeliveryTrackingService tracking, NotificationBridge notifications, AmapRouteService amap, OrderLifecycleService lifecycleService) { this.orders = orders; this.merchantClient = merchantClient; this.profiles = profiles; this.locations = locations; this.audits = audits; this.tracking = tracking; this.notifications = notifications; this.amap = amap; this.lifecycleService = lifecycleService; }
+    private final OrdersMapper orders; private final MerchantClient merchantClient; private final RiderProfileMapper profiles; private final RiderLocationService locations; private final RiderAuditLogMapper audits; private final DeliveryTrackingService tracking; private final NotificationBridge notifications; private final AmapRouteService amap; private final OrderClient orderClient;
+    public RiderDispatchService(OrdersMapper orders, MerchantClient merchantClient, RiderProfileMapper profiles, RiderLocationService locations, RiderAuditLogMapper audits, DeliveryTrackingService tracking, NotificationBridge notifications, AmapRouteService amap, OrderClient orderClient) { this.orders = orders; this.merchantClient = merchantClient; this.profiles = profiles; this.locations = locations; this.audits = audits; this.tracking = tracking; this.notifications = notifications; this.amap = amap; this.orderClient = orderClient; }
 
     public List<Orders> activeDeliveries() {
         locations.approvedProfile();
@@ -48,14 +51,22 @@ public class RiderDispatchService {
         List<Long> requested = request.orderIds().stream().distinct().sorted().toList();
         if (!current.equals(requested)) throw new BusinessException("排序必须且只能包含本人全部配送中的订单", DomainErrorCode.DELIVERY_FORBIDDEN);
         LocalDateTime eta = LocalDateTime.now();
+        List<Map<String, Object>> sequenceItems = new ArrayList<>();
         for (int i = 0; i < request.orderIds().size(); i++) {
             Long orderId = request.orderIds().get(i);
             Orders order = active.stream().filter(item -> item.getId().equals(orderId)).findFirst().orElseThrow();
             order.setDeliverySequence(i + 1);
             eta = eta.plusMinutes(Math.max(5, order.getEstimatedMinutes() == null ? 15 : order.getEstimatedMinutes()));
             order.setPredictedArrivalAt(eta);
-            orders.updateById(order);
-            tracking.tracking(order.getId());
+            Map<String, Object> item = new HashMap<>();
+            item.put("orderId", orderId);
+            item.put("sequence", i + 1);
+            item.put("predictedArrivalAt", eta);
+            sequenceItems.add(item);
+        }
+        orderClient.updateDeliverySequence(riderId, sequenceItems);
+        for (Long orderId : request.orderIds()) {
+            tracking.tracking(orderId);
         }
         RiderAuditLog audit = new RiderAuditLog();
         audit.setRiderId(riderId); audit.setOperatorId(riderId); audit.setAction("DELIVERY_SEQUENCE_UPDATED");
@@ -88,11 +99,9 @@ public class RiderDispatchService {
         Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         if (merchant == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) throw unavailable();
         if (travelDistanceMeters(rider.getCurrentLongitude(), rider.getCurrentLatitude(), merchant.getLongitude(), merchant.getLatitude()) > TASK_RADIUS_METERS) throw unavailable();
-        // The conditional UPDATE below is the final authority: concurrent riders can both pass the
-        // distance check, but only one can transition this AVAILABLE task to an assigned task.
-        if (orders.claimAvailableTask(orderId, riderId) != 1) throw unavailable();
-        Orders claimed = orders.selectById(orderId);
-        lifecycleService.record(claimed, "RIDER_CLAIMED", order.getStatus(), order.getDeliveryStatus(), "RIDER", riderId, "骑手领取配送任务");
+        // The conditional UPDATE in clas-order is the final authority: concurrent riders can both
+        // pass the distance check, but only one can transition this AVAILABLE task to assigned.
+        Orders claimed = orderClient.claim(orderId, riderId, "AVAILABLE");
         notifyOrder(claimed, "骑手已接单", "订单已由骑手接单，正在前往商家取餐。");
         return claimed;
     }

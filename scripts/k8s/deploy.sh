@@ -37,6 +37,7 @@ bash "$PROJECT_ROOT/scripts/k8s/quiesce-apps.sh"
 
 kubectl -n "$NAMESPACE" create secret generic clas-secrets \
   --from-literal=MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+  --from-literal=MYSQL_ORDER_PASSWORD="${MYSQL_ORDER_PASSWORD:-$MYSQL_PASSWORD}" \
   --from-literal=JWT_SECRET="$JWT_SECRET" \
   --from-literal=CLAS_INTERNAL_API_KEY="$CLAS_INTERNAL_API_KEY" \
   --from-literal=RIDER_IDENTITY_ENCRYPTION_KEY="$RIDER_IDENTITY_ENCRYPTION_KEY" \

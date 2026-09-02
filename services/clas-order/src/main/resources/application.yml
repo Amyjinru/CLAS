@@ -7,9 +7,9 @@ spring:
   config:
     import: optional:classpath:application-local.yml
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:clas}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:}
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_ORDER_DATABASE:${MYSQL_DATABASE:clas}}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_ORDER_USER:${MYSQL_USER:root}}
+    password: ${MYSQL_ORDER_PASSWORD:${MYSQL_PASSWORD:}}
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}

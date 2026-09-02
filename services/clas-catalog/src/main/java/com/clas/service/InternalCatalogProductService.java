@@ -95,11 +95,15 @@ public class InternalCatalogProductService {
         if (ids == null || ids.isBlank()) {
             return List.of();
         }
-        return Arrays.stream(ids.split(","))
-            .map(String::trim)
-            .filter(part -> !part.isEmpty())
-            .map(Long::valueOf)
-            .toList();
+        try {
+            return Arrays.stream(ids.split(","))
+                .map(String::trim)
+                .filter(part -> !part.isEmpty())
+                .map(Long::valueOf)
+                .toList();
+        } catch (NumberFormatException exception) {
+            throw new BusinessException(400, "商品 ID 必须为整数", "VALIDATION_ERROR");
+        }
     }
 
     private int averageInt(List<Integer> values) {
