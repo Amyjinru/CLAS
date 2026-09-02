@@ -7,7 +7,7 @@ data:
   MYSQL_HOST: mysql
   MYSQL_PORT: "3306"
   MYSQL_DATABASE: clas
-  # 跑完 isolate-order-privileges.sql 后改为 clas_app，并增加 MYSQL_ORDER_USER: clas_order_app
+  # 未跑 isolate 前保持 clas。P3 后再按服务增加 MYSQL_IAM_USER 等，勿在 isolate 前改默认值。
   MYSQL_USER: clas
   REDIS_HOST: redis
   REDIS_PORT: "6379"

@@ -96,8 +96,16 @@ foreach ($m in $modules) {
     if ($env:JWT_SECRET) { $javaArgs += "--jwt.secret=$($env:JWT_SECRET)" }
     if ($env:CLAS_INTERNAL_API_KEY) { $javaArgs += "--clas.internal-api-key=$($env:CLAS_INTERNAL_API_KEY)" }
     $dsPassword = $env:MYSQL_PASSWORD
-    if ($m.Name -eq "order" -and $env:MYSQL_ORDER_PASSWORD) {
-        $dsPassword = $env:MYSQL_ORDER_PASSWORD
+    $servicePassword = switch ($m.Name) {
+        "iam" { $env:MYSQL_IAM_PASSWORD }
+        "merchant" { $env:MYSQL_MERCHANT_PASSWORD }
+        "catalog" { $env:MYSQL_CATALOG_PASSWORD }
+        "order" { $env:MYSQL_ORDER_PASSWORD }
+        "compat" { $env:MYSQL_COMPAT_PASSWORD }
+        default { $null }
+    }
+    if ($servicePassword) {
+        $dsPassword = $servicePassword
     }
     if ($dsPassword) { $javaArgs += "--spring.datasource.password=$dsPassword" }
     if ($Foreground) {
