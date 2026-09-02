@@ -6,6 +6,9 @@ public record InternalAddressResponse(
     Long id,
     String userId,
     BigDecimal longitude,
-    BigDecimal latitude
+    BigDecimal latitude,
+    String contactName,
+    String phone,
+    String address
 ) {
 }

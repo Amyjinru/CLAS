@@ -28,9 +28,13 @@ class OrderCreationIdempotencyTest {
         existing.setId(501L);
         existing.setUserId("13345678900");
         existing.setClientRequestKey("create-501");
+        existing.setMerchantNameSnapshot("Snapshot Merchant");
+        existing.setMerchantLogoSnapshot("https://example.test/merchant.png");
         OrderItem item = new OrderItem();
         item.setOrderId(501L);
         item.setProductId(701L);
+        item.setProductNameSnapshot("Snapshot Product");
+        item.setProductImageSnapshot("https://example.test/product.png");
         when(ordersMapper.findByUserIdAndClientRequestKey("13345678900", "create-501")).thenReturn(existing);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
 
@@ -43,6 +47,11 @@ class OrderCreationIdempotencyTest {
 
         assertThat(response.order().getId()).isEqualTo(501L);
         assertThat(response.items()).extracting(OrderItem::getProductId).containsExactly(701L);
+        assertThat(response.merchantName()).isEqualTo("Snapshot Merchant");
+        assertThat(response.products()).singleElement().satisfies(product -> {
+            assertThat(product.name()).isEqualTo("Snapshot Product");
+            assertThat(product.image()).isEqualTo("https://example.test/product.png");
+        });
         verify(cartMapper, never()).selectList(any());
         verify(ordersMapper, never()).insert(any(Orders.class));
     }

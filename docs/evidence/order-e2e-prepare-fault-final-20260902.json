@@ -1,0 +1,305 @@
+{
+  "executedAt": "2026-09-02T16:26:58.4628986+08:00",
+  "baseUrl": "http://127.0.0.1:8080",
+  "result": "PASSED",
+  "failure": null,
+  "requests": [
+    {
+      "name": "gateway-health",
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200,
+      "requestId": [
+        "order-e2e-health-74b07c9f71054d84881a557bec2665c8",
+        "order-e2e-health-74b07c9f71054d84881a557bec2665c8"
+      ],
+      "elapsedMs": 89,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "status": "ok",
+          "service": "clas-iam",
+          "name": "Identity and Account"
+        },
+        "timestamp": 1788337617960,
+        "requestId": "order-e2e-health-74b07c9f71054d84881a557bec2665c8",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "user-login",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 400,
+      "requestId": [
+        "6751334f59c6287ca24817c9125be07b",
+        "6751334f59c6287ca24817c9125be07b"
+      ],
+      "elapsedMs": 66,
+      "response": {
+        "code": 400,
+        "message": "请先获取验证码",
+        "data": null,
+        "timestamp": 1788337618091,
+        "requestId": "6751334f59c6287ca24817c9125be07b",
+        "errorCode": "BUSINESS_ERROR"
+      }
+    },
+    {
+      "name": "user-login-send-code",
+      "method": "POST",
+      "path": "/api/user/login/send-code",
+      "status": 200,
+      "requestId": [
+        "9b28095ef3bde6c2bda447d198142993",
+        "9b28095ef3bde6c2bda447d198142993"
+      ],
+      "elapsedMs": 32,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": "验证码已发送",
+        "timestamp": 1788337618130,
+        "requestId": "9b28095ef3bde6c2bda447d198142993",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "user-login-verified",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 200,
+      "requestId": [
+        "48c355355351b355499222a7f1c14454",
+        "48c355355351b355499222a7f1c14454"
+      ],
+      "elapsedMs": 77,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "user": {
+            "phone": "13800000001",
+            "username": "user",
+            "password": "[REDACTED]",
+            "role": "USER",
+            "enabled": true,
+            "avatar": null,
+            "nickname": null,
+            "roles": [
+              "USER"
+            ]
+          },
+          "token": "[REDACTED]",
+          "roles": [
+            "USER"
+          ]
+        },
+        "timestamp": 1788337618211,
+        "requestId": "48c355355351b355499222a7f1c14454",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "merchant-login",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 400,
+      "requestId": [
+        "64c8985931cb8832a68ab3b078ee15b2",
+        "64c8985931cb8832a68ab3b078ee15b2"
+      ],
+      "elapsedMs": 61,
+      "response": {
+        "code": 400,
+        "message": "请先获取验证码",
+        "data": null,
+        "timestamp": 1788337618276,
+        "requestId": "64c8985931cb8832a68ab3b078ee15b2",
+        "errorCode": "BUSINESS_ERROR"
+      }
+    },
+    {
+      "name": "merchant-login-send-code",
+      "method": "POST",
+      "path": "/api/user/login/send-code",
+      "status": 200,
+      "requestId": [
+        "265e10f74d605b5be353ba1b28fef9f0",
+        "265e10f74d605b5be353ba1b28fef9f0"
+      ],
+      "elapsedMs": 8,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": "验证码已发送",
+        "timestamp": 1788337618286,
+        "requestId": "265e10f74d605b5be353ba1b28fef9f0",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "merchant-login-verified",
+      "method": "POST",
+      "path": "/api/user/login",
+      "status": 200,
+      "requestId": [
+        "aeb56c5e564c0b9dcbe0ac25c386033d",
+        "aeb56c5e564c0b9dcbe0ac25c386033d"
+      ],
+      "elapsedMs": 71,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": {
+          "user": {
+            "phone": "13800000002",
+            "username": "merchant",
+            "password": "[REDACTED]",
+            "role": "MERCHANT",
+            "enabled": true,
+            "avatar": null,
+            "nickname": null,
+            "roles": [
+              "USER",
+              "MERCHANT"
+            ]
+          },
+          "token": "[REDACTED]",
+          "roles": [
+            "USER",
+            "MERCHANT"
+          ]
+        },
+        "timestamp": 1788337618358,
+        "requestId": "aeb56c5e564c0b9dcbe0ac25c386033d",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "user-addresses",
+      "method": "GET",
+      "path": "/api/address/mine",
+      "status": 200,
+      "requestId": [
+        "3228357c5963c939060a3767cf220a6f",
+        "3228357c5963c939060a3767cf220a6f"
+      ],
+      "elapsedMs": 8,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": [
+          {
+            "id": 1,
+            "userId": "13800000001",
+            "contactName": "张同学",
+            "phone": "13800000001",
+            "address": "软件学院 A 座 302",
+            "longitude": 116.398,
+            "latitude": 39.91,
+            "isDefault": true,
+            "createdAt": "2026-09-02T08:18:02",
+            "updatedAt": "2026-09-02T08:18:02"
+          }
+        ],
+        "timestamp": 1788337618369,
+        "requestId": "3228357c5963c939060a3767cf220a6f",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "catalog-products",
+      "method": "GET",
+      "path": "/api/product/list/1",
+      "status": 200,
+      "requestId": [
+        "890dbe2ce4fb0798848c39d6b7d0d5a0"
+      ],
+      "elapsedMs": 16,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": [
+          {
+            "id": 1,
+            "merchantId": 1,
+            "categoryId": 1,
+            "name": "鸡胸肉能量碗",
+            "description": "健康低卡能量满满",
+            "price": 2590,
+            "stock": 30,
+            "image": "/images/product-1.jpg",
+            "status": "ON_SALE",
+            "createdAt": "2026-09-02T08:18:02",
+            "updatedAt": "2026-09-02T08:18:02"
+          },
+          {
+            "id": 2,
+            "merchantId": 1,
+            "categoryId": 1,
+            "name": "牛油果沙拉",
+            "description": "新鲜牛油果配时蔬",
+            "price": 2290,
+            "stock": 24,
+            "image": "/images/product-2.jpg",
+            "status": "ON_SALE",
+            "createdAt": "2026-09-02T08:18:02",
+            "updatedAt": "2026-09-02T08:18:02"
+          },
+          {
+            "id": 3,
+            "merchantId": 1,
+            "categoryId": 2,
+            "name": "低糖酸奶杯",
+            "description": "低糖酸奶搭配燕麦",
+            "price": 1290,
+            "stock": 40,
+            "image": "/images/product-3.jpg",
+            "status": "ON_SALE",
+            "createdAt": "2026-09-02T08:18:02",
+            "updatedAt": "2026-09-02T08:18:02"
+          }
+        ],
+        "timestamp": 1788337618395,
+        "requestId": "27eea253-66ad-4b79-81f2-735a1f4e1534",
+        "errorCode": null
+      }
+    },
+    {
+      "name": "cart-add",
+      "method": "POST",
+      "path": "/api/cart/add",
+      "status": 200,
+      "requestId": [
+        "a1c3117c3fc3d0367f4dc726999233d6"
+      ],
+      "elapsedMs": 54,
+      "response": {
+        "code": 200,
+        "message": "success",
+        "data": [
+          {
+            "id": 3,
+            "userId": "13800000001",
+            "productId": 1,
+            "merchantId": 1,
+            "merchantName": "校园轻食铺",
+            "productName": "鸡胸肉能量碗",
+            "price": 2590,
+            "stock": 30,
+            "image": "/images/product-1.jpg",
+            "quantity": 1,
+            "subtotal": 2590,
+            "valid": true,
+            "invalidReason": null
+          }
+        ],
+        "timestamp": 1788337618452,
+        "requestId": "aee62c27-0972-468f-94db-a10f301ff01b",
+        "errorCode": null
+      }
+    }
+  ]
+}

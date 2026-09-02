@@ -46,6 +46,8 @@ public class Orders {
     private String rejectReason;
     private String refundRejectReason;
     private String clientRequestKey;
+    private String merchantNameSnapshot;
+    private String merchantLogoSnapshot;
     private LocalDateTime createTime;
     private LocalDateTime paidAt;
     private LocalDateTime acceptedAt;

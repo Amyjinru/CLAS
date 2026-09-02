@@ -1,6 +1,7 @@
 param(
     [int]$MysqlPort = 3306,
     [int]$RedisPort = 6380,
+    [switch]$OrderE2E,
     [string]$EvidencePath = ""
 )
 
@@ -14,6 +15,7 @@ $StartScript = Join-Path $ScriptRoot "start-services.ps1"
 $StopScript = Join-Path $ScriptRoot "stop-services.ps1"
 $BootstrapScript = Join-Path $ScriptRoot "bootstrap-db.ps1"
 $SmokeScript = Join-Path $ScriptRoot "smoke-main-path.ps1"
+$OrderE2EScript = Join-Path $ScriptRoot "order-e2e-regression.ps1"
 $MysqlContainer = "clas-integration-mysql"
 $RedisContainer = "clas-integration-redis"
 $mysqlCreated = $false
@@ -24,6 +26,7 @@ $steps = New-Object System.Collections.Generic.List[string]
 $healthSnapshot = @()
 $directSmokeResult = "not run"
 $smokeResult = "not run"
+$orderE2EResult = "not run"
 
 if (-not $EvidencePath) {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -63,8 +66,27 @@ function Wait-MysqlReady {
 
 function Invoke-DockerMysqlFile {
     param([string]$Password, [string]$FileName)
-    docker exec $MysqlContainer sh -c "mysql --default-character-set=utf8mb4 -h 127.0.0.1 -uroot -p'$Password' clas < /tmp/clas-database/$FileName"
-    if ($LASTEXITCODE -ne 0) { throw "MySQL import failed in Docker: $FileName" }
+    # Docker Desktop on Windows can leave an attached `docker exec` client waiting
+    # after mysql has finished. Run imports detached and poll an explicit exit file.
+    $jobName = "clas-import-" + [guid]::NewGuid().ToString("N")
+    $exitFile = "/tmp/$jobName.exit"
+    $logFile = "/tmp/$jobName.log"
+    $command = "mysql --default-character-set=utf8mb4 -h 127.0.0.1 -uroot -p'$Password' clas < /tmp/clas-database/$FileName > $logFile 2>&1; status=`$?; echo `$status > $exitFile"
+    docker exec -d $MysqlContainer sh -c $command | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Unable to start MySQL import in Docker: $FileName" }
+    for ($attempt = 1; $attempt -le 90; $attempt++) {
+        $state = (docker exec $MysqlContainer sh -c "if test -f $exitFile; then cat $exitFile; else echo pending; fi").Trim()
+        if ($LASTEXITCODE -ne 0) { throw "Unable to poll MySQL import in Docker: $FileName" }
+        if ($state -ne "pending") {
+            if ($state -ne "0") {
+                $details = docker exec $MysqlContainer sh -c "cat $logFile"
+                throw "MySQL import failed in Docker: $FileName ($details)"
+            }
+            return
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    throw "MySQL import timed out in Docker: $FileName"
 }
 
 function Bootstrap-DatabaseInDocker {
@@ -79,7 +101,8 @@ function Bootstrap-DatabaseInDocker {
         "migration-20260826-order-lifecycle.sql",
         "migration-20260827-order-refund-dispute.sql",
         "migration-20260828-order-delivery-contact.sql",
-        "migration-20260902-order-create-idempotency.sql"
+        "migration-20260902-order-create-idempotency.sql",
+        "migration-20260902-order-snapshots.sql"
     )) {
         if (Test-Path (Join-Path $DatabaseDir $migration)) {
             Invoke-DockerMysqlFile $Password $migration
@@ -126,14 +149,14 @@ function Write-Evidence {
         "## Health snapshot"
     )) { $content.Add($line) | Out-Null }
     foreach ($line in $healthSnapshot) { $content.Add($line) | Out-Null }
-    foreach ($line in @("", "## Direct smoke", "- Result: $directSmokeResult", "", "## Gateway smoke", "- Result: $smokeResult", "", "## Execution steps")) { $content.Add($line) | Out-Null }
+    foreach ($line in @("", "## Direct smoke", "- Result: $directSmokeResult", "", "## Gateway smoke", "- Result: $smokeResult", "", "## Order end-to-end regression", "- Result: $orderE2EResult", "", "## Execution steps")) { $content.Add($line) | Out-Null }
     foreach ($step in $steps) { $content.Add("- $step") | Out-Null }
     foreach ($line in @(
         "",
         "## Scope boundary",
         "- This evidence validates local Docker-based five-service integration through Nginx.",
         "- Kubernetes service discovery and controlled dependency-failure recovery remain cluster acceptance work for #44.",
-        "- Order private schema and end-to-end refund/idempotency coverage remain tracked by #49 and #50."
+        "- When -OrderE2E is supplied, order creation, idempotency, snapshots, authorization, refund, and dependency failure are checked through the gateway."
     )) { $content.Add($line) | Out-Null }
     if ($Failure) {
         foreach ($line in @("", "## Failure", "- $Failure", "- Inspect services/logs/ for service startup details.")) { $content.Add($line) | Out-Null }
@@ -194,6 +217,22 @@ try {
         & $SmokeScript -BaseUrl "http://127.0.0.1:8080"
         $smokeResult = "passed"
         Add-Step "Gateway main-path smoke test passed"
+        if ($OrderE2E) {
+            $orderEvidence = Join-Path $EvidenceDir ("order-e2e-regression-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".json")
+            & $OrderE2EScript -MerchantPhone "13800000002" -MerchantPassword "Abc123!" -MerchantId 1 -UserPhone "13800000001" -UserPassword "Abc123!" -EvidencePath $orderEvidence
+            Add-Step "Gateway order end-to-end main and exception paths passed"
+
+            & $OrderE2EScript -MerchantPhone "13800000002" -MerchantPassword "Abc123!" -MerchantId 1 -UserPhone "13800000001" -UserPassword "Abc123!" -PrepareDependencyFailure -EvidencePath (Join-Path $EvidenceDir ("order-e2e-prepare-fault-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".json"))
+            $catalogPidFile = Join-Path $ServicesRoot "run\catalog.pid"
+            $catalogPid = [int](Get-Content $catalogPidFile -Raw)
+            Stop-Process -Id $catalogPid -Force
+            Remove-Item $catalogPidFile -Force
+            Add-Step "Catalog service stopped for controlled dependency-failure test"
+            & $OrderE2EScript -MerchantPhone "13800000002" -MerchantPassword "Abc123!" -MerchantId 1 -UserPhone "13800000001" -UserPassword "Abc123!" -FaultOnly -FaultProductId 1 -EvidencePath (Join-Path $EvidenceDir ("order-e2e-catalog-unavailable-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".json"))
+            & $StartScript -SkipBuild -SkipGateway -SkipEnvFile
+            Add-Step "Catalog service restarted after controlled dependency failure"
+            $orderE2EResult = "passed"
+        }
     } finally {
         Pop-Location
     }

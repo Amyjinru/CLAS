@@ -179,7 +179,10 @@ public class InternalIamController {
             address.getId(),
             address.getUserId(),
             address.getLongitude(),
-            address.getLatitude()
+            address.getLatitude(),
+            address.getContactName(),
+            address.getPhone(),
+            address.getAddress()
         ));
     }
 

@@ -167,6 +167,8 @@ public class OrderService {
         order.setEstimatedMinutes(deliverySnapshot.estimatedMinutes());
         order.setRefundStatus("NONE");
         order.setClientRequestKey(requestKey);
+        order.setMerchantNameSnapshot(merchant.getMerchantName());
+        order.setMerchantLogoSnapshot(merchant.getLogo());
         order.setCreateTime(LocalDateTime.now());
         try {
             ordersMapper.insert(order);
@@ -192,6 +194,8 @@ public class OrderService {
             orderItem.setProductId(product.getId());
             orderItem.setQuantity(cart.getQuantity());
             orderItem.setPrice(product.getPrice());
+            orderItem.setProductNameSnapshot(product.getName());
+            orderItem.setProductImageSnapshot(product.getImage());
             orderItemMapper.insert(orderItem);
             cartMapper.deleteById(cart.getId());
             return orderItem;
@@ -210,7 +214,7 @@ public class OrderService {
             order.getMerchantId(),
             "/order/" + order.getId()
         ));
-        return new OrderResponse(order, orderItems);
+        return snapshotOrderResponse(order, orderItems);
     }
 
     @Transactional
@@ -778,7 +782,18 @@ public class OrderService {
     private OrderResponse storedOrderResponse(Orders order) {
         List<OrderItem> orderItems = orderItemMapper.selectList(
             new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId()));
-        return new OrderResponse(order, orderItems);
+        return snapshotOrderResponse(order, orderItems);
+    }
+
+    private OrderResponse snapshotOrderResponse(Orders order, List<OrderItem> items) {
+        return new OrderResponse(
+            order,
+            items,
+            null,
+            order.getMerchantNameSnapshot(),
+            order.getMerchantLogoSnapshot(),
+            productSummaries(items, Map.of())
+        );
     }
 
     private List<OrderResponse> withItemsForMerchant(List<Orders> orders) {
@@ -806,35 +821,63 @@ public class OrderService {
     ) {
         Set<Long> productIds = itemsByOrderId.values().stream()
             .flatMap(List::stream)
+            .filter(item -> isBlank(item.getProductNameSnapshot()))
             .map(OrderItem::getProductId)
             .collect(Collectors.toSet());
         Map<Long, Product> productsById = productIds.isEmpty()
             ? Map.of()
             : catalogClient.getProducts(productIds);
-        Set<Long> merchantIds = orders.stream().map(Orders::getMerchantId).collect(Collectors.toSet());
+        Set<Long> merchantIds = orders.stream()
+            .filter(order -> isBlank(order.getMerchantNameSnapshot()))
+            .map(Orders::getMerchantId)
+            .collect(Collectors.toSet());
         Map<Long, Merchant> merchantsById = merchantIds.isEmpty()
             ? Map.of()
             : merchantClient.getMerchants(merchantIds);
 
         return orders.stream().map(order -> {
             List<OrderItem> items = itemsByOrderId.getOrDefault(order.getId(), List.of());
-            List<OrderProductSummary> products = items.stream()
-                .map(OrderItem::getProductId)
-                .distinct()
-                .map(productsById::get)
-                .filter(java.util.Objects::nonNull)
-                .map(product -> new OrderProductSummary(product.getId(), product.getName(), product.getImage()))
-                .toList();
+            List<OrderProductSummary> products = productSummaries(items, productsById);
             Merchant merchant = merchantsById.get(order.getMerchantId());
             return new OrderResponse(
                 order,
                 items,
                 includeCustomerCallUrl ? customerCallUrl(order) : null,
-                merchant == null ? null : merchant.getMerchantName(),
-                merchant == null ? null : merchant.getLogo(),
+                isBlank(order.getMerchantNameSnapshot())
+                    ? merchant == null ? null : merchant.getMerchantName()
+                    : order.getMerchantNameSnapshot(),
+                isBlank(order.getMerchantNameSnapshot())
+                    ? merchant == null ? null : merchant.getLogo()
+                    : order.getMerchantLogoSnapshot(),
                 products
             );
         }).toList();
+    }
+
+    private List<OrderProductSummary> productSummaries(List<OrderItem> items, Map<Long, Product> productsById) {
+        return items.stream()
+            .collect(Collectors.toMap(
+                OrderItem::getProductId,
+                item -> item,
+                (first, ignored) -> first,
+                java.util.LinkedHashMap::new
+            ))
+            .values().stream()
+            .map(item -> {
+                if (!isBlank(item.getProductNameSnapshot())) {
+                    return new OrderProductSummary(
+                        item.getProductId(), item.getProductNameSnapshot(), item.getProductImageSnapshot());
+                }
+                Product product = productsById.get(item.getProductId());
+                return product == null ? null : new OrderProductSummary(
+                    product.getId(), product.getName(), product.getImage());
+            })
+            .filter(java.util.Objects::nonNull)
+            .toList();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private String customerCallUrl(Orders order) {
@@ -979,9 +1022,9 @@ public class OrderService {
             if (!GeoUtils.hasCoordinate(address.longitude(), address.latitude())) {
                 throw new BusinessException("?????????");
             }
-            addressText = firstNonBlank(request.deliveryAddress(), "");
-            contactName = firstNonBlank(request.deliveryContactName(), "");
-            contactPhone = firstNonBlank(request.deliveryContactPhone(), "");
+            addressText = firstNonBlank(request.deliveryAddress(), address.address());
+            contactName = firstNonBlank(request.deliveryContactName(), address.contactName());
+            contactPhone = firstNonBlank(request.deliveryContactPhone(), address.phone());
             longitude = address.longitude();
             latitude = address.latitude();
         }
