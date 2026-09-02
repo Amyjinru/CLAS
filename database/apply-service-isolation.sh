@@ -25,15 +25,23 @@ COMPAT_PASSWORD="${MYSQL_COMPAT_PASSWORD:-$MYSQL_PASSWORD}"
 APP_PASSWORD="${MYSQL_APP_PASSWORD:-$MYSQL_PASSWORD}"
 
 MYSQL_TLS_OPTION="${MYSQL_TLS_OPTION:-}"
+MYSQL_AUTH_OPTION="${MYSQL_AUTH_OPTION:-}"
 if [ -z "$MYSQL_TLS_OPTION" ]; then
   if mysql --version 2>/dev/null | grep -qi 'mariadb'; then
     MYSQL_TLS_OPTION='--skip-ssl'
   else
     MYSQL_TLS_OPTION='--ssl-mode=DISABLED'
+    # isolate 末尾 FLUSH PRIVILEGES 会清掉 caching_sha2_password 缓存，
+    # 无 SSL 时下一次连接需要向服务器取 RSA 公钥，否则报 2061。
+    MYSQL_AUTH_OPTION="${MYSQL_AUTH_OPTION:---get-server-public-key}"
   fi
 fi
 
-MYSQL_ARGS=("$MYSQL_TLS_OPTION" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -h "$MYSQL_HOST" -P "$MYSQL_PORT")
+MYSQL_ARGS=("$MYSQL_TLS_OPTION")
+if [ -n "$MYSQL_AUTH_OPTION" ]; then
+  MYSQL_ARGS+=("$MYSQL_AUTH_OPTION")
+fi
+MYSQL_ARGS+=(-u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -h "$MYSQL_HOST" -P "$MYSQL_PORT")
 
 escape_sql() {
   printf '%s' "$1" | sed "s/'/''/g"

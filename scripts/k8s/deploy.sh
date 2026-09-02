@@ -98,7 +98,26 @@ done
 
 kubectl -n "$NAMESPACE" delete job clas-db-migrate --ignore-not-found
 kubectl apply -f "$rendered_dir/migration-job.yaml"
-kubectl -n "$NAMESPACE" wait --for=condition=complete job/clas-db-migrate --timeout=300s
+# wait --for=complete 在 Job Failed 时会空等到 timeout。失败立即退出并打日志。
+deadline=$((SECONDS + 300))
+while (( SECONDS < deadline )); do
+  succeeded="$(kubectl -n "$NAMESPACE" get job clas-db-migrate -o jsonpath='{.status.succeeded}' 2>/dev/null || true)"
+  failed="$(kubectl -n "$NAMESPACE" get job clas-db-migrate -o jsonpath='{.status.failed}' 2>/dev/null || true)"
+  if [[ "${succeeded:-0}" -ge 1 ]]; then
+    break
+  fi
+  if [[ "${failed:-0}" -ge 1 ]]; then
+    echo 'clas-db-migrate failed' >&2
+    kubectl -n "$NAMESPACE" logs job/clas-db-migrate --tail=120 || true
+    exit 1
+  fi
+  sleep 3
+done
+if [[ "${succeeded:-0}" -lt 1 ]]; then
+  echo 'timed out waiting for clas-db-migrate' >&2
+  kubectl -n "$NAMESPACE" logs job/clas-db-migrate --tail=120 || true
+  exit 1
+fi
 
 kubectl apply -f "$rendered_dir/microservices.yaml"
 kubectl apply -f "$rendered_dir/microservices-gateway.yaml"

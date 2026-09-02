@@ -10,15 +10,21 @@ MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-clas}"
 
 MYSQL_TLS_OPTION="${MYSQL_TLS_OPTION:-}"
+MYSQL_AUTH_OPTION="${MYSQL_AUTH_OPTION:-}"
 if [ -z "$MYSQL_TLS_OPTION" ]; then
   if mysql --version 2>/dev/null | grep -qi 'mariadb'; then
     MYSQL_TLS_OPTION='--skip-ssl'
   else
     MYSQL_TLS_OPTION='--ssl-mode=DISABLED'
+    MYSQL_AUTH_OPTION="${MYSQL_AUTH_OPTION:---get-server-public-key}"
   fi
 fi
 
-MYSQL_ARGS=("$MYSQL_TLS_OPTION" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -h "$MYSQL_HOST" -P "$MYSQL_PORT")
+MYSQL_ARGS=("$MYSQL_TLS_OPTION")
+if [ -n "$MYSQL_AUTH_OPTION" ]; then
+  MYSQL_ARGS+=("$MYSQL_AUTH_OPTION")
+fi
+MYSQL_ARGS+=(-u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -h "$MYSQL_HOST" -P "$MYSQL_PORT")
 
 mysql "${MYSQL_ARGS[@]}" -e 'SELECT 1' >/dev/null
 TABLE_COUNT="$(mysql "${MYSQL_ARGS[@]}" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${MYSQL_DATABASE}'")"
