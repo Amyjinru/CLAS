@@ -10,9 +10,17 @@ fi
 
 kubectl -n "$NAMESPACE" delete hpa clas-catalog --ignore-not-found
 deployments=()
-while IFS= read -r deployment; do
-  [[ -n "$deployment" ]] && deployments+=("$deployment")
-done < <(kubectl -n "$NAMESPACE" get deployment -l "$APP_SELECTOR" -o name)
+deployment_names="$(
+  kubectl -n "$NAMESPACE" get deployment \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+)"
+while IFS= read -r deployment_name; do
+  case "$deployment_name" in
+    clas-iam|clas-merchant|clas-catalog|clas-order|clas-compat|clas-gateway|frontend)
+      deployments+=("deployment/$deployment_name")
+      ;;
+  esac
+done <<< "$deployment_names"
 if ((${#deployments[@]})); then
   kubectl -n "$NAMESPACE" scale "${deployments[@]}" --replicas=0
 fi
