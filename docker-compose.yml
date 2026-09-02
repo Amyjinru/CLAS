@@ -79,7 +79,10 @@ services:
       timeout: 5s
       retries: 8
       start_period: 45s
-    networks: [clas]
+    networks:
+      clas:
+        aliases:
+          - clas-gateway
 
   frontend:
     build:
