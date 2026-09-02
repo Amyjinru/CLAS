@@ -7,10 +7,14 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-iam}}
   template:
     metadata: {labels: {app: clas-iam}}
     spec:
+      # Kubernetes service-link variables such as CLAS_IAM_PORT contain
+      # tcp://host:port and collide with Spring's integer port properties.
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-iam
@@ -23,8 +27,9 @@ spec:
             - {name: CLAS_CATALOG_HOST, value: clas-catalog}
             - {name: CLAS_ORDER_HOST, value: clas-order}
             - {name: CLAS_COMPAT_HOST, value: clas-compat}
-          readinessProbe: {httpGet: {path: /api/health, port: 8081}, initialDelaySeconds: 20, periodSeconds: 10}
-          livenessProbe: {httpGet: {path: /api/health, port: 8081}, initialDelaySeconds: 45, periodSeconds: 20}
+          startupProbe: {httpGet: {path: /api/health, port: 8081}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /api/health, port: 8081}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6}
+          livenessProbe: {httpGet: {path: /api/health, port: 8081}, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3}
           resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
 ---
 apiVersion: v1
@@ -49,10 +54,12 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-merchant}}
   template:
     metadata: {labels: {app: clas-merchant}}
     spec:
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-merchant
@@ -66,8 +73,9 @@ spec:
             - {name: CLAS_ORDER_HOST, value: clas-order}
             - {name: CLAS_COMPAT_HOST, value: clas-compat}
           volumeMounts: [{name: uploads, mountPath: /app/uploads}]
-          readinessProbe: {httpGet: {path: /api/health, port: 8085}, initialDelaySeconds: 20, periodSeconds: 10}
-          livenessProbe: {httpGet: {path: /api/health, port: 8085}, initialDelaySeconds: 45, periodSeconds: 20}
+          startupProbe: {httpGet: {path: /api/health, port: 8085}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /api/health, port: 8085}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6}
+          livenessProbe: {httpGet: {path: /api/health, port: 8085}, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3}
           resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
       volumes: [{name: uploads, persistentVolumeClaim: {claimName: clas-merchant-uploads}}]
 ---
@@ -93,10 +101,12 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-catalog}}
   template:
     metadata: {labels: {app: clas-catalog}}
     spec:
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-catalog
@@ -110,8 +120,9 @@ spec:
             - {name: CLAS_ORDER_HOST, value: clas-order}
             - {name: CLAS_COMPAT_HOST, value: clas-compat}
           volumeMounts: [{name: uploads, mountPath: /app/uploads}]
-          readinessProbe: {httpGet: {path: /api/health, port: 8082}, initialDelaySeconds: 20, periodSeconds: 10}
-          livenessProbe: {httpGet: {path: /api/health, port: 8082}, initialDelaySeconds: 45, periodSeconds: 20}
+          startupProbe: {httpGet: {path: /api/health, port: 8082}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /api/health, port: 8082}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6}
+          livenessProbe: {httpGet: {path: /api/health, port: 8082}, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3}
           resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
       volumes: [{name: uploads, persistentVolumeClaim: {claimName: clas-catalog-uploads}}]
 ---
@@ -130,10 +141,12 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-order}}
   template:
     metadata: {labels: {app: clas-order}}
     spec:
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-order
@@ -146,8 +159,9 @@ spec:
             - {name: CLAS_CATALOG_HOST, value: clas-catalog}
             - {name: CLAS_ORDER_HOST, value: clas-order}
             - {name: CLAS_COMPAT_HOST, value: clas-compat}
-          readinessProbe: {httpGet: {path: /api/health, port: 8083}, initialDelaySeconds: 20, periodSeconds: 10}
-          livenessProbe: {httpGet: {path: /api/health, port: 8083}, initialDelaySeconds: 45, periodSeconds: 20}
+          startupProbe: {httpGet: {path: /api/health, port: 8083}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /api/health, port: 8083}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6}
+          livenessProbe: {httpGet: {path: /api/health, port: 8083}, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3}
           resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: 750m, memory: 768Mi}}
 ---
 apiVersion: v1
@@ -165,10 +179,12 @@ metadata:
   namespace: clas
 spec:
   replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
   selector: {matchLabels: {app: clas-compat}}
   template:
     metadata: {labels: {app: clas-compat}}
     spec:
+      enableServiceLinks: false
       imagePullSecrets: [{name: ghcr-pull-secret}]
       containers:
         - name: clas-compat
@@ -181,8 +197,9 @@ spec:
             - {name: CLAS_CATALOG_HOST, value: clas-catalog}
             - {name: CLAS_ORDER_HOST, value: clas-order}
             - {name: CLAS_COMPAT_HOST, value: clas-compat}
-          readinessProbe: {httpGet: {path: /api/health, port: 8084}, initialDelaySeconds: 20, periodSeconds: 10}
-          livenessProbe: {httpGet: {path: /api/health, port: 8084}, initialDelaySeconds: 45, periodSeconds: 20}
+          startupProbe: {httpGet: {path: /api/health, port: 8084}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /api/health, port: 8084}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6}
+          livenessProbe: {httpGet: {path: /api/health, port: 8084}, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3}
           resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: 750m, memory: 768Mi}}
 ---
 apiVersion: v1

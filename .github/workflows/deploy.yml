@@ -194,7 +194,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.version.outputs.image_tag }}
     env:
-      # 逗号分隔的受影响微服务列表，由 changes job 输出；空串视为全量（兜底）
+      # 逗号分隔的受影响微服务列表，仅用于记录本次变更范围。
       CHANGED_SERVICES: ${{ needs.changes.outputs.services }}
     steps:
       - name: Check out source
@@ -208,14 +208,12 @@ jobs:
         id: matrix
         shell: bash
         run: |
+          # 所有 Deployment 共用同一个不可变 Git SHA。为保证任意节点都能
+          # 导入并启动该版本，每次发布必须构建和打包完整微服务集合。
           all_services=(clas-iam clas-merchant clas-catalog clas-order clas-compat)
-          if [[ -z "$CHANGED_SERVICES" ]]; then
-            # 兜底：未提供列表时全量构建（保持行为可预期）
-            printf -v joined '%s,' "${all_services[@]}"
-            echo "services=${joined%,}" >> "$GITHUB_OUTPUT"
-          else
-            echo "services=$CHANGED_SERVICES" >> "$GITHUB_OUTPUT"
-          fi
+          printf -v joined '%s,' "${all_services[@]}"
+          echo "services=${joined%,}" >> "$GITHUB_OUTPUT"
+          echo "changed services: ${CHANGED_SERVICES:-none}; release services: ${joined%,}"
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -289,6 +287,7 @@ jobs:
     name: Deploy immutable version to k3s
     needs: publish
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       SERVER_HOST: 8.141.112.182
       SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
@@ -317,8 +316,11 @@ jobs:
           test -n "$GHCR_TOKEN" || { echo 'GHCR_PULL_TOKEN is required'; exit 1; }
           test -n "$MYSQL_PASSWORD" || { echo 'MYSQL_PASSWORD is required'; exit 1; }
           test -n "$JWT_SECRET" || { echo 'JWT_SECRET is required'; exit 1; }
-          test -n "$CLAS_INTERNAL_API_KEY" || { echo 'CLAS_INTERNAL_API_KEY is required'; exit 1; }
           test -n "$RIDER_IDENTITY_ENCRYPTION_KEY" || { echo 'RIDER_IDENTITY_ENCRYPTION_KEY is required'; exit 1; }
+          if [[ -z "$CLAS_INTERNAL_API_KEY" ]]; then
+            echo 'CLAS_INTERNAL_API_KEY is not configured; deriving a stable, domain-separated key from JWT_SECRET.'
+            CLAS_INTERNAL_API_KEY="$(printf 'clas-internal-api:%s' "$JWT_SECRET" | sha256sum | cut -d ' ' -f 1)"
+          fi
           umask 077
           cat > "$RUNNER_TEMP/clas-deploy.env" <<EOF
           GHCR_USERNAME=$GHCR_USERNAME
@@ -364,6 +366,26 @@ jobs:
           git checkout --detach "$CLAS_IMAGE_TAG"
           test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"
           test -s "$image_archive"
+          if ! timeout 20 kubectl get --raw=/readyz >/dev/null 2>&1; then
+            echo 'k3s API is unhealthy; restarting the local control plane.'
+            systemctl restart k3s
+            api_ready=false
+            for _ in $(seq 1 60); do
+              if timeout 5 kubectl get --raw=/readyz >/dev/null 2>&1; then
+                api_ready=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$api_ready" != true ]; then
+              echo 'k3s API did not recover after restart.' >&2
+              systemctl status k3s --no-pager -n 100 >&2 || true
+              exit 1
+            fi
+          fi
+          # Release resources before importing images or running migrations;
+          # otherwise old Java Pods can immediately wedge this two-core node.
+          bash scripts/k8s/quiesce-apps.sh
           k3s ctr -n k8s.io images import "$image_archive"
           bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
           REMOTE

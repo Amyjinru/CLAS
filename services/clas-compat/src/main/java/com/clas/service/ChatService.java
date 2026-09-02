@@ -1,6 +1,6 @@
 package com.clas.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.clas.client.MerchantClient;
 import com.clas.common.BusinessException;
 import com.clas.dto.ChatMessageResponse;
 import com.clas.dto.ConversationSummary;
@@ -8,7 +8,6 @@ import com.clas.entity.ChatMessage;
 import com.clas.entity.Merchant;
 import com.clas.entity.Orders;
 import com.clas.mapper.ChatMessageMapper;
-import com.clas.mapper.MerchantMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -25,20 +24,20 @@ public class ChatService {
 
     private final ChatMessageMapper chatMessageMapper;
     private final OrderService orderService;
-    private final MerchantMapper merchantMapper;
+    private final MerchantClient merchantClient;
     private final ContentModerationService contentModerationService;
     private final PenaltyService penaltyService;
 
     public ChatService(
         ChatMessageMapper chatMessageMapper,
         OrderService orderService,
-        MerchantMapper merchantMapper,
+        MerchantClient merchantClient,
         ContentModerationService contentModerationService,
         PenaltyService penaltyService
     ) {
         this.chatMessageMapper = chatMessageMapper;
         this.orderService = orderService;
-        this.merchantMapper = merchantMapper;
+        this.merchantClient = merchantClient;
         this.contentModerationService = contentModerationService;
         this.penaltyService = penaltyService;
     }
@@ -160,7 +159,7 @@ public class ChatService {
         if (merchantId == null) {
             throw new BusinessException("请选择商家");
         }
-        Merchant merchant = merchantMapper.selectById(merchantId);
+        Merchant merchant = merchantClient.getMerchant(merchantId);
         if (merchant == null) {
             throw new BusinessException("商家不存在");
         }
@@ -212,8 +211,7 @@ public class ChatService {
     }
 
     private Merchant findCurrentMerchant(String userId) {
-        return merchantMapper.selectOne(new LambdaQueryWrapper<Merchant>()
-            .eq(Merchant::getUserId, userId)
-            .last("LIMIT 1"));
+        Long merchantId = merchantClient.getMerchantIdByUser(userId);
+        return merchantId == null ? null : merchantClient.getMerchant(merchantId);
     }
 }

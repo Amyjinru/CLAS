@@ -1,14 +1,14 @@
 # CLAS 微服务划分、接口与数据归属方案
 
-> 状态：目标架构蓝图；当前可运行实现为 `services/clas-iam`、`services/clas-catalog`、`services/clas-order` 与 `services/clas-compat`。本文件的 12 服务划分是后续演进目标，不应与当前四服务部署混用。
+> 状态：目标架构蓝图（12 服务）。当前可运行实现为 `clas-iam`、`clas-merchant`、`clas-catalog`、`clas-order`、`clas-compat`（基线 `main@51e45fb`）。本文件的 12 服务划分是后续演进目标，不应与当前五进程部署混用。当前表主写权以 `docs/三服务数据表归属表.md` 为准：`merchant`/`merchant_audit_log` → clas-merchant；`orders`/`order_item`/`order_lifecycle_event`/`order_refund_dispute` → clas-order。
 > 基线：提交 `15355196f0a18fdaa9e79b88da3480ef09c4fab9` 及其后的 `main`。
 > 本文定义从当前单体应用演进到微服务的目标蓝图，不改变当前生产运行方式。
 
 ## 1. 当前状态与约束
 
-当前生产证据仍是 **Vue 前端 + 单个 Spring Boot `backend` + MySQL + Redis**。仓库现已提供四服务与网关的
-Kubernetes 清单（`k8s/microservices*.yaml`），但尚无集群 apply/运行证据，不能表述为已完成线上微服务部署。当前目录能力以
-`services/clas-catalog` 实现并由 `services/nginx/clas-gateway.conf` 路由；下图中的其余服务仍是稳定的领域边界和后续可独立部署单元。迁移期间仍可先在同一代码仓、同一 MySQL 实例中按 schema 隔离。
+当前生产证据仍是 **Vue 前端 + 单个 Spring Boot `backend` + MySQL + Redis**。仓库现已提供五进程（iam/merchant/catalog/order/compat）与网关的
+Kubernetes 清单（`k8s/microservices*.yaml`），但尚无集群 apply/运行证据，不能表述为已完成线上微服务部署。商家能力以
+`services/clas-merchant` 实现，目录以 `services/clas-catalog` 实现，并由 `services/nginx/clas-gateway.conf` 路由。下图中的其余服务仍是稳定的领域边界和后续可独立部署单元。迁移期间仍可先在同一代码仓、同一 MySQL 实例中按 schema 隔离。
 
 - 每张业务表只有一个主写服务（owner）；其它服务只可通过 API、事件投影或只读副本使用数据。
 - `userId`、`merchantId`、`orderId` 等仅作为跨服务引用，不建立跨服务外键。

@@ -196,6 +196,12 @@ public class InternalIamController {
         return Result.ok();
     }
 
+    @GetMapping("/users/{userId}/comment-access")
+    public Result<Void> assertCommentAccess(@PathVariable String userId) {
+        penaltyService.assertCanComment(userId);
+        return Result.ok();
+    }
+
     @GetMapping("/users/{userId}/rider-role-pending")
     public Result<Boolean> hasPendingRiderRoleApplication(@PathVariable String userId) {
         boolean pending = roleApplicationMapper.exists(new LambdaQueryWrapper<RoleApplication>()

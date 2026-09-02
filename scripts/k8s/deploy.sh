@@ -28,6 +28,13 @@ collect() {
 trap collect ERR
 
 kubectl apply -f "$PROJECT_ROOT/k8s/namespace.yaml"
+
+# Quiesce the previous application release before doing any other work. This
+# must happen at the start: on the two-core production node, leaving old Java
+# Pods running during migration can starve the k3s API server before the staged
+# zero-replica manifests are applied.
+bash "$PROJECT_ROOT/scripts/k8s/quiesce-apps.sh"
+
 kubectl -n "$NAMESPACE" create secret generic clas-secrets \
   --from-literal=MYSQL_PASSWORD="$MYSQL_PASSWORD" \
   --from-literal=JWT_SECRET="$JWT_SECRET" \
@@ -72,20 +79,33 @@ fi
 
 rendered_dir="$(mktemp -d)"
 trap 'rm -rf "$rendered_dir"; collect' ERR
-for manifest in migration-job frontend microservices microservices-gateway; do
+sed "s/REQUIRED_TAG/$IMAGE_TAG/g" \
+  "$PROJECT_ROOT/k8s/migration-job.yaml" > "$rendered_dir/migration-job.yaml"
+for manifest in frontend microservices microservices-gateway; do
+  # A two-core single-node k3s host cannot boot every Spring service at once
+  # without starving the API server. Apply the release at zero replicas, then
+  # start and verify each workload below. The live Deployments finish at the
+  # replica counts declared by the source manifests/HPA.
   sed "s/REQUIRED_TAG/$IMAGE_TAG/g" "$PROJECT_ROOT/k8s/$manifest.yaml" > "$rendered_dir/$manifest.yaml"
+  sed -i.bak 's/^  replicas: 1$/  replicas: 0/' "$rendered_dir/$manifest.yaml"
+  rm -f "$rendered_dir/$manifest.yaml.bak"
 done
 
 kubectl -n "$NAMESPACE" delete job clas-db-migrate --ignore-not-found
 kubectl apply -f "$rendered_dir/migration-job.yaml"
 kubectl -n "$NAMESPACE" wait --for=condition=complete job/clas-db-migrate --timeout=300s
+
 kubectl apply -f "$rendered_dir/microservices.yaml"
 kubectl apply -f "$rendered_dir/microservices-gateway.yaml"
 kubectl apply -f "$rendered_dir/frontend.yaml"
+
 for deployment in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway; do
-  kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout=300s
+  kubectl -n "$NAMESPACE" scale "deployment/$deployment" --replicas=1
+  kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout=600s
 done
+kubectl -n "$NAMESPACE" scale deployment/frontend --replicas=1
 kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=180s
+kubectl apply -f "$PROJECT_ROOT/k8s/catalog-hpa.yaml"
 
 # API traffic is switched to clas-gateway by ingress.yaml only after every
 # microservice is healthy. The legacy deployment is no longer part of the

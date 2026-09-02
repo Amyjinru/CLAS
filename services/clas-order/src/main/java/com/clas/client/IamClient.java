@@ -87,13 +87,37 @@ public class IamClient {
     }
 
     public void assertCanUsePlatform(String userId) {
+        assertAccess("/users/" + userId + "/platform-access", "当前账号无法使用平台");
+    }
+
+    public void assertCanComment(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        assertAccess("/users/" + userId + "/comment-access", "您已被禁言，暂时无法发表评论或评价");
+    }
+
+    private void assertAccess(String path, String fallbackMessage) {
         try {
             restTemplate.exchange(
-                serviceEndpoints.iam() + "/internal/iam/v1/users/" + userId + "/platform-access",
+                serviceEndpoints.iam() + "/internal/iam/v1" + path,
                 HttpMethod.GET,
                 null,
                 Void.class
             );
+        } catch (HttpStatusCodeException exception) {
+            int status = exception.getStatusCode().value();
+            if (status >= 400 && status < 500) {
+                String body = exception.getResponseBodyAsString(java.nio.charset.StandardCharsets.UTF_8);
+                String message = fallbackMessage;
+                if (body != null && body.contains("永久停止")) {
+                    message = "您的账号已被永久停止服务，无法发表评论或评价";
+                } else if (body != null && body.contains("禁言")) {
+                    message = "您已被禁言，暂时无法发表评论或评价";
+                }
+                throw new BusinessException(status, message);
+            }
+            throw upstreamUnavailable();
         } catch (RestClientException exception) {
             throw upstreamUnavailable();
         }

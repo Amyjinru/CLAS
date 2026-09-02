@@ -24,3 +24,7 @@ services/scripts/env.local
 # 本地敏感/临时文件
 .env
 dump.rdb
+
+# macOS/iCloud 产生的同名冲突副本（例如 "file 2.ext"）
+**/* 2.*
+**/* 2

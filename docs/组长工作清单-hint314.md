@@ -2,7 +2,8 @@
 
 > **PDF 主责**：微服务拆分代码、接口与数据归属、总体集成 + 四份架构说明。  
 > **开发分支**：本地 **`main`**。  
-> **划分定稿**：见 `docs/三服务划分图.md`（3 业务服务 + compat，骑手不硬并 order）。
+> **划分定稿**：见 `docs/三服务划分图.md`（iam/catalog/order 计三项 + 已拆 `clas-merchant` + compat 过渡层）。  
+> **#36 基线**：`main@51e45fb`。商家/订单写权与 P3 拆库顺序见 `docs/三服务数据表归属表.md`。
 
 ---
 
@@ -49,7 +50,7 @@ services/
 7. [x] 主路径联调脚本与文档（`scripts/smoke-main-path.ps1`、`docs/主路径联调.md`）；网关冒烟 + 前端 dev 已验证
 8. [x] 打 `monolith-start`（`d2f77a9` · 单体/容器化基线，无 `services/`）
 9. [x] 服务器部署指南（`docs/服务器部署指南.md`）
-10. [ ] 修订四文档
+10. [x] 修订四文档（#36 按独立 merchant 更新写权与 K8s DNS）
 
 ---
 
@@ -68,4 +69,4 @@ services/
 ## 5. compat 边界（答辩用）
 
 compat **有内容**：骑手 UC16、admin 聚合、平台公告。  
-compat **不是**第四个业务微服务；三业务服务为 iam / catalog / order。
+compat **不是**用来凑数的业务微服务；课程三项计 iam / catalog / order。`clas-merchant` 是 #38 额外拆出的正式业务服务。
