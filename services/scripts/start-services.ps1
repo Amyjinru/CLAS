@@ -2,7 +2,8 @@
 param(
     [switch]$SkipBuild,
     [switch]$SkipGateway,
-    [switch]$Foreground
+    [switch]$Foreground,
+    [switch]$SkipEnvFile
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +33,9 @@ function Set-DefaultEnv {
     }
 }
 
-Import-EnvFile $EnvFile
+if (-not $SkipEnvFile) {
+    Import-EnvFile $EnvFile
+}
 Set-DefaultEnv "MYSQL_HOST" "127.0.0.1"
 Set-DefaultEnv "MYSQL_PORT" "3306"
 Set-DefaultEnv "MYSQL_DATABASE" "clas"
