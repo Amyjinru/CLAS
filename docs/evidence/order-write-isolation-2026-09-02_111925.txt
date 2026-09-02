@@ -1,0 +1,26 @@
+﻿CLAS #49 order write isolation
+host=127.0.0.1 database=clas
+app_user=clas_app order_user=clas_order_app
+
+[2026-09-02 11:19:23] Host=127.0.0.1 Database=clas
+[2026-09-02 11:19:24] AdminUser=root AppUser=clas_app OrderUser=clas_order_app
+[2026-09-02 11:19:24] PASS allow schema and users exist (root)
+[2026-09-02 11:19:24]   Database (clas_order) clas_order User Host clas_app % clas_app localhost clas_order_app % clas_order_app localhost
+[2026-09-02 11:19:24] PASS allow clas_app SELECT orders (clas_app)
+[2026-09-02 11:19:24]   order_rows 0
+[2026-09-02 11:19:24] PASS deny clas_app INSERT orders (clas_app) exit=1
+[2026-09-02 11:19:24]   mysql: [Warning] Using a password on the command line interface can be insecure. ERROR 1142 (42000) at line 2: INSERT command denied to user 'clas_app'@'localhost' for table 'orders'
+[2026-09-02 11:19:24] PASS deny clas_app UPDATE orders (clas_app) exit=1
+[2026-09-02 11:19:24]   mysql: [Warning] Using a password on the command line interface can be insecure. ERROR 1142 (42000) at line 2: UPDATE command denied to user 'clas_app'@'localhost' for table 'orders'
+[2026-09-02 11:19:24] PASS deny clas_app DELETE orders (clas_app) exit=1
+[2026-09-02 11:19:24]   mysql: [Warning] Using a password on the command line interface can be insecure. ERROR 1142 (42000) at line 2: DELETE command denied to user 'clas_app'@'localhost' for table 'orders'
+[2026-09-02 11:19:24] PASS deny clas_app INSERT order_item (clas_app) exit=1
+[2026-09-02 11:19:24]   mysql: [Warning] Using a password on the command line interface can be insecure. ERROR 1142 (42000) at line 2: INSERT command denied to user 'clas_app'@'localhost' for table 'order_item'
+[2026-09-02 11:19:24] PASS deny clas_app INSERT order_lifecycle_event (clas_app) exit=1
+[2026-09-02 11:19:24]   mysql: [Warning] Using a password on the command line interface can be insecure. ERROR 1142 (42000) at line 2: INSERT command denied to user 'clas_app'@'localhost' for table 'order_lifecycle_event'
+[2026-09-02 11:19:24] PASS deny clas_app INSERT order_refund_dispute (clas_app) exit=1
+[2026-09-02 11:19:24]   mysql: [Warning] Using a password on the command line interface can be insecure. ERROR 1142 (42000) at line 2: INSERT command denied to user 'clas_app'@'localhost' for table 'order_refund_dispute'
+[2026-09-02 11:19:25] PASS allow clas_order_app INSERT/UPDATE/DELETE orders (clas_order_app)
+[2026-09-02 11:19:25]   result clas_order_app write ok
+[2026-09-02 11:19:25] PASS clas-order health 200 http://127.0.0.1:8083/api/health
+[2026-09-02 11:19:25] All privilege assertions passed.

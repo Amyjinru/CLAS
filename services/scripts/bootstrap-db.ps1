@@ -12,6 +12,10 @@ $RepoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $DbDir = Join-Path $RepoRoot "database"
 $EnvFile = Join-Path $PSScriptRoot "env.local"
 
+$AdminUserFromFile = $null
+$AppUserFromFile = $null
+$AdminPasswordFromFile = $null
+$PasswordFromFile = $null
 if (Test-Path $EnvFile) {
     Get-Content $EnvFile | ForEach-Object {
         $line = $_.Trim()
@@ -22,12 +26,18 @@ if (Test-Path $EnvFile) {
         $value = $line.Substring($idx + 1).Trim()
         switch ($name) {
             "MYSQL_HOST" { $HostName = $value }
-            "MYSQL_USER" { $User = $value }
-            "MYSQL_PASSWORD" { $Password = $value }
+            "MYSQL_ADMIN_USER" { $AdminUserFromFile = $value }
+            "MYSQL_USER" { $AppUserFromFile = $value }
+            "MYSQL_ADMIN_PASSWORD" { $AdminPasswordFromFile = $value }
+            "MYSQL_PASSWORD" { $PasswordFromFile = $value }
             "MYSQL_DATABASE" { $Database = $value }
         }
     }
 }
+if ($AdminUserFromFile) { $User = $AdminUserFromFile }
+elseif ($AppUserFromFile -eq "root") { $User = $AppUserFromFile }
+if ($AdminPasswordFromFile) { $Password = $AdminPasswordFromFile }
+elseif ($PasswordFromFile) { $Password = $PasswordFromFile }
 
 if (-not (Test-Path $MysqlExe)) {
     throw "mysql.exe not found at $MysqlExe"

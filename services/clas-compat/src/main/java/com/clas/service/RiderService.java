@@ -1,7 +1,7 @@
 package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.clas.common.BusinessException;
+import com.clas.client.OrderClient;
 import com.clas.dto.OrderResponse;
 import com.clas.entity.OrderItem;
 import com.clas.entity.Orders;
@@ -17,10 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class RiderService {
     private final OrdersMapper ordersMapper;
     private final OrderItemMapper orderItemMapper;
+    private final OrderClient orderClient;
 
-    public RiderService(OrdersMapper ordersMapper, OrderItemMapper orderItemMapper) {
+    public RiderService(OrdersMapper ordersMapper, OrderItemMapper orderItemMapper, OrderClient orderClient) {
         this.ordersMapper = ordersMapper;
         this.orderItemMapper = orderItemMapper;
+        this.orderClient = orderClient;
     }
 
     /** 最小用例：只展示已被商家接单、正在备餐且尚未指派的订单。 */
@@ -42,14 +44,7 @@ public class RiderService {
 
     @Transactional
     public OrderResponse claim(Long orderId, String riderId) {
-        int updated = ordersMapper.claimForRider(orderId, riderId);
-        if (updated == 0) {
-            if (ordersMapper.selectById(orderId) == null) {
-                throw new BusinessException("订单不存在");
-            }
-            throw new BusinessException("订单已被其他骑手接走或状态已变化");
-        }
-        return withItems(ordersMapper.selectById(orderId));
+        return withItems(orderClient.claim(orderId, riderId, "PREPARING"));
     }
 
     // TODO(rider-next): 实现到店、取餐、送达状态机，并与用户/商家通知联动。

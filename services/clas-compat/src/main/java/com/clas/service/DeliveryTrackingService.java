@@ -9,6 +9,7 @@ import com.clas.entity.Merchant;
 import com.clas.entity.Orders;
 import com.clas.entity.RiderProfile;
 import com.clas.client.MerchantClient;
+import com.clas.client.OrderClient;
 import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.RiderProfileMapper;
 import java.math.BigDecimal;
@@ -24,9 +25,10 @@ public class DeliveryTrackingService {
     private final MerchantClient merchantClient;
     private final RiderProfileMapper riders;
     private final AmapRouteService amap;
+    private final OrderClient orderClient;
 
-    public DeliveryTrackingService(OrdersMapper orders, MerchantClient merchantClient, RiderProfileMapper riders, AmapRouteService amap) {
-        this.orders = orders; this.merchantClient = merchantClient; this.riders = riders; this.amap = amap;
+    public DeliveryTrackingService(OrdersMapper orders, MerchantClient merchantClient, RiderProfileMapper riders, AmapRouteService amap, OrderClient orderClient) {
+        this.orders = orders; this.merchantClient = merchantClient; this.riders = riders; this.amap = amap; this.orderClient = orderClient;
     }
 
     public DeliveryTrackingResponse tracking(Long orderId) {
@@ -37,8 +39,12 @@ public class DeliveryTrackingService {
         Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         Eta eta = estimateEta(order, rider, merchant);
         if (eta.arrival() != null && !eta.arrival().equals(order.getPredictedArrivalAt())) {
+            try {
+                orderClient.updatePredictedArrival(order.getId(), eta.arrival());
+            } catch (BusinessException ignored) {
+                // 轨迹查询仍返回本次估算；预计到达回写失败不阻断用户查看。
+            }
             order.setPredictedArrivalAt(eta.arrival());
-            orders.updateById(order);
         }
         return response(order, rider, eta.arrival(), eta.routeAvailable(), eta.source(), true);
     }

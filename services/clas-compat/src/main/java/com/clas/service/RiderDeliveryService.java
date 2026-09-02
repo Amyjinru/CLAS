@@ -11,9 +11,9 @@ import com.clas.entity.Orders;
 import com.clas.entity.Product;
 import com.clas.client.CatalogClient;
 import com.clas.client.MerchantClient;
+import com.clas.client.OrderClient;
 import com.clas.mapper.OrderItemMapper;
 import com.clas.mapper.OrdersMapper;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,44 +28,36 @@ public class RiderDeliveryService {
     private final MerchantClient merchantClient;
     private final NotificationBridge notifications;
     private final RiderSettlementService settlements;
-    private final OrderLifecycleService lifecycleService;
     private final OrderItemMapper orderItems;
     private final CatalogClient catalogClient;
-    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantClient merchantClient, NotificationBridge notifications, RiderSettlementService settlements, OrderLifecycleService lifecycleService, OrderItemMapper orderItems, CatalogClient catalogClient) { this.orders = orders; this.locations = locations; this.merchantClient = merchantClient; this.notifications = notifications; this.settlements = settlements; this.lifecycleService = lifecycleService; this.orderItems = orderItems; this.catalogClient = catalogClient; }
+    private final OrderClient orderClient;
+    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantClient merchantClient, NotificationBridge notifications, RiderSettlementService settlements, OrderItemMapper orderItems, CatalogClient catalogClient, OrderClient orderClient) { this.orders = orders; this.locations = locations; this.merchantClient = merchantClient; this.notifications = notifications; this.settlements = settlements; this.orderItems = orderItems; this.catalogClient = catalogClient; this.orderClient = orderClient; }
 
     @Transactional
-    public Orders pickup(Long orderId) { return transition(orderId, "ASSIGNED_WAITING_MEAL", "DELIVERING", true); }
+    public Orders pickup(Long orderId) {
+        locations.approvedProfile();
+        owned(orderId);
+        Orders order = orderClient.pickup(orderId, UserContext.getUserId());
+        notifyOrder(order, "骑手已取餐", "骑手已取餐，正在配送中。");
+        return order;
+    }
+
     @Transactional
-    public Orders deliver(Long orderId) { return transition(orderId, "DELIVERING", "DELIVERED", false); }
+    public Orders deliver(Long orderId) {
+        locations.approvedProfile();
+        owned(orderId);
+        Orders order = orderClient.complete(orderId, UserContext.getUserId());
+        settlements.createPendingCommission(order);
+        notifyOrder(order, "订单已送达", "骑手已送达，请确认收货。");
+        return order;
+    }
 
     @Transactional
     public Orders abandonBeforePickup(Long orderId, String reason) {
         locations.approvedProfile();
-        Orders order = owned(orderId);
-        if (!"ASSIGNED_WAITING_MEAL".equals(order.getDeliveryStatus())) throw invalid();
-        String fromStatus = order.getStatus(); String fromDelivery = order.getDeliveryStatus();
-        order.setRiderId(null); order.setRiderAssignedAt(null); order.setDeliveryStatus("AVAILABLE");
-        order.setReassignCount((order.getReassignCount() == null ? 0 : order.getReassignCount()) + 1);
-        orders.updateById(order);
-        orders.clearRiderAssignment(order.getId());
-        lifecycleService.record(order, "RIDER_ABANDONED", fromStatus, fromDelivery, "RIDER", UserContext.getUserId(), reason);
+        owned(orderId);
+        Orders order = orderClient.abandon(orderId, UserContext.getUserId(), reason);
         notifyOrder(order, "骑手已放弃配送", "骑手暂时无法配送，订单已回到骑手任务池。");
-        return order;
-    }
-
-    private Orders transition(Long orderId, String expected, String target, boolean pickup) {
-        locations.approvedProfile();
-        Orders order = owned(orderId);
-        if (!expected.equals(order.getDeliveryStatus())) throw invalid();
-        String fromStatus = order.getStatus(); String fromDelivery = order.getDeliveryStatus();
-        LocalDateTime now = LocalDateTime.now();
-        order.setDeliveryStatus(target);
-        if (pickup) order.setPickedUpAt(now);
-        else { order.setDeliveryCompletedAt(now); order.setDeliveredAt(now); }
-        orders.updateById(order);
-        lifecycleService.record(order, pickup ? "RIDER_PICKED_UP" : "RIDER_DELIVERED", fromStatus, fromDelivery, "RIDER", UserContext.getUserId(), pickup ? "骑手确认取餐" : "骑手确认送达");
-        if (!pickup) settlements.createPendingCommission(order);
-        notifyOrder(order, pickup ? "骑手已取餐" : "订单已送达", pickup ? "骑手已取餐，正在配送中。" : "骑手已送达，请确认收货。");
         return order;
     }
 
@@ -93,7 +85,6 @@ public class RiderDeliveryService {
             .toList();
         return new RiderOrderDetailResponse(order, merchant, detailItems);
     }
-    private BusinessException invalid() { return new BusinessException("配送状态不允许此操作", DomainErrorCode.DELIVERY_STATE_INVALID); }
     private void notifyOrder(Orders order, String title, String content) {
         notifications.send(new NotificationBridge.NotificationTarget(order.getUserId(), title, content, "DELIVERY_STATUS", "ORDER", order.getId(), null, null, order.getId(), order.getMerchantId(), "/order/" + order.getId()));
         Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
