@@ -350,8 +350,22 @@ jobs:
           deploy_env="/tmp/clas-deploy.env"
           recovery_script="/tmp/clas-quiesce-apps.sh"
           ssh_options="-o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=8"
-          sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
-          sshpass -p "$SSH_PASSWORD" scp $ssh_options scripts/k8s/quiesce-apps.sh "root@${SERVER_HOST}:$recovery_script"
+          retry_scp() {
+            local attempt
+            for attempt in $(seq 1 8); do
+              if sshpass -p "$SSH_PASSWORD" scp $ssh_options "$1" "$2"; then
+                return 0
+              fi
+              if [ "$attempt" -lt 8 ]; then
+                echo "SSH transfer failed (attempt ${attempt}/8); retrying in 15 seconds." >&2
+                sleep 15
+              fi
+            done
+            echo "SSH transfer failed after 8 attempts: $1" >&2
+            return 1
+          }
+          retry_scp "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
+          retry_scp scripts/k8s/quiesce-apps.sh "root@${SERVER_HOST}:$recovery_script"
           sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
@@ -386,7 +400,21 @@ jobs:
           deploy_env="/tmp/clas-deploy.env"
           image_archive="/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
           ssh_options="-o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
-          sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-images/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "root@${SERVER_HOST}:$image_archive"
+          retry_image_transfer() {
+            local attempt
+            for attempt in $(seq 1 8); do
+              if sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-images/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "root@${SERVER_HOST}:$image_archive"; then
+                return 0
+              fi
+              if [ "$attempt" -lt 8 ]; then
+                echo "Image transfer failed (attempt ${attempt}/8); retrying in 15 seconds." >&2
+                sleep 15
+              fi
+            done
+            echo 'Image transfer failed after 8 attempts.' >&2
+            return 1
+          }
+          retry_image_transfer
           sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
