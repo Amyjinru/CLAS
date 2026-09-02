@@ -1,0 +1,34 @@
+CLAS main-path smoke test
+BaseUrl: http://localhost:8080  Direct: False
+
+==> Gateway health
+  PASS: GET /api/health
+
+==> User login (iam)
+  PASS: POST /api/user/login
+  PASS: token acquired
+
+==> Merchant list (merchant)
+  PASS: GET /api/merchant/list
+  PASS: merchant count 2
+
+==> Product list (catalog)
+  PASS: GET /api/product/list/1
+
+==> Cart (order)
+  PASS: GET /api/cart/me
+
+==> Deals list (catalog)
+  PASS: GET /api/deals
+
+==> Announcements (compat)
+  PASS: GET /api/announcement/list
+
+==> Public stats (compat)
+  PASS: GET /api/public/stats
+
+==> Admin dashboard (compat)
+  PASS: admin login
+  PASS: GET /api/admin/dashboard
+
+All main-path checks passed.

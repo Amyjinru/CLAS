@@ -51,8 +51,8 @@ services/
 8. [x] 打 `monolith-start`（`d2f77a9` · 单体/容器化基线，无 `services/`）
 9. [x] 服务器部署指南（`docs/服务器部署指南.md`）
 10. [x] 修订四文档（#36 按独立 merchant 更新写权与 K8s DNS）
-11. [x] P3 各服务最小权限账号（脚本 + 可回退数据源变量；表未 MOVE，集群 ConfigMap 未切）
-12. [x] 本机用 `clas_*_app` 启动五服务 + 已有单测 + Direct/网关冒烟（证据 `docs/evidence/service-isolation-start-*.txt`）
+11. [x] P3 各服务最小权限账号 + 表 MOVE + 集群 ConfigMap `MYSQL_*_USER`/`MYSQL_*_DATABASE`
+12. [x] 本机用 `clas_*_app` 连私有库启动五服务 + Direct/网关冒烟（证据 `docs/evidence/service-move-start-2026-09-02_192900.txt`）
 
 ---
 

@@ -65,10 +65,10 @@ function Invoke-MysqlSql {
 }
 
 if ($Rollback) {
-    Write-Host "Rolling back service write isolation (keeps clas_order_app / clas_app) ..."
-    Invoke-MysqlSql (Get-Content (Join-Path $DbDir "rollback-service-privileges.sql") -Raw -Encoding UTF8) "rollback"
-    Write-Host "Done. Re-run isolate-order-privileges.ps1 if you need #49 clas_app writes on non-order tables."
-    Write-Host "Point services back to MYSQL_USER=root (or cluster clas) and unset MYSQL_*_USER."
+    Write-Host "Moving private-schema tables back to clas, then dropping P3 users ..."
+    Invoke-MysqlSql (Get-Content (Join-Path $DbDir "rollback-move-service-tables.sql") -Raw -Encoding UTF8) "rollback-move"
+    Invoke-MysqlSql (Get-Content (Join-Path $DbDir "rollback-service-privileges.sql") -Raw -Encoding UTF8) "rollback-users"
+    Write-Host "Done. Point services back to MYSQL_USER=root (or cluster clas) and unset MYSQL_*_USER / MYSQL_*_DATABASE."
     return
 }
 
@@ -82,6 +82,9 @@ $sql = $sql.Replace("{{CLAS_APP_PASSWORD}}", (Escape-SqlLiteral $AppPassword))
 Write-Host "Applying service write isolation on $HostName ..."
 Invoke-MysqlSql $sql "isolate"
 
+Write-Host "Moving business tables into private schemas ..."
+Invoke-MysqlSql (Get-Content (Join-Path $DbDir "move-service-tables.sql") -Raw -Encoding UTF8) "move"
+
 $listSql = "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='clas' AND TABLE_TYPE='BASE TABLE';"
 $tablesOut = & $MysqlExe --default-character-set=utf8mb4 -h $HostName -u $AdminUser -p"$AdminPassword" -N -e $listSql
 if ($LASTEXITCODE -ne 0) {
@@ -89,7 +92,10 @@ if ($LASTEXITCODE -ne 0) {
 }
 $tables = @($tablesOut | ForEach-Object { "$_".Trim() } | Where-Object { $_ -ne "" })
 if ($tables.Count -eq 0) {
-    throw "No tables found in clas; run bootstrap-db.ps1 first"
+    Write-Host "No tables left in clas (already moved). Skipping leftover clas_app table grants."
+    Write-Host "Applied. Set MYSQL_*_USER and MYSQL_*_DATABASE, then restart."
+    Write-Host "Verify with .\verify-service-write-isolation.ps1"
+    return
 }
 
 try {
@@ -124,5 +130,5 @@ foreach ($table in $tables) {
 [void]$selectOnly.AppendLine("FLUSH PRIVILEGES;")
 Invoke-MysqlSql $selectOnly.ToString() "clas_app select grants"
 
-Write-Host "Applied. Set env.local MYSQL_*_USER to clas_*_app (clas_app is SELECT-only), then restart."
+Write-Host "Applied. Set env.local MYSQL_*_USER and MYSQL_*_DATABASE, then restart."
 Write-Host "Verify with .\verify-service-write-isolation.ps1"

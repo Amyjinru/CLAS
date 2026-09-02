@@ -138,3 +138,4 @@ if (-not $SkipSeed) {
 }
 
 Write-Host "Database bootstrap complete."
+Write-Host "If using per-service accounts, run isolate-service-privileges.ps1 (creates DBs, GRANTs, MOVE tables)."

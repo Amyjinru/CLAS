@@ -1,7 +1,6 @@
--- #36 P3 各服务最小权限：同实例逻辑隔离。
--- 物理表仍在 clas；空库 clas_iam/clas_merchant/clas_catalog/clas_order/clas_compat 留给后续 MOVE。
--- 占位符由 isolate-service-privileges.ps1 替换，禁止提交真实密码。
--- clas_app 改为全表 SELECT-only，由 isolate-service-privileges.ps1 按 information_schema 生成。
+-- #36 P3 各服务最小权限。占位符由 isolate-service-privileges.ps1 / apply-service-isolation.sh 替换。
+-- 随后执行 move-service-tables.sql，把 clas 中的业务表搬进下列空库。
+-- clas_app 对私有库仅 SELECT；clas 上残留表的 SELECT 由脚本按 information_schema 补。
 
 CREATE DATABASE IF NOT EXISTS clas_iam
   DEFAULT CHARACTER SET utf8mb4
@@ -153,5 +152,16 @@ GRANT ALL PRIVILEGES ON clas.chat_conversation TO 'clas_compat_app'@'%';
 GRANT ALL PRIVILEGES ON clas.chat_conversation TO 'clas_compat_app'@'localhost';
 GRANT ALL PRIVILEGES ON clas.chat_message TO 'clas_compat_app'@'%';
 GRANT ALL PRIVILEGES ON clas.chat_message TO 'clas_compat_app'@'localhost';
+
+GRANT SELECT ON clas_iam.* TO 'clas_app'@'%';
+GRANT SELECT ON clas_iam.* TO 'clas_app'@'localhost';
+GRANT SELECT ON clas_merchant.* TO 'clas_app'@'%';
+GRANT SELECT ON clas_merchant.* TO 'clas_app'@'localhost';
+GRANT SELECT ON clas_catalog.* TO 'clas_app'@'%';
+GRANT SELECT ON clas_catalog.* TO 'clas_app'@'localhost';
+GRANT SELECT ON clas_order.* TO 'clas_app'@'%';
+GRANT SELECT ON clas_order.* TO 'clas_app'@'localhost';
+GRANT SELECT ON clas_compat.* TO 'clas_app'@'%';
+GRANT SELECT ON clas_compat.* TO 'clas_app'@'localhost';
 
 FLUSH PRIVILEGES;

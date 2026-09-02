@@ -39,5 +39,7 @@ if [ "$TABLE_COUNT" -eq 0 ]; then
   echo '[bootstrap] schema baseline registered'
 else
   echo '[bootstrap] existing database detected; applying pending migrations only'
-  exec bash "$SCRIPT_DIR/migrate.sh"
+  bash "$SCRIPT_DIR/migrate.sh"
 fi
+
+bash "$SCRIPT_DIR/apply-service-isolation.sh"

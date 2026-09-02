@@ -6,9 +6,19 @@ metadata:
 data:
   MYSQL_HOST: mysql
   MYSQL_PORT: "3306"
+  # mysql 镜像初始化库/账号仍用 clas。Java 服务走下面的 MYSQL_*_USER / MYSQL_*_DATABASE。
   MYSQL_DATABASE: clas
-  # 未跑 isolate 前保持 clas。P3 后再按服务增加 MYSQL_IAM_USER 等，勿在 isolate 前改默认值。
   MYSQL_USER: clas
+  MYSQL_IAM_USER: clas_iam_app
+  MYSQL_MERCHANT_USER: clas_merchant_app
+  MYSQL_CATALOG_USER: clas_catalog_app
+  MYSQL_ORDER_USER: clas_order_app
+  MYSQL_COMPAT_USER: clas_compat_app
+  MYSQL_IAM_DATABASE: clas_iam
+  MYSQL_MERCHANT_DATABASE: clas_merchant
+  MYSQL_CATALOG_DATABASE: clas_catalog
+  MYSQL_ORDER_DATABASE: clas_order
+  MYSQL_COMPAT_DATABASE: clas_compat
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   CHAT_MODERATION_TIMEOUT_MS: "3000"

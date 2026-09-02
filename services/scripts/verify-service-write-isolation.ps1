@@ -58,14 +58,20 @@ function Write-Log([string]$Message) {
 }
 
 function Invoke-Mysql {
-    param([string]$User, [string]$Password, [string]$Sql)
+    param(
+        [string]$User,
+        [string]$Password,
+        [string]$Sql,
+        [string]$Db = $Database
+    )
     $tmpSql = Join-Path $env:TEMP ("clas-svc-sql-" + [guid]::NewGuid().ToString("N") + ".sql")
     $tmpOut = Join-Path $env:TEMP ("clas-svc-out-" + [guid]::NewGuid().ToString("N") + ".txt")
     $tmpErr = Join-Path $env:TEMP ("clas-svc-err-" + [guid]::NewGuid().ToString("N") + ".txt")
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($tmpSql, "SET NAMES utf8mb4;`r`n" + $Sql + "`r`n", $utf8NoBom)
+    $dbArg = if ($Db) { $Db } else { "" }
     try {
-        cmd /c "`"$MysqlExe`" --default-character-set=utf8mb4 -h $HostName -u $User -p`"$Password`" $Database < `"$tmpSql`" > `"$tmpOut`" 2> `"$tmpErr`""
+        cmd /c "`"$MysqlExe`" --default-character-set=utf8mb4 -h $HostName -u $User -p`"$Password`" $dbArg < `"$tmpSql`" > `"$tmpOut`" 2> `"$tmpErr`""
         $stdout = if (Test-Path $tmpOut) { Get-Content $tmpOut -Raw -ErrorAction SilentlyContinue } else { "" }
         $stderr = if (Test-Path $tmpErr) { Get-Content $tmpErr -Raw -ErrorAction SilentlyContinue } else { "" }
         return [pscustomobject]@{
@@ -78,8 +84,8 @@ function Invoke-Mysql {
     }
 }
 
-function Assert-Denied([string]$User, [string]$Sql, [string]$Label) {
-    $result = Invoke-Mysql -User $User -Password $passwords[$User] -Sql $Sql
+function Assert-Denied([string]$User, [string]$Sql, [string]$Label, [string]$Db) {
+    $result = Invoke-Mysql -User $User -Password $passwords[$User] -Sql $Sql -Db $Db
     $combined = "$($result.Stdout)$($result.Stderr)"
     if ($result.ExitCode -eq 0) {
         throw "EXPECTED DENY failed: $Label (`n$combined)"
@@ -87,24 +93,24 @@ function Assert-Denied([string]$User, [string]$Sql, [string]$Label) {
     if ($combined -notmatch "1142|1044|denied") {
         throw "EXPECTED privilege error for $Label, got: $combined"
     }
-    Write-Log "PASS deny $Label ($User) exit=$($result.ExitCode)"
+    Write-Log "PASS deny $Label ($User@$Db) exit=$($result.ExitCode)"
     Write-Log ("  " + ($combined.Trim() -replace "\s+", " "))
 }
 
-function Assert-Allowed([string]$User, [string]$Sql, [string]$Label) {
+function Assert-Allowed([string]$User, [string]$Sql, [string]$Label, [string]$Db = $Database) {
     $password = if ($User -eq $AdminUser) { $AdminPassword } else { $passwords[$User] }
-    $result = Invoke-Mysql -User $User -Password $password -Sql $Sql
+    $result = Invoke-Mysql -User $User -Password $password -Sql $Sql -Db $Db
     $combined = "$($result.Stdout)$($result.Stderr)"
     if ($result.ExitCode -ne 0) {
         throw "EXPECTED ALLOW failed: $Label (`n$combined)"
     }
-    Write-Log "PASS allow $Label ($User)"
+    Write-Log "PASS allow $Label ($User@$Db)"
     if ($result.Stdout) {
         Write-Log ("  " + ($result.Stdout.Trim() -replace "\s+", " "))
     }
 }
 
-Write-Log "Host=$HostName Database=$Database"
+Write-Log "Host=$HostName fallbackDatabase=$Database"
 Write-Log "AdminUser=$AdminUser AppUser=$AppUser"
 
 Assert-Allowed $AdminUser @"
@@ -113,17 +119,23 @@ SHOW DATABASES LIKE 'clas_merchant';
 SHOW DATABASES LIKE 'clas_catalog';
 SHOW DATABASES LIKE 'clas_order';
 SHOW DATABASES LIKE 'clas_compat';
+SELECT TABLE_SCHEMA, COUNT(*) AS n
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA IN ('clas_iam','clas_merchant','clas_catalog','clas_order','clas_compat')
+  AND TABLE_TYPE='BASE TABLE'
+GROUP BY TABLE_SCHEMA
+ORDER BY TABLE_SCHEMA;
 SELECT User, Host FROM mysql.user
 WHERE User IN ('clas_app','clas_iam_app','clas_merchant_app','clas_catalog_app','clas_order_app','clas_compat_app')
 ORDER BY User, Host;
-"@ "schema and users exist"
+"@ "schema, moved tables, and users exist" "clas"
 
-Assert-Allowed $AppUser "SELECT COUNT(*) AS user_rows FROM user;" "clas_app SELECT user"
-Assert-Denied $AppUser "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_app__', 'p3', 'x', 'USER', 0);" "clas_app INSERT user"
-Assert-Denied $AppUser "INSERT INTO merchant (user_id, merchant_name, phone, created_at, updated_at) VALUES ('__clas_p3_app__', 'p3', '__clas_p3_app__', NOW(), NOW());" "clas_app INSERT merchant"
-Assert-Denied $AppUser "INSERT INTO product (merchant_id, name, price, stock, created_at, updated_at) VALUES (-1, '__clas_p3_app__', 1, 0, NOW(), NOW());" "clas_app INSERT product"
-Assert-Denied $AppUser "INSERT INTO orders (user_id, merchant_id, total_price, status, create_time) VALUES ('__clas_p3_app__', 1, 1, 'CANCELED', NOW());" "clas_app INSERT orders"
-Assert-Denied $AppUser "INSERT INTO announcement (title, content, create_time) VALUES ('__clas_p3_app__', 'probe', NOW());" "clas_app INSERT announcement"
+Assert-Allowed $AppUser "SELECT COUNT(*) AS user_rows FROM user;" "clas_app SELECT user" "clas_iam"
+Assert-Denied $AppUser "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_app__', 'p3', 'x', 'USER', 0);" "clas_app INSERT user" "clas_iam"
+Assert-Denied $AppUser "INSERT INTO merchant (user_id, merchant_name, phone, created_at, updated_at) VALUES ('__clas_p3_app__', 'p3', '__clas_p3_app__', NOW(), NOW());" "clas_app INSERT merchant" "clas_merchant"
+Assert-Denied $AppUser "INSERT INTO product (merchant_id, name, price, stock, created_at, updated_at) VALUES (-1, '__clas_p3_app__', 1, 0, NOW(), NOW());" "clas_app INSERT product" "clas_catalog"
+Assert-Denied $AppUser "INSERT INTO orders (user_id, merchant_id, total_price, status, create_time) VALUES ('__clas_p3_app__', 1, 1, 'CANCELED', NOW());" "clas_app INSERT orders" "clas_order"
+Assert-Denied $AppUser "INSERT INTO announcement (title, content, create_time) VALUES ('__clas_p3_app__', 'probe', NOW());" "clas_app INSERT announcement" "clas_compat"
 
 Assert-Allowed "clas_iam_app" @"
 INSERT INTO user (phone, username, password, role, enabled)
@@ -131,9 +143,9 @@ VALUES ('__clas_p3_iam__', 'p3probe', 'x', 'USER', 0);
 UPDATE user SET nickname = 'p3-ok' WHERE phone = '__clas_p3_iam__';
 DELETE FROM user WHERE phone = '__clas_p3_iam__';
 SELECT 'clas_iam_app write ok' AS result;
-"@ "clas_iam_app INSERT/UPDATE/DELETE user"
-Assert-Denied "clas_iam_app" "INSERT INTO merchant (user_id, merchant_name, phone, created_at, updated_at) VALUES ('__clas_p3_iam__', 'p3', '__clas_p3_iam__', NOW(), NOW());" "clas_iam_app INSERT merchant"
-Assert-Denied "clas_iam_app" "INSERT INTO orders (user_id, merchant_id, total_price, status, create_time) VALUES ('__clas_p3_iam__', 1, 1, 'CANCELED', NOW());" "clas_iam_app INSERT orders"
+"@ "clas_iam_app INSERT/UPDATE/DELETE user" "clas_iam"
+Assert-Denied "clas_iam_app" "INSERT INTO merchant (user_id, merchant_name, phone, created_at, updated_at) VALUES ('__clas_p3_iam__', 'p3', '__clas_p3_iam__', NOW(), NOW());" "clas_iam_app INSERT merchant" "clas_merchant"
+Assert-Denied "clas_iam_app" "INSERT INTO orders (user_id, merchant_id, total_price, status, create_time) VALUES ('__clas_p3_iam__', 1, 1, 'CANCELED', NOW());" "clas_iam_app INSERT orders" "clas_order"
 
 Assert-Allowed "clas_merchant_app" @"
 INSERT INTO merchant (user_id, merchant_name, phone, created_at, updated_at)
@@ -141,9 +153,9 @@ VALUES ('__clas_p3_mch__', 'p3probe', '__clas_p3_mch__', NOW(), NOW());
 UPDATE merchant SET admin_remarks = 'p3-ok' WHERE user_id = '__clas_p3_mch__';
 DELETE FROM merchant WHERE user_id = '__clas_p3_mch__';
 SELECT 'clas_merchant_app write ok' AS result;
-"@ "clas_merchant_app INSERT/UPDATE/DELETE merchant"
-Assert-Denied "clas_merchant_app" "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_mch__', 'p3', 'x', 'USER', 0);" "clas_merchant_app INSERT user"
-Assert-Denied "clas_merchant_app" "INSERT INTO product (merchant_id, name, price, stock, created_at, updated_at) VALUES (-1, '__clas_p3_mch__', 1, 0, NOW(), NOW());" "clas_merchant_app INSERT product"
+"@ "clas_merchant_app INSERT/UPDATE/DELETE merchant" "clas_merchant"
+Assert-Denied "clas_merchant_app" "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_mch__', 'p3', 'x', 'USER', 0);" "clas_merchant_app INSERT user" "clas_iam"
+Assert-Denied "clas_merchant_app" "INSERT INTO product (merchant_id, name, price, stock, created_at, updated_at) VALUES (-1, '__clas_p3_mch__', 1, 0, NOW(), NOW());" "clas_merchant_app INSERT product" "clas_catalog"
 
 Assert-Allowed "clas_catalog_app" @"
 INSERT INTO product (merchant_id, name, price, stock, created_at, updated_at)
@@ -151,9 +163,9 @@ VALUES (-1, '__clas_p3_cat__', 1, 0, NOW(), NOW());
 UPDATE product SET stock = 2 WHERE name = '__clas_p3_cat__' AND merchant_id = -1;
 DELETE FROM product WHERE name = '__clas_p3_cat__' AND merchant_id = -1;
 SELECT 'clas_catalog_app write ok' AS result;
-"@ "clas_catalog_app INSERT/UPDATE/DELETE product"
-Assert-Denied "clas_catalog_app" "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_cat__', 'p3', 'x', 'USER', 0);" "clas_catalog_app INSERT user"
-Assert-Denied "clas_catalog_app" "INSERT INTO merchant (user_id, merchant_name, phone, created_at, updated_at) VALUES ('__clas_p3_cat__', 'p3', '__clas_p3_cat__', NOW(), NOW());" "clas_catalog_app INSERT merchant"
+"@ "clas_catalog_app INSERT/UPDATE/DELETE product" "clas_catalog"
+Assert-Denied "clas_catalog_app" "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_cat__', 'p3', 'x', 'USER', 0);" "clas_catalog_app INSERT user" "clas_iam"
+Assert-Denied "clas_catalog_app" "INSERT INTO merchant (user_id, merchant_name, phone, created_at, updated_at) VALUES ('__clas_p3_cat__', 'p3', '__clas_p3_cat__', NOW(), NOW());" "clas_catalog_app INSERT merchant" "clas_merchant"
 
 Assert-Allowed "clas_order_app" @"
 INSERT INTO orders (user_id, merchant_id, total_price, status, create_time)
@@ -161,9 +173,9 @@ VALUES ('__clas_p3_ord__', 1, 1, 'CANCELED', NOW());
 UPDATE orders SET remark = 'p3-ok' WHERE user_id = '__clas_p3_ord__';
 DELETE FROM orders WHERE user_id = '__clas_p3_ord__';
 SELECT 'clas_order_app write ok' AS result;
-"@ "clas_order_app INSERT/UPDATE/DELETE orders"
-Assert-Denied "clas_order_app" "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_ord__', 'p3', 'x', 'USER', 0);" "clas_order_app INSERT user"
-Assert-Denied "clas_order_app" "INSERT INTO announcement (title, content, create_time) VALUES ('__clas_p3_ord__', 'probe', NOW());" "clas_order_app INSERT announcement"
+"@ "clas_order_app INSERT/UPDATE/DELETE orders" "clas_order"
+Assert-Denied "clas_order_app" "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_ord__', 'p3', 'x', 'USER', 0);" "clas_order_app INSERT user" "clas_iam"
+Assert-Denied "clas_order_app" "INSERT INTO announcement (title, content, create_time) VALUES ('__clas_p3_ord__', 'probe', NOW());" "clas_order_app INSERT announcement" "clas_compat"
 
 Assert-Allowed "clas_compat_app" @"
 INSERT INTO announcement (title, content, create_time)
@@ -171,9 +183,9 @@ VALUES ('__clas_p3_cmp__', 'probe', NOW());
 UPDATE announcement SET status = 'PUBLISHED' WHERE title = '__clas_p3_cmp__';
 DELETE FROM announcement WHERE title = '__clas_p3_cmp__';
 SELECT 'clas_compat_app write ok' AS result;
-"@ "clas_compat_app INSERT/UPDATE/DELETE announcement"
-Assert-Denied "clas_compat_app" "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_cmp__', 'p3', 'x', 'USER', 0);" "clas_compat_app INSERT user"
-Assert-Denied "clas_compat_app" "INSERT INTO orders (user_id, merchant_id, total_price, status, create_time) VALUES ('__clas_p3_cmp__', 1, 1, 'CANCELED', NOW());" "clas_compat_app INSERT orders"
+"@ "clas_compat_app INSERT/UPDATE/DELETE announcement" "clas_compat"
+Assert-Denied "clas_compat_app" "INSERT INTO user (phone, username, password, role, enabled) VALUES ('__clas_p3_cmp__', 'p3', 'x', 'USER', 0);" "clas_compat_app INSERT user" "clas_iam"
+Assert-Denied "clas_compat_app" "INSERT INTO orders (user_id, merchant_id, total_price, status, create_time) VALUES ('__clas_p3_cmp__', 1, 1, 'CANCELED', NOW());" "clas_compat_app INSERT orders" "clas_order"
 
 Write-Log "All privilege assertions passed."
 
@@ -182,8 +194,8 @@ if (-not $SkipEvidence) {
     $stamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
     $evidence = Join-Path $EvidenceDir "service-write-isolation-$stamp.txt"
     @(
-        "CLAS #36 P3 service write isolation",
-        "host=$HostName database=$Database",
+        "CLAS #36 P3 private-schema write isolation",
+        "host=$HostName fallback_database=$Database",
         "app_user=$AppUser",
         ""
     ) + $log | Set-Content -Path $evidence -Encoding utf8
