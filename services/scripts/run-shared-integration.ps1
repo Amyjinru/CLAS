@@ -9,6 +9,7 @@ $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ServicesRoot = Split-Path -Parent $ScriptRoot
 $RepoRoot = Split-Path -Parent $ServicesRoot
 $EvidenceDir = Join-Path $RepoRoot "docs\evidence"
+$DatabaseDir = Join-Path $RepoRoot "database"
 $StartScript = Join-Path $ScriptRoot "start-services.ps1"
 $StopScript = Join-Path $ScriptRoot "stop-services.ps1"
 $BootstrapScript = Join-Path $ScriptRoot "bootstrap-db.ps1"
@@ -58,6 +59,35 @@ function Wait-MysqlReady {
         Start-Sleep -Seconds 2
     }
     throw "Temporary MySQL was not ready within 60 seconds"
+}
+
+function Invoke-DockerMysqlFile {
+    param([string]$Password, [string]$FileName)
+    docker exec $MysqlContainer sh -c "mysql --default-character-set=utf8mb4 -h 127.0.0.1 -uroot -p'$Password' clas < /tmp/clas-database/$FileName"
+    if ($LASTEXITCODE -ne 0) { throw "MySQL import failed in Docker: $FileName" }
+}
+
+function Bootstrap-DatabaseInDocker {
+    param([string]$Password)
+    docker cp $DatabaseDir "${MysqlContainer}:/tmp/clas-database"
+    if ($LASTEXITCODE -ne 0) { throw "Unable to copy database scripts into $MysqlContainer" }
+    docker exec $MysqlContainer mysql --default-character-set=utf8mb4 -h 127.0.0.1 -uroot "-p$Password" -e "DROP DATABASE IF EXISTS clas; CREATE DATABASE clas DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    if ($LASTEXITCODE -ne 0) { throw "Unable to recreate temporary CLAS database" }
+    Invoke-DockerMysqlFile $Password "schema.sql"
+    foreach ($migration in @(
+        "migration-20260825-rider-delivery.sql",
+        "migration-20260826-order-lifecycle.sql",
+        "migration-20260827-order-refund-dispute.sql",
+        "migration-20260828-order-delivery-contact.sql",
+        "migration-20260902-order-create-idempotency.sql"
+    )) {
+        if (Test-Path (Join-Path $DatabaseDir $migration)) {
+            Invoke-DockerMysqlFile $Password $migration
+        }
+    }
+    Get-ChildItem $DatabaseDir -Filter "seed-*.sql" | Sort-Object Name | ForEach-Object {
+        Invoke-DockerMysqlFile $Password $_.Name
+    }
 }
 
 function Get-HealthSnapshot {
@@ -137,7 +167,13 @@ try {
 
     Push-Location $ScriptRoot
     try {
-        & $BootstrapScript -HostName "127.0.0.1" -Port $MysqlPort -Password $password -Database "clas" -SkipEnvFile
+        $localMysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+        if (Test-Path $localMysql) {
+            & $BootstrapScript -MysqlExe $localMysql -HostName "127.0.0.1" -Port $MysqlPort -Password $password -Database "clas" -SkipEnvFile
+        } else {
+            Add-Step "Local mysql.exe unavailable; bootstrapping with the temporary MySQL container"
+            Bootstrap-DatabaseInDocker $password
+        }
         $env:MYSQL_HOST = "127.0.0.1"
         $env:MYSQL_PORT = "$MysqlPort"
         $env:MYSQL_DATABASE = "clas"
