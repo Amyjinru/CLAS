@@ -231,16 +231,34 @@ public class UserService {
     }
 
     public void grantRole(String userId, String role) {
-        UserRole existing = userRoleMapper.selectOne(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId).eq(UserRole::getRole, role));
+        upsertRoleStatus(userId, role, "APPROVED");
+    }
+
+    public void upsertRoleStatus(String userId, String role, String status) {
+        if (userId == null || userId.isBlank() || role == null || role.isBlank()) {
+            throw new BusinessException("用户或角色不能为空");
+        }
+        String nextStatus = status == null || status.isBlank() ? "APPROVED" : status.trim().toUpperCase();
+        if (!java.util.Set.of("PENDING", "APPROVED", "DISABLED", "REJECTED").contains(nextStatus)) {
+            throw new BusinessException("角色状态只能是 PENDING、APPROVED、DISABLED 或 REJECTED");
+        }
+        UserRole existing = userRoleMapper.selectOne(new LambdaQueryWrapper<UserRole>()
+            .eq(UserRole::getUserId, userId)
+            .eq(UserRole::getRole, role));
+        LocalDateTime now = LocalDateTime.now();
         if (existing == null) {
             UserRole userRole = new UserRole();
             userRole.setUserId(userId);
             userRole.setRole(role);
-            userRole.setStatus("APPROVED");
-            userRole.setCreatedAt(LocalDateTime.now());
-            userRole.setUpdatedAt(LocalDateTime.now());
+            userRole.setStatus(nextStatus);
+            userRole.setCreatedAt(now);
+            userRole.setUpdatedAt(now);
             userRoleMapper.insert(userRole);
+            return;
         }
+        existing.setStatus(nextStatus);
+        existing.setUpdatedAt(now);
+        userRoleMapper.updateById(existing);
     }
 
     private LoginResponse loginResponse(User user, String activeRole, String deviceId, List<String> roles) {

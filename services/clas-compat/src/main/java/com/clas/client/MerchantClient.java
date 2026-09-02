@@ -68,6 +68,19 @@ public class MerchantClient {
         return stats == null ? Map.of() : stats;
     }
 
+    public Map<String, Long> getAdminStats() {
+        Map<String, Long> stats = get("/stats/admin", new ParameterizedTypeReference<Result<Map<String, Long>>>() {});
+        return stats == null ? Map.of() : stats;
+    }
+
+    public List<Merchant> topByScore(int limit) {
+        List<Merchant> merchants = get(
+            "/merchants/top-by-score?limit=" + limit,
+            new ParameterizedTypeReference<Result<List<Merchant>>>() {}
+        );
+        return merchants == null ? List.of() : merchants;
+    }
+
     private <T> T get(String path, ParameterizedTypeReference<Result<T>> type) {
         try {
             ResponseEntity<Result<T>> response = restTemplate.exchange(

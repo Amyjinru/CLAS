@@ -1,6 +1,5 @@
 package com.clas.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.common.GeoUtils;
@@ -11,7 +10,6 @@ import com.clas.entity.Orders;
 import com.clas.entity.RiderProfile;
 import com.clas.client.MerchantClient;
 import com.clas.client.OrderClient;
-import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.RiderProfileMapper;
 import com.clas.entity.RiderAuditLog;
 import com.clas.mapper.RiderAuditLogMapper;
@@ -29,9 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RiderDispatchService {
     private static final int TASK_RADIUS_METERS = 5000;
-    private static final List<String> ACTIVE_STATES = List.of("ASSIGNED_WAITING_MEAL", "DELIVERING");
-    private final OrdersMapper orders; private final MerchantClient merchantClient; private final RiderProfileMapper profiles; private final RiderLocationService locations; private final RiderAuditLogMapper audits; private final DeliveryTrackingService tracking; private final NotificationBridge notifications; private final AmapRouteService amap; private final OrderClient orderClient;
-    public RiderDispatchService(OrdersMapper orders, MerchantClient merchantClient, RiderProfileMapper profiles, RiderLocationService locations, RiderAuditLogMapper audits, DeliveryTrackingService tracking, NotificationBridge notifications, AmapRouteService amap, OrderClient orderClient) { this.orders = orders; this.merchantClient = merchantClient; this.profiles = profiles; this.locations = locations; this.audits = audits; this.tracking = tracking; this.notifications = notifications; this.amap = amap; this.orderClient = orderClient; }
+    private final OrderClient orderClient; private final MerchantClient merchantClient; private final RiderProfileMapper profiles; private final RiderLocationService locations; private final RiderAuditLogMapper audits; private final DeliveryTrackingService tracking; private final NotificationBridge notifications; private final AmapRouteService amap;
+    public RiderDispatchService(OrderClient orderClient, MerchantClient merchantClient, RiderProfileMapper profiles, RiderLocationService locations, RiderAuditLogMapper audits, DeliveryTrackingService tracking, NotificationBridge notifications, AmapRouteService amap) { this.orderClient = orderClient; this.merchantClient = merchantClient; this.profiles = profiles; this.locations = locations; this.audits = audits; this.tracking = tracking; this.notifications = notifications; this.amap = amap; }
 
     public List<Orders> activeDeliveries() {
         locations.approvedProfile();
@@ -76,7 +73,7 @@ public class RiderDispatchService {
 
     public List<RiderTaskResponse> nearbyTasks(String sort) {
         RiderProfile rider = requireOnlineLocated(locations.approvedProfile(), false);
-        List<RiderTaskResponse> candidates = orders.selectList(new LambdaQueryWrapper<Orders>().eq(Orders::getStatus, "ACCEPTED").eq(Orders::getDeliveryStatus, "AVAILABLE"))
+        List<RiderTaskResponse> candidates = orderClient.listDispatchPool()
             .stream().map(order -> nearby(order, rider)).filter(java.util.Objects::nonNull)
             .toList();
         return switch (sort == null ? "SMART" : sort.toUpperCase()) {
@@ -92,9 +89,9 @@ public class RiderDispatchService {
     public Orders claim(Long orderId) {
         String riderId = UserContext.getUserId();
         RiderProfile rider = requireOnlineLocated(profiles.selectByUserIdForUpdate(riderId), true);
-        long active = orders.selectCount(new LambdaQueryWrapper<Orders>().eq(Orders::getRiderId, riderId).in(Orders::getDeliveryStatus, ACTIVE_STATES));
+        long active = orderClient.countActiveOrders(riderId, "ASSIGNED_WAITING_MEAL,DELIVERING");
         if (active >= rider.getMaxActiveOrders()) throw new BusinessException("骑手当前配送单已达上限", DomainErrorCode.RIDER_CAPACITY_REACHED);
-        Orders order = orders.selectById(orderId);
+        Orders order = orderClient.getOrder(orderId);
         if (order == null || !"ACCEPTED".equals(order.getStatus()) || !"AVAILABLE".equals(order.getDeliveryStatus()) || order.getRiderId() != null) throw unavailable();
         Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
         if (merchant == null || !GeoUtils.hasCoordinate(merchant.getLongitude(), merchant.getLatitude())) throw unavailable();
@@ -134,7 +131,7 @@ public class RiderDispatchService {
         Merchant merchant = merchantClient.getMerchant(task.merchantId());
         BigDecimal[] merchantStop = merchant == null ? null : coordinate(merchant.getLongitude(), merchant.getLatitude());
         if (merchantStop != null) route.add(merchantStop);
-        Orders candidate = orders.selectById(task.orderId());
+        Orders candidate = orderClient.getOrder(task.orderId());
         if (candidate != null) {
             BigDecimal[] customerStop = coordinate(candidate.getDeliveryLongitude(), candidate.getDeliveryLatitude());
             if (customerStop != null) route.add(customerStop);
@@ -169,7 +166,7 @@ public class RiderDispatchService {
             .map(AmapRouteService.RouteEstimate::distanceMeters)
             .orElseGet(() -> GeoUtils.distanceMeters(fromLatitude, fromLongitude, toLatitude, toLongitude));
     }
-    private List<Orders> activeOrders(String riderId) { return orders.selectList(new LambdaQueryWrapper<Orders>().eq(Orders::getRiderId, riderId).in(Orders::getDeliveryStatus, ACTIVE_STATES)); }
+    private List<Orders> activeOrders(String riderId) { return orderClient.listActiveOrders(riderId); }
     private RiderProfile requireOnlineLocated(RiderProfile rider, boolean requireAcceptingOrders) {
         if (rider == null || !"APPROVED".equals(rider.getStatus())) throw new BusinessException(403, "骑手身份尚未审核通过或已被停用");
         if (!Boolean.TRUE.equals(rider.getOnlineStatus())) throw new BusinessException("骑手当前未上线");

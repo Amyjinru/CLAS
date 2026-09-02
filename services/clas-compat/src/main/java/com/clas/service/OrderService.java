@@ -1,12 +1,12 @@
 package com.clas.service;
 
+import com.clas.client.OrderClient;
 import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.entity.Orders;
-import com.clas.mapper.OrdersMapper;
 import org.springframework.stereotype.Service;
 
-/** compat 侧订单读取与鉴权（共享库只读）。 */
+/** compat 侧订单读取与鉴权，一律走 clas-order 内部查询 API。 */
 @Service
 public class OrderService {
     public static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
@@ -18,14 +18,14 @@ public class OrderService {
     public static final String STATUS_REFUNDED = "REFUNDED";
     public static final String STATUS_REFUND_PENDING = "REFUND_PENDING";
 
-    private final OrdersMapper ordersMapper;
+    private final OrderClient orderClient;
 
-    public OrderService(OrdersMapper ordersMapper) {
-        this.ordersMapper = ordersMapper;
+    public OrderService(OrderClient orderClient) {
+        this.orderClient = orderClient;
     }
 
     public Orders requireOrder(Long orderId) {
-        Orders order = ordersMapper.selectById(orderId);
+        Orders order = orderClient.getOrder(orderId);
         if (order == null) {
             throw new BusinessException("订单不存在");
         }

@@ -45,7 +45,7 @@ services/
 2. [x] 迁 iam（User/Address/Favorite/Notification…）— 已编译通过，待联调
 3. [x] 迁 catalog（Merchant/Product/Booking/Deal 发布）— 已编译通过；OrderClient 已对接 internal API
 4. [x] 迁 order（Cart/Order/Payment/Coupon/Deal 购买/Review）— 已编译通过；CompatClient 已对接佣金 internal API
-5. [x] 迁 compat（Rider/Delivery/Chat/Admin/Announcement/Public）— 已编译通过；骑手履约写已改 `/internal/order/v1`（#49）；Admin 统计仍 SELECT
+5. [x] 迁 compat（Rider/Delivery/Chat/Admin/Announcement/Public）— 已编译通过；骑手履约写已改 `/internal/order/v1`（#49）；Admin/统计/骑手读已改各 owner 内部 API（#36）
 6. [x] Nginx 四服务路由（`services/nginx/clas-gateway.conf` + 启动脚本）
 7. [x] 主路径联调脚本与文档（`scripts/smoke-main-path.ps1`、`docs/主路径联调.md`）；网关冒烟 + 前端 dev 已验证
 8. [x] 打 `monolith-start`（`d2f77a9` · 单体/容器化基线，无 `services/`）

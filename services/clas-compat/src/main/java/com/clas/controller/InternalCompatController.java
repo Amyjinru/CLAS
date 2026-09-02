@@ -1,11 +1,11 @@
 package com.clas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.clas.client.OrderClient;
 import com.clas.common.Result;
 import com.clas.dto.RoleApplicationRecordResponse;
 import com.clas.entity.Orders;
 import com.clas.entity.RiderApplication;
-import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.RiderApplicationMapper;
 import com.clas.service.RiderApplicationService;
 import com.clas.service.RiderSettlementService;
@@ -22,18 +22,18 @@ public class InternalCompatController {
     private final RiderApplicationMapper riderApplicationMapper;
     private final RiderApplicationService riderApplicationService;
     private final RiderSettlementService riderSettlementService;
-    private final OrdersMapper ordersMapper;
+    private final OrderClient orderClient;
 
     public InternalCompatController(
         RiderApplicationMapper riderApplicationMapper,
         RiderApplicationService riderApplicationService,
         RiderSettlementService riderSettlementService,
-        OrdersMapper ordersMapper
+        OrderClient orderClient
     ) {
         this.riderApplicationMapper = riderApplicationMapper;
         this.riderApplicationService = riderApplicationService;
         this.riderSettlementService = riderSettlementService;
-        this.ordersMapper = ordersMapper;
+        this.orderClient = orderClient;
     }
 
     @GetMapping("/users/{userId}/rider-pending")
@@ -51,27 +51,24 @@ public class InternalCompatController {
 
     @PostMapping("/orders/{orderId}/commission/withdrawable")
     public Result<Void> makeCommissionWithdrawable(@PathVariable Long orderId) {
-        Orders order = requireOrder(orderId);
-        riderSettlementService.makeCommissionWithdrawable(order);
+        riderSettlementService.makeCommissionWithdrawable(requireOrder(orderId));
         return Result.ok();
     }
 
     @PostMapping("/orders/{orderId}/commission/reverse")
     public Result<Void> reverseCommissionForRefund(@PathVariable Long orderId) {
-        Orders order = requireOrder(orderId);
-        riderSettlementService.reverseCommissionForRefund(order);
+        riderSettlementService.reverseCommissionForRefund(requireOrder(orderId));
         return Result.ok();
     }
 
     @PostMapping("/orders/{orderId}/commission/release")
     public Result<Void> releaseCommissionIfEligible(@PathVariable Long orderId) {
-        Orders order = requireOrder(orderId);
-        riderSettlementService.releaseCommissionIfEligible(order);
+        riderSettlementService.releaseCommissionIfEligible(requireOrder(orderId));
         return Result.ok();
     }
 
     private Orders requireOrder(Long orderId) {
-        Orders order = ordersMapper.selectById(orderId);
+        Orders order = orderClient.getOrder(orderId);
         if (order == null) {
             throw new com.clas.common.BusinessException("订单不存在");
         }

@@ -10,7 +10,6 @@ import com.clas.entity.Orders;
 import com.clas.entity.RiderProfile;
 import com.clas.client.MerchantClient;
 import com.clas.client.OrderClient;
-import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.RiderProfileMapper;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -21,14 +20,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class DeliveryTrackingService {
     private static final Duration LOCATION_STALE_AFTER = Duration.ofMinutes(1);
-    private final OrdersMapper orders;
+    private final OrderClient orderClient;
     private final MerchantClient merchantClient;
     private final RiderProfileMapper riders;
     private final AmapRouteService amap;
-    private final OrderClient orderClient;
 
-    public DeliveryTrackingService(OrdersMapper orders, MerchantClient merchantClient, RiderProfileMapper riders, AmapRouteService amap, OrderClient orderClient) {
-        this.orders = orders; this.merchantClient = merchantClient; this.riders = riders; this.amap = amap; this.orderClient = orderClient;
+    public DeliveryTrackingService(OrderClient orderClient, MerchantClient merchantClient, RiderProfileMapper riders, AmapRouteService amap) {
+        this.orderClient = orderClient; this.merchantClient = merchantClient; this.riders = riders; this.amap = amap;
     }
 
     public DeliveryTrackingResponse tracking(Long orderId) {
@@ -81,7 +79,7 @@ public class DeliveryTrackingService {
     }
 
     private Orders requireAuthorizedOrder(Long orderId) {
-        Orders order = orders.selectById(orderId);
+        Orders order = orderClient.getOrder(orderId);
         if (order == null) throw new BusinessException("订单不存在", DomainErrorCode.RESOURCE_NOT_FOUND);
         String userId = UserContext.getUserId(); String role = UserContext.getRole();
         boolean authorized = "ADMIN".equals(role)

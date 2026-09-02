@@ -86,6 +86,17 @@ public class InternalMerchantService {
         merchantMapper.updateById(merchant);
     }
 
+    public long countAll() {
+        return merchantMapper.selectCount(null);
+    }
+
+    public List<Merchant> topByScore(int limit) {
+        int size = Math.max(1, Math.min(limit, 50));
+        return merchantMapper.selectList(new LambdaQueryWrapper<Merchant>()
+            .orderByDesc(Merchant::getScore)
+            .last("LIMIT " + size));
+    }
+
     private String merchantApplicationStatus(String status) {
         if ("OPEN".equals(status) || "CLOSED".equals(status) || "APPROVED".equals(status)) {
             return APPROVED;

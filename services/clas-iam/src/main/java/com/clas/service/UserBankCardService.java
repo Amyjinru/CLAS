@@ -58,6 +58,14 @@ public class UserBankCardService {
         return toResponse(card);
     }
 
+    public boolean ownedBy(Long cardId, String userId) {
+        if (cardId == null || userId == null || userId.isBlank()) {
+            return false;
+        }
+        UserBankCard card = userBankCardMapper.selectById(cardId);
+        return card != null && userId.equals(card.getUserId());
+    }
+
     public void delete(Long id) {
         String userId = UserContext.getUserId();
         int deleted = userBankCardMapper.delete(new LambdaQueryWrapper<UserBankCard>()

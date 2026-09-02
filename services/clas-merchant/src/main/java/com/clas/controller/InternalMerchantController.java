@@ -80,4 +80,14 @@ public class InternalMerchantController {
             .eq(Merchant::getStatus, MerchantStatusEnum.OPEN));
         return Result.ok(Map.of("merchants", merchants));
     }
+
+    @GetMapping("/stats/admin")
+    public Result<Map<String, Long>> adminStats() {
+        return Result.ok(Map.of("merchants", internalMerchantService.countAll()));
+    }
+
+    @GetMapping("/merchants/top-by-score")
+    public Result<List<Merchant>> topByScore(@RequestParam(defaultValue = "10") int limit) {
+        return Result.ok(internalMerchantService.topByScore(limit));
+    }
 }

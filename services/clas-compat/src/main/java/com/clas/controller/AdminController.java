@@ -1,70 +1,71 @@
 package com.clas.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.clas.client.IamClient;
+import com.clas.client.OrderClient;
 import com.clas.common.BusinessException;
 import com.clas.common.Result;
 import com.clas.config.RequireRole;
-import com.clas.dto.*;
-import com.clas.entity.*;
-import com.clas.mapper.*;
+import com.clas.config.UserContext;
+import com.clas.dto.AdminReviewRecord;
+import com.clas.dto.DashboardStats;
+import com.clas.dto.InternalPage;
+import com.clas.dto.InternalUserProfile;
+import com.clas.dto.MerchantRankingDTO;
+import com.clas.dto.OrderStatsDTO;
+import com.clas.dto.PenaltyRequest;
+import com.clas.dto.RefundDisputeAuditRequest;
+import com.clas.dto.SalesOverviewDTO;
+import com.clas.dto.TopProductDTO;
 import com.clas.entity.Appeal;
 import com.clas.entity.DeletedReviewBackup;
+import com.clas.entity.OrderRefundDispute;
+import com.clas.entity.Orders;
+import com.clas.entity.Review;
 import com.clas.entity.ReviewDeleteRequest;
 import com.clas.entity.UserPenalty;
 import com.clas.service.AppealService;
 import com.clas.service.PenaltyService;
 import com.clas.service.StatisticsService;
-import com.clas.config.UserContext;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.*;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.time.LocalDate;
-import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 管理员后台统一控制器
- * 所有接口均需 ADMIN 角色
- */
 @RestController
 @RequestMapping("/api/admin")
 @RequireRole("ADMIN")
 public class AdminController {
-
     private final StatisticsService statisticsService;
-    private final UserMapper userMapper;
-    private final OrdersMapper ordersMapper;
-    private final OrderItemMapper orderItemMapper;
-    private final MerchantMapper merchantMapper;
-    private final ReviewMapper reviewMapper;
-    private final ProductMapper productMapper;
+    private final IamClient iamClient;
+    private final OrderClient orderClient;
     private final PenaltyService penaltyService;
     private final AppealService appealService;
 
     public AdminController(
         StatisticsService statisticsService,
-        UserMapper userMapper,
-        OrdersMapper ordersMapper,
-        OrderItemMapper orderItemMapper,
-        MerchantMapper merchantMapper,
-        ReviewMapper reviewMapper,
-        ProductMapper productMapper,
+        IamClient iamClient,
+        OrderClient orderClient,
         PenaltyService penaltyService,
         AppealService appealService
     ) {
         this.statisticsService = statisticsService;
-        this.userMapper = userMapper;
-        this.ordersMapper = ordersMapper;
-        this.orderItemMapper = orderItemMapper;
-        this.merchantMapper = merchantMapper;
-        this.reviewMapper = reviewMapper;
-        this.productMapper = productMapper;
+        this.iamClient = iamClient;
+        this.orderClient = orderClient;
         this.penaltyService = penaltyService;
         this.appealService = appealService;
     }
@@ -73,8 +74,6 @@ public class AdminController {
         return new BusinessException(503, "评价/退款争议管理请通过 order 服务处理");
     }
 
-    // ==================== 仪表盘 ====================
-
     @GetMapping("/dashboard")
     public Result<DashboardStats> dashboard(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -82,8 +81,6 @@ public class AdminController {
     ) {
         return Result.ok(statisticsService.getDashboardStats(startDate, endDate));
     }
-
-    // ==================== 订单统计 ====================
 
     @GetMapping("/stats/orders")
     public Result<OrderStatsDTO> orderStats(
@@ -111,8 +108,6 @@ public class AdminController {
         return Result.ok(statisticsService.getTopProducts());
     }
 
-    // ==================== 订单管理 ====================
-
     @GetMapping("/order-refund-disputes")
     public Result<List<OrderRefundDispute>> orderRefundDisputes(@RequestParam(required = false) String status) {
         throw orderDomainUnavailable();
@@ -135,45 +130,8 @@ public class AdminController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
         @RequestParam(required = false) String keyword
     ) {
-        LambdaQueryWrapper<Orders> wrapper = new LambdaQueryWrapper<>();
-        if (status != null && !status.isBlank()) {
-            wrapper.eq(Orders::getStatus, status);
-        }
-        if (deliveryStatus != null && !deliveryStatus.isBlank()) {
-            wrapper.eq(Orders::getDeliveryStatus, deliveryStatus);
-        }
-        if (startDate != null) {
-            wrapper.ge(Orders::getCreateTime, startDate.atStartOfDay());
-        }
-        if (endDate != null) {
-            wrapper.le(Orders::getCreateTime, endDate.atTime(LocalTime.MAX));
-        }
-        if (keyword != null && !keyword.isBlank()) {
-            String normalizedKeyword = keyword.trim();
-            wrapper.and(w -> {
-                w.like(Orders::getUserId, normalizedKeyword)
-                    .or()
-                    .like(Orders::getDeliveryAddress, normalizedKeyword);
-                try {
-                    Long numeric = Long.valueOf(normalizedKeyword);
-                    w.or().eq(Orders::getId, numeric).or().eq(Orders::getMerchantId, numeric);
-                } catch (NumberFormatException ignored) {
-                    // Non-numeric keywords only search text fields.
-                }
-            });
-        }
-        wrapper.orderByDesc(Orders::getCreateTime);
-
-        Page<Orders> result = ordersMapper.selectPage(new Page<>(page, size), wrapper);
-        return Result.ok(Map.of(
-            "records", result.getRecords(),
-            "total", result.getTotal(),
-            "page", result.getCurrent(),
-            "size", result.getSize()
-        ));
+        return Result.ok(toPage(orderClient.listAdminOrders(page, size, status, deliveryStatus, startDate, endDate, keyword)));
     }
-
-    // ==================== 用户管理 ====================
 
     @GetMapping("/users")
     public Result<Map<String, Object>> listUsers(
@@ -183,49 +141,16 @@ public class AdminController {
         @RequestParam(required = false) Boolean enabled,
         @RequestParam(required = false) String keyword
     ) {
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        if (role != null && !role.isBlank()) {
-            wrapper.eq(User::getRole, role);
-        }
-        if (enabled != null) {
-            wrapper.eq(User::getEnabled, enabled);
-        }
-        if (keyword != null && !keyword.isBlank()) {
-            String normalizedKeyword = keyword.trim();
-            wrapper.and(w -> w.like(User::getPhone, normalizedKeyword)
-                .or()
-                .like(User::getUsername, normalizedKeyword)
-                .or()
-                .like(User::getNickname, normalizedKeyword));
-        }
-        wrapper.orderByAsc(User::getPhone);
-        wrapper.select(User.class, info -> !"password".equals(info.getColumn()));
-
-        Page<User> result = userMapper.selectPage(new Page<>(page, size), wrapper);
-        return Result.ok(Map.of(
-            "records", result.getRecords(),
-            "total", result.getTotal(),
-            "page", result.getCurrent(),
-            "size", result.getSize()
-        ));
+        return Result.ok(toPage(iamClient.listUsers(page, size, role, enabled, keyword)));
     }
 
     @PutMapping("/users/{phone}/status")
-    public Result<User> toggleUserStatus(@PathVariable String phone, @RequestBody Map<String, Boolean> body) {
-        User user = userMapper.selectById(phone);
-        if (user == null) {
-            throw new BusinessException("用户不存在");
-        }
+    public Result<InternalUserProfile> toggleUserStatus(@PathVariable String phone, @RequestBody Map<String, Boolean> body) {
         if (!body.getOrDefault("enabled", true)) {
             throw new BusinessException("请使用账户封禁处罚接口，并提供原因和时长");
         }
-        penaltyService.restoreAccount(phone, UserContext.getUserId());
-        user = userMapper.selectById(phone);
-        user.setPassword(null);
-        return Result.ok(user);
+        return Result.ok(iamClient.restoreAccount(phone, UserContext.getUserId()));
     }
-
-    // ==================== 评价管理 ====================
 
     @GetMapping("/reviews")
     public Result<Map<String, Object>> listReviews(
@@ -234,55 +159,30 @@ public class AdminController {
         @RequestParam(required = false) String reportStatus,
         @RequestParam(required = false) String keyword
     ) {
-        LambdaQueryWrapper<Review> wrapper = new LambdaQueryWrapper<>();
-        if (reportStatus != null && !reportStatus.isBlank()) {
-            wrapper.eq(Review::getReportStatus, reportStatus);
-        }
-        if (keyword != null && !keyword.isBlank()) {
-            String normalizedKeyword = keyword.trim();
-            wrapper.and(w -> w.like(Review::getUserId, normalizedKeyword)
-                .or()
-                .like(Review::getContent, normalizedKeyword)
-                .or()
-                .like(Review::getReportReason, normalizedKeyword));
-        }
-        wrapper.orderByDesc(Review::getId);
-
-        Page<Review> result = reviewMapper.selectPage(new Page<>(page, size), wrapper);
-
-        // 补充关联信息
-        // 批量预加载关联数据，消除 N+1
-        java.util.Set<Long> orderIds = result.getRecords().stream().map(Review::getOrderId).collect(java.util.stream.Collectors.toSet());
-        java.util.Set<String> userIds = result.getRecords().stream().map(Review::getUserId).collect(java.util.stream.Collectors.toSet());
-        java.util.Map<Long, Orders> orderMap = ordersMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Orders>().in(Orders::getId, orderIds))
-            .stream().collect(java.util.stream.Collectors.toMap(Orders::getId, o -> o));
-        java.util.Map<String, User> userMap = userMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<User>().in(User::getPhone, userIds))
-            .stream().collect(java.util.stream.Collectors.toMap(User::getPhone, u -> u));
-
-        List<Map<String, Object>> enrichedRecords = result.getRecords().stream().map(r -> {
-            Orders order = orderMap.get(r.getOrderId());
-            User user = userMap.get(r.getUserId());
-            Map<String, Object> map = new java.util.HashMap<>();
-            map.put("id", r.getId());
-            map.put("orderId", r.getOrderId());
-            map.put("userId", r.getUserId());
-            map.put("username", user != null ? user.getUsername() : "未知");
-            map.put("score", r.getScore());
-            map.put("content", r.getContent());
-            map.put("merchantReply", r.getMerchantReply());
-            map.put("reportReason", r.getReportReason());
-            map.put("reportStatus", r.getReportStatus());
-            map.put("merchantId", order != null ? order.getMerchantId() : null);
+        InternalPage<AdminReviewRecord> result = orderClient.listAdminReviews(page, size, reportStatus, keyword);
+        Map<String, InternalUserProfile> users = iamClient.getUserProfiles(
+            result.records().stream().map(AdminReviewRecord::userId).distinct().toList()
+        );
+        List<Map<String, Object>> enriched = result.records().stream().map(review -> {
+            InternalUserProfile user = users.get(review.userId());
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", review.id());
+            map.put("orderId", review.orderId());
+            map.put("userId", review.userId());
+            map.put("username", user != null && user.username() != null ? user.username() : "未知");
+            map.put("score", review.score());
+            map.put("content", review.content());
+            map.put("merchantReply", review.merchantReply());
+            map.put("reportReason", review.reportReason());
+            map.put("reportStatus", review.reportStatus());
+            map.put("merchantId", review.merchantId());
             return map;
         }).toList();
-
         return Result.ok(Map.of(
-            "records", enrichedRecords,
-            "total", result.getTotal(),
-            "page", result.getCurrent(),
-            "size", result.getSize()
+            "records", enriched,
+            "total", result.total(),
+            "page", result.page(),
+            "size", result.size()
         ));
     }
 
@@ -317,7 +217,7 @@ public class AdminController {
     @PostMapping("/users/{phone}/penalties")
     public Result<UserPenalty> applyPenalty(@PathVariable String phone, @Valid @RequestBody PenaltyRequest request) {
         PenaltyRequest payload = new PenaltyRequest(phone, request.penaltyType(), request.reason(), request.durationHours());
-        return Result.ok(penaltyService.applyPenalty(payload, com.clas.config.UserContext.getUserId()));
+        return Result.ok(penaltyService.applyPenalty(payload, UserContext.getUserId()));
     }
 
     @PostMapping("/users/{phone}/account-ban/restore")
@@ -328,7 +228,7 @@ public class AdminController {
 
     @PostMapping("/penalties/{id}/revoke")
     public Result<Void> revokePenalty(@PathVariable Long id) {
-        penaltyService.revokePenalty(id, com.clas.config.UserContext.getUserId());
+        penaltyService.revokePenalty(id, UserContext.getUserId());
         return Result.ok();
     }
 
@@ -343,11 +243,9 @@ public class AdminController {
             id,
             body.getOrDefault("status", "APPROVED"),
             body.get("adminReply"),
-            com.clas.config.UserContext.getUserId()
+            UserContext.getUserId()
         ));
     }
-
-    // ==================== CSV 导出 ====================
 
     @GetMapping("/export/users")
     public void exportUsers(
@@ -356,26 +254,17 @@ public class AdminController {
         @RequestParam(required = false) String keyword,
         HttpServletResponse response
     ) throws IOException {
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        if (role != null && !role.isBlank()) wrapper.eq(User::getRole, role);
-        if (enabled != null) wrapper.eq(User::getEnabled, enabled);
-        if (keyword != null && !keyword.isBlank()) {
-            String nk = keyword.trim();
-            wrapper.and(w -> w.like(User::getPhone, nk).or().like(User::getUsername, nk).or().like(User::getNickname, nk));
-        }
-        wrapper.orderByAsc(User::getPhone);
-        List<User> users = userMapper.selectList(wrapper);
-
+        List<InternalUserProfile> users = iamClient.exportUsers(role, enabled, keyword);
         setCsvHeaders(response, "users.csv");
         PrintWriter w = response.getWriter();
         w.println("﻿手机号,用户名,角色,状态,昵称");
-        for (User u : users) {
+        for (InternalUserProfile user : users) {
             w.println(String.join(",",
-                csvEscape(u.getPhone()),
-                csvEscape(u.getUsername()),
-                csvEscape(u.getRole()),
-                Boolean.TRUE.equals(u.getEnabled()) ? "启用" : "禁用",
-                csvEscape(u.getNickname() != null ? u.getNickname() : "")
+                csvEscape(user.phone()),
+                csvEscape(user.username()),
+                csvEscape(user.role()),
+                Boolean.TRUE.equals(user.enabled()) ? "启用" : "禁用",
+                csvEscape(user.nickname() != null ? user.nickname() : "")
             ));
         }
         w.flush();
@@ -390,22 +279,7 @@ public class AdminController {
         @RequestParam(required = false) String keyword,
         HttpServletResponse response
     ) throws IOException {
-        LambdaQueryWrapper<Orders> wrapper = new LambdaQueryWrapper<>();
-        if (status != null && !status.isBlank()) wrapper.eq(Orders::getStatus, status);
-        if (deliveryStatus != null && !deliveryStatus.isBlank()) wrapper.eq(Orders::getDeliveryStatus, deliveryStatus);
-        if (startDate != null) wrapper.ge(Orders::getCreateTime, startDate.atStartOfDay());
-        if (endDate != null) wrapper.le(Orders::getCreateTime, endDate.atTime(LocalTime.MAX));
-        if (keyword != null && !keyword.isBlank()) {
-            String nk = keyword.trim();
-            wrapper.and(w -> {
-                w.like(Orders::getUserId, nk).or().like(Orders::getDeliveryAddress, nk);
-                try { w.or().eq(Orders::getId, Long.valueOf(nk)).or().eq(Orders::getMerchantId, Long.valueOf(nk)); }
-                catch (NumberFormatException ignored) {}
-            });
-        }
-        wrapper.orderByDesc(Orders::getCreateTime);
-        List<Orders> orders = ordersMapper.selectList(wrapper);
-
+        List<Orders> orders = orderClient.exportOrders(status, deliveryStatus, startDate, endDate, keyword);
         setCsvHeaders(response, "orders.csv");
         PrintWriter w = response.getWriter();
         w.println("﻿订单ID,用户手机,商家ID,金额(分),状态,配送状态,退款状态,创建时间,收货地址");
@@ -431,31 +305,32 @@ public class AdminController {
         @RequestParam(required = false) String keyword,
         HttpServletResponse response
     ) throws IOException {
-        LambdaQueryWrapper<Review> wrapper = new LambdaQueryWrapper<>();
-        if (reportStatus != null && !reportStatus.isBlank()) wrapper.eq(Review::getReportStatus, reportStatus);
-        if (keyword != null && !keyword.isBlank()) {
-            String nk = keyword.trim();
-            wrapper.and(w -> w.like(Review::getUserId, nk).or().like(Review::getContent, nk).or().like(Review::getReportReason, nk));
-        }
-        wrapper.orderByDesc(Review::getId);
-        List<Review> reviews = reviewMapper.selectList(wrapper);
-
+        List<AdminReviewRecord> reviews = orderClient.exportReviews(reportStatus, keyword);
         setCsvHeaders(response, "reviews.csv");
         PrintWriter w = response.getWriter();
         w.println("﻿评价ID,订单ID,用户手机,评分,内容,举报原因,举报状态,创建时间");
-        for (Review r : reviews) {
+        for (AdminReviewRecord r : reviews) {
             w.println(String.join(",",
-                String.valueOf(r.getId()),
-                String.valueOf(r.getOrderId()),
-                csvEscape(r.getUserId()),
-                String.valueOf(r.getScore()),
-                csvEscape(r.getContent() != null ? r.getContent() : ""),
-                csvEscape(r.getReportReason() != null ? r.getReportReason() : ""),
-                csvEscape(r.getReportStatus()),
-                csvEscape(r.getCreatedAt() != null ? r.getCreatedAt().toString() : "")
+                String.valueOf(r.id()),
+                String.valueOf(r.orderId()),
+                csvEscape(r.userId()),
+                String.valueOf(r.score()),
+                csvEscape(r.content() != null ? r.content() : ""),
+                csvEscape(r.reportReason() != null ? r.reportReason() : ""),
+                csvEscape(r.reportStatus()),
+                csvEscape(r.createdAt() != null ? r.createdAt().toString() : "")
             ));
         }
         w.flush();
+    }
+
+    private Map<String, Object> toPage(InternalPage<?> page) {
+        return Map.of(
+            "records", page.records(),
+            "total", page.total(),
+            "page", page.page(),
+            "size", page.size()
+        );
     }
 
     private void setCsvHeaders(HttpServletResponse response, String filename) {

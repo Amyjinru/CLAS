@@ -1,9 +1,11 @@
 package com.clas.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.clas.client.IamClient;
 import com.clas.common.BusinessException;
 import com.clas.common.PhoneValidator;
 import com.clas.config.UserContext;
+import com.clas.dto.InternalUserProfile;
 import com.clas.dto.RiderInfoResponse;
 import com.clas.dto.RiderInfoUpdateRequest;
 import com.clas.dto.RiderPhoneChangeAuditRequest;
@@ -16,7 +18,6 @@ import com.clas.entity.User;
 import com.clas.mapper.RiderProfileChangeRequestMapper;
 import com.clas.mapper.RiderProfileMapper;
 import com.clas.mapper.RiderReviewMapper;
-import com.clas.mapper.UserMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -27,17 +28,17 @@ public class RiderInfoService {
     private final RiderProfileMapper profiles;
     private final RiderReviewMapper reviews;
     private final RiderProfileChangeRequestMapper changeRequests;
-    private final UserMapper users;
+    private final IamClient iamClient;
     private final UserProfileService userProfileService;
     private final NotificationBridge notifications;
 
     public RiderInfoService(RiderProfileMapper profiles, RiderReviewMapper reviews,
-                            RiderProfileChangeRequestMapper changeRequests, UserMapper users,
+                            RiderProfileChangeRequestMapper changeRequests, IamClient iamClient,
                             UserProfileService userProfileService, NotificationBridge notifications) {
         this.profiles = profiles;
         this.reviews = reviews;
         this.changeRequests = changeRequests;
-        this.users = users;
+        this.iamClient = iamClient;
         this.userProfileService = userProfileService;
         this.notifications = notifications;
     }
@@ -171,8 +172,17 @@ public class RiderInfoService {
     }
 
     private User requireUser(String riderId) {
-        User user = users.selectById(riderId);
-        if (user == null) throw new BusinessException("用户不存在");
+        InternalUserProfile profile = iamClient.getUserProfile(riderId);
+        if (profile == null) {
+            throw new BusinessException("用户不存在");
+        }
+        User user = new User();
+        user.setPhone(profile.phone());
+        user.setUsername(profile.username());
+        user.setRole(profile.role());
+        user.setEnabled(profile.enabled());
+        user.setNickname(profile.nickname());
+        user.setAvatar(profile.avatar());
         return user;
     }
 

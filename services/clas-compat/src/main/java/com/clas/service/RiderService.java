@@ -1,12 +1,9 @@
 package com.clas.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.client.OrderClient;
 import com.clas.dto.OrderResponse;
 import com.clas.entity.OrderItem;
 import com.clas.entity.Orders;
-import com.clas.mapper.OrderItemMapper;
-import com.clas.mapper.OrdersMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -15,31 +12,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RiderService {
-    private final OrdersMapper ordersMapper;
-    private final OrderItemMapper orderItemMapper;
     private final OrderClient orderClient;
 
-    public RiderService(OrdersMapper ordersMapper, OrderItemMapper orderItemMapper, OrderClient orderClient) {
-        this.ordersMapper = ordersMapper;
-        this.orderItemMapper = orderItemMapper;
+    public RiderService(OrderClient orderClient) {
         this.orderClient = orderClient;
     }
 
     /** 最小用例：只展示已被商家接单、正在备餐且尚未指派的订单。 */
     public List<OrderResponse> listAvailableOrders() {
-        List<Orders> orders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
-            .eq(Orders::getStatus, OrderService.STATUS_ACCEPTED)
-            .eq(Orders::getDeliveryStatus, "PREPARING")
-            .isNull(Orders::getRiderId)
-            .orderByAsc(Orders::getAcceptedAt));
-        return withItems(orders);
+        return withItems(orderClient.listAvailablePreparing());
     }
 
     public List<OrderResponse> listMyOrders(String riderId) {
-        List<Orders> orders = ordersMapper.selectList(new LambdaQueryWrapper<Orders>()
-            .eq(Orders::getRiderId, riderId)
-            .orderByDesc(Orders::getRiderAcceptedAt));
-        return withItems(orders);
+        return withItems(orderClient.listRiderOrders(riderId));
     }
 
     @Transactional
@@ -47,17 +32,12 @@ public class RiderService {
         return withItems(orderClient.claim(orderId, riderId, "PREPARING"));
     }
 
-    // TODO(rider-next): 实现到店、取餐、送达状态机，并与用户/商家通知联动。
-    // TODO(rider-next): 引入骑手在线状态、实时位置、距离排序、收益统计与调度策略。
-
     private List<OrderResponse> withItems(List<Orders> orders) {
         if (orders.isEmpty()) {
             return List.of();
         }
         List<Long> orderIds = orders.stream().map(Orders::getId).toList();
-        Map<Long, List<OrderItem>> itemsByOrderId = orderItemMapper.selectList(
-                new LambdaQueryWrapper<OrderItem>().in(OrderItem::getOrderId, orderIds))
-            .stream()
+        Map<Long, List<OrderItem>> itemsByOrderId = orderClient.listItemsByOrderIds(orderIds).stream()
             .collect(Collectors.groupingBy(OrderItem::getOrderId));
         return orders.stream()
             .map(order -> new OrderResponse(order, itemsByOrderId.getOrDefault(order.getId(), List.of())))
@@ -65,8 +45,6 @@ public class RiderService {
     }
 
     private OrderResponse withItems(Orders order) {
-        List<OrderItem> items = orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>()
-            .eq(OrderItem::getOrderId, order.getId()));
-        return new OrderResponse(order, items);
+        return new OrderResponse(order, orderClient.listItems(order.getId()));
     }
 }

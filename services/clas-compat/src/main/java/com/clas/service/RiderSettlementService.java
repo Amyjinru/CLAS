@@ -1,10 +1,9 @@
 package com.clas.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.clas.client.OrderClient;
 import com.clas.entity.Orders;
 import com.clas.entity.RiderProfile;
 import com.clas.entity.RiderSettlement;
-import com.clas.mapper.OrdersMapper;
 import com.clas.mapper.RiderProfileMapper;
 import com.clas.mapper.RiderSettlementMapper;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,8 +17,8 @@ public class RiderSettlementService {
     private static final String COMMISSION = "DELIVERY_COMMISSION";
     private final RiderSettlementMapper settlements;
     private final RiderProfileMapper profiles;
-    private final OrdersMapper orders;
-    public RiderSettlementService(RiderSettlementMapper settlements, RiderProfileMapper profiles, OrdersMapper orders) { this.settlements = settlements; this.profiles = profiles; this.orders = orders; }
+    private final OrderClient orderClient;
+    public RiderSettlementService(RiderSettlementMapper settlements, RiderProfileMapper profiles, OrderClient orderClient) { this.settlements = settlements; this.profiles = profiles; this.orderClient = orderClient; }
 
     @Transactional
     public void createPendingCommission(Orders order) {
@@ -55,12 +54,7 @@ public class RiderSettlementService {
     @Transactional
     public void releaseMaturedDeliveryCommissions() {
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(15);
-        List<Orders> delivered = orders.selectList(new LambdaQueryWrapper<Orders>()
-            .eq(Orders::getDeliveryStatus, "DELIVERED")
-            .le(Orders::getDeliveryCompletedAt, cutoff)
-            .in(Orders::getStatus, OrderService.STATUS_ACCEPTED, OrderService.STATUS_COMPLETED)
-            .and(wrapper -> wrapper.isNull(Orders::getRefundStatus)
-                .or().in(Orders::getRefundStatus, "NONE", "REJECTED")));
+        List<Orders> delivered = orderClient.listMaturedDeliveries(cutoff);
         delivered.forEach(this::releaseCommissionIfEligible);
     }
 

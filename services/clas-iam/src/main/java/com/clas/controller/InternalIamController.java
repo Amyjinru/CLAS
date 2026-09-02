@@ -1,6 +1,7 @@
 package com.clas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.clas.common.BusinessException;
 import com.clas.common.JwtUtil;
 import com.clas.common.PasswordValidator;
@@ -9,26 +10,37 @@ import com.clas.common.Result;
 import com.clas.common.VerificationCodeStore;
 import com.clas.common.dto.InternalTokenValidationRequest;
 import com.clas.common.dto.InternalValidatedUser;
+import com.clas.dto.AppealProcessRequest;
 import com.clas.dto.InternalAddressResponse;
+import com.clas.dto.InternalPage;
+import com.clas.dto.InternalUserProfile;
 import com.clas.dto.InternalUserSummary;
 import com.clas.dto.MerchantApplicantRequest;
+import com.clas.dto.PenaltyRequest;
+import com.clas.dto.RoleStatusRequest;
+import com.clas.entity.Appeal;
 import com.clas.entity.Favorite;
 import com.clas.entity.RoleApplication;
 import com.clas.entity.User;
 import com.clas.entity.UserAddress;
+import com.clas.entity.UserPenalty;
 import com.clas.mapper.FavoriteMapper;
 import com.clas.mapper.RoleApplicationMapper;
 import com.clas.mapper.UserAddressMapper;
 import com.clas.mapper.UserMapper;
+import com.clas.service.AppealService;
 import com.clas.service.PenaltyService;
+import com.clas.service.UserBankCardService;
 import com.clas.service.UserService;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,6 +55,8 @@ public class InternalIamController {
     private final RoleApplicationMapper roleApplicationMapper;
     private final UserService userService;
     private final PenaltyService penaltyService;
+    private final AppealService appealService;
+    private final UserBankCardService userBankCardService;
     private final VerificationCodeStore verificationCodeStore;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
@@ -54,6 +68,8 @@ public class InternalIamController {
         RoleApplicationMapper roleApplicationMapper,
         UserService userService,
         PenaltyService penaltyService,
+        AppealService appealService,
+        UserBankCardService userBankCardService,
         VerificationCodeStore verificationCodeStore,
         BCryptPasswordEncoder passwordEncoder,
         JwtUtil jwtUtil
@@ -64,6 +80,8 @@ public class InternalIamController {
         this.roleApplicationMapper = roleApplicationMapper;
         this.userService = userService;
         this.penaltyService = penaltyService;
+        this.appealService = appealService;
+        this.userBankCardService = userBankCardService;
         this.verificationCodeStore = verificationCodeStore;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
@@ -76,6 +94,51 @@ public class InternalIamController {
             return Result.ok(null);
         }
         return Result.ok(new InternalUserSummary(user.getPhone(), user.getUsername(), user.getRole(), user.getEnabled()));
+    }
+
+    @GetMapping("/users/{userId}/profile")
+    public Result<InternalUserProfile> getUserProfile(@PathVariable String userId) {
+        return Result.ok(toProfile(userMapper.selectById(userId)));
+    }
+
+    @GetMapping("/users")
+    public Result<InternalPage<InternalUserProfile>> listUsers(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(required = false) String role,
+        @RequestParam(required = false) Boolean enabled,
+        @RequestParam(required = false) String keyword
+    ) {
+        LambdaQueryWrapper<User> wrapper = userQuery(role, enabled, keyword);
+        wrapper.orderByAsc(User::getPhone);
+        wrapper.select(User.class, info -> !"password".equals(info.getColumn()));
+        Page<User> result = userMapper.selectPage(new Page<>(page, size), wrapper);
+        List<InternalUserProfile> records = result.getRecords().stream().map(this::toProfile).toList();
+        return Result.ok(new InternalPage<>(records, result.getTotal(), result.getCurrent(), result.getSize()));
+    }
+
+    @GetMapping("/users/export")
+    public Result<List<InternalUserProfile>> exportUsers(
+        @RequestParam(required = false) String role,
+        @RequestParam(required = false) Boolean enabled,
+        @RequestParam(required = false) String keyword
+    ) {
+        LambdaQueryWrapper<User> wrapper = userQuery(role, enabled, keyword);
+        wrapper.orderByAsc(User::getPhone);
+        wrapper.select(User.class, info -> !"password".equals(info.getColumn()));
+        return Result.ok(userMapper.selectList(wrapper).stream().map(this::toProfile).toList());
+    }
+
+    @GetMapping("/users/batch")
+    public Result<List<InternalUserProfile>> getUsersBatch(@RequestParam("ids") String ids) {
+        List<String> userIds = parseUserIds(ids);
+        if (userIds.isEmpty()) {
+            return Result.ok(List.of());
+        }
+        return Result.ok(userMapper.selectList(new LambdaQueryWrapper<User>().in(User::getPhone, userIds))
+            .stream()
+            .map(this::toProfile)
+            .toList());
     }
 
     @PostMapping("/auth/validate")
@@ -117,6 +180,16 @@ public class InternalIamController {
     @PostMapping("/users/{userId}/roles/{role}")
     public Result<Void> grantRole(@PathVariable String userId, @PathVariable String role) {
         userService.grantRole(userId, role);
+        return Result.ok();
+    }
+
+    @PutMapping("/users/{userId}/roles/{role}/status")
+    public Result<Void> upsertRoleStatus(
+        @PathVariable String userId,
+        @PathVariable String role,
+        @RequestBody RoleStatusRequest request
+    ) {
+        userService.upsertRoleStatus(userId, role, request == null ? null : request.status());
         return Result.ok();
     }
 
@@ -214,8 +287,90 @@ public class InternalIamController {
         return Result.ok(pending);
     }
 
+    @GetMapping("/bank-cards/{cardId}/owned")
+    public Result<Boolean> bankCardOwned(@PathVariable Long cardId, @RequestParam String userId) {
+        return Result.ok(userBankCardService.ownedBy(cardId, userId));
+    }
+
+    @PostMapping("/admin/penalties")
+    public Result<UserPenalty> applyPenalty(@RequestBody PenaltyRequest request, @RequestParam String adminId) {
+        return Result.ok(penaltyService.applyPenalty(request, adminId));
+    }
+
+    @PostMapping("/admin/penalties/{penaltyId}/revoke")
+    public Result<Void> revokePenalty(@PathVariable Long penaltyId, @RequestParam String adminId) {
+        penaltyService.revokePenalty(penaltyId, adminId);
+        return Result.ok();
+    }
+
+    @PostMapping("/admin/users/{userId}/restore")
+    public Result<InternalUserProfile> restoreAccount(@PathVariable String userId, @RequestParam String adminId) {
+        penaltyService.restoreAccount(userId, adminId);
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        return Result.ok(toProfile(user));
+    }
+
+    @GetMapping("/admin/appeals")
+    public Result<List<Appeal>> listPendingAppeals() {
+        return Result.ok(appealService.listPending());
+    }
+
+    @PostMapping("/admin/appeals/{appealId}/process")
+    public Result<Appeal> processAppeal(@PathVariable Long appealId, @RequestBody AppealProcessRequest request) {
+        if (request == null) {
+            throw new BusinessException("申诉处理内容不能为空");
+        }
+        return Result.ok(appealService.process(appealId, request.status(), request.adminReply(), request.adminId()));
+    }
+
     @GetMapping("/stats/public")
     public Result<Map<String, Long>> publicStats() {
         return Result.ok(Map.of("users", userMapper.selectCount(null)));
+    }
+
+    private LambdaQueryWrapper<User> userQuery(String role, Boolean enabled, String keyword) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        if (role != null && !role.isBlank()) {
+            wrapper.eq(User::getRole, role);
+        }
+        if (enabled != null) {
+            wrapper.eq(User::getEnabled, enabled);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            String normalizedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(User::getPhone, normalizedKeyword)
+                .or()
+                .like(User::getUsername, normalizedKeyword)
+                .or()
+                .like(User::getNickname, normalizedKeyword));
+        }
+        return wrapper;
+    }
+
+    private InternalUserProfile toProfile(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new InternalUserProfile(
+            user.getPhone(),
+            user.getUsername(),
+            user.getRole(),
+            user.getEnabled(),
+            user.getNickname(),
+            user.getAvatar()
+        );
+    }
+
+    private List<String> parseUserIds(String ids) {
+        if (ids == null || ids.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(ids.split(","))
+            .map(String::trim)
+            .filter(value -> !value.isBlank())
+            .toList();
     }
 }

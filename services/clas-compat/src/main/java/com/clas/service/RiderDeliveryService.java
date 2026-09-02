@@ -1,6 +1,5 @@
 package com.clas.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.clas.common.BusinessException;
 import com.clas.common.DomainErrorCode;
 import com.clas.config.UserContext;
@@ -12,8 +11,6 @@ import com.clas.entity.Product;
 import com.clas.client.CatalogClient;
 import com.clas.client.MerchantClient;
 import com.clas.client.OrderClient;
-import com.clas.mapper.OrderItemMapper;
-import com.clas.mapper.OrdersMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,15 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RiderDeliveryService {
-    private final OrdersMapper orders;
+    private final OrderClient orderClient;
     private final RiderLocationService locations;
     private final MerchantClient merchantClient;
     private final NotificationBridge notifications;
     private final RiderSettlementService settlements;
-    private final OrderItemMapper orderItems;
     private final CatalogClient catalogClient;
-    private final OrderClient orderClient;
-    public RiderDeliveryService(OrdersMapper orders, RiderLocationService locations, MerchantClient merchantClient, NotificationBridge notifications, RiderSettlementService settlements, OrderItemMapper orderItems, CatalogClient catalogClient, OrderClient orderClient) { this.orders = orders; this.locations = locations; this.merchantClient = merchantClient; this.notifications = notifications; this.settlements = settlements; this.orderItems = orderItems; this.catalogClient = catalogClient; this.orderClient = orderClient; }
+    public RiderDeliveryService(OrderClient orderClient, RiderLocationService locations, MerchantClient merchantClient, NotificationBridge notifications, RiderSettlementService settlements, CatalogClient catalogClient) { this.orderClient = orderClient; this.locations = locations; this.merchantClient = merchantClient; this.notifications = notifications; this.settlements = settlements; this.catalogClient = catalogClient; }
 
     @Transactional
     public Orders pickup(Long orderId) {
@@ -62,7 +57,7 @@ public class RiderDeliveryService {
     }
 
     private Orders owned(Long orderId) {
-        Orders order = orders.selectById(orderId);
+        Orders order = orderClient.getOrder(orderId);
         if (order == null || !UserContext.getUserId().equals(order.getRiderId())) throw new BusinessException("仅已指派骑手可操作配送任务", DomainErrorCode.DELIVERY_FORBIDDEN);
         return order;
     }
@@ -71,8 +66,7 @@ public class RiderDeliveryService {
     public RiderOrderDetailResponse detail(Long orderId) {
         Orders order = owned(orderId);
         Merchant merchant = merchantClient.getMerchant(order.getMerchantId());
-        List<OrderItem> items = orderItems.selectList(
-            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        List<OrderItem> items = orderClient.listItems(orderId);
         List<Long> productIds = items.stream().map(OrderItem::getProductId).filter(Objects::nonNull).distinct().toList();
         Map<Long, String> nameByProductId = catalogClient.getProducts(productIds).values().stream()
                 .collect(Collectors.toMap(Product::getId, Product::getName, (a, b) -> a));
