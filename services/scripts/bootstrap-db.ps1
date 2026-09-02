@@ -1,10 +1,12 @@
 param(
     [string]$MysqlExe = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe",
     [string]$HostName = "127.0.0.1",
+    [int]$Port = 3306,
     [string]$User = "root",
     [string]$Password = "",
     [string]$Database = "clas",
-    [switch]$SkipSeed
+    [switch]$SkipSeed,
+    [switch]$SkipEnvFile
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +18,7 @@ $AdminUserFromFile = $null
 $AppUserFromFile = $null
 $AdminPasswordFromFile = $null
 $PasswordFromFile = $null
-if (Test-Path $EnvFile) {
+if ((-not $SkipEnvFile) -and (Test-Path $EnvFile)) {
     Get-Content $EnvFile | ForEach-Object {
         $line = $_.Trim()
         if ($line -eq "" -or $line.StartsWith("#")) { return }
@@ -26,6 +28,7 @@ if (Test-Path $EnvFile) {
         $value = $line.Substring($idx + 1).Trim()
         switch ($name) {
             "MYSQL_HOST" { $HostName = $value }
+            "MYSQL_PORT" { $Port = [int]$value }
             "MYSQL_ADMIN_USER" { $AdminUserFromFile = $value }
             "MYSQL_USER" { $AppUserFromFile = $value }
             "MYSQL_ADMIN_PASSWORD" { $AdminPasswordFromFile = $value }
@@ -53,7 +56,7 @@ if (-not (Test-Path $schema)) {
 
 function Invoke-MysqlFile {
     param([string]$FilePath)
-    cmd /c "`"$MysqlExe`" --default-character-set=utf8mb4 -h $HostName -u $User -p`"$Password`" $Database < `"$FilePath`""
+    cmd /c "`"$MysqlExe`" --default-character-set=utf8mb4 -h $HostName -P $Port -u $User -p`"$Password`" $Database < `"$FilePath`""
     if ($LASTEXITCODE -ne 0) {
         throw "MySQL import failed: $FilePath"
     }
@@ -61,7 +64,7 @@ function Invoke-MysqlFile {
 
 Write-Host "Recreating database $Database ..."
 $createDb = "DROP DATABASE IF EXISTS ``$Database``; CREATE DATABASE ``$Database`` DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-& $MysqlExe --default-character-set=utf8mb4 -h $HostName -u $User -p"$Password" -e $createDb
+& $MysqlExe --default-character-set=utf8mb4 -h $HostName -P $Port -u $User -p"$Password" -e $createDb
 
 Write-Host "Importing schema.sql ..."
 $combined = Join-Path $env:TEMP "clas-schema-import.sql"

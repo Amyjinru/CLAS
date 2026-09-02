@@ -2,7 +2,8 @@
 param(
     [switch]$SkipBuild,
     [switch]$SkipGateway,
-    [switch]$Foreground
+    [switch]$Foreground,
+    [switch]$SkipEnvFile
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +33,9 @@ function Set-DefaultEnv {
     }
 }
 
-Import-EnvFile $EnvFile
+if (-not $SkipEnvFile) {
+    Import-EnvFile $EnvFile
+}
 Set-DefaultEnv "MYSQL_HOST" "127.0.0.1"
 Set-DefaultEnv "MYSQL_PORT" "3306"
 Set-DefaultEnv "MYSQL_DATABASE" "clas"
@@ -113,8 +116,9 @@ if (-not $SkipGateway -and -not $Foreground) {
     $nginxCmd = Get-Command nginx -ErrorAction SilentlyContinue
     $nginxExe = if ($nginxCmd) { $nginxCmd.Source } else {
         @(
-            "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\nginxinc.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\nginx-1.31.4\nginx.exe"
-        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+            "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\nginxinc.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\nginx-*\nginx.exe",
+            "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\freenginx.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\freenginx-*\nginx.exe"
+        ) | Get-ChildItem -File -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
     }
     if ($nginxExe) {
         $nginxPrefix = Join-Path $ServicesRoot "nginx"
