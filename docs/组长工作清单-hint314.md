@@ -52,6 +52,7 @@ services/
 9. [x] 服务器部署指南（`docs/服务器部署指南.md`）
 10. [x] 修订四文档（#36 按独立 merchant 更新写权与 K8s DNS）
 11. [x] P3 各服务最小权限账号（脚本 + 可回退数据源变量；表未 MOVE，集群 ConfigMap 未切）
+12. [x] 本机用 `clas_*_app` 启动五服务 + 已有单测 + Direct/网关冒烟（证据 `docs/evidence/service-isolation-start-*.txt`）
 
 ---
 

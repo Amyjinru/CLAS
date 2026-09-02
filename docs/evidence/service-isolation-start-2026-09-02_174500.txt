@@ -1,0 +1,40 @@
+CLAS #36 local start with per-service MySQL accounts
+date=2026-09-02
+host=127.0.0.1 database=clas
+git=pending-commit (see repo after push)
+
+MySQL users observed in processlist while services were up:
+- clas_iam_app
+- clas_merchant_app
+- clas_catalog_app
+- clas_order_app
+- clas_compat_app
+No clas_app write sessions. Tables still in schema clas (not MOVE).
+
+mvn -pl clas-common,clas-iam,clas-merchant,clas-catalog,clas-order,clas-compat -am test
+BUILD SUCCESS (2026-09-02T17:39:11+08:00)
+- clas-common: 2 tests
+- clas-iam: no test sources
+- clas-merchant: 2 tests
+- clas-catalog: 6 tests
+- clas-order: 5 tests
+- clas-compat: no test sources
+Total 15 tests, Failures 0, Errors 0, Skipped 0
+
+Health (isolation accounts):
+- 8081 clas-iam ok
+- 8085 clas-merchant ok
+- 8082 clas-catalog ok
+- 8083 clas-order ok
+- 8084 clas-compat ok
+- 8080 nginx gateway -> clas-iam health ok
+
+smoke-main-path.ps1 -Direct: All main-path checks passed
+smoke-main-path.ps1 (gateway :8080): All main-path checks passed
+
+Fix required to start iam under clas_iam_app:
+removed clas-iam DatabaseCompatibilityConfig (it ALTER TABLE merchant/orders/payment at boot; isolation correctly denied ALTER on merchant).
+
+Local admin also applied database/migration-20260902-order-create-idempotency.sql and migration-20260902-order-snapshots.sql so orders.client_request_key exists.
+
+Not done: physical MOVE, cluster ConfigMap MYSQL_USER=clas still unchanged, Redis was not listening on 6379 (login still passed via demo/fixed code).
