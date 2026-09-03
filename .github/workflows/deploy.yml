@@ -157,7 +157,7 @@ jobs:
           echo "RIDER_IDENTITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef"
           } > ci-compose.env
           for attempt in 1 2 3; do
-            if timeout 360s docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240; then
+            if timeout -k 30s 360s docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240; then
               break
             fi
             if [ "$attempt" -eq 3 ]; then
