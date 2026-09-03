@@ -287,7 +287,9 @@ jobs:
     name: Deploy immutable version to k3s
     needs: publish
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 恢复（5 分钟）+ 本地导入镜像（15 分钟）+ 应用部署（30 分钟）均有
+    # 独立上限；任务总时限略高于它们的和，确保失败时仍能采集诊断。
+    timeout-minutes: 60
     env:
       SERVER_HOST: 8.141.112.182
       SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
@@ -452,7 +454,9 @@ jobs:
           git checkout --detach "$CLAS_IMAGE_TAG"
           test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"
           test -s "$image_archive"
-          k3s ctr -n k8s.io images import "$image_archive"
+          # 镜像导入同样可能在磁盘或 containerd 异常时无输出地阻塞。
+          timeout --foreground --signal=TERM --kill-after=60s 900s \
+            k3s ctr -n k8s.io images import "$image_archive"
           # 远端 k3s 失去 API 响应时，不能让 SSH 会话与整个发布一直悬挂。
           # 超时后 deploy.sh 的 ERR trap 会采集诊断并尝试回滚，CI 随后上传证据。
           timeout --foreground --signal=TERM --kill-after=60s 1800s \
