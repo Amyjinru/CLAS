@@ -146,8 +146,8 @@ jobs:
         run: npm run build
 
       - name: Run clean Docker Compose smoke test
-        # 单次启动理论上最多 240 秒，连同构建与三次重试留出余量后仍必须受限。
-        timeout-minutes: 20
+        # 由 Actions 终止整个步骤，避免 Docker 构建器留下的子进程逃过 shell 级超时。
+        timeout-minutes: 8
         run: |
           {
             echo "MYSQL_DATABASE=clas"
@@ -157,18 +157,7 @@ jobs:
           echo "JWT_SECRET=0123456789abcdef0123456789abcdef"
           echo "RIDER_IDENTITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef"
           } > ci-compose.env
-          for attempt in 1 2 3; do
-            if timeout -k 30s 360s docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240; then
-              break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "Compose 镜像构建或启动连续三次失败" >&2
-              exit 1
-            fi
-            docker compose --env-file ci-compose.env down --volumes --remove-orphans || true
-            echo "Compose 启动第 ${attempt} 次失败，30 秒后重试以应对镜像仓库瞬时故障。" >&2
-            sleep 30
-          done
+          docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240
           pwsh -File scripts/compose-smoke.ps1
 
       - name: Collect Compose diagnostics
