@@ -389,7 +389,7 @@ jobs:
           retry_scp "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
           # 控制面恢复本身也必须有边界；否则 systemctl 或 SSH 会话卡住时，
           # 后续 deploy.sh 的超时保护永远不会被执行。
-          timeout 300s sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
+          timeout 480s sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
           set -a
@@ -412,6 +412,23 @@ jobs:
               systemctl status k3s --no-pager -n 100 >&2 || true
               exit 1
             fi
+          fi
+
+          # readyz 只代表 API Server 可访问，并不代表 CNI 已恢复。之前的故障
+          # 中 Flannel 的 subnet.env 缺失，导致所有新 Pod 无法创建网络沙箱。
+          flannel_ready=false
+          for _ in $(seq 1 90); do
+            if [ -s /run/flannel/subnet.env ]; then
+              flannel_ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$flannel_ready" != true ]; then
+            echo 'Flannel CNI did not restore /run/flannel/subnet.env after k3s recovery.' >&2
+            kubectl -n kube-system get pod -o wide >&2 || true
+            systemctl status k3s --no-pager -n 100 >&2 || true
+            exit 1
           fi
           REMOTE
 
