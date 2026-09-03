@@ -31,9 +31,10 @@ env:
 jobs:
   deploy-new-ecs:
     name: Deploy to new ECS (k3s microservices)
+    # 主流程里旧站 deploy 失败时，publish 仍可能成功；新站部署不应被跳过。
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'cancelled')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -47,12 +48,7 @@ jobs:
       DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
       FORBIDDEN_WORDS: ${{ secrets.FORBIDDEN_WORDS }}
       CLAS_DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
-      CLAS_IMAGE_TAG: >-
-        ${{
-          inputs.image_tag ||
-          github.event.workflow_run.head_sha ||
-          github.sha
-        }}
+      CLAS_IMAGE_TAG: ${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
     steps:
       - name: Check out deployment scripts
         uses: actions/checkout@v5
@@ -141,9 +137,22 @@ jobs:
           export CLAS_IMAGE_TAG='${{ env.CLAS_IMAGE_TAG }}'
           export CLAS_PUBLIC_URL='${{ env.NEW_ECS_PUBLIC_URL }}'
           if ! command -v k3s >/dev/null 2>&1; then
-            curl -sfL https://get.k3s.io | sudo INSTALL_K3S_EXEC='server --write-kubeconfig-mode 644' sh -
+            export INSTALL_K3S_EXEC='server --write-kubeconfig-mode 644'
+            curl -sfL https://get.k3s.io | sudo -E sh -
           fi
           export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          sudo mkdir -p /etc/rancher/k3s
+          if [[ ! -f /etc/rancher/k3s/registries.yaml ]]; then
+            sudo tee /etc/rancher/k3s/registries.yaml >/dev/null <<'REG'
+          mirrors:
+            docker.io:
+              endpoint:
+                - "https://docker.m.daocloud.io"
+                - "https://docker.1panel.live"
+          REG
+            sudo systemctl restart k3s
+            sleep 15
+          fi
           sudo mkdir -p /opt/clas-k8s
           sudo tar xzf /tmp/clas-k8s-bundle.tar.gz -C /opt/clas-k8s
           sudo mkdir -p /etc/clas
@@ -155,7 +164,6 @@ jobs:
           MYSQL_USER=root
           ENV
           fi
-          # 释放 80 端口：停止 Compose 前端（若存在）
           if [[ -f /opt/clas/docker-compose.yml ]]; then
             cd /opt/clas
             sudo docker compose stop frontend 2>/dev/null || true
@@ -163,15 +171,25 @@ jobs:
           set -a
           source /etc/clas/clas.env
           source /tmp/clas-deploy.env
+          export MYSQL_ORDER_PASSWORD="${MYSQL_ORDER_PASSWORD:-$MYSQL_PASSWORD}"
+          export MYSQL_IAM_PASSWORD="${MYSQL_IAM_PASSWORD:-$MYSQL_PASSWORD}"
+          export MYSQL_MERCHANT_PASSWORD="${MYSQL_MERCHANT_PASSWORD:-$MYSQL_PASSWORD}"
+          export MYSQL_CATALOG_PASSWORD="${MYSQL_CATALOG_PASSWORD:-$MYSQL_PASSWORD}"
+          export MYSQL_COMPAT_PASSWORD="${MYSQL_COMPAT_PASSWORD:-$MYSQL_PASSWORD}"
           set +a
+          if ! timeout 20 kubectl get --raw=/readyz >/dev/null 2>&1; then
+            sudo systemctl restart k3s
+            for _ in $(seq 1 60); do
+              timeout 5 kubectl get --raw=/readyz >/dev/null 2>&1 && break
+              sleep 2
+            done
+          fi
+          bash /tmp/clas-quiesce-apps.sh || true
           sudo k3s ctr -n k8s.io images import "/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
           cd /opt/clas-k8s
           sudo -E env CLAS_PUBLIC_URL="$CLAS_PUBLIC_URL" CLAS_STOP_LEGACY_NGINX=true bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
-          sudo kubectl -n clas patch configmap clas-config --type merge -p '{"data":{"CORS_ALLOWED_ORIGINS":"'"$CLAS_PUBLIC_URL"'"}}'
-          sudo kubectl -n clas rollout restart deployment/clas-iam deployment/clas-merchant deployment/clas-catalog deployment/clas-order deployment/clas-compat deployment/clas-gateway
-          for d in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway frontend; do
-            sudo kubectl -n clas rollout status "deployment/$d" --timeout=600s
-          done
+          sudo kubectl apply -f k8s/ingress.yaml
+          sudo kubectl -n clas get configmap clas-config -o yaml | sed "s|CORS_ALLOWED_ORIGINS: .*|CORS_ALLOWED_ORIGINS: $CLAS_PUBLIC_URL|" | sudo kubectl apply -f -
           curl -fsS "$CLAS_PUBLIC_URL/api/health"
           REMOTE
 

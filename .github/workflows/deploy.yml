@@ -287,6 +287,8 @@ jobs:
     name: Deploy immutable version to k3s
     needs: publish
     runs-on: ubuntu-latest
+    # 旧站 8.141.112.182 不可用时允许失败，不阻断 publish 与新站 deploy-new-ecs。
+    continue-on-error: true
     # 恢复（5 分钟）+ 本地导入镜像（15 分钟）+ 应用部署（30 分钟）均有
     # 独立上限；任务总时限略高于它们的和，确保失败时仍能采集诊断。
     timeout-minutes: 60
