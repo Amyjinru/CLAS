@@ -451,7 +451,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$CLAS_IMAGE_TAG"
           test -s "$image_archive"
           k3s ctr -n k8s.io images import "$image_archive"
-          bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
+          # 远端 k3s 失去 API 响应时，不能让 SSH 会话与整个发布一直悬挂。
+          # 超时后 deploy.sh 的 ERR trap 会采集诊断并尝试回滚，CI 随后上传证据。
+          timeout --foreground --signal=TERM --kill-after=60s 1800s \
+            bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
           REMOTE
 
       - name: Remove temporary server deployment inputs

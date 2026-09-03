@@ -9,6 +9,12 @@ ARTIFACT_DIR="${CLAS_DEPLOY_ARTIFACT_DIR:-$PROJECT_ROOT/artifacts/k8s-diagnostic
 DATABASE_RESTORE_FILE="${CLAS_DATABASE_RESTORE_FILE:-}"
 STOP_LEGACY_NGINX="${CLAS_STOP_LEGACY_NGINX:-false}"
 
+# 单节点 k3s 在内存紧张时可能接受 TCP 连接却不返回 API 响应。为避免发布
+# 长时间无输出地卡住，所有 kubectl 请求都必须带有限时的服务端请求截止时间。
+kubectl() {
+  command kubectl --request-timeout=30s "$@"
+}
+
 if [[ -z "$IMAGE_TAG" || "$IMAGE_TAG" == "latest" || ! "$IMAGE_TAG" =~ ^[0-9a-f]{7,64}$ ]]; then
   echo 'CLAS_IMAGE_TAG must be a Git SHA (7-64 lowercase hexadecimal characters), never latest.' >&2
   exit 2
@@ -102,7 +108,8 @@ release_interrupted=true
 # must happen at the start: on the two-core production node, leaving old Java
 # Pods running during migration can starve the k3s API server before the staged
 # zero-replica manifests are applied.
-bash "$PROJECT_ROOT/scripts/k8s/quiesce-apps.sh"
+timeout --foreground --signal=TERM --kill-after=30s 300s \
+  bash "$PROJECT_ROOT/scripts/k8s/quiesce-apps.sh"
 
 kubectl -n "$NAMESPACE" create secret generic clas-secrets \
   --from-literal=MYSQL_PASSWORD="$MYSQL_PASSWORD" \
