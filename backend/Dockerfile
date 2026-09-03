@@ -3,7 +3,12 @@ FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /workspace/backend
 
 COPY backend/pom.xml ./
-RUN mvn --batch-mode dependency:go-offline
+# Maven Central 偶发限流时最多重试两次；最终失败仍使镜像构建失败，不能掩盖依赖问题。
+RUN for attempt in 1 2 3; do \
+      mvn --batch-mode dependency:go-offline && exit 0; \
+      [ "$attempt" = 3 ] && exit 1; \
+      sleep 5; \
+    done
 
 COPY backend/src ./src
 RUN mvn --batch-mode -DskipTests package

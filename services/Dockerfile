@@ -17,7 +17,13 @@ COPY clas-order/src clas-order/src
 COPY clas-compat/src clas-compat/src
 
 ARG SERVICE_MODULE
-RUN test -n "$SERVICE_MODULE" && mvn --batch-mode -pl "$SERVICE_MODULE" -am package -DskipTests
+# 镜像构建依赖外部仓库，短暂 403/限流时重试；第三次仍失败必须阻断发布。
+RUN test -n "$SERVICE_MODULE" && \
+    for attempt in 1 2 3; do \
+      mvn --batch-mode -pl "$SERVICE_MODULE" -am package -DskipTests && exit 0; \
+      [ "$attempt" = 3 ] && exit 1; \
+      sleep 5; \
+    done
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
