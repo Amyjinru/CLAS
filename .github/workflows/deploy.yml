@@ -101,8 +101,7 @@ jobs:
   verify:
     name: Test gate
     runs-on: ubuntu-latest
-    # 冒烟测试包含镜像构建与服务健康检查；总时限避免异常 Docker 任务无限占用发布队列。
-    timeout-minutes: 35
+    timeout-minutes: 20
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -145,9 +144,17 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+  compose-smoke:
+    name: Docker Compose smoke gate
+    runs-on: ubuntu-latest
+    # GitHub Actions 仅对 Job 保证超时终止。将 Compose 独立为短时 Job，
+    # 使 Docker 子进程卡住时最多占用十分钟，且会阻断镜像发布。
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
       - name: Run clean Docker Compose smoke test
-        # 由 Actions 终止整个步骤，避免 Docker 构建器留下的子进程逃过 shell 级超时。
-        timeout-minutes: 8
         run: |
           {
             echo "MYSQL_DATABASE=clas"
@@ -182,7 +189,7 @@ jobs:
 
   publish:
     name: Build and publish immutable images
-    needs: [verify, changes]
+    needs: [verify, compose-smoke, changes]
     if: ${{ needs.changes.outputs.deploy == 'true' }}
     runs-on: ubuntu-latest
     outputs:
