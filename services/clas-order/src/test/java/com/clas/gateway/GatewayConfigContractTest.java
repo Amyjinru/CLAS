@@ -17,6 +17,7 @@ class GatewayConfigContractTest {
         assertThat(config).contains("location ^~ /api/payment { proxy_pass http://clas_order; }");
         assertThat(config).contains("location ^~ /api/coupon { proxy_pass http://clas_order; }");
         assertThat(config).contains("location ^~ /api/review { proxy_pass http://clas_order; }");
+        assertThat(config).contains("location ^~ /uploads/reviews/ { proxy_pass http://clas_order; }");
         assertThat(config).contains("proxy_set_header Authorization $http_authorization;");
         assertThat(config).contains("proxy_set_header X-Request-Id $clas_request_id;");
         assertThat(config).contains("add_header X-Request-Id $clas_request_id always;");

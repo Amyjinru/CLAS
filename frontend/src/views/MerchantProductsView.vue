@@ -238,7 +238,7 @@ onMounted(loadMerchant)
             <el-table-column label="商品图片" width="100">
               <template #default="scope">
                 <el-image
-                  :src="scope.row.imageUrl || '/images/default-product.png'"
+                  :src="scope.row.imageUrl || scope.row.image || '/images/default-product.png'"
                   fit="cover"
                   class="product-table-img"
                 >

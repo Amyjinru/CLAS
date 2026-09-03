@@ -22,6 +22,10 @@ public class Product {
     private String image;
     private String status;
 
+    public String getImageUrl() {
+        return image;
+    }
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

@@ -93,7 +93,7 @@ watch(() => props.visible, (v) => {
       price: props.product.price / 100,
       stock: props.product.stock,
       categoryId: props.product.categoryId || null,
-      imageUrl: props.product.imageUrl || ''
+      imageUrl: props.product.imageUrl || props.product.image || ''
     })
   } else {
     Object.assign(form, { id: null, name: '', description: '', price: 0, stock: 0, categoryId: null, imageUrl: '' })

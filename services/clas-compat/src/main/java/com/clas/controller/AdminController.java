@@ -70,10 +70,6 @@ public class AdminController {
         this.appealService = appealService;
     }
 
-    private BusinessException orderDomainUnavailable() {
-        return new BusinessException(503, "评价/退款争议管理请通过 order 服务处理");
-    }
-
     @GetMapping("/dashboard")
     public Result<DashboardStats> dashboard(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -110,14 +106,19 @@ public class AdminController {
 
     @GetMapping("/order-refund-disputes")
     public Result<List<OrderRefundDispute>> orderRefundDisputes(@RequestParam(required = false) String status) {
-        throw orderDomainUnavailable();
+        return Result.ok(orderClient.listRefundDisputes(status));
     }
 
     @PatchMapping("/order-refund-disputes/{id}")
     public Result<OrderRefundDispute> auditOrderRefundDispute(
         @PathVariable Long id, @Valid @RequestBody RefundDisputeAuditRequest request
     ) {
-        throw orderDomainUnavailable();
+        return Result.ok(orderClient.auditRefundDispute(
+            id,
+            request.approved(),
+            request.reason(),
+            UserContext.getUserId()
+        ));
     }
 
     @GetMapping("/orders")
@@ -188,22 +189,23 @@ public class AdminController {
 
     @DeleteMapping("/reviews/{id}")
     public Result<Void> deleteReview(@PathVariable Long id) {
-        throw orderDomainUnavailable();
+        orderClient.deleteReview(id);
+        return Result.ok();
     }
 
     @PutMapping("/reviews/{id}/report-status")
     public Result<Review> resolveReviewReport(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        throw orderDomainUnavailable();
+        return Result.ok(orderClient.resolveReviewReport(id, body.getOrDefault("status", "RESOLVED")));
     }
 
     @GetMapping("/reviews/deleted-backups")
     public Result<List<DeletedReviewBackup>> deletedBackups() {
-        throw orderDomainUnavailable();
+        return Result.ok(orderClient.listDeletedBackups());
     }
 
     @GetMapping("/reviews/delete-requests")
     public Result<List<ReviewDeleteRequest>> deleteRequests(@RequestParam(required = false) String status) {
-        throw orderDomainUnavailable();
+        return Result.ok(orderClient.listDeleteRequests(status));
     }
 
     @PostMapping("/reviews/delete-requests/{id}/process")
@@ -211,7 +213,10 @@ public class AdminController {
         @PathVariable Long id,
         @RequestBody Map<String, Object> body
     ) {
-        throw orderDomainUnavailable();
+        boolean approve = Boolean.TRUE.equals(body.get("approve"));
+        String remarks = body.get("remarks") == null ? null : String.valueOf(body.get("remarks"));
+        orderClient.processDeleteRequest(id, approve, remarks, UserContext.getUserId());
+        return Result.ok();
     }
 
     @PostMapping("/users/{phone}/penalties")

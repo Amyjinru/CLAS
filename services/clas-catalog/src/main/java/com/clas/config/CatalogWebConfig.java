@@ -1,5 +1,6 @@
 package com.clas.config;
 
+import com.clas.common.UploadsPaths;
 import com.clas.common.web.InternalServiceAuthInterceptor;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,7 +35,7 @@ public class CatalogWebConfig implements WebMvcConfigurer {
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/uploads/**")
-            .addResourceLocations("file:uploads/");
+            .addResourceLocations(UploadsPaths.resourceLocation());
     }
 
     @Override

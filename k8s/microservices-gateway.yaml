@@ -34,6 +34,7 @@ data:
         location ^~ /uploads/merchant-logo/ { proxy_pass http://clas-merchant:8085; }
         location ^~ /api/merchant { proxy_pass http://clas-merchant:8085; }
 
+        location ^~ /uploads/reviews/ { proxy_pass http://clas-order:8083; }
         location ^~ /uploads/ { proxy_pass http://clas-catalog:8082; }
         location ^~ /api/product { proxy_pass http://clas-catalog:8082; }
         location ^~ /api/bookings { proxy_pass http://clas-catalog:8082; }

@@ -46,9 +46,7 @@ public class CartService {
         if (product.getStock() < request.quantity()) {
             throw new BusinessException("????");
         }
-        Cart cart = cartMapper.selectOne(new LambdaQueryWrapper<Cart>()
-            .eq(Cart::getUserId, request.userId())
-            .eq(Cart::getProductId, request.productId()));
+        Cart cart = findOrMergeItem(request.userId(), request.productId());
         if (cart == null) {
             cart = new Cart();
             cart.setUserId(request.userId());
@@ -67,9 +65,7 @@ public class CartService {
     }
 
     public List<CartItemResponse> remove(RemoveCartRequest request) {
-        Cart cart = cartMapper.selectOne(new LambdaQueryWrapper<Cart>()
-            .eq(Cart::getUserId, request.userId())
-            .eq(Cart::getProductId, request.productId()));
+        Cart cart = findOrMergeItem(request.userId(), request.productId());
         if (cart == null) {
             throw new BusinessException("?????????");
         }
@@ -108,9 +104,9 @@ public class CartService {
     }
 
     public CartValidationResponse validate(String userId) {
-        List<Cart> cartItems = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
+        List<Cart> cartItems = mergeDuplicateRows(cartMapper.selectList(new LambdaQueryWrapper<Cart>()
             .eq(Cart::getUserId, userId)
-            .orderByAsc(Cart::getId));
+            .orderByAsc(Cart::getId)));
         List<Long> productIds = cartItems.stream().map(Cart::getProductId).toList();
         Map<Long, Product> products = productIds.isEmpty()
             ? Map.of()
@@ -153,13 +149,50 @@ public class CartService {
     }
 
     private Cart requireCartItem(String userId, Long productId) {
-        Cart cart = cartMapper.selectOne(new LambdaQueryWrapper<Cart>()
-            .eq(Cart::getUserId, userId)
-            .eq(Cart::getProductId, productId));
+        Cart cart = findOrMergeItem(userId, productId);
         if (cart == null) {
             throw new BusinessException("?????????");
         }
         return cart;
+    }
+
+    private Cart findOrMergeItem(String userId, Long productId) {
+        List<Cart> rows = cartMapper.selectList(new LambdaQueryWrapper<Cart>()
+            .eq(Cart::getUserId, userId)
+            .eq(Cart::getProductId, productId)
+            .orderByAsc(Cart::getId));
+        if (rows.isEmpty()) {
+            return null;
+        }
+        return mergeDuplicateRows(rows).get(0);
+    }
+
+    private List<Cart> mergeDuplicateRows(List<Cart> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Cart> kept = new java.util.LinkedHashMap<>();
+        List<Long> duplicateIds = new java.util.ArrayList<>();
+        for (Cart row : rows) {
+            Cart existing = kept.get(row.getProductId());
+            if (existing == null) {
+                kept.put(row.getProductId(), row);
+                continue;
+            }
+            int left = existing.getQuantity() == null ? 0 : existing.getQuantity();
+            int right = row.getQuantity() == null ? 0 : row.getQuantity();
+            existing.setQuantity(left + right);
+            duplicateIds.add(row.getId());
+        }
+        if (!duplicateIds.isEmpty()) {
+            for (Cart item : kept.values()) {
+                cartMapper.updateById(item);
+            }
+            for (Long duplicateId : duplicateIds) {
+                cartMapper.deleteById(duplicateId);
+            }
+        }
+        return List.copyOf(kept.values());
     }
 
     private CartItemResponse toResponse(Cart item, Product product, Merchant merchant) {

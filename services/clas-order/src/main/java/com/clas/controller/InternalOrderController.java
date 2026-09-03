@@ -2,6 +2,9 @@ package com.clas.controller;
 
 import com.clas.common.Result;
 import com.clas.dto.AdminReviewRecord;
+import com.clas.dto.InternalAdminCommands.ProcessDeleteRequest;
+import com.clas.dto.InternalAdminCommands.RefundDisputeAuditCommand;
+import com.clas.dto.InternalAdminCommands.ReviewReportStatusRequest;
 import com.clas.dto.InternalDeliveryCommands.AbandonRequest;
 import com.clas.dto.InternalDeliveryCommands.ActorRequest;
 import com.clas.dto.InternalDeliveryCommands.ClaimRequest;
@@ -17,10 +20,16 @@ import com.clas.dto.OrderStatsDTO;
 import com.clas.dto.ProductSalesRank;
 import com.clas.dto.SalesOverviewDTO;
 import com.clas.entity.OrderItem;
+import com.clas.entity.OrderRefundDispute;
 import com.clas.entity.Orders;
+import com.clas.entity.Review;
+import com.clas.entity.ReviewDeleteRequest;
+import com.clas.entity.DeletedReviewBackup;
 import com.clas.service.InternalOrderDeliveryService;
 import com.clas.service.InternalOrderQueryService;
+import com.clas.service.OrderRefundDisputeService;
 import com.clas.service.OrderStatisticsService;
+import com.clas.service.ReviewService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -43,15 +52,21 @@ public class InternalOrderController {
     private final OrderStatisticsService statisticsService;
     private final InternalOrderDeliveryService deliveryService;
     private final InternalOrderQueryService queryService;
+    private final ReviewService reviewService;
+    private final OrderRefundDisputeService refundDisputeService;
 
     public InternalOrderController(
         OrderStatisticsService statisticsService,
         InternalOrderDeliveryService deliveryService,
-        InternalOrderQueryService queryService
+        InternalOrderQueryService queryService,
+        ReviewService reviewService,
+        OrderRefundDisputeService refundDisputeService
     ) {
         this.statisticsService = statisticsService;
         this.deliveryService = deliveryService;
         this.queryService = queryService;
+        this.reviewService = reviewService;
+        this.refundDisputeService = refundDisputeService;
     }
 
     @GetMapping("/orders/{orderId}")
@@ -207,6 +222,60 @@ public class InternalOrderController {
         @RequestParam(required = false) String keyword
     ) {
         return Result.ok(queryService.exportReviews(reportStatus, keyword));
+    }
+
+    @GetMapping("/admin/reviews/delete-requests")
+    public Result<List<ReviewDeleteRequest>> deleteRequests(@RequestParam(required = false) String status) {
+        return Result.ok(reviewService.listDeleteRequests(status));
+    }
+
+    @PostMapping("/admin/reviews/delete-requests/{id}/process")
+    public Result<Void> processDeleteRequest(
+        @PathVariable Long id,
+        @RequestBody ProcessDeleteRequest request
+    ) {
+        reviewService.approveDeleteRequest(
+            id,
+            request == null ? null : request.adminId(),
+            request != null && request.approve(),
+            request == null ? null : request.remarks()
+        );
+        return Result.ok();
+    }
+
+    @GetMapping("/admin/reviews/deleted-backups")
+    public Result<List<DeletedReviewBackup>> deletedBackups() {
+        return Result.ok(reviewService.listDeletedBackups());
+    }
+
+    @PostMapping("/admin/reviews/{id}/delete")
+    public Result<Void> deleteReview(@PathVariable Long id) {
+        reviewService.adminDeleteReview(id);
+        return Result.ok();
+    }
+
+    @PostMapping("/admin/reviews/{id}/report-status")
+    public Result<Review> resolveReviewReport(
+        @PathVariable Long id,
+        @RequestBody ReviewReportStatusRequest request
+    ) {
+        return Result.ok(reviewService.resolveReport(id, request == null ? null : request.status()));
+    }
+
+    @GetMapping("/admin/order-refund-disputes")
+    public Result<List<OrderRefundDispute>> orderRefundDisputes(@RequestParam(required = false) String status) {
+        return Result.ok(refundDisputeService.list(status));
+    }
+
+    @PostMapping("/admin/order-refund-disputes/{id}/audit")
+    public Result<OrderRefundDispute> auditOrderRefundDispute(
+        @PathVariable Long id,
+        @RequestBody RefundDisputeAuditCommand request
+    ) {
+        boolean approved = request != null && request.approved();
+        String reason = request == null ? null : request.reason();
+        String adminId = request == null ? null : request.adminId();
+        return Result.ok(refundDisputeService.audit(id, approved, reason, adminId));
     }
 
     @GetMapping("/deliveries/available")

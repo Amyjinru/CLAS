@@ -14,7 +14,11 @@ import com.clas.dto.OrderStatsDTO;
 import com.clas.dto.ProductSalesRank;
 import com.clas.dto.SalesOverviewDTO;
 import com.clas.entity.OrderItem;
+import com.clas.entity.OrderRefundDispute;
 import com.clas.entity.Orders;
+import com.clas.entity.Review;
+import com.clas.entity.ReviewDeleteRequest;
+import com.clas.entity.DeletedReviewBackup;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
@@ -288,6 +292,82 @@ public class OrderClient {
             new ParameterizedTypeReference<Result<List<AdminReviewRecord>>>() {}
         );
         return reviews == null ? List.of() : reviews;
+    }
+
+    public List<ReviewDeleteRequest> listDeleteRequests(String status) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/admin/reviews/delete-requests");
+        if (status != null && !status.isBlank()) {
+            builder.queryParam("status", status);
+        }
+        List<ReviewDeleteRequest> requests = get(
+            builder.build().toUriString(),
+            new ParameterizedTypeReference<Result<List<ReviewDeleteRequest>>>() {}
+        );
+        return requests == null ? List.of() : requests;
+    }
+
+    public List<DeletedReviewBackup> listDeletedBackups() {
+        List<DeletedReviewBackup> backups = get(
+            "/admin/reviews/deleted-backups",
+            new ParameterizedTypeReference<Result<List<DeletedReviewBackup>>>() {}
+        );
+        return backups == null ? List.of() : backups;
+    }
+
+    public void deleteReview(Long reviewId) {
+        exchange(
+            "/admin/reviews/" + reviewId + "/delete",
+            HttpMethod.POST,
+            new HttpEntity<>(Map.of()),
+            new ParameterizedTypeReference<Result<Void>>() {}
+        );
+    }
+
+    public Review resolveReviewReport(Long reviewId, String status) {
+        return exchange(
+            "/admin/reviews/" + reviewId + "/report-status",
+            HttpMethod.POST,
+            new HttpEntity<>(Map.of("status", status == null ? "" : status)),
+            new ParameterizedTypeReference<Result<Review>>() {}
+        );
+    }
+
+    public void processDeleteRequest(Long requestId, boolean approve, String remarks, String adminId) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("approve", approve);
+        body.put("remarks", remarks == null ? "" : remarks);
+        body.put("adminId", adminId == null ? "" : adminId);
+        exchange(
+            "/admin/reviews/delete-requests/" + requestId + "/process",
+            HttpMethod.POST,
+            new HttpEntity<>(body),
+            new ParameterizedTypeReference<Result<Void>>() {}
+        );
+    }
+
+    public List<OrderRefundDispute> listRefundDisputes(String status) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/admin/order-refund-disputes");
+        if (status != null && !status.isBlank()) {
+            builder.queryParam("status", status);
+        }
+        List<OrderRefundDispute> disputes = get(
+            builder.build().toUriString(),
+            new ParameterizedTypeReference<Result<List<OrderRefundDispute>>>() {}
+        );
+        return disputes == null ? List.of() : disputes;
+    }
+
+    public OrderRefundDispute auditRefundDispute(Long disputeId, boolean approved, String reason, String adminId) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("approved", approved);
+        body.put("reason", reason == null ? "" : reason);
+        body.put("adminId", adminId == null ? "" : adminId);
+        return exchange(
+            "/admin/order-refund-disputes/" + disputeId + "/audit",
+            HttpMethod.POST,
+            new HttpEntity<>(body),
+            new ParameterizedTypeReference<Result<OrderRefundDispute>>() {}
+        );
     }
 
     public Orders claim(Long orderId, String riderId, String mode) {

@@ -964,7 +964,16 @@ public class OrderService {
         Map<Long, Product> products
     ) {
         Map<Long, Cart> cartByProductId = cartItems.stream()
-            .collect(Collectors.toMap(Cart::getProductId, item -> item));
+            .collect(Collectors.toMap(
+                Cart::getProductId,
+                item -> item,
+                (left, right) -> {
+                    int leftQty = left.getQuantity() == null ? 0 : left.getQuantity();
+                    int rightQty = right.getQuantity() == null ? 0 : right.getQuantity();
+                    left.setQuantity(leftQty + rightQty);
+                    return left;
+                }
+            ));
         List<Long> requestedProductIds = request.productIds();
         if (requestedProductIds == null) {
             List<Cart> merchantItems = cartItems.stream()
