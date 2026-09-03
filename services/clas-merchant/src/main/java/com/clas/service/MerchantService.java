@@ -6,6 +6,7 @@ import com.clas.client.CompatClient;
 import com.clas.client.IamClient;
 import com.clas.client.OrderClient;
 import com.clas.common.BusinessException;
+import com.clas.common.DomainErrorCode;
 import com.clas.common.GeoUtils;
 import com.clas.common.MerchantStatusEnum;
 import com.clas.common.PhoneValidator;
@@ -623,7 +624,10 @@ public class MerchantService {
         if (merchant == null) {
             return;
         }
-        int averagePrice = computeAveragePrice(merchantId);
+        Integer averagePrice = computeAveragePrice(merchantId);
+        if (averagePrice == null) {
+            return;
+        }
         if (!Objects.equals(merchant.getAveragePrice(), averagePrice)) {
             merchant.setAveragePrice(averagePrice);
             merchantMapper.updateById(merchant);
@@ -646,6 +650,10 @@ public class MerchantService {
                 continue;
             }
             OrderClient.CompletedOrderStats stats = completedStats.getOrDefault(merchantId, OrderClient.CompletedOrderStats.EMPTY);
+            if (stats.count() < COMPLETED_ORDER_THRESHOLD && productAverages == null) {
+                // 目录短暂不可达时沿用已持久化的展示均价，避免商家浏览被联动中断。
+                continue;
+            }
             int averagePrice = stats.count() < COMPLETED_ORDER_THRESHOLD
                 ? productAverages.getOrDefault(merchantId, 0)
                 : stats.averagePrice();
@@ -656,17 +664,25 @@ public class MerchantService {
         }
     }
 
-    private int computeAveragePrice(Long merchantId) {
+    private Integer computeAveragePrice(Long merchantId) {
         OrderClient.CompletedOrderStats stats = orderClient.getCompletedOrderStats(List.of(merchantId))
             .getOrDefault(merchantId, OrderClient.CompletedOrderStats.EMPTY);
         if (stats.count() < COMPLETED_ORDER_THRESHOLD) {
-            return loadProductAveragePrices(List.of(merchantId)).getOrDefault(merchantId, 0);
+            Map<Long, Integer> productAverages = loadProductAveragePrices(List.of(merchantId));
+            return productAverages == null ? null : productAverages.getOrDefault(merchantId, 0);
         }
         return stats.averagePrice();
     }
 
     private Map<Long, Integer> loadProductAveragePrices(Collection<Long> merchantIds) {
-        return catalogClient.getProductAveragePrices(merchantIds);
+        try {
+            return catalogClient.getProductAveragePrices(merchantIds);
+        } catch (BusinessException exception) {
+            if (exception.getHttpStatus() == 503 && DomainErrorCode.UPSTREAM_UNAVAILABLE.equals(exception.getErrorCode())) {
+                return null;
+            }
+            throw exception;
+        }
     }
 
     private int averageInt(List<Integer> values) {
