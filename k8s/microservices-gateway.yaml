@@ -30,6 +30,7 @@ data:
 
         location ^~ /api/merchant/me/products { proxy_pass http://clas-catalog:8082; }
         location ^~ /api/merchant/products { proxy_pass http://clas-catalog:8082; }
+        location ^~ /uploads/avatars/ { proxy_pass http://clas-iam:8081; }
         location ^~ /uploads/merchant-logo/ { proxy_pass http://clas-merchant:8085; }
         location ^~ /api/merchant { proxy_pass http://clas-merchant:8085; }
 
