@@ -1,5 +1,12 @@
 # Apply after namespace.yaml, configmap.yaml, secret creation, mysql.yaml and redis.yaml.
 # Replace REQUIRED_TAG with one immutable image tag before applying.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: clas-iam-uploads, namespace: clas}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 2Gi}}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,16 +34,13 @@ spec:
             - {name: CLAS_CATALOG_HOST, value: clas-catalog}
             - {name: CLAS_ORDER_HOST, value: clas-order}
             - {name: CLAS_COMPAT_HOST, value: clas-compat}
-          # Keep user avatars in the server's established uploads tree.
           # LocalFileStorage writes /app/uploads/avatars/<userId>/... .
-          volumeMounts: [{name: avatars, mountPath: /app/uploads/avatars}]
+          volumeMounts: [{name: uploads, mountPath: /app/uploads}]
           startupProbe: {httpGet: {path: /api/health, port: 8081}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 30}
           readinessProbe: {httpGet: {path: /api/health, port: 8081}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6}
           livenessProbe: {httpGet: {path: /api/health, port: 8081}, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3}
           resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
-      volumes:
-        - name: avatars
-          hostPath: {path: /opt/clas/backend/uploads/avatars, type: DirectoryOrCreate}
+      volumes: [{name: uploads, persistentVolumeClaim: {claimName: clas-iam-uploads}}]
 ---
 apiVersion: v1
 kind: Service
@@ -45,6 +49,13 @@ spec:
   type: ClusterIP
   selector: {app: clas-iam}
   ports: [{name: http, port: 8081, targetPort: 8081}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: clas-merchant-uploads, namespace: clas}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 2Gi}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -72,14 +83,12 @@ spec:
             - {name: CLAS_ORDER_HOST, value: clas-order}
             - {name: CLAS_COMPAT_HOST, value: clas-compat}
           # LocalFileStorage writes /app/uploads/merchant-logo/<merchantId>/... .
-          volumeMounts: [{name: merchant-logos, mountPath: /app/uploads/merchant-logo}]
+          volumeMounts: [{name: uploads, mountPath: /app/uploads}]
           startupProbe: {httpGet: {path: /api/health, port: 8085}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 30}
           readinessProbe: {httpGet: {path: /api/health, port: 8085}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6}
           livenessProbe: {httpGet: {path: /api/health, port: 8085}, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3}
           resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
-      volumes:
-        - name: merchant-logos
-          hostPath: {path: /opt/clas/backend/uploads/merchant-logo, type: DirectoryOrCreate}
+      volumes: [{name: uploads, persistentVolumeClaim: {claimName: clas-merchant-uploads}}]
 ---
 apiVersion: v1
 kind: Service
@@ -88,6 +97,13 @@ spec:
   type: ClusterIP
   selector: {app: clas-merchant}
   ports: [{name: http, port: 8085, targetPort: 8085}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: clas-catalog-uploads, namespace: clas}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 5Gi}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -115,14 +131,12 @@ spec:
             - {name: CLAS_ORDER_HOST, value: clas-order}
             - {name: CLAS_COMPAT_HOST, value: clas-compat}
           # LocalFileStorage writes /app/uploads/product/<merchantId>/... .
-          volumeMounts: [{name: product-images, mountPath: /app/uploads/product}]
+          volumeMounts: [{name: uploads, mountPath: /app/uploads}]
           startupProbe: {httpGet: {path: /api/health, port: 8082}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 30}
           readinessProbe: {httpGet: {path: /api/health, port: 8082}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6}
           livenessProbe: {httpGet: {path: /api/health, port: 8082}, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3}
           resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
-      volumes:
-        - name: product-images
-          hostPath: {path: /opt/clas/backend/uploads/product, type: DirectoryOrCreate}
+      volumes: [{name: uploads, persistentVolumeClaim: {claimName: clas-catalog-uploads}}]
 ---
 apiVersion: v1
 kind: Service
