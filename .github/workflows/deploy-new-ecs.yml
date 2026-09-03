@@ -53,7 +53,8 @@ jobs:
       - name: Check out deployment scripts
         uses: actions/checkout@v5
         with:
-          ref: ${{ env.CLAS_IMAGE_TAG }}
+          # 清单始终从 main 取；镜像 tag 单独用 CLAS_IMAGE_TAG。
+          ref: main
           sparse-checkout: |
             k8s
             scripts/k8s
