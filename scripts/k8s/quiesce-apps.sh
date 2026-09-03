@@ -32,7 +32,9 @@ if kubectl -n "$NAMESPACE" get pod -l "$APP_SELECTOR" -o name | grep -q .; then
     # scaled to zero, so force removal is safe and prevents the next rollout
     # from being blocked indefinitely.
     echo 'Timed out waiting for previous application Pods; force deleting remaining Pods.' >&2
-    kubectl -n "$NAMESPACE" delete pod -l "$APP_SELECTOR" --grace-period=0 --force --wait=true
+    # delete --wait=true 在 API 服务繁忙时可能无限等待，即使 Pod 已经不再提供服务。
+    # 随后的限时 wait 负责确认删除结果，避免 CI/CD 长时间卡死在恢复步骤。
+    kubectl -n "$NAMESPACE" delete pod -l "$APP_SELECTOR" --grace-period=0 --force --wait=false
     kubectl -n "$NAMESPACE" wait --for=delete pod -l "$APP_SELECTOR" --timeout=60s
   fi
 fi
