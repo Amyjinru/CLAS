@@ -46,11 +46,16 @@ spec:
               command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD --silent"]
             initialDelaySeconds: 15
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           livenessProbe:
             exec:
               command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD --silent"]
             initialDelaySeconds: 30
             periodSeconds: 15
+            # 单节点在多个 JVM 冷启动时会出现瞬时 CPU 抢占；1 秒探针超时不应重启有状态数据库。
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests: {cpu: 200m, memory: 512Mi}
             limits: {cpu: "1", memory: 1Gi}
