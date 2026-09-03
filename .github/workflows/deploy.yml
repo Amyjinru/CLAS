@@ -366,10 +366,9 @@ jobs:
           echo 'Server SSH did not recover within 10 minutes; inspect or restart the host from the cloud console.' >&2
           exit 1
 
-      - name: Recover k3s and quiesce the previous release
+      - name: Recover k3s control plane
         run: |
           deploy_env="/tmp/clas-deploy.env"
-          recovery_script="/tmp/clas-quiesce-apps.sh"
           ssh_options="-o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=8"
           retry_scp() {
             local attempt
@@ -386,16 +385,13 @@ jobs:
             return 1
           }
           retry_scp "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
-          retry_scp scripts/k8s/quiesce-apps.sh "root@${SERVER_HOST}:$recovery_script"
           sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
-          recovery_script="/tmp/clas-quiesce-apps.sh"
           set -a
           . /etc/clas/clas.env
           . "$deploy_env"
           set +a
-          trap 'rm -f "$recovery_script"' EXIT
           if ! timeout 20 kubectl get --raw=/readyz >/dev/null 2>&1; then
             echo 'k3s API is unhealthy; restarting the local control plane.'
             systemctl restart k3s
@@ -413,7 +409,6 @@ jobs:
               exit 1
             fi
           fi
-          bash "$recovery_script"
           REMOTE
 
       - name: Deploy tested image version through server-local k3s API
