@@ -469,7 +469,11 @@ jobs:
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/k8s-diagnostics"
-          sshpass -p "$SSH_PASSWORD" scp -r -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+          # 故障主机可能仍能建立 TCP 连接却无法完成 SSH 会话。诊断采集必须
+          # 有独立上限，否则失败发布会永远占用生产发布队列。
+          timeout 120s sshpass -p "$SSH_PASSWORD" scp -r \
+            -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
             "root@${SERVER_HOST}:/opt/clas-k8s/artifacts/k8s-diagnostics/." "$RUNNER_TEMP/k8s-diagnostics/" || true
 
       - name: Upload deployment diagnostics
