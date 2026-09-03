@@ -244,7 +244,9 @@ if [[ "$STOP_LEGACY_NGINX" == "true" ]]; then
     echo 'CLAS_STOP_LEGACY_NGINX requires systemd on the deployment host.' >&2
     exit 2
   fi
-  systemctl disable --now nginx
+  if systemctl list-unit-files nginx.service >/dev/null 2>&1; then
+    systemctl disable --now nginx || true
+  fi
 fi
 
 kubectl apply -f "$PROJECT_ROOT/k8s/ingress.yaml"
