@@ -4,6 +4,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 NAMESPACE="${CLAS_NAMESPACE:-clas}"
 IMAGE_TAG="${CLAS_IMAGE_TAG:-${1:-}}"
+COMPAT_IMAGE_TAG="${CLAS_COMPAT_IMAGE_TAG:-$IMAGE_TAG}"
 PUBLIC_URL="${CLAS_PUBLIC_URL:-http://8.141.112.182}"
 ARTIFACT_DIR="${CLAS_DEPLOY_ARTIFACT_DIR:-$PROJECT_ROOT/artifacts/k8s-diagnostics}"
 DATABASE_RESTORE_FILE="${CLAS_DATABASE_RESTORE_FILE:-}"
@@ -17,6 +18,10 @@ kubectl() {
 
 if [[ -z "$IMAGE_TAG" || "$IMAGE_TAG" == "latest" || ! "$IMAGE_TAG" =~ ^[0-9a-f]{7,64}$ ]]; then
   echo 'CLAS_IMAGE_TAG must be a Git SHA (7-64 lowercase hexadecimal characters), never latest.' >&2
+  exit 2
+fi
+if [[ "$COMPAT_IMAGE_TAG" == "latest" || ! "$COMPAT_IMAGE_TAG" =~ ^[0-9a-f]{7,64}$ ]]; then
+  echo 'CLAS_COMPAT_IMAGE_TAG must be a Git SHA (7-64 lowercase hexadecimal characters), never latest.' >&2
   exit 2
 fi
 
@@ -195,6 +200,11 @@ for manifest in frontend microservices microservices-gateway; do
   # start and verify each workload below. The live Deployments finish at the
   # replica counts declared by the source manifests/HPA.
   sed "s/REQUIRED_TAG/$IMAGE_TAG/g" "$PROJECT_ROOT/k8s/$manifest.yaml" > "$rendered_dir/$manifest.yaml"
+  if [[ "$manifest" == "microservices" && "$COMPAT_IMAGE_TAG" != "$IMAGE_TAG" ]]; then
+    # Compat 未变更时复用已验证镜像，避免低带宽节点重复下载大型基础层。
+    sed -i.bak "s|ghcr.io/amyjinru/clas-compat:${IMAGE_TAG}|ghcr.io/amyjinru/clas-compat:${COMPAT_IMAGE_TAG}|g" "$rendered_dir/$manifest.yaml"
+    rm -f "$rendered_dir/$manifest.yaml.bak"
+  fi
   sed -i.bak 's/^  replicas: 1$/  replicas: 0/' "$rendered_dir/$manifest.yaml"
   rm -f "$rendered_dir/$manifest.yaml.bak"
 done

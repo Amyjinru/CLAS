@@ -14,6 +14,10 @@ on:
         description: 要部署的 Git SHA（7–64 位十六进制）
         required: false
         type: string
+      compat_image_tag:
+        description: 兼容服务的已验证镜像 SHA；留空则与 image_tag 一致
+        required: false
+        type: string
   workflow_run:
     workflows: ['Build and publish CLAS']
     types: [completed]
@@ -49,6 +53,9 @@ jobs:
       FORBIDDEN_WORDS: ${{ secrets.FORBIDDEN_WORDS }}
       CLAS_DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
       CLAS_IMAGE_TAG: ${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
+      # 2 GiB 单节点下载未改动的 Compat 新镜像会拖慢整个发布。设置仓库变量时，
+      # 仅复用该已验证镜像；Compat 本身变更后应清除此变量或显式传入新 SHA。
+      CLAS_COMPAT_IMAGE_TAG: ${{ vars.CLAS_COMPAT_IMAGE_TAG || inputs.compat_image_tag || github.event.workflow_run.head_sha || github.sha }}
     steps:
       - name: Check out deployment scripts
         uses: actions/checkout@v5
@@ -108,6 +115,7 @@ jobs:
           FORBIDDEN_WORDS=$FORBIDDEN_WORDS
           CLAS_DEMO_ACCESS_PASSWORD=$CLAS_DEMO_ACCESS_PASSWORD
           CLAS_IMAGE_TAG=$CLAS_IMAGE_TAG
+          CLAS_COMPAT_IMAGE_TAG=$CLAS_COMPAT_IMAGE_TAG
           CLAS_PUBLIC_URL=$NEW_ECS_PUBLIC_URL
           CLAS_STOP_LEGACY_NGINX=true
           EOF
@@ -124,9 +132,9 @@ jobs:
         run: |
           ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ServerAliveInterval=15"
           ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" \
-            "CLAS_IMAGE_TAG=${CLAS_IMAGE_TAG} CLAS_PUBLIC_URL=${NEW_ECS_PUBLIC_URL} bash -s" <<'REMOTE'
+            "CLAS_IMAGE_TAG=${CLAS_IMAGE_TAG} CLAS_COMPAT_IMAGE_TAG=${CLAS_COMPAT_IMAGE_TAG} CLAS_PUBLIC_URL=${NEW_ECS_PUBLIC_URL} bash -s" <<'REMOTE'
           set -euo pipefail
-          export CLAS_IMAGE_TAG CLAS_PUBLIC_URL
+          export CLAS_IMAGE_TAG CLAS_COMPAT_IMAGE_TAG CLAS_PUBLIC_URL
           if ! command -v k3s >/dev/null 2>&1; then
             export INSTALL_K3S_EXEC='server --write-kubeconfig-mode 644'
             curl -sfL https://get.k3s.io | sudo -E sh -
