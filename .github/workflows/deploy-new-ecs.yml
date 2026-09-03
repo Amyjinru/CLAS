@@ -78,12 +78,20 @@ jobs:
           fi
 
       - name: Configure SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.CLAS_NEW_ECS_SSH_KEY }}
         run: |
           umask 077
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.CLAS_NEW_ECS_SSH_KEY }}" > ~/.ssh/clas_new_ecs
+          # 通过 env 注入多行 Secret，避免 inline 展开破坏 PEM 换行；去掉 Windows CRLF。
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/clas_new_ecs
           chmod 600 ~/.ssh/clas_new_ecs
+          ssh-keygen -y -f ~/.ssh/clas_new_ecs >/dev/null || {
+            echo 'CLAS_NEW_ECS_SSH_KEY is not a valid PEM private key (check copy/paste, include BEGIN/END lines)' >&2
+            exit 1
+          }
           ssh-keyscan -H "$NEW_ECS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -i ~/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o BatchMode=yes "${NEW_ECS_USER}@${NEW_ECS_HOST}" 'echo ssh_ok'
 
       - name: Pull and package images for import
         run: |
