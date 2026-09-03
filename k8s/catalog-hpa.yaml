@@ -14,17 +14,21 @@ spec:
   maxReplicas: 4
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 0
-      selectPolicy: Max
+      # Avoid reacting to short JVM start-up/request spikes on the single-node
+      # cluster.  A sustained signal must remain above target for one minute.
+      stabilizationWindowSeconds: 60
+      selectPolicy: Min
       policies:
         - type: Pods
           value: 1
-          periodSeconds: 30
+          periodSeconds: 60
         - type: Percent
           value: 100
-          periodSeconds: 60
+          periodSeconds: 120
     scaleDown:
-      stabilizationWindowSeconds: 120
+      # Keep a newly-created Pod around long enough for traffic and metrics to
+      # settle, preventing rapid 1<->2 oscillation.
+      stabilizationWindowSeconds: 300
       selectPolicy: Min
       policies:
         - type: Pods
