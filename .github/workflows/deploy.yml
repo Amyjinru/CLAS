@@ -345,6 +345,27 @@ jobs:
       - name: Install SSH client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
 
+      - name: Wait for server SSH recovery
+        shell: bash
+        run: |
+          # A busy k3s node can finish its transient recovery after the first
+          # SCP retry window. Wait for a complete SSH handshake before trying
+          # to transfer deployment inputs, while still failing deterministically
+          # if the host remains unavailable.
+          ssh_options="-o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=8"
+          for attempt in $(seq 1 20); do
+            if sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'exit 0'; then
+              echo "Server SSH is ready (attempt ${attempt}/20)."
+              exit 0
+            fi
+            if [ "$attempt" -lt 20 ]; then
+              echo "Server SSH has not completed a handshake (attempt ${attempt}/20); retrying in 10 seconds." >&2
+              sleep 10
+            fi
+          done
+          echo 'Server SSH did not recover within 10 minutes; inspect or restart the host from the cloud console.' >&2
+          exit 1
+
       - name: Recover k3s and quiesce the previous release
         run: |
           deploy_env="/tmp/clas-deploy.env"
