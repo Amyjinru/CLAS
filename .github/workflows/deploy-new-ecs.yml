@@ -1,0 +1,183 @@
+# 新 ECS 专用部署（不影响旧站 deploy.yml）
+#
+# 旧站流水线仍指向 8.141.112.182；本工作流只部署到 81.70.59.38。
+# 需在 GitHub Secrets 中配置：
+#   CLAS_NEW_ECS_SSH_KEY  — 与 ~/.ssh/314.pem 对应的私钥全文
+# 其余密钥与主 deploy 相同（MYSQL_PASSWORD、JWT_SECRET、GHCR_* 等）。
+
+name: Deploy CLAS to new ECS
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 要部署的 Git SHA（7–64 位十六进制）
+        required: false
+        type: string
+  workflow_run:
+    workflows: ['Build, publish and deploy CLAS']
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: clas-new-ecs
+  cancel-in-progress: false
+
+env:
+  NEW_ECS_HOST: 81.70.59.38
+  NEW_ECS_USER: ubuntu
+  NEW_ECS_PUBLIC_URL: http://81.70.59.38
+
+jobs:
+  deploy-new-ecs:
+    name: Deploy to new ECS (k3s microservices)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+      GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+      MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      CLAS_INTERNAL_API_KEY: ${{ secrets.CLAS_INTERNAL_API_KEY }}
+      RIDER_IDENTITY_ENCRYPTION_KEY: ${{ secrets.RIDER_IDENTITY_ENCRYPTION_KEY }}
+      AMAP_WEB_SERVICE_KEY: ${{ secrets.AMAP_WEB_SERVICE_KEY }}
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      FORBIDDEN_WORDS: ${{ secrets.FORBIDDEN_WORDS }}
+      CLAS_DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
+      CLAS_IMAGE_TAG: >-
+        ${{
+          inputs.image_tag ||
+          github.event.workflow_run.head_sha ||
+          github.sha
+        }}
+    steps:
+      - name: Check out deployment scripts
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.CLAS_IMAGE_TAG }}
+          sparse-checkout: |
+            k8s
+            scripts/k8s
+            database
+
+      - name: Validate inputs
+        run: |
+          test -n "${{ secrets.CLAS_NEW_ECS_SSH_KEY }}" || { echo 'CLAS_NEW_ECS_SSH_KEY is required'; exit 1; }
+          test -n "$GHCR_USERNAME" || { echo 'GHCR_USERNAME is required'; exit 1; }
+          test -n "$GHCR_TOKEN" || { echo 'GHCR_PULL_TOKEN is required'; exit 1; }
+          test -n "$MYSQL_PASSWORD" || { echo 'MYSQL_PASSWORD is required'; exit 1; }
+          test -n "$JWT_SECRET" || { echo 'JWT_SECRET is required'; exit 1; }
+          test -n "$RIDER_IDENTITY_ENCRYPTION_KEY" || { echo 'RIDER_IDENTITY_ENCRYPTION_KEY is required'; exit 1; }
+          if [[ -z "$CLAS_INTERNAL_API_KEY" ]]; then
+            CLAS_INTERNAL_API_KEY="$(printf 'clas-internal-api:%s' "$JWT_SECRET" | sha256sum | cut -d ' ' -f 1)"
+            echo "CLAS_INTERNAL_API_KEY=$CLAS_INTERNAL_API_KEY" >> "$GITHUB_ENV"
+          fi
+          if [[ ! "$CLAS_IMAGE_TAG" =~ ^[0-9a-f]{7,64}$ ]]; then
+            echo "Invalid CLAS_IMAGE_TAG: $CLAS_IMAGE_TAG" >&2
+            exit 1
+          fi
+
+      - name: Configure SSH key
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.CLAS_NEW_ECS_SSH_KEY }}" > ~/.ssh/clas_new_ecs
+          chmod 600 ~/.ssh/clas_new_ecs
+          ssh-keyscan -H "$NEW_ECS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Pull and package images for import
+        run: |
+          images=(
+            "ghcr.io/amyjinru/clas-frontend:${CLAS_IMAGE_TAG}"
+            "ghcr.io/amyjinru/clas-database:${CLAS_IMAGE_TAG}"
+            "ghcr.io/amyjinru/clas-iam:${CLAS_IMAGE_TAG}"
+            "ghcr.io/amyjinru/clas-merchant:${CLAS_IMAGE_TAG}"
+            "ghcr.io/amyjinru/clas-catalog:${CLAS_IMAGE_TAG}"
+            "ghcr.io/amyjinru/clas-order:${CLAS_IMAGE_TAG}"
+            "ghcr.io/amyjinru/clas-compat:${CLAS_IMAGE_TAG}"
+          )
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+          for img in "${images[@]}"; do
+            docker pull "$img"
+          done
+          docker save "${images[@]}" | gzip -1 > "/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
+
+      - name: Prepare deploy env file
+        run: |
+          umask 077
+          cat > "$RUNNER_TEMP/clas-deploy.env" <<EOF
+          GHCR_USERNAME=$GHCR_USERNAME
+          GHCR_TOKEN=$GHCR_TOKEN
+          MYSQL_PASSWORD=$MYSQL_PASSWORD
+          JWT_SECRET=$JWT_SECRET
+          CLAS_INTERNAL_API_KEY=$CLAS_INTERNAL_API_KEY
+          RIDER_IDENTITY_ENCRYPTION_KEY=$RIDER_IDENTITY_ENCRYPTION_KEY
+          AMAP_WEB_SERVICE_KEY=$AMAP_WEB_SERVICE_KEY
+          DASHSCOPE_API_KEY=$DASHSCOPE_API_KEY
+          FORBIDDEN_WORDS=$FORBIDDEN_WORDS
+          CLAS_DEMO_ACCESS_PASSWORD=$CLAS_DEMO_ACCESS_PASSWORD
+          CLAS_IMAGE_TAG=$CLAS_IMAGE_TAG
+          CLAS_PUBLIC_URL=$NEW_ECS_PUBLIC_URL
+          CLAS_STOP_LEGACY_NGINX=true
+          EOF
+
+      - name: Upload manifests and deploy bundle
+        run: |
+          ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o ConnectTimeout=20"
+          scp $ssh_opts "$RUNNER_TEMP/clas-deploy.env" "${NEW_ECS_USER}@${NEW_ECS_HOST}:/tmp/clas-deploy.env"
+          scp $ssh_opts "/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "${NEW_ECS_USER}@${NEW_ECS_HOST}:/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
+          scp $ssh_opts scripts/k8s/quiesce-apps.sh "${NEW_ECS_USER}@${NEW_ECS_HOST}:/tmp/clas-quiesce-apps.sh"
+          tar czf /tmp/clas-k8s-bundle.tar.gz k8s scripts/k8s database
+          scp $ssh_opts /tmp/clas-k8s-bundle.tar.gz "${NEW_ECS_USER}@${NEW_ECS_HOST}:/tmp/clas-k8s-bundle.tar.gz"
+
+      - name: Install k3s if needed and deploy release
+        run: |
+          ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ServerAliveInterval=15"
+          ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" 'bash -s' <<REMOTE
+          set -euo pipefail
+          export CLAS_IMAGE_TAG='${{ env.CLAS_IMAGE_TAG }}'
+          export CLAS_PUBLIC_URL='${{ env.NEW_ECS_PUBLIC_URL }}'
+          if ! command -v k3s >/dev/null 2>&1; then
+            curl -sfL https://get.k3s.io | sudo INSTALL_K3S_EXEC='server --write-kubeconfig-mode 644' sh -
+          fi
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          sudo mkdir -p /opt/clas-k8s
+          sudo tar xzf /tmp/clas-k8s-bundle.tar.gz -C /opt/clas-k8s
+          sudo mkdir -p /etc/clas
+          if [[ ! -f /etc/clas/clas.env ]]; then
+            sudo tee /etc/clas/clas.env >/dev/null <<'ENV'
+          MYSQL_HOST=127.0.0.1
+          MYSQL_PORT=3306
+          MYSQL_DATABASE=clas
+          MYSQL_USER=root
+          ENV
+          fi
+          # 释放 80 端口：停止 Compose 前端（若存在）
+          if [[ -f /opt/clas/docker-compose.yml ]]; then
+            cd /opt/clas
+            sudo docker compose stop frontend 2>/dev/null || true
+          fi
+          set -a
+          source /etc/clas/clas.env
+          source /tmp/clas-deploy.env
+          set +a
+          sudo k3s ctr -n k8s.io images import "/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
+          cd /opt/clas-k8s
+          sudo -E env CLAS_PUBLIC_URL="$CLAS_PUBLIC_URL" CLAS_STOP_LEGACY_NGINX=true bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
+          sudo kubectl -n clas patch configmap clas-config --type merge -p '{"data":{"CORS_ALLOWED_ORIGINS":"'"$CLAS_PUBLIC_URL"'"}}'
+          sudo kubectl -n clas rollout restart deployment/clas-iam deployment/clas-merchant deployment/clas-catalog deployment/clas-order deployment/clas-compat deployment/clas-gateway
+          for d in clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway frontend; do
+            sudo kubectl -n clas rollout status "deployment/$d" --timeout=600s
+          done
+          curl -fsS "$CLAS_PUBLIC_URL/api/health"
+          REMOTE
+
+      - name: Cleanup remote temp files
+        if: always()
+        run: |
+          ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o ConnectTimeout=15"
+          ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" \
+            "rm -f /tmp/clas-deploy.env /tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz /tmp/clas-quiesce-apps.sh /tmp/clas-k8s-bundle.tar.gz" || true
