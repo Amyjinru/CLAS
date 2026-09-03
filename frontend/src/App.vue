@@ -232,6 +232,20 @@ async function switchPortal(nextRole) {
       </div>
     </footer>
     <ChatSidebar v-if="['USER', 'MERCHANT'].includes(role)" />
+    <!-- 临时测试样例模块：仅用于本次前端构建与部署验证，后续恢复时删除。 -->
+    <section
+      v-if="role === 'USER'"
+      class="test-sample-module"
+      data-testid="test-sample-module"
+      aria-label="测试样例模块"
+    >
+      <div class="test-sample-module__badge">TEST ONLY</div>
+      <div>
+        <h2>测试样例模块</h2>
+        <p>这是一个测试样例模块，仅用于本次前端构建、部署与业务流程验证。</p>
+      </div>
+      <span class="test-sample-module__status">部署验证中</span>
+    </section>
   </div>
 </template>
 
@@ -462,6 +476,53 @@ nav a.router-link-active {
   flex: 1;
 }
 
+/* 临时测试样例模块：后续恢复版本时一并删除。 */
+.test-sample-module {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: min(960px, calc(100% - 40px));
+  margin: 0 auto 24px;
+  padding: 16px 20px;
+  border: 1px dashed rgba(234, 88, 12, 0.45);
+  border-radius: 14px;
+  background: rgba(255, 247, 237, 0.92);
+  color: #7c2d12;
+  box-shadow: 0 6px 18px rgba(124, 45, 18, 0.08);
+}
+
+.test-sample-module__badge {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #ea580c;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.test-sample-module h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.test-sample-module p {
+  margin: 0;
+  color: #9a3412;
+  font-size: 13px;
+}
+
+.test-sample-module__status {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: #c2410c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 @media (max-width: 980px) {
   .topbar {
     align-items: flex-start;
@@ -482,6 +543,15 @@ nav a.router-link-active {
 
   nav a {
     padding: 7px 10px;
+  }
+
+  .test-sample-module {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .test-sample-module__status {
+    margin-left: 0;
   }
 }
 
