@@ -139,6 +139,16 @@ kubectl apply -f "$PROJECT_ROOT/k8s/redis.yaml"
 kubectl -n "$NAMESPACE" rollout status deployment/mysql --timeout=300s
 kubectl -n "$NAMESPACE" rollout status deployment/redis --timeout=180s
 
+# Existing MySQL volumes may only allow root@localhost; migrate Job connects over TCP.
+kubectl -n "$NAMESPACE" exec deploy/mysql -- sh -c '
+  mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "
+    CREATE USER IF NOT EXISTS \"root\"@\"%\" IDENTIFIED BY \"${MYSQL_ROOT_PASSWORD}\";
+    ALTER USER \"root\"@\"%\" IDENTIFIED BY \"${MYSQL_ROOT_PASSWORD}\";
+    GRANT ALL PRIVILEGES ON *.* TO \"root\"@\"%\" WITH GRANT OPTION;
+    FLUSH PRIVILEGES;
+  "
+'
+
 if [[ -n "$DATABASE_RESTORE_FILE" ]]; then
   if [[ ! -f "$DATABASE_RESTORE_FILE" ]]; then
     echo "CLAS_DATABASE_RESTORE_FILE does not exist: $DATABASE_RESTORE_FILE" >&2
