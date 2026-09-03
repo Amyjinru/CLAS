@@ -1,0 +1,82 @@
+name: Collect new ECS Kubernetes evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 对应已部署的 Git SHA（7-64 位十六进制）
+        required: true
+        type: string
+
+concurrency:
+  group: clas-new-ecs-evidence
+  cancel-in-progress: false
+
+env:
+  NEW_ECS_HOST: 81.70.59.38
+  NEW_ECS_USER: ubuntu
+  CLAS_PUBLIC_URL: http://81.70.59.38
+
+jobs:
+  collect:
+    name: Collect Pod, deployment and health evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate input
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{7,64}$ ]] || { echo 'Invalid image tag' >&2; exit 1; }
+          test -n "${{ secrets.CLAS_NEW_ECS_SSH_KEY }}" || { echo 'CLAS_NEW_ECS_SSH_KEY is required' >&2; exit 1; }
+
+      - name: Configure SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.CLAS_NEW_ECS_SSH_KEY }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/clas_new_ecs
+          chmod 600 ~/.ssh/clas_new_ecs
+          ssh-keyscan -H "$NEW_ECS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Collect read-only Kubernetes evidence
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          remote_dir="/tmp/clas-evidence-${IMAGE_TAG:0:7}-${stamp}"
+          ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20"
+          ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" "REMOTE_DIR='$remote_dir' CLAS_PUBLIC_URL='$CLAS_PUBLIC_URL' bash -s" <<'REMOTE'
+          set -euo pipefail
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          mkdir -p "$REMOTE_DIR"
+          kubectl get --raw=/readyz > "$REMOTE_DIR/kubernetes-readyz.txt"
+          kubectl get nodes -o wide > "$REMOTE_DIR/nodes.txt"
+          kubectl -n clas get deploy,po,svc -o wide > "$REMOTE_DIR/workloads.txt"
+          kubectl -n clas get events --sort-by=.lastTimestamp > "$REMOTE_DIR/events.txt"
+          kubectl -n clas get deploy -o yaml > "$REMOTE_DIR/deployments.yaml"
+          kubectl -n clas get pods -o json > "$REMOTE_DIR/pods.json"
+          for deployment in clas-iam clas-merchant clas-catalog clas-order clas-compat; do
+            kubectl -n clas describe deployment "$deployment" > "$REMOTE_DIR/${deployment}-deployment-describe.txt"
+            pod="$(kubectl -n clas get pod -l "app=$deployment" -o jsonpath='{.items[0].metadata.name}')"
+            kubectl -n clas describe pod "$pod" > "$REMOTE_DIR/${deployment}-pod-describe.txt"
+            kubectl -n clas get deployment "$deployment" -o jsonpath='{range .spec.template.spec.containers[*]}{.name}{"\t"}{.image}{"\n"}{end}' > "$REMOTE_DIR/${deployment}-images.txt"
+          done
+          curl -fsS "$CLAS_PUBLIC_URL/api/health" > "$REMOTE_DIR/gateway-health.json"
+          sha256sum "$REMOTE_DIR"/* > "$REMOTE_DIR/SHA256SUMS.txt"
+          tar czf "${REMOTE_DIR}.tar.gz" -C /tmp "$(basename "$REMOTE_DIR")"
+          REMOTE
+          scp $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}:${remote_dir}.tar.gz" evidence.tar.gz
+          ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" "rm -rf '$remote_dir' '${remote_dir}.tar.gz'"
+          tar xzf evidence.tar.gz
+
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: new-ecs-kubernetes-evidence-${{ inputs.image_tag }}
+          path: |
+            evidence.tar.gz
+            clas-evidence-*/
+          if-no-files-found: error
