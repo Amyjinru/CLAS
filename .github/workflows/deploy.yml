@@ -385,7 +385,9 @@ jobs:
             return 1
           }
           retry_scp "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
-          sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
+          # 控制面恢复本身也必须有边界；否则 systemctl 或 SSH 会话卡住时，
+          # 后续 deploy.sh 的超时保护永远不会被执行。
+          timeout 300s sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
           set -a
@@ -394,7 +396,7 @@ jobs:
           set +a
           if ! timeout 20 kubectl get --raw=/readyz >/dev/null 2>&1; then
             echo 'k3s API is unhealthy; restarting the local control plane.'
-            systemctl restart k3s
+            timeout 90s systemctl restart k3s
             api_ready=false
             for _ in $(seq 1 60); do
               if timeout 5 kubectl get --raw=/readyz >/dev/null 2>&1; then
