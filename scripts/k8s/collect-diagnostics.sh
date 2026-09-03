@@ -3,7 +3,15 @@ set -euo pipefail
 
 NAMESPACE="${CLAS_NAMESPACE:-clas}"
 OUTPUT_DIR="${1:-artifacts/k8s-diagnostics}"
+case "$OUTPUT_DIR" in
+  ''|/|.)
+    echo "Refusing unsafe diagnostics output directory: $OUTPUT_DIR" >&2
+    exit 2
+    ;;
+esac
 mkdir -p "$OUTPUT_DIR"
+# 诊断目录会被 CI 回传为本轮唯一证据；先移除上一轮的普通文件，避免旧 Pod、镜像或日志混入。
+find "$OUTPUT_DIR" -mindepth 1 -maxdepth 1 -type f -delete
 
 kubectl --request-timeout=15s -n "$NAMESPACE" get all,ingress,pvc,hpa -o wide > "$OUTPUT_DIR/resources.txt" 2>&1 || true
 kubectl --request-timeout=15s -n "$NAMESPACE" get events --sort-by=.lastTimestamp > "$OUTPUT_DIR/events.txt" 2>&1 || true
