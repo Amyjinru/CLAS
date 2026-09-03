@@ -100,6 +100,8 @@ jobs:
   verify:
     name: Test gate
     runs-on: ubuntu-latest
+    # 冒烟测试包含镜像构建与服务健康检查；总时限避免异常 Docker 任务无限占用发布队列。
+    timeout-minutes: 35
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -143,6 +145,8 @@ jobs:
         run: npm run build
 
       - name: Run clean Docker Compose smoke test
+        # 单次启动理论上最多 240 秒，连同构建与三次重试留出余量后仍必须受限。
+        timeout-minutes: 20
         run: |
           {
             echo "MYSQL_DATABASE=clas"
@@ -153,7 +157,7 @@ jobs:
           echo "RIDER_IDENTITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef"
           } > ci-compose.env
           for attempt in 1 2 3; do
-            if docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240; then
+            if timeout 360s docker compose --env-file ci-compose.env up --build --detach --wait --wait-timeout 240; then
               break
             fi
             if [ "$attempt" -eq 3 ]; then
