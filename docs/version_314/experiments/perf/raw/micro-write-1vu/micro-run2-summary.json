@@ -1,0 +1,38 @@
+{
+    "machine":  {
+                    "version":  "micro",
+                    "baseUrl":  "http://127.0.0.1:8080",
+                    "gitSha":  "61dd013",
+                    "cores":  16,
+                    "os":  "Microsoft Windows NT 10.0.26200.0",
+                    "resourceMode":  "host",
+                    "merchantId":  1,
+                    "userPhone":  "13800000001",
+                    "startedAt":  "2026-09-03T10:18:05.2393411+08:00"
+                },
+    "run":  2,
+    "endpoints":  [
+                      {
+                          "endpoint":  "order-create",
+                          "vus":  1,
+                          "seconds":  20,
+                          "requests":  19,
+                          "ok":  19,
+                          "errors":  0,
+                          "errorRate":  0,
+                          "rps":  0.95,
+                          "avgMs":  41.51,
+                          "p50Ms":  38.61,
+                          "p95Ms":  62.47,
+                          "p99Ms":  62.47,
+                          "maxMs":  62.47,
+                          "cpuNote":  "host Processor(_Total) percent; java rss is working set",
+                          "cpuAvg":  25.4,
+                          "rssMbAvg":  127.9,
+                          "rssMbMax":  296,
+                          "javaProcessCount":  11,
+                          "rawCsv":  "micro-run2-order-create.csv",
+                          "resourceCsv":  "micro-run2-order-create-resources.csv"
+                      }
+                  ]
+}

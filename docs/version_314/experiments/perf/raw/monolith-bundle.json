@@ -1,0 +1,16 @@
+{
+  "machine": {
+    "version": "monolith",
+    "baseUrl": "http://127.0.0.1:8090",
+    "gitSha": "61dd013",
+    "cores": 16,
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "note": "run1-2 ResourceMode=docker (sidecar only, cpuAvg=0 is not app CPU); run3 ResourceMode=host"
+  },
+  "finishedAt": "2026-09-03T10:32:23+08:00",
+  "runs": [
+    { "run": 1, "file": "monolith-run1-summary.json" },
+    { "run": 2, "file": "monolith-run2-summary.json" },
+    { "run": 3, "file": "monolith-run3-summary.json" }
+  ]
+}
