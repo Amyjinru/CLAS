@@ -93,23 +93,6 @@ jobs:
           ssh-keyscan -H "$NEW_ECS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh -i ~/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o BatchMode=yes "${NEW_ECS_USER}@${NEW_ECS_HOST}" 'echo ssh_ok'
 
-      - name: Pull and package images for import
-        run: |
-          images=(
-            "ghcr.io/amyjinru/clas-frontend:${CLAS_IMAGE_TAG}"
-            "ghcr.io/amyjinru/clas-database:${CLAS_IMAGE_TAG}"
-            "ghcr.io/amyjinru/clas-iam:${CLAS_IMAGE_TAG}"
-            "ghcr.io/amyjinru/clas-merchant:${CLAS_IMAGE_TAG}"
-            "ghcr.io/amyjinru/clas-catalog:${CLAS_IMAGE_TAG}"
-            "ghcr.io/amyjinru/clas-order:${CLAS_IMAGE_TAG}"
-            "ghcr.io/amyjinru/clas-compat:${CLAS_IMAGE_TAG}"
-          )
-          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-          for img in "${images[@]}"; do
-            docker pull "$img"
-          done
-          docker save "${images[@]}" | gzip -1 > "/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
-
       - name: Prepare deploy env file
         run: |
           umask 077
@@ -133,7 +116,6 @@ jobs:
         run: |
           ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o ConnectTimeout=20"
           scp $ssh_opts "$RUNNER_TEMP/clas-deploy.env" "${NEW_ECS_USER}@${NEW_ECS_HOST}:/tmp/clas-deploy.env"
-          scp $ssh_opts "/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "${NEW_ECS_USER}@${NEW_ECS_HOST}:/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
           scp $ssh_opts scripts/k8s/quiesce-apps.sh "${NEW_ECS_USER}@${NEW_ECS_HOST}:/tmp/clas-quiesce-apps.sh"
           tar czf /tmp/clas-k8s-bundle.tar.gz k8s scripts/k8s database
           scp $ssh_opts /tmp/clas-k8s-bundle.tar.gz "${NEW_ECS_USER}@${NEW_ECS_HOST}:/tmp/clas-k8s-bundle.tar.gz"
@@ -194,7 +176,8 @@ jobs:
             done
           fi
           bash /tmp/clas-quiesce-apps.sh || true
-          sudo k3s ctr -n k8s.io images import "/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
+          # Deployment 清单已创建 ghcr-pull-secret；让 k3s 直接按不可变 SHA
+          # 拉取镜像，避免 Runner 将全套镜像经 1 Mbps 主机链路重复上传。
           cd /opt/clas-k8s
           sudo -E env CLAS_PUBLIC_URL="$CLAS_PUBLIC_URL" CLAS_STOP_LEGACY_NGINX=true bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
           sudo kubectl apply -f k8s/ingress.yaml
@@ -207,4 +190,4 @@ jobs:
         run: |
           ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o ConnectTimeout=15"
           ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" \
-            "rm -f /tmp/clas-deploy.env /tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz /tmp/clas-quiesce-apps.sh /tmp/clas-k8s-bundle.tar.gz" || true
+            "rm -f /tmp/clas-deploy.env /tmp/clas-quiesce-apps.sh /tmp/clas-k8s-bundle.tar.gz" || true
