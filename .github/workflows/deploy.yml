@@ -21,7 +21,8 @@ permissions:
 
 concurrency:
   group: clas-production
-  cancel-in-progress: false
+  # main 出现更晚的修复时，旧版本不得继续占用同一发布队列或覆盖新版本。
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
