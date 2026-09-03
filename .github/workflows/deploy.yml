@@ -76,7 +76,7 @@ jobs:
               services/clas-compat/*)   affected[clas-compat]=1;   deploy=true;;
 
               # 跨切面文件（基础设施/数据库/网关/前端/单体）→ 保守全量部署
-              backend/*|database/*|k8s/*|scripts/k8s/*|frontend/*|docker-compose.yml|.github/workflows/deploy.yml)
+              backend/*|database/*|k8s/*|scripts/k8s/*|frontend/*|docker-compose.yml|.github/workflows/deploy.yml|.github/workflows/deploy-new-ecs.yml)
                 full_deploy=true; deploy=true;;
             esac
           done < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
