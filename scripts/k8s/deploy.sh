@@ -25,9 +25,78 @@ done
 collect() {
   bash "$PROJECT_ROOT/scripts/k8s/collect-diagnostics.sh" "$ARTIFACT_DIR" || true
 }
-trap collect ERR
+
+app_deployments=(clas-iam clas-merchant clas-catalog clas-order clas-compat clas-gateway frontend)
+rollback_dir="$(mktemp -d)"
+release_interrupted=false
+rollback_running=false
+rendered_dir=""
+
+capture_previous_release() {
+  : > "$rollback_dir/deployments.tsv"
+  for deployment in "${app_deployments[@]}"; do
+    if ! kubectl -n "$NAMESPACE" get "deployment/$deployment" >/dev/null 2>&1; then
+      continue
+    fi
+
+    replicas="$(kubectl -n "$NAMESPACE" get "deployment/$deployment" -o jsonpath='{.spec.replicas}')"
+    revision="$(kubectl -n "$NAMESPACE" get "deployment/$deployment" -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}')"
+    printf '%s\t%s\t%s\n' "$deployment" "${replicas:-0}" "$revision" >> "$rollback_dir/deployments.tsv"
+  done
+
+  if kubectl -n "$NAMESPACE" get hpa clas-catalog >/dev/null 2>&1; then
+    touch "$rollback_dir/catalog-hpa-present"
+  fi
+}
+
+rollback_release() {
+  if [[ "$release_interrupted" != "true" || "$rollback_running" == "true" ]]; then
+    return
+  fi
+  rollback_running=true
+  set +e
+
+  if [[ ! -s "$rollback_dir/deployments.tsv" ]]; then
+    echo 'No previous application release was found; skipping rollback.' >&2
+    return
+  fi
+
+  echo 'Deployment failed; restoring the previous application release.' >&2
+  while IFS=$'\t' read -r deployment replicas revision; do
+    if [[ -n "$revision" ]]; then
+      kubectl -n "$NAMESPACE" rollout undo "deployment/$deployment" --to-revision="$revision" || true
+    fi
+    kubectl -n "$NAMESPACE" scale "deployment/$deployment" --replicas="$replicas" || true
+  done < "$rollback_dir/deployments.tsv"
+
+  if [[ -f "$rollback_dir/catalog-hpa-present" ]]; then
+    kubectl apply -f "$PROJECT_ROOT/k8s/catalog-hpa.yaml" || true
+  fi
+
+  while IFS=$'\t' read -r deployment replicas revision; do
+    if [[ "${replicas:-0}" -gt 0 ]]; then
+      kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout=300s || true
+    fi
+  done < "$rollback_dir/deployments.tsv"
+}
+
+on_error() {
+  local exit_status="$1"
+  trap - ERR
+  rollback_release
+  collect
+  rm -rf "$rollback_dir" "${rendered_dir:-}"
+  exit "$exit_status"
+}
+
+trap 'on_error "$?"' ERR
 
 kubectl apply -f "$PROJECT_ROOT/k8s/namespace.yaml"
+
+# 记录可工作的发布版本。单节点资源不足时必须短暂停止旧 Pod 才能发布，
+# 但任何后续步骤失败都应恢复此处记录的镜像版本与副本数，避免整站持续不可用。
+capture_previous_release
+release_interrupted=true
 
 # Quiesce the previous application release before doing any other work. This
 # must happen at the start: on the two-core production node, leaving old Java
@@ -83,7 +152,6 @@ if [[ -n "$DATABASE_RESTORE_FILE" ]]; then
 fi
 
 rendered_dir="$(mktemp -d)"
-trap 'rm -rf "$rendered_dir"; collect' ERR
 sed "s/REQUIRED_TAG/$IMAGE_TAG/g" \
   "$PROJECT_ROOT/k8s/migration-job.yaml" > "$rendered_dir/migration-job.yaml"
 for manifest in frontend microservices microservices-gateway; do
@@ -149,3 +217,5 @@ sleep 5
 curl -fsS --retry 20 --retry-all-errors --retry-delay 3 --max-time 10 "$PUBLIC_URL/api/health"
 
 echo "Deployment succeeded with image tag: $IMAGE_TAG"
+trap - ERR
+rm -rf "$rollback_dir" "$rendered_dir"
