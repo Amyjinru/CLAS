@@ -1,0 +1,82 @@
+6d55a46a8ab1fca99c721c44673af5d2fde1242a`t2026-08-29T14:46:01+08:00`tleelyn69211111`tdocs: add microservice boundary design
+a4bdad9a01e085bd24baaf209ffb05fa7147d2d2`t2026-08-29T16:45:27+08:00`tleelyn69211111`tdocs: consolidate UC01-UC16 test reports
+8051e5e5336dbaf3b54e689a6ab633c87dae3234`t2026-08-29T17:42:33+08:00`tkddsk`tdocs: 规划上传图片持久化
+6add010f6ee0d21b1848c537f1987d470b1351fc`t2026-08-29T18:05:05+08:00`tAmy`tfix: prevent duplicate container migrations
+3a09f9a8778588c72ca0bccb4a4549317646251d`t2026-08-29T22:28:56+08:00`tkddsk`tfeat: 持久化上传图片
+fc7c872e9b60b385cc1725118c4ea944dfa28759`t2026-08-29T23:25:42+08:00`tkddsk`tfix: 明确容器运行时存储边界
+2ecaf50ae385118e2d8473316f38085c513a7ec6`t2026-08-29T23:44:41+08:00`tkddsk`tci: 按变更范围控制部署
+fc5e710a67d86cc4ec609e909c8f910bd66afc57`t2026-08-29T23:51:05+08:00`tkddsk`tdocs: 添加UC16格式综合测试报告
+fec5ce69e81f8efad0434031ab77cdda390ab999`t2026-08-31T10:31:19+08:00`tleelyn69211111`ttest: expand frontend and e2e coverage
+193623e3d558fe2549eece896dce9739e77d4fa3`t2026-08-31T10:43:02+08:00`tkddsk`tdocs: 补充用例清单与综合测试报告
+74b9dabb122fec23bc089c05850b1dc20a4c423d`t2026-08-31T10:43:23+08:00`tkddsk`tstyle: 清理文档末尾空行
+f71f60255cd54d7712f3b72a6b1940a50d6b9484`t2026-08-31T11:14:46+08:00`tkddsk`ttest: 补齐验证码与骑手端到端验证
+c48a9ba429d460d6b2ca08acdbe497e176b82291`t2026-09-01T10:21:29+08:00`tkddsk`tdocs: 添加微服务服务契约表
+cd395272723fcab0e0e0617d3a740afbe63a5a1d`t2026-09-01T10:24:15+08:00`tkddsk`tdocs: 移除未确认的任务规划
+18e6727f7c5c8b1e4b9c943d2b3e27434dffcbc6`t2026-09-01T10:24:39+08:00`tleelyn69211111`tfeat: add catalog microservice
+c540cafadbc3237024a6b9ce5d9349fa82ac598b`t2026-09-01T10:24:39+08:00`tleelyn69211111`tMerge remote-tracking branch 'origin/main'
+50016ee9553ab5c903728e97925d3c5bd49e901c`t2026-09-01T10:28:39+08:00`ttrouble314`tfeat: 添加四微服务架构、联调脚本与部署文档
+b4b30603549ac83ed735b39ab8bcc0697973f242`t2026-09-01T10:38:21+08:00`tkddsk`tMerge remote-tracking branch 'upstream/main' into codex/microservice-contract
+1894a5922a864710c696c579901e1cb2e79df50e`t2026-09-01T10:39:54+08:00`tkddsk`tdocs: 记录微服务拆分现状与缺口
+bc0d01504c7b399c5aafdb59f95075a24e6d7e77`t2026-09-01T10:44:46+08:00`tleelyn69211111`tfix: secure internal service contracts
+13d672c32d7fa4d98963d5bdd9f42d1146fecd48`t2026-09-01T10:46:51+08:00`tleelyn69211111`trefactor: route compat reads through service APIs
+7e31c1802cff754f1173f4519d3481ebabc74d81`t2026-09-01T10:47:29+08:00`tleelyn69211111`trefactor: read rider contact phone through iam
+2419a19b5f21a5bbee648435942fc9154ee0715b`t2026-09-01T10:54:19+08:00`tkddsk`tfeat: 增强网关请求追踪与故障保护
+ab28e1e4772f295d31915c30b3f4746f5347b5ee`t2026-09-01T10:59:49+08:00`tleelyn69211111`trefactor: centralize iam session validation
+d0c31bd66ead7058f050d09d53c556643e16632e`t2026-09-01T11:22:28+08:00`tleelyn69211111`tfeat: prepare microservices for kubernetes
+bf0715fa144294d72415b9e18884b21cc871d180`t2026-09-01T14:08:26+08:00`tkddsk`tdocs: 更新后五天协作看板状态
+22800d96b84e56471324121ace86c2fb0c1835d4`t2026-09-01T15:00:13+08:00`tleelyn69211111`tci: deploy microservices through k8s
+51e45fba2f91b7a711c2843d9f2f6e877f16e72b`t2026-09-01T15:38:03+08:00`ttrouble314`tfeat: 从 catalog 拆出独立 clas-merchant 服务
+35f4b7770d9e4848a11d312fc5bac52bd8e992fb`t2026-09-01T15:56:28+08:00`tZmr51`tci: 按服务识别变更并补齐 clas-merchant 微服务构建部署
+ca55b9c3d2a78794194eedc8d338b6556eb92e04`t2026-09-01T16:14:00+08:00`tkddsk`tMerge remote-tracking branch 'upstream/main' into codex/microservice-contract
+3a0d50f786ff5a8dd113d4e6de4a0121e0fb72a9`t2026-09-01T16:15:21+08:00`tAmy`tHPA、压测、故障和恢复脚本;CI/CD 修复
+a805f2635fb9bab5a30b945037c26d8e94fb3909`t2026-09-01T16:20:45+08:00`tkddsk`ttest: 验证订单商家调用与网关契约
+b4877d8659a0da43e78298d06cd3b0b4511a08de`t2026-09-01T16:22:17+08:00`tAmy`tMerge branch 'main' of https://github.com/Amyjinru/CLAS
+a6ea421b7dda9d758793157a6545b10bf2cfe18f`t2026-09-01T16:22:30+08:00`tkddsk`tdocs: 标记订单网关验证完成
+3fa5ff49af1c7e3b88e2e00493e08067977046ac`t2026-09-01T16:34:37+08:00`tkddsk`ttest: 记录网关 Nginx 故障验证
+be46f501ba8e9b2ee67bc2783ae7aa5ee0d9c799`t2026-09-01T16:42:37+08:00`tkddsk`tfix: 兼容 Winget 安装的 Nginx
+aa1ef5e261f442bbeb0cd3e417585383750dcdf3`t2026-09-01T16:57:20+08:00`tAmy`tfix: remove accidental duplicate files from CI build
+3b43fd4239b53c353ad2a4d5894bfcb9822f6600`t2026-09-01T16:57:45+08:00`tkddsk`tfix: 未启动网关时跳过 Nginx 停止信号
+21b56157dd0f0c40ef29b158362ae7608eaac772`t2026-09-01T17:22:06+08:00`tAmy`tfix: let microservices finish startup on k3s
+6e885fc44a46f2fe44fa0d98025f4a4bbd9755ea`t2026-09-01T17:46:17+08:00`tAmy`tfix: prevent k8s service env collisions
+06bb815c1af4aac032fb27a6f6ab1ab097cc0b17`t2026-09-01T18:11:55+08:00`tAmy`tfix: deploy services sequentially on k3s
+15815dad21a93032680530f29159e6a879693f19`t2026-09-01T18:44:55+08:00`ttrouble314`tdocs: 冻结 #36 商家与订单表写权及拆库顺序
+7a8dc0e1787fe5434be146c1d21d814221b726ce`t2026-09-01T21:21:14+08:00`tAmy`tfix: recover k3s before rolling out services
+bcaab9043afab12bdc42ddfe385594e881ed1130`t2026-09-01T21:38:44+08:00`ttrouble314`trefactor: 把未阻塞的跨域读从 Mapper 改到内部 API
+38f9d43bf1ef16d8c190e2ce7302ab79795a389e`t2026-09-02T10:16:35+08:00`tAmy`tfix: quiesce unlabeled deployments before rollout
+d768a3e9dcdea1e3982194ace8d73e6f787a8ba7`t2026-09-02T10:30:17+08:00`tkddsk`tMerge remote-tracking branch 'upstream/main' into codex/microservice-contract
+ae1c86b381da19ae059f2239f602a780aa6c1b5f`t2026-09-02T10:40:03+08:00`tleelyn69211111`ttest: complete catalog service contract coverage
+9c1b847fa816404e6f465817f881f12a9a0d0887`t2026-09-02T10:41:39+08:00`tleelyn69211111`tdocs: record catalog issue acceptance evidence
+11951fc687b65c3dc2668aabf1f1752ba614132c`t2026-09-02T10:53:22+08:00`tLin`tMerge pull request #48 from Amyjinru/codex/catalog-issue-37-evidence
+e03fb092d7ab767fa18040272e047d08c7bbde9c`t2026-09-02T10:53:42+08:00`tAmy`tfix: recover k3s before transferring images
+73d35db2da7e8ccd036f9ff081675d4a29cc0f8f`t2026-09-02T11:16:11+08:00`tleelyn69211111`tfix: recover stuck k3s rollout pods
+46f8e4d205dc9fdf36163f4901fe933ca8cf7ebe`t2026-09-02T11:21:01+08:00`ttrouble314`tfeat: 收回订单四表写权并提供配送内部命令
+c7cff5e454c12a5ef4dab91abbe17a6c6242815b`t2026-09-02T11:22:41+08:00`tkddsk`ttest: 固化五服务共享联调证据
+50e403c048d42a2162b343469731530b90538007`t2026-09-02T11:28:15+08:00`tkddsk`tMerge remote-tracking branch 'upstream/main' into codex/microservice-contract
+e5b8bb26dbf21160450423175d4cf815fca8bbaf`t2026-09-02T11:40:08+08:00`tkddsk`ttest: 复验共享五服务网关联调
+f696061d4411af60e3e67672b4cdd8191118a1be`t2026-09-02T11:43:12+08:00`tleelyn69211111`tfix: retry deployment transfers while host recovers
+80d5a1b532a7b844abf6c615c37ef65b476ed9fb`t2026-09-02T11:45:03+08:00`tkddsk`ttest: 补齐共享联调直连与网关证据
+677a246830a085bbfe82e431951a7e8851416588`t2026-09-02T11:48:09+08:00`tkddsk`tMerge remote-tracking branch 'upstream/main' into codex/microservice-contract
+845831bfbc8c4b1bd584c40bc4d4b11920b869f9`t2026-09-02T11:51:02+08:00`tkddsk`tMerge pull request #46 from Amyjinru/codex/microservice-contract
+e792ff80cdeb402a2796df45285f3101e7f6f75b`t2026-09-02T14:42:34+08:00`tleelyn69211111`ttest: cover order gateway end-to-end regression
+30b2df98682d3aa4465389a0c2f57295dab8dfa2`t2026-09-02T15:35:09+08:00`tleelyn69211111`ttest: verify local five-service gateway integration
+02f9845a54c246d304373822c5db9353b98123cf`t2026-09-02T16:29:19+08:00`tleelyn69211111`ttest: complete order fulfilment regression evidence
+349c41afe2abcd58a971fb7b040fc58d3c7f9f8c`t2026-09-02T16:48:05+08:00`tleelyn69211111`tdocs: add public API regression evidence
+73771cad4a036ddd104c68f2572d25486cdaba26`t2026-09-02T17:05:09+08:00`ttrouble314`tfix: route remaining cross-domain reads through owner APIs
+c874b3c8a066674c65596e7be08497c35f3c667f`t2026-09-02T17:29:46+08:00`ttrouble314`tfeat: isolate MySQL writes with per-service least-privilege accounts
+91d3ff371e6c3bb41c30564a7534ea62461b67df`t2026-09-02T17:45:39+08:00`ttrouble314`tfix: start five services under isolated MySQL accounts
+c5e335de07be9f6d240708175701ae37d37d39c0`t2026-09-02T18:52:37+08:00`tkddsk`ttest: 复验服务隔离后的五服务联调
+13e438d80b0ce8e6bad84b2b833fcac73ccc7606`t2026-09-02T18:54:12+08:00`tkddsk`tMerge pull request #51 from Amyjinru/codex/revalidate-service-isolation
+59c57b720ed2e4d5896679a0d44c978a6176acda`t2026-09-02T19:30:30+08:00`ttrouble314`tfeat: move business tables into per-service MySQL schemas
+532cfffb82f85285edaeca1da38810260a469b10`t2026-09-02T19:38:12+08:00`ttrouble314`tfix: skip schema MOVE in Compose smoke
+4bb12df456c60165f01a4739aaf64d1fcd796bb4`t2026-09-02T19:58:43+08:00`ttrouble314`tfix: fetch MySQL RSA key after privilege flush
+e67b1f7d99ba841d9d294538a4f3ed1aaacdf315`t2026-09-02T20:22:26+08:00`ttrouble314`tfix: proxy frontend nginx through clas-gateway
+a54876085a6af7438e2761659f433c3513dc77b5`t2026-09-02T20:49:28+08:00`ttrouble314`ttest: record post-MOVE regression and run E2E on Windows PowerShell 5.1
+61dd01324cea72e816fed1fb9ebfd67945055fd6`t2026-09-02T23:43:55+08:00`tAmy`ttest: record remote HPA and resilience drill
+0a07378b9a854b1da896ab0cfd2506935cb967c2`t2026-09-03T10:22:43+08:00`tleelyn69211111`tfix: serve merchant and product uploads
+a8396bae09b493c5d3890c4e61238e014515c3fc`t2026-09-03T10:34:53+08:00`ttrouble314`ttest: record local monolith vs microservice compare for #45
+febf0053d14aa57dd87bc07ebfcdd65edc712c30`t2026-09-03T10:51:22+08:00`tleelyn69211111`tfix: wait for server SSH recovery before deploy
+2861eaf0fd1324f3a4544b9efa56eaf2fb3107ba`t2026-09-03T11:42:10+08:00`tleelyn69211111`tchore: retry deployment
+aa095bca4637dd17fc1e9e0be9b9e6e612a86a47`t2026-09-03T12:11:57+08:00`tleelyn69211111`tfix: mount uploads to server storage
+5c62296c22363f25202c27c66df40aaf18f38c87`t2026-09-03T12:20:20+08:00`tleelyn69211111`tfix: retain PVC-backed upload storage
+3b75d5aca368445ffaa3f7eaad6e9324deb5e966`t2026-09-03T12:23:03+08:00`tAmy`tfix: stabilize catalog HPA scaling
+fbec011106426989d9d4352186ea09faa5b24b4b`t2026-09-03T15:19:32+08:00`ttrouble314`tfix: restore shared upload PVC and admin order routes
