@@ -1,0 +1,90 @@
+name: Verify new ECS fault isolation
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 当前已部署的应用 Git SHA（仅用于证据标记）
+        required: true
+        type: string
+
+concurrency:
+  group: clas-new-ecs-fault-isolation
+  cancel-in-progress: false
+
+env:
+  NEW_ECS_HOST: 81.70.59.38
+  NEW_ECS_USER: ubuntu
+  CLAS_PUBLIC_URL: http://81.70.59.38
+
+jobs:
+  verify:
+    name: Catalog down, order 503, recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Configure SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.CLAS_NEW_ECS_SSH_KEY }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY" || { echo 'CLAS_NEW_ECS_SSH_KEY is required' >&2; exit 1; }
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/clas_new_ecs
+          chmod 600 ~/.ssh/clas_new_ecs
+          ssh-keyscan -H "$NEW_ECS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Scale Catalog down for controlled test
+        id: scale
+        run: |
+          set -euo pipefail
+          ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20"
+          replicas="$(ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl -n clas get deployment clas-catalog -o jsonpath="{.spec.replicas}"')"
+          [[ "$replicas" =~ ^[0-9]+$ ]] || { echo 'Unable to determine Catalog replicas' >&2; exit 1; }
+          echo "original_replicas=$replicas" >> "$GITHUB_OUTPUT"
+          ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl -n clas scale deployment/clas-catalog --replicas=0; kubectl -n clas get deployment,po -l app=clas-catalog -o wide'
+
+      - name: Verify order failure and unaffected gateway route
+        env:
+          DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$DEMO_ACCESS_PASSWORD" || { echo 'CLAS_DEMO_ACCESS_PASSWORD is required' >&2; exit 1; }
+          mkdir -p evidence
+          curl -fsS "$CLAS_PUBLIC_URL/api/health" > evidence/gateway-during-catalog-down.json
+          curl -fsS "$CLAS_PUBLIC_URL/api/merchant/list" > evidence/merchant-list-during-catalog-down.json
+          pwsh -File services/scripts/order-e2e-regression.ps1 \
+            -BaseUrl "$CLAS_PUBLIC_URL" \
+            -UserPhone '13800000001' \
+            -UserPassword 'unused' \
+            -MerchantPhone '13800000002' \
+            -MerchantPassword 'unused' \
+            -MerchantId 1 \
+            -FaultOnly \
+            -FaultProductId 1 \
+            -DemoAccessPassword "$DEMO_ACCESS_PASSWORD" \
+            -EvidencePath "$PWD/evidence/catalog-down-order-503.json"
+
+      - name: Restore Catalog and verify recovery
+        if: always()
+        run: |
+          set -euo pipefail
+          ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20"
+          replicas='${{ steps.scale.outputs.original_replicas }}'
+          [[ "$replicas" =~ ^[0-9]+$ ]] || replicas=1
+          ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl -n clas scale deployment/clas-catalog --replicas=$replicas; kubectl -n clas rollout status deployment/clas-catalog --timeout=180s; kubectl -n clas get deployment,po -l app=clas-catalog -o wide" > recovery-kubernetes.txt
+          mkdir -p evidence
+          curl --retry 12 --retry-delay 5 --retry-connrefused -fsS "$CLAS_PUBLIC_URL/api/health" > evidence/gateway-after-recovery.json
+
+      - name: Upload fault isolation evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: new-ecs-fault-isolation-${{ inputs.image_tag }}
+          path: |
+            evidence/
+            recovery-kubernetes.txt
+          if-no-files-found: warn

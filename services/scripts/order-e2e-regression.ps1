@@ -2,6 +2,7 @@ param(
     [string]$BaseUrl = "http://127.0.0.1:8080",
     [string]$UserPhone = "13345678900",
     [string]$UserPassword = "Abc123!",
+    [string]$DemoAccessPassword = "",
     [Parameter(Mandatory = $true)][string]$MerchantPhone,
     [Parameter(Mandatory = $true)][string]$MerchantPassword,
     [Parameter(Mandatory = $true)][long]$MerchantId,
@@ -109,6 +110,14 @@ function Assert-Result {
 }
 
 function Login([string]$Phone, [string]$Password, [string]$Name) {
+    if ($DemoAccessPassword) {
+        $demoResult = Invoke-Api -Name ($Name + '-demo') -Method POST -Path "/api/user/demo-login" -Body @{
+            phone = $Phone; code = $VerificationCode; deviceId = "order-e2e-$([guid]::NewGuid().ToString('N'))"; accessPassword = $DemoAccessPassword
+        }
+        Assert-Result $demoResult 200 200
+        if (-not $demoResult.response.data.token) { throw "$Name demo login returned no access token" }
+        return $demoResult.response.data.token
+    }
     $loginBody = @{
         phone = $Phone; password = $Password; deviceId = "order-e2e-$([guid]::NewGuid().ToString('N'))"; code = $VerificationCode
     }
@@ -130,7 +139,9 @@ try {
     if (-not $health.requestId) { throw "Gateway health response did not preserve X-Request-Id" }
 
     $userToken = Login $UserPhone $UserPassword "user-login"
-    $merchantToken = Login $MerchantPhone $MerchantPassword "merchant-login"
+    if (-not $FaultOnly) {
+        $merchantToken = Login $MerchantPhone $MerchantPassword "merchant-login"
+    }
     $addresses = Invoke-Api -Name "user-addresses" -Path "/api/address/mine" -Token $userToken
     Assert-Result $addresses 200 200
     $address = @($addresses.response.data | Where-Object { $_.isDefault }) | Select-Object -First 1
