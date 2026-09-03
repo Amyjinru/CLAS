@@ -141,10 +141,10 @@ jobs:
       - name: Install k3s if needed and deploy release
         run: |
           ssh_opts="-i $HOME/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ServerAliveInterval=15"
-          ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" 'bash -s' <<REMOTE
+          ssh $ssh_opts "${NEW_ECS_USER}@${NEW_ECS_HOST}" \
+            "CLAS_IMAGE_TAG=${CLAS_IMAGE_TAG} CLAS_PUBLIC_URL=${NEW_ECS_PUBLIC_URL} bash -s" <<'REMOTE'
           set -euo pipefail
-          export CLAS_IMAGE_TAG='${{ env.CLAS_IMAGE_TAG }}'
-          export CLAS_PUBLIC_URL='${{ env.NEW_ECS_PUBLIC_URL }}'
+          export CLAS_IMAGE_TAG CLAS_PUBLIC_URL
           if ! command -v k3s >/dev/null 2>&1; then
             export INSTALL_K3S_EXEC='server --write-kubeconfig-mode 644'
             curl -sfL https://get.k3s.io | sudo -E sh -
@@ -198,7 +198,7 @@ jobs:
           cd /opt/clas-k8s
           sudo -E env CLAS_PUBLIC_URL="$CLAS_PUBLIC_URL" CLAS_STOP_LEGACY_NGINX=true bash scripts/k8s/deploy.sh "$CLAS_IMAGE_TAG"
           sudo kubectl apply -f k8s/ingress.yaml
-          sudo kubectl -n clas get configmap clas-config -o yaml | sed "s|CORS_ALLOWED_ORIGINS: .*|CORS_ALLOWED_ORIGINS: $CLAS_PUBLIC_URL|" | sudo kubectl apply -f -
+          sudo kubectl -n clas get configmap clas-config -o yaml | sed "s|CORS_ALLOWED_ORIGINS: .*|CORS_ALLOWED_ORIGINS: ${CLAS_PUBLIC_URL}|" | sudo kubectl apply -f -
           curl -fsS "$CLAS_PUBLIC_URL/api/health"
           REMOTE
 
