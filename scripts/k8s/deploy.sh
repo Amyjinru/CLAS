@@ -111,6 +111,19 @@ release_interrupted=true
 timeout --foreground --signal=TERM --kill-after=30s 300s \
   bash "$PROJECT_ROOT/scripts/k8s/quiesce-apps.sh"
 
+# 已有 mysql-data 卷时，MySQL 实际 root 密码来自首次初始化，不能被 Secret 覆盖。
+if kubectl -n "$NAMESPACE" get pvc mysql-data >/dev/null 2>&1; then
+  existing_mysql_password="$(kubectl -n "$NAMESPACE" get secret clas-secrets -o jsonpath='{.data.MYSQL_PASSWORD}' 2>/dev/null | base64 -d || true)"
+  if [[ -n "$existing_mysql_password" ]]; then
+    MYSQL_PASSWORD="$existing_mysql_password"
+    MYSQL_ORDER_PASSWORD="${MYSQL_ORDER_PASSWORD:-$MYSQL_PASSWORD}"
+    MYSQL_IAM_PASSWORD="${MYSQL_IAM_PASSWORD:-$MYSQL_PASSWORD}"
+    MYSQL_MERCHANT_PASSWORD="${MYSQL_MERCHANT_PASSWORD:-$MYSQL_PASSWORD}"
+    MYSQL_CATALOG_PASSWORD="${MYSQL_CATALOG_PASSWORD:-$MYSQL_PASSWORD}"
+    MYSQL_COMPAT_PASSWORD="${MYSQL_COMPAT_PASSWORD:-$MYSQL_PASSWORD}"
+  fi
+fi
+
 kubectl -n "$NAMESPACE" create secret generic clas-secrets \
   --from-literal=MYSQL_PASSWORD="$MYSQL_PASSWORD" \
   --from-literal=MYSQL_ORDER_PASSWORD="${MYSQL_ORDER_PASSWORD:-$MYSQL_PASSWORD}" \
@@ -140,6 +153,11 @@ kubectl -n "$NAMESPACE" rollout status deployment/mysql --timeout=300s
 kubectl -n "$NAMESPACE" rollout status deployment/redis --timeout=180s
 
 # Existing MySQL volumes may only allow root@localhost; migrate Job connects over TCP.
+if ! kubectl -n "$NAMESPACE" exec deploy/mysql -- sh -c \
+  'mysqladmin ping -h127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent'; then
+  echo 'MySQL root password mismatch detected; syncing data volume to clas-secrets' >&2
+  bash "$PROJECT_ROOT/scripts/k8s/sync-mysql-root-password.sh"
+fi
 kubectl -n "$NAMESPACE" exec deploy/mysql -- sh -c '
   mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "
     CREATE USER IF NOT EXISTS \"root\"@\"%\" IDENTIFIED BY \"${MYSQL_ROOT_PASSWORD}\";
