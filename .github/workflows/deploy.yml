@@ -1,4 +1,4 @@
-name: Build, publish and deploy CLAS
+name: Build and publish CLAS
 
 on:
   push:
@@ -286,8 +286,11 @@ jobs:
   deploy:
     name: Deploy immutable version to k3s
     needs: publish
+    # 旧服务器已退役。新 ECS 由 deploy-new-ecs.yml 在发布成功后接管，
+    # 禁止 main 推送继续连接旧主机。
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    # 旧站 8.141.112.182 不可用时允许失败，不阻断 publish 与新站 deploy-new-ecs。
+    # 保留历史诊断定义；该 Job 被上方条件永久跳过。
     continue-on-error: true
     # 恢复（5 分钟）+ 本地导入镜像（15 分钟）+ 应用部署（30 分钟）均有
     # 独立上限；任务总时限略高于它们的和，确保失败时仍能采集诊断。

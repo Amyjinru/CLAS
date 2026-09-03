@@ -15,7 +15,7 @@ on:
         required: false
         type: string
   workflow_run:
-    workflows: ['Build, publish and deploy CLAS']
+    workflows: ['Build and publish CLAS']
     types: [completed]
     branches: [main]
 
@@ -31,10 +31,10 @@ env:
 jobs:
   deploy-new-ecs:
     name: Deploy to new ECS (k3s microservices)
-    # 主流程里旧站 deploy 失败时，publish 仍可能成功；新站部署不应被跳过。
+    # 仅在构建、测试与镜像发布均成功后部署，防止失败版本进入新 ECS。
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'cancelled')
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

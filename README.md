@@ -289,19 +289,20 @@ mvn -f backend/pom.xml -Dtest=RiderModuleIntegrationTest test
 
 ## CI/CD 与 k3s 部署
 
-推送到 `main` 分支后，GitHub Actions 工作流 `.github/workflows/deploy.yml` 会执行严格门禁：
+推送到 `main` 分支后，GitHub Actions 先由 `.github/workflows/deploy.yml` 执行严格构建与测试门禁；成功后 `.github/workflows/deploy-new-ecs.yml` 将同一 Git SHA 的镜像部署到新 ECS：
 
 ```text
 push main
   → 单体基线与四微服务 Maven 测试
   → 前端 npm test + build
   → 构建并推送 GHCR SHA 微服务镜像
+  → 触发新 ECS 部署工作流
   → k3s 数据库迁移 Job
-  → 四服务与 API Gateway Deployment rollout
-  → http://8.141.112.182/api/health
+  → 五服务、API Gateway 与前端 Deployment rollout
+  → http://81.70.59.38/api/health
 ```
 
-任一测试失败时，镜像构建、GHCR 推送和 k3s 部署均不会执行。前端和四服务镜像分别为 `ghcr.io/amyjinru/clas-frontend:<git-sha>` 及 `ghcr.io/amyjinru/clas-{iam,catalog,order,compat}:<git-sha>`；部署禁止使用 `latest`。工作流无论成功或失败都会上传测试报告、镜像摘要和 k3s 诊断日志。
+任一测试失败时，镜像构建、GHCR 推送和新 ECS 部署均不会执行。前端和五服务镜像均使用 Git SHA 标签，部署禁止使用 `latest`。旧服务器 `8.141.112.182` 已退役，遗留工作流不再执行 SSH 部署。工作流无论成功或失败都会上传测试报告、镜像摘要和 k3s 诊断日志。
 
 首次云端准备使用 root 用户执行：
 
@@ -309,7 +310,7 @@ push main
 bash scripts/k8s/install-k3s.sh
 ```
 
-在 GitHub Actions Secrets 中配置以下值：`SSH_PASSWORD`（云服务器部署账户密码）、`GHCR_USERNAME`、`GHCR_PULL_TOKEN`、`MYSQL_PASSWORD`、`JWT_SECRET`、`CLAS_INTERNAL_API_KEY`、`RIDER_IDENTITY_ENCRYPTION_KEY`，以及按需配置的 `AMAP_WEB_SERVICE_KEY`、`DASHSCOPE_API_KEY`、`FORBIDDEN_WORDS`、`CLAS_DEMO_ACCESS_PASSWORD`。部署 Job 经 SSH 调用服务器本机 k3s，不再使用 kubeconfig Secret；镜像仍发布至 GHCR，并以 Git SHA 版本归档导入服务器。Secret 不得写入仓库或工作流日志。
+在 GitHub Actions Secrets 中配置以下值：`CLAS_NEW_ECS_SSH_KEY`（新 ECS 的 `ubuntu` 用户私钥）、`GHCR_USERNAME`、`GHCR_PULL_TOKEN`、`MYSQL_PASSWORD`、`JWT_SECRET`、`CLAS_INTERNAL_API_KEY`、`RIDER_IDENTITY_ENCRYPTION_KEY`，以及按需配置的 `AMAP_WEB_SERVICE_KEY`、`DASHSCOPE_API_KEY`、`FORBIDDEN_WORDS`、`CLAS_DEMO_ACCESS_PASSWORD`。部署 Job 经 SSH 调用新服务器本机 k3s，不再使用 kubeconfig Secret；镜像仍发布至 GHCR，并以 Git SHA 版本归档导入服务器。Secret 不得写入仓库或工作流日志。
 
 手动部署已发布镜像时，配置同名环境变量后执行：
 
@@ -327,7 +328,7 @@ CLAS_IMAGE_TAG=<git-sha> CLAS_DATABASE_RESTORE_FILE=/opt/clas-backups/<时间戳
 
 首次从旧 Nginx/systemd 服务切换到 k3s 时，可额外设置 `CLAS_STOP_LEGACY_NGINX=true`。脚本会等待新前后端 Pod 就绪后，才停用旧 Nginx 并启用 Ingress，避免旧服务掩盖健康检查结果。
 
-部署清单位于 `k8s/`：MySQL 使用官方镜像和 `mysql-data` PVC；后端上传的商品图、店铺 Logo、用户头像和评价图片使用独立的 `uploads-data` PVC，挂载到 `/opt/clas/uploads`。两个卷均依赖当前单节点 k3s 的 `local-path` 存储，后端保持单副本；若迁移节点或扩展为多副本写入，应先备份数据并改用对象存储或支持 `ReadWriteMany` 的共享存储。Redis 是验证码等短期数据的易失缓存，不启用 AOF/RDB 持久化。云端部署工作树只稀疏检出 `k8s/`、`scripts/k8s/` 与 `database/`，不会下载 `openspec/`、`docs/` 和测试报告。后端使用 `/api/health` 作为 readiness/liveness probe，Ingress 在当前公网 IP `http://8.141.112.182/` 暴露前端。当前入口没有 DNS 域名，故仅提供 HTTP；获得域名后可在 `k8s/ingress.yaml` 增加 Host 与 TLS 配置。
+部署清单位于 `k8s/`：MySQL 使用官方镜像和 `mysql-data` PVC；后端上传的商品图、店铺 Logo、用户头像和评价图片使用独立的 `uploads-data` PVC，挂载到 `/opt/clas/uploads`。两个卷均依赖当前单节点 k3s 的 `local-path` 存储，后端保持单副本；若迁移节点或扩展为多副本写入，应先备份数据并改用对象存储或支持 `ReadWriteMany` 的共享存储。Redis 是验证码等短期数据的易失缓存，不启用 AOF/RDB 持久化。云端部署工作树只稀疏检出 `k8s/`、`scripts/k8s/` 与 `database/`，不会下载 `openspec/`、`docs/` 和测试报告。后端使用 `/api/health` 作为 readiness/liveness probe，Ingress 在新 ECS 公网入口 `http://81.70.59.38/` 暴露前端。当前入口没有 DNS 域名，故仅提供 HTTP；获得域名后可在 `k8s/ingress.yaml` 增加 Host 与 TLS 配置。
 
 ## 文档与协作
 
