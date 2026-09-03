@@ -389,7 +389,7 @@ jobs:
           retry_scp "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
           # 控制面恢复本身也必须有边界；否则 systemctl 或 SSH 会话卡住时，
           # 后续 deploy.sh 的超时保护永远不会被执行。
-          timeout 480s sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
+          timeout 600s sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
           set -a
@@ -417,7 +417,7 @@ jobs:
           # readyz 只代表 API Server 可访问，并不代表 CNI 已恢复。之前的故障
           # 中 Flannel 的 subnet.env 缺失，导致所有新 Pod 无法创建网络沙箱。
           flannel_ready=false
-          for _ in $(seq 1 90); do
+          for _ in $(seq 1 30); do
             if [ -s /run/flannel/subnet.env ]; then
               flannel_ready=true
               break
@@ -425,10 +425,35 @@ jobs:
             sleep 2
           done
           if [ "$flannel_ready" != true ]; then
-            echo 'Flannel CNI did not restore /run/flannel/subnet.env after k3s recovery.' >&2
-            kubectl -n kube-system get pod -o wide >&2 || true
-            systemctl status k3s --no-pager -n 100 >&2 || true
-            exit 1
+            # API 已就绪而 CNI 文件缺失时，前一版仅等待会必然失败。
+            # 重启一次 k3s 以重新拉起内置 Flannel，再验证两个就绪条件。
+            echo 'Flannel CNI is missing although the API is ready; restarting k3s once.' >&2
+            timeout 90s systemctl restart k3s
+            api_ready=false
+            for _ in $(seq 1 60); do
+              if timeout 5 kubectl get --raw=/readyz >/dev/null 2>&1; then
+                api_ready=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$api_ready" != true ]; then
+              echo 'k3s API did not recover after the Flannel recovery restart.' >&2
+              exit 1
+            fi
+            for _ in $(seq 1 60); do
+              if [ -s /run/flannel/subnet.env ]; then
+                flannel_ready=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$flannel_ready" != true ]; then
+              echo 'Flannel CNI did not restore /run/flannel/subnet.env after restart.' >&2
+              kubectl -n kube-system get pod -o wide >&2 || true
+              systemctl status k3s --no-pager -n 100 >&2 || true
+              exit 1
+            fi
           fi
           REMOTE
 
