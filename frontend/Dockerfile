@@ -11,7 +11,10 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 
 FROM nginx:1.27-alpine
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# Compose 保持连接单体后端；Kubernetes 构建时通过参数改为服务网关。
+ARG API_UPSTREAM=backend:8080
+ENV API_UPSTREAM=$API_UPSTREAM
+COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /workspace/frontend/dist /usr/share/nginx/html
 EXPOSE 80
 HEALTHCHECK --interval=15s --timeout=5s --retries=6 \

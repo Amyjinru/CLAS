@@ -225,7 +225,7 @@ jobs:
       - name: Build and push frontend image
         run: |
           image="${REGISTRY}/${IMAGE_OWNER}/clas-frontend:${GITHUB_SHA}"
-          docker build --file frontend/Dockerfile --tag "$image" .
+          docker build --file frontend/Dockerfile --build-arg API_UPSTREAM=clas-gateway:8080 --tag "$image" .
           docker push "$image"
           docker image inspect "$image" --format '{{index .RepoDigests 0}}' | tee frontend-image.txt
 
