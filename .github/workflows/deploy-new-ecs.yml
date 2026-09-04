@@ -100,6 +100,19 @@ jobs:
           ssh-keyscan -H "$NEW_ECS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh -i ~/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o BatchMode=yes "${NEW_ECS_USER}@${NEW_ECS_HOST}" 'echo ssh_ok'
 
+      - name: Reuse deployed image for non-release commits
+        shell: bash
+        run: |
+          # 测试、文档、演示脚本变更不构建应用镜像。workflow_run 仍会触发本
+          # 工作流，此时必须复用当前已验证镜像，不能将未发布的 Git SHA 作为镜像 tag。
+          if curl -fsSI -u "${GHCR_USERNAME}:${GHCR_TOKEN}" "https://ghcr.io/v2/amyjinru/clas-database/manifests/${CLAS_IMAGE_TAG}" >/dev/null; then
+            exit 0
+          fi
+          deployed_tag="$(ssh -i ~/.ssh/clas_new_ecs -o StrictHostKeyChecking=no -o BatchMode=yes "${NEW_ECS_USER}@${NEW_ECS_HOST}" 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml; kubectl -n clas get deployment clas-iam -o jsonpath="{.spec.template.spec.containers[0].image}"' | sed -n 's/.*://p')"
+          [[ "$deployed_tag" =~ ^[0-9a-f]{7,64}$ ]] || { echo 'Unable to resolve the currently deployed immutable image tag.' >&2; exit 1; }
+          echo "CLAS_IMAGE_TAG=$deployed_tag" >> "$GITHUB_ENV"
+          echo "Reusing deployed image tag $deployed_tag for non-release commit ${{ github.event.workflow_run.head_sha }}."
+
       - name: Prepare deploy env file
         run: |
           umask 077
