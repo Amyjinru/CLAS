@@ -289,8 +289,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      SERVER_HOST: 8.141.112.182
-      SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+      SERVER_HOST: ${{ vars.CLAS_SERVER_HOST }}
+      SERVER_USER: ${{ vars.CLAS_SERVER_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.CLAS_NEW_ECS_SSH_KEY }}
       GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
       GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
       MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
@@ -302,6 +303,8 @@ jobs:
       FORBIDDEN_WORDS: ${{ secrets.FORBIDDEN_WORDS }}
       CLAS_DEMO_ACCESS_PASSWORD: ${{ secrets.CLAS_DEMO_ACCESS_PASSWORD }}
       CLAS_IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
+      CLAS_PUBLIC_URL: ${{ vars.CLAS_PUBLIC_URL }}
+      CLAS_CORS_ALLOWED_ORIGINS: ${{ vars.CLAS_CORS_ALLOWED_ORIGINS }}
     steps:
       - name: Check out deployment scripts
         uses: actions/checkout@v5
@@ -316,7 +319,10 @@ jobs:
 
       - name: Prepare secret deployment input
         run: |
-          test -n "$SSH_PASSWORD" || { echo 'SSH_PASSWORD is required'; exit 1; }
+          test -n "$SERVER_HOST" || { echo 'CLAS_SERVER_HOST is required'; exit 1; }
+          test -n "$SERVER_USER" || { echo 'CLAS_SERVER_USER is required'; exit 1; }
+          test -n "$DEPLOY_SSH_KEY" || { echo 'CLAS_NEW_ECS_SSH_KEY is required'; exit 1; }
+          test -n "$CLAS_PUBLIC_URL" || { echo 'CLAS_PUBLIC_URL is required'; exit 1; }
           test -n "$GHCR_USERNAME" || { echo 'GHCR_USERNAME is required'; exit 1; }
           test -n "$GHCR_TOKEN" || { echo 'GHCR_PULL_TOKEN is required'; exit 1; }
           test -n "$MYSQL_PASSWORD" || { echo 'MYSQL_PASSWORD is required'; exit 1; }
@@ -339,21 +345,27 @@ jobs:
           FORBIDDEN_WORDS=$FORBIDDEN_WORDS
           CLAS_DEMO_ACCESS_PASSWORD=$CLAS_DEMO_ACCESS_PASSWORD
           CLAS_IMAGE_TAG=$CLAS_IMAGE_TAG
-          CLAS_STOP_LEGACY_NGINX=true
+          CLAS_PUBLIC_URL=$CLAS_PUBLIC_URL
+          CLAS_CORS_ALLOWED_ORIGINS=${CLAS_CORS_ALLOWED_ORIGINS:-$CLAS_PUBLIC_URL}
+          CLAS_STOP_LEGACY_NGINX=false
           EOF
 
-      - name: Install SSH client
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+      - name: Configure deployment key
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/clas_deploy_key"
+          chmod 600 "$HOME/.ssh/clas_deploy_key"
 
       - name: Recover k3s and quiesce the previous release
         run: |
           deploy_env="/tmp/clas-deploy.env"
           recovery_script="/tmp/clas-quiesce-apps.sh"
-          ssh_options="-o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=8"
+          ssh_options=(-i "$HOME/.ssh/clas_deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
           retry_scp() {
             local attempt
             for attempt in $(seq 1 8); do
-              if sshpass -p "$SSH_PASSWORD" scp $ssh_options "$1" "$2"; then
+              if scp "${ssh_options[@]}" "$1" "$2"; then
                 return 0
               fi
               if [ "$attempt" -lt 8 ]; then
@@ -364,9 +376,9 @@ jobs:
             echo "SSH transfer failed after 8 attempts: $1" >&2
             return 1
           }
-          retry_scp "$RUNNER_TEMP/clas-deploy.env" "root@${SERVER_HOST}:$deploy_env"
-          retry_scp scripts/k8s/quiesce-apps.sh "root@${SERVER_HOST}:$recovery_script"
-          sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
+          retry_scp "$RUNNER_TEMP/clas-deploy.env" "${SERVER_USER}@${SERVER_HOST}:$deploy_env"
+          retry_scp scripts/k8s/quiesce-apps.sh "${SERVER_USER}@${SERVER_HOST}:$recovery_script"
+          ssh "${ssh_options[@]}" "${SERVER_USER}@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
           recovery_script="/tmp/clas-quiesce-apps.sh"
@@ -399,11 +411,11 @@ jobs:
         run: |
           deploy_env="/tmp/clas-deploy.env"
           image_archive="/tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz"
-          ssh_options="-o StrictHostKeyChecking=no -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+          ssh_options=(-i "$HOME/.ssh/clas_deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ConnectionAttempts=2 -o ServerAliveInterval=30 -o ServerAliveCountMax=10)
           retry_image_transfer() {
             local attempt
             for attempt in $(seq 1 8); do
-              if sshpass -p "$SSH_PASSWORD" scp $ssh_options "$RUNNER_TEMP/clas-images/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "root@${SERVER_HOST}:$image_archive"; then
+              if scp "${ssh_options[@]}" "$RUNNER_TEMP/clas-images/clas-images-${CLAS_IMAGE_TAG}.tar.gz" "${SERVER_USER}@${SERVER_HOST}:$image_archive"; then
                 return 0
               fi
               if [ "$attempt" -lt 8 ]; then
@@ -415,7 +427,7 @@ jobs:
             return 1
           }
           retry_image_transfer
-          sshpass -p "$SSH_PASSWORD" ssh $ssh_options "root@${SERVER_HOST}" 'bash -s' <<'REMOTE'
+          ssh "${ssh_options[@]}" "${SERVER_USER}@${SERVER_HOST}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           deploy_env="/tmp/clas-deploy.env"
           set -a
@@ -441,17 +453,17 @@ jobs:
       - name: Remove temporary server deployment inputs
         if: always()
         run: |
-          sshpass -p "$SSH_PASSWORD" ssh \
-            -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-            "root@${SERVER_HOST}" \
+          ssh -i "$HOME/.ssh/clas_deploy_key" \
+            -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 \
+            "${SERVER_USER}@${SERVER_HOST}" \
             "rm -f /tmp/clas-deploy.env /tmp/clas-images-${CLAS_IMAGE_TAG}.tar.gz /tmp/clas-quiesce-apps.sh" || true
 
       - name: Collect server deployment diagnostics
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/k8s-diagnostics"
-          sshpass -p "$SSH_PASSWORD" scp -r -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
-            "root@${SERVER_HOST}:/opt/clas-k8s/artifacts/k8s-diagnostics/." "$RUNNER_TEMP/k8s-diagnostics/" || true
+          scp -r -i "$HOME/.ssh/clas_deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+            "${SERVER_USER}@${SERVER_HOST}:/opt/clas-k8s/artifacts/k8s-diagnostics/." "$RUNNER_TEMP/k8s-diagnostics/" || true
 
       - name: Upload deployment diagnostics
         if: always()

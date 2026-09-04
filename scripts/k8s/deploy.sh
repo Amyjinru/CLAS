@@ -4,13 +4,19 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 NAMESPACE="${CLAS_NAMESPACE:-clas}"
 IMAGE_TAG="${CLAS_IMAGE_TAG:-${1:-}}"
-PUBLIC_URL="${CLAS_PUBLIC_URL:-http://8.141.112.182}"
+PUBLIC_URL="${CLAS_PUBLIC_URL:-}"
+CLAS_CORS_ALLOWED_ORIGINS="${CLAS_CORS_ALLOWED_ORIGINS:-$PUBLIC_URL}"
 ARTIFACT_DIR="${CLAS_DEPLOY_ARTIFACT_DIR:-$PROJECT_ROOT/artifacts/k8s-diagnostics}"
 DATABASE_RESTORE_FILE="${CLAS_DATABASE_RESTORE_FILE:-}"
 STOP_LEGACY_NGINX="${CLAS_STOP_LEGACY_NGINX:-false}"
 
 if [[ -z "$IMAGE_TAG" || "$IMAGE_TAG" == "latest" || ! "$IMAGE_TAG" =~ ^[0-9a-f]{7,64}$ ]]; then
   echo 'CLAS_IMAGE_TAG must be a Git SHA (7-64 lowercase hexadecimal characters), never latest.' >&2
+  exit 2
+fi
+
+if [[ -z "$PUBLIC_URL" ]]; then
+  echo 'CLAS_PUBLIC_URL is required.' >&2
   exit 2
 fi
 
@@ -54,7 +60,9 @@ kubectl -n "$NAMESPACE" create secret docker-registry ghcr-pull-secret \
   --docker-server=ghcr.io --docker-username="$GHCR_USERNAME" --docker-password="$GHCR_TOKEN" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl apply -f "$PROJECT_ROOT/k8s/configmap.yaml"
+sed "s|REQUIRED_CORS_ALLOWED_ORIGINS|$CLAS_CORS_ALLOWED_ORIGINS|g" \
+  "$PROJECT_ROOT/k8s/configmap.yaml" > "$rollback_dir/configmap.yaml"
+kubectl apply -f "$rollback_dir/configmap.yaml"
 kubectl -n "$NAMESPACE" create configmap clas-database-scripts \
   --from-file="$PROJECT_ROOT/database" \
   --dry-run=client -o yaml | kubectl apply -f -
